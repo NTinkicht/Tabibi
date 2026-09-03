@@ -1,4 +1,4 @@
-# Tabibi Product Specification — Foundation v0.2
+# Tabibi Product Specification — Foundation v0.3
 
 ## Problem
 
@@ -75,9 +75,9 @@ The first releasable vertical slice should support one clinic, one or more docto
 MVP capabilities:
 - secure authentication for clinic staff;
 - clinic and doctor configuration;
-- create/open/close consultation session;
+- create/open/close/cancel consultation session;
 - add scheduled or walk-in queue entry;
-- queue states: waiting, checked-in, called, in-consultation, completed, cancelled, no-show;
+- queue states: `waiting`, `checked_in`, `called`, `in_consultation`, `completed`, `cancelled`, `no_show`;
 - deterministic queue ordering and transitions;
 - estimated waiting/consultation time;
 - patient lookup using a privacy-preserving access mechanism;
@@ -85,6 +85,8 @@ MVP capabilities:
 - audit trail for operational queue changes;
 - French/Arabic localization foundation;
 - automated test suite and CI.
+
+The snake_case values above are the canonical persisted/API queue-state names. UI labels may be localized or humanized but must map to these exact domain values.
 
 ## Explicitly out of MVP unless separately approved
 
@@ -106,25 +108,40 @@ A consultation session belongs to exactly one doctor and clinic and represents a
 Each queue entry has:
 - an immutable internal identifier;
 - a distinct public display label/number suitable for clinic workflow;
-- for guest access, a separate secret high-entropy access credential that is never the display label and can never be inferred from it.
+- for guest access, a separate secret high-entropy access credential that is never the display label and can never be inferred from it;
+- an immutable registration/booking-order reference for audit and scheduling context;
+- a call-eligibility order assigned when the patient becomes `checked_in`.
 
 Queue ordering must be explicit and deterministic. Any manual priority/urgent insertion must be authorized, auditable, and must cause estimates for affected patients to be recomputed.
 
 Arrival semantics are explicit:
 - `waiting` = registered/booked but not confirmed physically present and ready to be called;
-- `checked-in` = present and eligible to be called;
+- `checked_in` = present and eligible to be called;
 - unarrived `waiting` patients do not block checked-in patients behind them;
-- their arrival later triggers deterministic re-evaluation of eligible order and estimates.
+- checking in later does not allow a previously unarrived patient to overtake patients who were already `checked_in` at that moment;
+- on `waiting -> checked_in`, the entry joins the tail of the current normal call-eligible cohort, unless an explicit authorized priority policy applies;
+- the immutable booking/registration order remains available for audit and UX, but normal call order among arrived patients is determined by call-eligibility order;
+- check-in and call operations must be serialized transactionally so concurrent arrival/call activity produces one deterministic result;
+- arrival/check-in triggers deterministic re-evaluation of eligible order and estimates.
 
-Cancellation semantics are distinct from no-show semantics. A patient or authorized staff member may move an entry to `cancelled` from `waiting`, `checked-in`, or `called` before consultation begins. `no-show` is reserved for operational absence according to clinic policy and must not be used merely because a patient cancels after being called.
+Cancellation semantics are distinct from no-show semantics. A patient or authorized staff member may move an entry to `cancelled` from `waiting`, `checked_in`, or `called` before consultation begins. `no_show` is reserved for operational absence according to clinic policy and must not be used merely because a patient cancels after being called.
 
 The system must never silently lose or duplicate queue entries because of concurrent updates.
 
-## Consultation session closure contract
+## Consultation session closure and cancellation contract
 
-Normal session closure is permitted only when no entries remain active in `waiting`, `checked-in`, `called`, or `in-consultation`.
+Normal session closure is permitted only when no entries remain active in `waiting`, `checked_in`, `called`, or `in_consultation`.
 
-If active entries remain, staff must resolve them explicitly as completed, cancelled, or no-show as appropriate before closure. The final close operation must atomically validate the queue, close the session, record its audit event and create any required notification intents. A force-close workflow, if ever added, requires elevated authorization, an explicit reason and deterministic disposition of every affected entry; it is not part of the initial MVP.
+If active entries remain, staff must resolve them explicitly as `completed`, `cancelled`, or `no_show` as appropriate before closure. The final close operation must atomically validate the queue, close the session, record its audit event and create any required notification intents. A force-close workflow, if ever added, requires elevated authorization, an explicit reason and deterministic disposition of every affected entry; it is not part of the initial MVP.
+
+Cancelling an entire session is a distinct MVP operation:
+- only authorized clinic staff may cancel a session and an explicit cancellation reason is required;
+- cancellation is rejected while any entry is `in_consultation`; the active consultation must first be completed or otherwise resolved through a future elevated emergency workflow;
+- once cancellation begins, new queue additions, check-ins, calls, reorders and consultation starts are rejected for that session;
+- all remaining `waiting`, `checked_in`, and `called` entries are atomically transitioned to `cancelled` with a session-cancellation reason;
+- affected estimates become unavailable/terminal rather than continuing to imply service will occur;
+- audit events and durable `session_cancelled` notification intents for affected patients are written in the same transaction as the session and queue dispositions;
+- concurrent cancel-versus-add/check-in/call/start operations must produce one deterministic winner and may not leave serviceable entries inside a cancelled session.
 
 ## Initial estimation model
 
@@ -138,7 +155,7 @@ Candidate inputs:
 - cancellations/no-shows;
 - current consultation elapsed time.
 
-Unarrived `waiting` entries are not treated as guaranteed active work ahead of already checked-in patients. The clinic dashboard may still expose their count separately for operational awareness.
+Unarrived `waiting` entries are not treated as guaranteed active work ahead of already checked-in patients. When a late patient checks in, the patient joins behind the current normal checked-in cohort, so already-arrived patients' estimates are not worsened by the late arrival unless an explicit authorized priority rule applies. The clinic dashboard may still expose unarrived counts separately for operational awareness.
 
 Do not promise exact times. Estimates must be represented as estimates and may include a confidence/range later.
 
@@ -165,8 +182,11 @@ We have a deployable, tested vertical slice when:
 - concurrent queue mutations preserve consistency;
 - the queue estimator responds deterministically to state changes;
 - mixed arrived/unarrived queues have deterministic call eligibility and estimates;
+- late arrivals cannot unexpectedly overtake patients already checked in;
 - normal session closure cannot strand active entries;
+- session cancellation atomically disposes all eligible active entries and rejects unsafe cancellation during an active consultation;
 - public display labels cannot authorize guest access;
+- persisted/API state names are canonical and consistent;
 - operational mutations are auditable;
 - French and Arabic strings are externalized/localizable;
 - CI passes deterministic tests;
