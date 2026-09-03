@@ -1,4 +1,4 @@
-# Tabibi Architecture — Foundation Proposal v0.7
+# Tabibi Architecture — Foundation Proposal v0.8
 
 This is a proposal for independent review before production implementation.
 
@@ -65,7 +65,7 @@ A bounded queue/service period for one doctor at one clinic. Fields should inclu
 Represents one patient's place in one consultation session. Must support both account-linked patients and receptionist-created guests. Contains queue lifecycle state, immutable registration/booking order, normal call-eligibility order, optional persisted priority/service-order override, check-in timestamps and privacy-preserving external access data.
 
 ### QueueEvent / AuditEvent
-Append-oriented event history for operationally meaningful mutations such as creation, check-in, reordering, priority insertion, call, consultation start/end, cancellation, no-show and session pause/resume/cancellation.
+Append-oriented event history for operationally meaningful mutations such as creation, check-in, reordering, priority insertion, call, consultation start/end, cancellation, no-show and session pause/resume/cancellation/delay changes.
 
 ### NotificationIntent
 Records that a domain event warrants a notification. Provider-specific delivery should not be part of queue mutation transactions except through durable outbox-style handoff.
@@ -123,20 +123,26 @@ Rules:
 - when that waiting entry later checks in, its `eligibility_order` is still assigned from the committed arrival cohort, while its pre-existing `priority_order` becomes effective in call selection;
 - changing/removing `priority_order` for a `waiting` or `checked_in` entry is transactional, authorized, reasoned and audited;
 - equal persisted non-null `priority_order` values are forbidden within one consultation session;
-- priority mutation uses one canonical collision policy: after acquiring the session mutation boundary, inserting/moving/removing a priority entry transactionally renumbers the affected priority cohort into a unique contiguous sequence `1..N`; no committed state may contain a duplicate priority slot or a gap caused by that mutation;
+- the **active priority cohort** is defined exactly as entries in `waiting` or `checked_in` with non-null `priority_order`; `called`, `in_consultation`, `completed`, `cancelled` and `no_show` entries are never members of that cohort;
+- transition `waiting -> checked_in` preserves an existing priority slot because both source and target states belong to the active priority cohort;
+- any transition that leaves the active priority cohort (`waiting`/`checked_in` -> `called`, `cancelled` or `no_show`) atomically clears that entry's live `priority_order` and renumbers the remaining active cohort into contiguous `1..N` order inside the same session-serialized transaction;
+- historical priority information is preserved in append-oriented audit/queue events, not by leaving a terminal or already-called entry in the live priority sequence;
+- `called -> cancelled`/`no_show`, `called -> in_consultation`, and `in_consultation -> completed` operate on entries whose live `priority_order` is already null; they must not renumber or rewrite the active priority cohort again;
+- whole-session cancellation leaves no active priority cohort: each affected `waiting`/`checked_in` entry has `priority_order` cleared as part of the atomic cancellation transaction, while audit events preserve the pre-cancellation ordering context;
+- priority mutation uses one canonical collision policy: after acquiring the session mutation boundary, inserting/moving/removing a priority entry transactionally renumbers the affected active priority cohort into a unique contiguous sequence `1..N`; no committed state may contain a duplicate priority slot or a gap caused by that mutation;
 - priority slot requests are one-based integers only; `0`, negative values, non-integers and malformed values are rejected without mutation or side effects;
-- when inserting an entry that is not currently in the priority cohort of size `N`, the only valid requested slots are `1..N+1` inclusive; `N+1` appends the entry to the end of the priority cohort;
-- when moving an entry already in a priority cohort of size `N`, the only valid requested slots are `1..N` inclusive;
+- when inserting an entry that is not currently in the active priority cohort of size `N`, the only valid requested slots are `1..N+1` inclusive; `N+1` appends the entry to the end of the priority cohort;
+- when moving an entry already in an active priority cohort of size `N`, the only valid requested slots are `1..N` inclusive;
 - out-of-range priority requests are always rejected rather than clamped, wrapped, normalized or silently reinterpreted; API validation and domain validation must agree on this policy;
-- validation of priority bounds occurs after acquiring the session mutation boundary and against the then-current committed cohort size, so concurrent priority mutations cannot make a previously calculated range authoritative;
+- validation of priority bounds occurs after acquiring the session mutation boundary and against the then-current committed active cohort size, so concurrent priority/state mutations cannot make a previously calculated range authoritative;
 - when a request moves or inserts an entry into an occupied valid priority slot, the moved entry owns the requested slot and affected entries at or after that slot shift deterministically by one while preserving their previous relative order; moving an entry out closes the resulting gap while preserving relative order;
 - concurrent priority mutations serialize at the session boundary, so the later transaction observes and renumbers from the already committed sequence rather than inventing a tie-breaker;
-- the committed unique `priority_order` sequence is authoritative for call selection and ETA; no secondary ID/eligibility tie-break is used between priority entries because ties cannot persist;
+- the committed unique `priority_order` sequence is authoritative for call selection and ETA while entries remain in the active priority cohort; once an entry is called, its committed `called` state represents pending work ahead and no live priority slot is needed;
 - assignment of `eligibility_order`, check-in mutation, estimate recomputation and any related audit event happen transactionally;
-- concurrent priority-change/check-in/call operations serialize through the same session mutation boundary so one committed history determines which priority state was effective at the call boundary;
+- concurrent priority-change/check-in/call/cancel/no-show operations serialize through the same session mutation boundary so one committed history determines cohort membership and priority state at every transition;
 - direct `waiting -> called` is disallowed in normal workflow; staff must check the patient in first unless a separately audited administrative override exists.
 
-Required tests include mixed arrival ordering, late arrival behind an existing checked-in cohort, simultaneous check-ins, waiting-entry priority before check-in, checked-in priority changes, priority insertion into an occupied slot, priority removal/move renumbering, valid append at `N+1`, rejection of `0`, negative, non-integer and above-range slots, revalidation of slot bounds after concurrent cohort mutation, concurrent same-slot priority mutations, call-selection/ETA consistency after renumbering, and concurrent priority/check-in/call races against PostgreSQL.
+Required tests include mixed arrival ordering, late arrival behind an existing checked-in cohort, simultaneous check-ins, waiting-entry priority before check-in, checked-in priority changes, priority insertion into an occupied slot, priority removal/move renumbering, valid append at `N+1`, rejection of `0`, negative, non-integer and above-range slots, revalidation of slot bounds after concurrent cohort mutation, concurrent same-slot priority mutations, call-selection/ETA consistency after renumbering, priority-cohort exit on call/cancel/no-show, terminal-state priority nullability, call/cancel/no-show races followed by bounded insertions, and concurrent priority/check-in/call races against PostgreSQL.
 
 ### Consultation session lifecycle
 
@@ -160,6 +166,8 @@ All queue/session mutations are server-side gated by the current session state a
 | complete active consultation | reject | allowed | allowed | reject | reject | reject |
 | cancel/no-show individual non-consulting entry | allowed | allowed | allowed | reject | reject | reject |
 | manual reorder/priority insertion | allowed for waiting/checked-in only | allowed for waiting/checked-in only | allowed for waiting/checked-in only | reject | reject | reject |
+| declare/update doctor delay | allowed | allowed | allowed | reject | reject | reject |
+| clear doctor delay | allowed if delay exists | allowed if delay exists | allowed if delay exists | reject | reject | reject |
 | pause session | reject | allowed | idempotent no-op/reject by API policy | reject | reject | reject |
 | resume session | reject | reject | allowed | reject | reject | reject |
 | begin normal close | reject | allowed | allowed | n/a | reject | reject |
@@ -173,6 +181,23 @@ Session-opening contract:
 - open participates in the same session-level serialization boundary as pause, close, cancellation, check-in and other queue mutations; concurrent commands commit in one valid serial order and must revalidate source state after acquiring that boundary;
 - API/PostgreSQL tests must cover open from every lifecycle state, duplicate/retried open, and open-versus-pause/close/cancel/check-in races.
 
+#### Doctor-delay contract
+
+Doctor delay is an explicit session mutation because it changes patient estimates and can create notification intents.
+
+Rules:
+- `declare/update doctor delay` accepts an explicit non-negative delay duration/offset and optional staff-facing reason; setting a positive value creates or replaces the current delay snapshot, while `clear doctor delay` removes it explicitly rather than relying on wall-clock inference;
+- declare/update/clear is permitted only in `planned`, `open` or `paused` as shown in the matrix; `closing`, `closed` and `cancelled` reject delay mutations without state, audit or outbox side effects;
+- every delay mutation acquires the same session serialization boundary used by pause/resume/close/cancel and queue mutations, then revalidates lifecycle state before committing;
+- the session delay snapshot, estimator inputs/output version, actor/reason metadata, audit event and durable notification intents are committed atomically;
+- a positive newly declared or materially changed delay creates idempotent/versioned `session_delayed` notification intents for affected active patient entries according to product notification policy; retries cannot duplicate the same logical notification version;
+- clearing a delay atomically removes its estimator contribution, recomputes affected estimates and records an audit event; any patient-facing recovery/update notification must also be represented by a durable, idempotent outbox intent rather than sent inline;
+- delay contributes to the estimator exactly once as an explicit session delay input; paused time remains a separate input and must not be double-counted as doctor delay merely because the clock advanced while paused;
+- if a delay races with pause, resume, normal close or session cancellation, serialization determines a single valid committed order. A delay command that observes `closing`, `closed` or `cancelled` after acquiring the boundary fails with no side effects; if the delay commits first, the later lifecycle operation observes that committed delay and proceeds according to its own contract;
+- session cancellation makes the delay snapshot operationally terminal with the session; normal closure preserves it only as historical/audit context and no further delay mutation is possible.
+
+Required tests include declare/update/clear in every lifecycle state, duplicate/idempotent requests, estimator recomputation, outbox deduplication, and delay-versus-pause/resume/close/cancel races against PostgreSQL.
+
 Additional rules:
 - a planned session may accumulate registrations and early check-ins because clinics can receive patients before the doctor starts; nobody can be called until the session is `open`;
 - a paused session can continue accepting registrations/check-ins and resolving non-consulting entries, but cannot call a new patient or start a new consultation;
@@ -181,14 +206,14 @@ Additional rules:
 - `start consultation` must re-check that invariant after acquiring the session-level serialization boundary; a second sequential or concurrent start request must fail once another entry is active;
 - call/start selection and the one-active-consultation invariant must be enforced in PostgreSQL-backed integration tests, not only application-memory tests;
 - operations rejected by lifecycle state fail without partial mutation or outbox/audit side effects;
-- open/pause/resume/close/cancel races must serialize and produce one valid committed history.
+- open/pause/resume/delay/close/cancel races must serialize and produce one valid committed history.
 
 #### Normal closure
 - a normal `close` operation is rejected while any queue entry remains in `waiting`, `checked_in`, `called`, or `in_consultation`;
 - staff must first resolve remaining entries explicitly as `completed`, `cancelled`, or `no_show` as appropriate;
 - `closing` serializes shutdown and rejects new queue mutations while final invariants are checked;
 - transition to `closed`, final queue-entry validation, session timestamps, audit event and notification intents are atomic;
-- concurrent close-versus-check-in/call/add/reorder operations must produce one deterministic winner;
+- concurrent close-versus-check-in/call/add/reorder/delay operations must produce one deterministic winner;
 - forced administrative closure is outside the MVP.
 
 #### Session cancellation
@@ -197,13 +222,14 @@ Session cancellation is distinct from normal closure and is an MVP operation bec
 Contract:
 - only an authorized clinic role may initiate cancellation and a non-empty reason is mandatory;
 - cancellation is rejected if any queue entry is `in_consultation`; the active consultation must first finish normally, unless a future elevated emergency-stop workflow is introduced;
-- cancellation first obtains the session-level serialization/lock boundary used for queue mutation, preventing new add/check-in/call/reorder/start-consultation commits once cancellation wins;
+- cancellation first obtains the session-level serialization/lock boundary used for queue mutation, preventing new add/check-in/call/reorder/start-consultation/delay commits once cancellation wins;
 - in the same transaction, every remaining `waiting`, `checked_in`, or `called` entry transitions to `cancelled` with a machine-readable session-cancellation cause plus human audit reason;
+- any affected `waiting`/`checked_in` live priority slot is cleared; after the transaction no active priority cohort exists in the cancelled session, while audit events preserve prior priority context;
 - their pending/live estimates become terminal/unavailable;
 - the session transitions to `cancelled` with cancellation timestamp, actor and reason;
 - audit records and durable `session_cancelled` notification intents for affected entries are inserted transactionally with the state changes;
 - notification delivery happens asynchronously after commit and may retry idempotently;
-- concurrent cancellation-versus-add/check-in/call/start-consultation tests must prove there is no state where a cancelled session retains a serviceable active queue entry.
+- concurrent cancellation-versus-add/check-in/call/start-consultation/delay tests must prove there is no state where a cancelled session retains a serviceable active queue entry.
 
 ## Estimation engine
 
@@ -220,7 +246,7 @@ For an entry in `checked_in`, the deterministic model should combine:
 - pauses/delays;
 - known terminal/non-serving entries excluded from work ahead.
 
-A `called` entry contributes one pending consultation-duration unit (using the same current robust/baseline duration model) until it transitions to `in_consultation`, `cancelled`, or `no_show`; once `in_consultation`, its contribution is represented by active-consultation remaining time rather than counted twice.
+A `called` entry contributes one pending consultation-duration unit (using the same current robust/baseline duration model) until it transitions to `in_consultation`, `cancelled`, or `no_show`; once `in_consultation`, its contribution is represented by active-consultation remaining time rather than counted twice. A called entry's live `priority_order` has already been cleared because it has left the active priority cohort; its pending-work contribution comes from state, not a retained priority slot.
 
 Late arrivals join behind the current normal checked-in cohort, so they do not worsen existing arrived patients' work-ahead estimates unless a separately authorized persisted priority override is applied.
 
