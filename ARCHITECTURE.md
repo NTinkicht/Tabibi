@@ -1,4 +1,4 @@
-# Tabibi Architecture — Foundation Proposal v0.6
+# Tabibi Architecture — Foundation Proposal v0.7
 
 This is a proposal for independent review before production implementation.
 
@@ -124,14 +124,19 @@ Rules:
 - changing/removing `priority_order` for a `waiting` or `checked_in` entry is transactional, authorized, reasoned and audited;
 - equal persisted non-null `priority_order` values are forbidden within one consultation session;
 - priority mutation uses one canonical collision policy: after acquiring the session mutation boundary, inserting/moving/removing a priority entry transactionally renumbers the affected priority cohort into a unique contiguous sequence `1..N`; no committed state may contain a duplicate priority slot or a gap caused by that mutation;
-- when a request moves an entry into an occupied priority slot, the moved entry owns the requested slot and affected entries at or after that slot shift deterministically by one while preserving their previous relative order; moving an entry out closes the resulting gap while preserving relative order;
+- priority slot requests are one-based integers only; `0`, negative values, non-integers and malformed values are rejected without mutation or side effects;
+- when inserting an entry that is not currently in the priority cohort of size `N`, the only valid requested slots are `1..N+1` inclusive; `N+1` appends the entry to the end of the priority cohort;
+- when moving an entry already in a priority cohort of size `N`, the only valid requested slots are `1..N` inclusive;
+- out-of-range priority requests are always rejected rather than clamped, wrapped, normalized or silently reinterpreted; API validation and domain validation must agree on this policy;
+- validation of priority bounds occurs after acquiring the session mutation boundary and against the then-current committed cohort size, so concurrent priority mutations cannot make a previously calculated range authoritative;
+- when a request moves or inserts an entry into an occupied valid priority slot, the moved entry owns the requested slot and affected entries at or after that slot shift deterministically by one while preserving their previous relative order; moving an entry out closes the resulting gap while preserving relative order;
 - concurrent priority mutations serialize at the session boundary, so the later transaction observes and renumbers from the already committed sequence rather than inventing a tie-breaker;
 - the committed unique `priority_order` sequence is authoritative for call selection and ETA; no secondary ID/eligibility tie-break is used between priority entries because ties cannot persist;
 - assignment of `eligibility_order`, check-in mutation, estimate recomputation and any related audit event happen transactionally;
 - concurrent priority-change/check-in/call operations serialize through the same session mutation boundary so one committed history determines which priority state was effective at the call boundary;
 - direct `waiting -> called` is disallowed in normal workflow; staff must check the patient in first unless a separately audited administrative override exists.
 
-Required tests include mixed arrival ordering, late arrival behind an existing checked-in cohort, simultaneous check-ins, waiting-entry priority before check-in, checked-in priority changes, priority insertion into an occupied slot, priority removal/move renumbering, concurrent same-slot priority mutations, call-selection/ETA consistency after renumbering, and concurrent priority/check-in/call races against PostgreSQL.
+Required tests include mixed arrival ordering, late arrival behind an existing checked-in cohort, simultaneous check-ins, waiting-entry priority before check-in, checked-in priority changes, priority insertion into an occupied slot, priority removal/move renumbering, valid append at `N+1`, rejection of `0`, negative, non-integer and above-range slots, revalidation of slot bounds after concurrent cohort mutation, concurrent same-slot priority mutations, call-selection/ETA consistency after renumbering, and concurrent priority/check-in/call races against PostgreSQL.
 
 ### Consultation session lifecycle
 
