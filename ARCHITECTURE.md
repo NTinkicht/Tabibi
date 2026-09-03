@@ -1,4 +1,4 @@
-# Tabibi Architecture — Foundation Proposal v0.2
+# Tabibi Architecture — Foundation Proposal v0.3
 
 This is a proposal for independent review before production implementation.
 
@@ -29,7 +29,6 @@ This stack is intentionally provisional. Claude should challenge it before imple
 ## Deployment shape
 
 Begin as a modular monolith:
-
 - identity/access module
 - clinic module
 - scheduling/session module
@@ -60,16 +59,13 @@ Maps users to clinic-scoped roles and permissions.
 Represents a clinician within a clinic context.
 
 ### ConsultationSession
-A bounded queue/service period for one doctor at one clinic.
-Fields should include lifecycle status, planned start/end, actual start/end, pause/delay state and estimator configuration snapshot.
+A bounded queue/service period for one doctor at one clinic. Fields should include lifecycle status, planned start/end, actual start/end, pause/delay state and estimator configuration snapshot.
 
 ### QueueEntry
-Represents one patient's place in one consultation session.
-Must support both account-linked patients and receptionist-created guests.
-Contains queue lifecycle state, ordering data, check-in timestamps and privacy-preserving external access data.
+Represents one patient's place in one consultation session. Must support both account-linked patients and receptionist-created guests. Contains queue lifecycle state, immutable registration/booking order, call-eligibility order, check-in timestamps and privacy-preserving external access data.
 
 ### QueueEvent / AuditEvent
-Append-oriented event history for operationally meaningful mutations such as creation, check-in, reordering, priority insertion, call, consultation start/end, cancellation, no-show and session pause/resume.
+Append-oriented event history for operationally meaningful mutations such as creation, check-in, reordering, priority insertion, call, consultation start/end, cancellation, no-show and session pause/resume/cancellation.
 
 ### NotificationIntent
 Records that a domain event warrants a notification. Provider-specific delivery should not be part of queue mutation transactions except through durable outbox-style handoff.
@@ -82,11 +78,19 @@ Initial design requirement:
 - every state transition is validated against a state machine;
 - changes affecting order/position execute transactionally;
 - conflicting concurrent updates cannot silently overwrite one another;
-- queue order has an explicit persisted representation;
+- queue order has explicit persisted representations;
 - priority/manual reorder requires authorization and an audit reason;
 - estimates are recomputed from committed queue/session state.
 
 Implementation strategy (row locks, optimistic versioning, serializable transactions, advisory locks, etc.) should be selected after explicit concurrency tests are designed.
+
+## Canonical queue state values
+
+Persisted/database/API values are exactly:
+
+`waiting`, `checked_in`, `called`, `in_consultation`, `completed`, `cancelled`, `no_show`.
+
+Localized UI labels may differ, but domain schemas, payloads and tests must use these snake_case values consistently.
 
 ## Queue state machine — proposed
 
@@ -102,44 +106,67 @@ Rollback/recovery transitions must be explicit administrative actions and audite
 
 `waiting` means the patient has a place in the session but is not yet confirmed physically present and ready to be called. `checked_in` means the patient is present and eligible for normal calling.
 
+Each queue entry has two distinct ordering concepts:
+1. `registration_order`: immutable historical booking/registration order used for audit and scheduling context;
+2. `eligibility_order`: normal service-order key assigned transactionally when the entry becomes `checked_in`.
+
 Rules:
 - only `checked_in` entries are normally call-eligible;
-- a `waiting` entry never blocks an eligible `checked_in` entry behind it;
-- among call-eligible entries, the persisted queue order determines who is next, subject only to an explicit authorized priority override;
-- an unarrived `waiting` entry retains its persisted relative order for when it later checks in, but it does not reserve service capacity ahead of already checked-in patients;
-- when an entry changes from `waiting` to `checked_in`, the system recomputes eligible order and all affected estimates transactionally;
-- the estimator excludes unarrived `waiting` entries from active work-ahead for patients who are already `checked_in`, while separately exposing that additional booked/waiting patients exist if useful to clinic staff;
+- a `waiting` entry never blocks an eligible `checked_in` entry;
+- among normal call-eligible entries, `eligibility_order` determines who is next, subject only to an explicit authorized priority override;
+- an unarrived `waiting` entry does not reserve service capacity ahead of already checked-in patients;
+- when an entry changes `waiting -> checked_in`, it receives an `eligibility_order` after the current normal checked-in cohort, so a late arrival cannot overtake patients who were already present;
+- `registration_order` remains immutable and is never silently rewritten to mimic service order;
+- assignment of `eligibility_order`, check-in mutation, estimate recomputation and any related audit event happen transactionally;
+- concurrent check-in-versus-call operations must serialize so exactly one committed history determines whether a newly arrived patient was present before or after the call boundary;
+- the estimator excludes unarrived `waiting` entries from active work-ahead for patients already `checked_in`;
 - direct `waiting -> called` is disallowed in normal workflow; staff must check the patient in first unless a separately audited administrative override exists.
 
-This contract must be covered by state-machine and PostgreSQL integration tests for mixed arrived/unarrived ordering and concurrent check-in/call operations.
+Required tests include mixed arrival ordering, late arrival behind an existing checked-in cohort, simultaneous check-ins, and concurrent check-in/call races against PostgreSQL.
 
-### Consultation session lifecycle and closing contract
+### Consultation session lifecycle
 
-Proposed session states:
+Proposed normal states:
 
 planned -> open -> paused -> open -> closing -> closed
 
-Cancellation of an entire session is a separate terminal path and must be audited.
+A separate terminal state `cancelled` represents an abandoned service session.
 
-Rules for closure:
+#### Normal closure
 - a normal `close` operation is rejected while any queue entry remains in `waiting`, `checked_in`, `called`, or `in_consultation`;
 - staff must first resolve remaining entries explicitly as `completed`, `cancelled`, or `no_show` as appropriate;
-- `closing` is an internal/administrative transition used to serialize shutdown and reject new queue mutations while final invariants are checked;
-- the transition to `closed`, final queue-entry validation, session timestamps, audit event and any notification intents are committed atomically;
-- concurrent close-versus-check-in/call/add/reorder operations must produce one deterministic winner rather than stranded active entries;
-- forced administrative closure, if introduced later, must require elevated permission, an audit reason, deterministic disposition of every active entry, and explicit patient notifications. It is not part of the initial MVP API.
+- `closing` serializes shutdown and rejects new queue mutations while final invariants are checked;
+- transition to `closed`, final queue-entry validation, session timestamps, audit event and notification intents are atomic;
+- concurrent close-versus-check-in/call/add/reorder operations must produce one deterministic winner;
+- forced administrative closure is outside the MVP.
+
+#### Session cancellation
+Session cancellation is distinct from normal closure and is an MVP operation because clinics may cancel a doctor's remaining session.
+
+Contract:
+- only an authorized clinic role may initiate cancellation and a non-empty reason is mandatory;
+- cancellation is rejected if any queue entry is `in_consultation`; the active consultation must first finish normally, unless a future elevated emergency-stop workflow is introduced;
+- cancellation first obtains the session-level serialization/lock boundary used for queue mutation, preventing new add/check-in/call/reorder/start-consultation commits once cancellation wins;
+- in the same transaction, every remaining `waiting`, `checked_in`, or `called` entry transitions to `cancelled` with a machine-readable session-cancellation cause plus human audit reason;
+- their pending/live estimates become terminal/unavailable;
+- the session transitions to `cancelled` with cancellation timestamp, actor and reason;
+- audit records and durable `session_cancelled` notification intents for affected entries are inserted transactionally with the state changes;
+- notification delivery happens asynchronously after commit and may retry idempotently;
+- concurrent cancellation-versus-add/check-in/call/start-consultation tests must prove there is no state where a cancelled session retains a serviceable active queue entry.
 
 ## Estimation engine
 
 Keep estimator as a pure/domain-oriented component receiving a snapshot of relevant session/queue facts.
 
 Initial deterministic model should combine:
-- active call-eligible entries ahead;
+- active call-eligible entries ahead by `eligibility_order`;
 - doctor/session baseline duration;
 - robust statistic from completed consultations in current session when enough samples exist;
 - active consultation elapsed time;
 - pauses/delays;
 - known terminal/non-serving entries excluded from work ahead.
+
+Late arrivals join behind the current normal checked-in cohort, so they do not worsen existing arrived patients' work-ahead estimates unless a separately authorized priority override is applied.
 
 The first model must expose which inputs produced the estimate. Avoid hidden ML in the MVP.
 
@@ -149,7 +176,7 @@ Patient-facing queue access must not expose sequential identifiers that make enu
 
 For account-linked patients, authenticated ownership can authorize access.
 
-For guest/reception-entered patients, use a high-entropy, revocable external access credential. This bearer credential must be stored and transmitted as a secret and must never appear on public waiting-room displays, printed queue boards or URLs that may be casually observed/logged where avoidable.
+For guest/reception-entered patients, use a high-entropy, revocable external access credential. This bearer credential must be stored and transmitted as a secret and must never appear on public waiting-room displays, printed queue boards or casually logged URLs.
 
 Every queue entry may also have a distinct public display label (for example a short queue number). A public display label is non-secret, non-identifying, may be shown in the clinic, and can never authorize patient lookup or mutation. Guest access credentials and public display labels are separate fields with separate security semantics. Authorization tests must verify that possession of a display label alone is rejected by all guest lookup/mutation endpoints.
 
