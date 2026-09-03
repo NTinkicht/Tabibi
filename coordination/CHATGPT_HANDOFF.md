@@ -27,14 +27,18 @@ Foundation review only. No production implementation has started.
 - TAB-FND-007 MINOR — standardized canonical persisted/API queue states as snake_case.
 
 ### Round C — resolved
-- TAB-FND-008 MAJOR — `called` entries are now explicitly committed work ahead in live ETA calculations until they enter consultation or terminate; active consultation remaining time replaces, rather than duplicates, that contribution.
-- TAB-FND-009 MAJOR — unarrived `waiting` patients no longer receive a fabricated exact live position. They receive a clearly provisional arrival estimate/window with uncertainty; check-in atomically switches them to the live eligibility-order estimator.
+- TAB-FND-008 MAJOR — `called` entries are explicitly committed work ahead in live ETA calculations until they enter consultation or terminate; active consultation remaining time replaces, rather than duplicates, that contribution.
+- TAB-FND-009 MAJOR — unarrived `waiting` patients receive a clearly provisional arrival estimate/window with uncertainty; check-in atomically switches them to the live eligibility-order estimator.
 - TAB-FND-010 MAJOR — added an explicit consultation-session state/operation matrix covering `planned`, `open`, `paused`, `closing`, `closed`, and `cancelled`, including deterministic boundary-race requirements.
-- TAB-FND-011 MAJOR — raw guest bearer tokens are now one-time issued and never persisted; only one-way verifiers are stored, with explicit rotation/revocation/expiry and tests proving stored verifiers cannot authenticate.
+- TAB-FND-011 MAJOR — raw guest bearer tokens are one-time issued and never persisted; only one-way verifiers are stored, with explicit rotation/revocation/expiry and negative authentication tests.
 
 ### Round D — resolved
 - TAB-FND-012 MAJOR — added a hard one-doctor-session invariant of at most one `in_consultation` entry; start-consultation must re-check after session serialization, with sequential and concurrent PostgreSQL tests.
 - TAB-FND-013 MAJOR — introduced a separate persisted `priority_order` override so waiting-entry priority/reorder never rewrites immutable registration history or prematurely assigns arrival order; its effect at check-in/call is deterministic and concurrency-tested.
+
+### Round E — resolved
+- TAB-FND-014 MAJOR — session opening is now an explicit serialized `planned -> open` operation with defined behavior from every lifecycle state, idempotent retry semantics, authorization/audit rules, and open-boundary race tests.
+- TAB-FND-015 MAJOR — priority collisions now use one canonical policy: equal persisted `priority_order` values are forbidden. A priority mutation transactionally renumbers affected priority slots into a unique contiguous sequence; the committed sequence is authoritative for call selection and ETA, with collision/concurrency tests required.
 
 Claude must independently validate these resolutions rather than assuming Codex was correct.
 
@@ -48,7 +52,7 @@ Claude should independently challenge:
 6. notification/outbox separation;
 7. MVP boundary and whether anything critical is missing or prematurely included;
 8. testing strategy required before implementation;
-9. all Codex resolutions above, especially dual/triple ordering semantics, priority persistence, one-active-consultation enforcement, cancellation serialization, lifecycle gating, provisional estimates and guest-token verifier design.
+9. all Codex resolutions above, especially triple ordering semantics, priority collision/renumbering behavior, one-active-consultation enforcement, cancellation serialization, lifecycle gating/opening, provisional estimates and guest-token verifier design.
 
 Do not treat proposed technology choices as settled. Identify blocking decisions separately from optional recommendations.
 
