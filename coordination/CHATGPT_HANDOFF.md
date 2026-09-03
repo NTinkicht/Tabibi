@@ -32,6 +32,10 @@ Foundation review only. No production implementation has started.
 - TAB-FND-010 MAJOR — added an explicit consultation-session state/operation matrix covering `planned`, `open`, `paused`, `closing`, `closed`, and `cancelled`, including deterministic boundary-race requirements.
 - TAB-FND-011 MAJOR — raw guest bearer tokens are now one-time issued and never persisted; only one-way verifiers are stored, with explicit rotation/revocation/expiry and tests proving stored verifiers cannot authenticate.
 
+### Round D — resolved
+- TAB-FND-012 MAJOR — added a hard one-doctor-session invariant of at most one `in_consultation` entry; start-consultation must re-check after session serialization, with sequential and concurrent PostgreSQL tests.
+- TAB-FND-013 MAJOR — introduced a separate persisted `priority_order` override so waiting-entry priority/reorder never rewrites immutable registration history or prematurely assigns arrival order; its effect at check-in/call is deterministic and concurrency-tested.
+
 Claude must independently validate these resolutions rather than assuming Codex was correct.
 
 ## Review request
@@ -44,7 +48,7 @@ Claude should independently challenge:
 6. notification/outbox separation;
 7. MVP boundary and whether anything critical is missing or prematurely included;
 8. testing strategy required before implementation;
-9. all Codex resolutions above, especially dual ordering, cancellation serialization, lifecycle gating, provisional estimates and guest-token verifier design.
+9. all Codex resolutions above, especially dual/triple ordering semantics, priority persistence, one-active-consultation enforcement, cancellation serialization, lifecycle gating, provisional estimates and guest-token verifier design.
 
 Do not treat proposed technology choices as settled. Identify blocking decisions separately from optional recommendations.
 
