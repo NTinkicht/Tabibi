@@ -1,4 +1,4 @@
-# Tabibi Architecture — Foundation Proposal v0.5
+# Tabibi Architecture — Foundation Proposal v0.6
 
 This is a proposal for independent review before production implementation.
 
@@ -122,12 +122,16 @@ Rules:
 - a manual priority/reorder action on a `waiting` entry persists only `priority_order` plus actor/reason/audit metadata; it does not assign `eligibility_order` early and does not alter `registration_order`;
 - when that waiting entry later checks in, its `eligibility_order` is still assigned from the committed arrival cohort, while its pre-existing `priority_order` becomes effective in call selection;
 - changing/removing `priority_order` for a `waiting` or `checked_in` entry is transactional, authorized, reasoned and audited;
-- two entries may not commit the same effective priority slot in one session; the implementation must use a deterministic tie-breaker or transactional renumbering strategy, defined before coding;
+- equal persisted non-null `priority_order` values are forbidden within one consultation session;
+- priority mutation uses one canonical collision policy: after acquiring the session mutation boundary, inserting/moving/removing a priority entry transactionally renumbers the affected priority cohort into a unique contiguous sequence `1..N`; no committed state may contain a duplicate priority slot or a gap caused by that mutation;
+- when a request moves an entry into an occupied priority slot, the moved entry owns the requested slot and affected entries at or after that slot shift deterministically by one while preserving their previous relative order; moving an entry out closes the resulting gap while preserving relative order;
+- concurrent priority mutations serialize at the session boundary, so the later transaction observes and renumbers from the already committed sequence rather than inventing a tie-breaker;
+- the committed unique `priority_order` sequence is authoritative for call selection and ETA; no secondary ID/eligibility tie-break is used between priority entries because ties cannot persist;
 - assignment of `eligibility_order`, check-in mutation, estimate recomputation and any related audit event happen transactionally;
 - concurrent priority-change/check-in/call operations serialize through the same session mutation boundary so one committed history determines which priority state was effective at the call boundary;
 - direct `waiting -> called` is disallowed in normal workflow; staff must check the patient in first unless a separately audited administrative override exists.
 
-Required tests include mixed arrival ordering, late arrival behind an existing checked-in cohort, simultaneous check-ins, waiting-entry priority before check-in, checked-in priority changes, deterministic priority ties, and concurrent priority/check-in/call races against PostgreSQL.
+Required tests include mixed arrival ordering, late arrival behind an existing checked-in cohort, simultaneous check-ins, waiting-entry priority before check-in, checked-in priority changes, priority insertion into an occupied slot, priority removal/move renumbering, concurrent same-slot priority mutations, call-selection/ETA consistency after renumbering, and concurrent priority/check-in/call races against PostgreSQL.
 
 ### Consultation session lifecycle
 
@@ -143,6 +147,7 @@ All queue/session mutations are server-side gated by the current session state a
 
 | Operation | planned | open | paused | closing | closed | cancelled |
 | --- | --- | --- | --- | --- | --- | --- |
+| open session | allowed: `planned -> open` | idempotent success/no-op for same command | reject | reject | reject | reject |
 | add/register `waiting` entry | allowed | allowed | allowed | reject | reject | reject |
 | check in (`waiting -> checked_in`) | allowed | allowed | allowed | reject | reject | reject |
 | call next (`checked_in -> called`) | reject | allowed | reject | reject | reject | reject |
@@ -154,6 +159,14 @@ All queue/session mutations are server-side gated by the current session state a
 | resume session | reject | reject | allowed | reject | reject | reject |
 | begin normal close | reject | allowed | allowed | n/a | reject | reject |
 | cancel entire session | allowed | allowed | allowed | reject | reject | reject |
+
+Session-opening contract:
+- opening is an explicit authorized lifecycle command, not an implicit side effect of the first call/check-in;
+- its only mutating source state is `planned`, where it atomically transitions the session to `open`, sets the actual-open timestamp, records actor/audit metadata, and emits any opening notification intents required by product policy;
+- an exact retry of a successfully committed open command against an already `open` session is idempotent success/no-op and does not duplicate audit/outbox effects; unrelated open requests against `open` may return the current representation but cannot rewrite the original open metadata;
+- opening from `paused`, `closing`, `closed`, or `cancelled` is rejected without mutation or side effects; reopening a paused session uses the distinct resume operation;
+- open participates in the same session-level serialization boundary as pause, close, cancellation, check-in and other queue mutations; concurrent commands commit in one valid serial order and must revalidate source state after acquiring that boundary;
+- API/PostgreSQL tests must cover open from every lifecycle state, duplicate/retried open, and open-versus-pause/close/cancel/check-in races.
 
 Additional rules:
 - a planned session may accumulate registrations and early check-ins because clinics can receive patients before the doctor starts; nobody can be called until the session is `open`;
@@ -195,7 +208,7 @@ Keep estimator as a pure/domain-oriented component receiving a snapshot of relev
 
 For an entry in `checked_in`, the deterministic model should combine:
 - all committed work ahead, including `called` entries ahead because a called patient still owns a pending consultation unless they are explicitly cancelled/no-show;
-- other call-eligible `checked_in` entries ahead by effective service order (`priority_order` first when present, then normal `eligibility_order` with a deterministic tie-breaker);
+- other call-eligible `checked_in` entries ahead by effective service order (`priority_order` first when present, then normal `eligibility_order`); priority entries have unique committed priority slots by contract;
 - doctor/session baseline duration;
 - robust statistic from completed consultations in current session when enough samples exist;
 - active consultation elapsed/remaining-time estimate;
