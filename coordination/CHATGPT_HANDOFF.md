@@ -22,9 +22,15 @@ Foundation review only. No production implementation has started.
 - TAB-FND-004 MINOR — added `called -> cancelled` and kept no-show distinct.
 
 ### Round B — resolved
-- TAB-FND-005 MAJOR — removed late-arrival ambiguity. Queue entries now keep immutable `registration_order` for audit, while normal service uses `eligibility_order` assigned transactionally at `waiting -> checked_in`. A late arrival joins behind the current normal checked-in cohort and cannot overtake patients who were already present unless an explicit authorized priority override applies. Concurrent check-in/call behavior must be covered by PostgreSQL tests.
-- TAB-FND-006 MAJOR — defined whole-session cancellation. Cancellation requires authorization/reason, is rejected while an entry is `in_consultation`, serializes against queue mutation, atomically moves remaining `waiting`/`checked_in`/`called` entries to `cancelled`, terminates estimates, writes audit records and durable `session_cancelled` notification intents, and requires concurrency tests.
-- TAB-FND-007 MINOR — standardized canonical persisted/API queue states as snake_case: `waiting`, `checked_in`, `called`, `in_consultation`, `completed`, `cancelled`, `no_show`.
+- TAB-FND-005 MAJOR — removed late-arrival ambiguity using immutable `registration_order` plus transactional `eligibility_order` assigned at check-in.
+- TAB-FND-006 MAJOR — defined whole-session cancellation transaction, authorization, dispositions, audit/outbox and concurrency behavior.
+- TAB-FND-007 MINOR — standardized canonical persisted/API queue states as snake_case.
+
+### Round C — resolved
+- TAB-FND-008 MAJOR — `called` entries are now explicitly committed work ahead in live ETA calculations until they enter consultation or terminate; active consultation remaining time replaces, rather than duplicates, that contribution.
+- TAB-FND-009 MAJOR — unarrived `waiting` patients no longer receive a fabricated exact live position. They receive a clearly provisional arrival estimate/window with uncertainty; check-in atomically switches them to the live eligibility-order estimator.
+- TAB-FND-010 MAJOR — added an explicit consultation-session state/operation matrix covering `planned`, `open`, `paused`, `closing`, `closed`, and `cancelled`, including deterministic boundary-race requirements.
+- TAB-FND-011 MAJOR — raw guest bearer tokens are now one-time issued and never persisted; only one-way verifiers are stored, with explicit rotation/revocation/expiry and tests proving stored verifiers cannot authenticate.
 
 Claude must independently validate these resolutions rather than assuming Codex was correct.
 
@@ -33,11 +39,12 @@ Claude should independently challenge:
 1. product assumptions and missing requirements likely to cause expensive rework;
 2. architecture suitability for live queue/concurrency behavior;
 3. privacy/security model, especially patient/guest access and cross-clinic isolation;
-4. queue state-machine completeness;
-5. notification/outbox separation;
-6. MVP boundary and whether anything critical is missing or prematurely included;
-7. testing strategy required before implementation;
-8. all Codex resolutions above, especially whether the dual-order model or session-cancellation transaction introduces new edge cases.
+4. queue and session state-machine completeness;
+5. estimator semantics for waiting, checked-in, called and in-consultation states;
+6. notification/outbox separation;
+7. MVP boundary and whether anything critical is missing or prematurely included;
+8. testing strategy required before implementation;
+9. all Codex resolutions above, especially dual ordering, cancellation serialization, lifecycle gating, provisional estimates and guest-token verifier design.
 
 Do not treat proposed technology choices as settled. Identify blocking decisions separately from optional recommendations.
 
