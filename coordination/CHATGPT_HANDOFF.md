@@ -43,6 +43,10 @@ Foundation review only. No production implementation has started.
 ### Round F — resolved
 - TAB-FND-016 MAJOR — priority-slot bounds are now canonical. Slot requests are one-based integers; insertion into a cohort of size `N` permits `1..N+1`, moving an existing priority entry permits `1..N`, and all invalid/out-of-range requests are rejected rather than clamped or reinterpreted. Bounds are revalidated after acquiring the session serialization boundary, with explicit PostgreSQL tests for invalid and concurrent cases.
 
+### Round G — resolved
+- TAB-FND-017 MAJOR — defined the live priority cohort exactly as `waiting`/`checked_in` entries with non-null `priority_order`. Leaving that cohort via call/cancel/no-show atomically clears the live priority slot and renumbers the remaining cohort; historical priority context lives in audit/queue events, not terminal records. Session cancellation also clears all affected live priority slots. Added lifecycle/race/bounded-insertion test requirements.
+- TAB-FND-018 MAJOR — added doctor-delay mutations to the lifecycle matrix. Declare/update/clear is allowed only in `planned`/`open`/`paused`, serialized with all session mutations, and atomically updates estimator state, audit data and idempotent outbox intents. Added delay-vs-pause/resume/close/cancel and estimator/outbox verification requirements.
+
 Claude must independently validate these resolutions rather than assuming Codex was correct.
 
 ## Review request
@@ -55,7 +59,7 @@ Claude should independently challenge:
 6. notification/outbox separation;
 7. MVP boundary and whether anything critical is missing or prematurely included;
 8. testing strategy required before implementation;
-9. all Codex resolutions above, especially triple ordering semantics, priority collision/renumbering and slot-bound behavior, one-active-consultation enforcement, cancellation serialization, lifecycle gating/opening, provisional estimates and guest-token verifier design.
+9. all Codex resolutions above, especially priority cohort lifecycle/renumbering, triple ordering semantics, priority collision/renumbering and slot-bound behavior, one-active-consultation enforcement, cancellation serialization, lifecycle gating/opening, doctor-delay serialization, provisional estimates and guest-token verifier design.
 
 Do not treat proposed technology choices as settled. Identify blocking decisions separately from optional recommendations.
 
