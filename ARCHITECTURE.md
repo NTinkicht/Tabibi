@@ -1,4 +1,4 @@
-# Tabibi Architecture — Foundation Proposal v0.4
+# Tabibi Architecture — Foundation Proposal v0.5
 
 This is a proposal for independent review before production implementation.
 
@@ -62,7 +62,7 @@ Represents a clinician within a clinic context.
 A bounded queue/service period for one doctor at one clinic. Fields should include lifecycle status, planned start/end, actual start/end, pause/delay state and estimator configuration snapshot.
 
 ### QueueEntry
-Represents one patient's place in one consultation session. Must support both account-linked patients and receptionist-created guests. Contains queue lifecycle state, immutable registration/booking order, call-eligibility order, check-in timestamps and privacy-preserving external access data.
+Represents one patient's place in one consultation session. Must support both account-linked patients and receptionist-created guests. Contains queue lifecycle state, immutable registration/booking order, normal call-eligibility order, optional persisted priority/service-order override, check-in timestamps and privacy-preserving external access data.
 
 ### QueueEvent / AuditEvent
 Append-oriented event history for operationally meaningful mutations such as creation, check-in, reordering, priority insertion, call, consultation start/end, cancellation, no-show and session pause/resume/cancellation.
@@ -80,7 +80,8 @@ Initial design requirement:
 - conflicting concurrent updates cannot silently overwrite one another;
 - queue order has explicit persisted representations;
 - priority/manual reorder requires authorization and an audit reason;
-- estimates are recomputed from committed queue/session state.
+- estimates are recomputed from committed queue/session state;
+- a one-doctor consultation session has at most one `in_consultation` entry at any committed point in time.
 
 Implementation strategy (row locks, optimistic versioning, serializable transactions, advisory locks, etc.) should be selected after explicit concurrency tests are designed.
 
@@ -102,26 +103,31 @@ Allowed alternate terminal paths where context permits:
 
 Rollback/recovery transitions must be explicit administrative actions and audited; do not silently permit arbitrary state mutation.
 
-### Arrival and call eligibility contract
+### Arrival, service order and call eligibility contract
 
 `waiting` means the patient has a place in the session but is not yet confirmed physically present and ready to be called. `checked_in` means the patient is present and eligible for normal calling.
 
-Each queue entry has two distinct ordering concepts:
+Each queue entry has three distinct ordering concepts:
 1. `registration_order`: immutable historical booking/registration order used for audit and scheduling context;
-2. `eligibility_order`: normal service-order key assigned transactionally when the entry becomes `checked_in`.
+2. `eligibility_order`: normal service-order key assigned transactionally when the entry becomes `checked_in`;
+3. `priority_order`: optional persisted service-priority override, distinct from both historical registration order and normal arrival order.
 
 Rules:
 - only `checked_in` entries are normally call-eligible;
 - a `waiting` entry never blocks an eligible `checked_in` entry;
-- among normal call-eligible entries, `eligibility_order` determines who is next, subject only to an explicit authorized priority override;
+- among call-eligible entries, an explicit authorized `priority_order` override is evaluated before normal `eligibility_order`; entries without a priority override retain normal arrival order;
 - an unarrived `waiting` entry does not reserve service capacity ahead of already checked-in patients;
-- when an entry changes `waiting -> checked_in`, it receives an `eligibility_order` after the current normal checked-in cohort, so a late arrival cannot overtake patients who were already present;
+- when an entry changes `waiting -> checked_in`, it receives an `eligibility_order` after the current normal checked-in cohort, so a late arrival cannot overtake patients who were already present unless an authorized persisted priority override applies;
 - `registration_order` remains immutable and is never silently rewritten to mimic service order;
+- a manual priority/reorder action on a `waiting` entry persists only `priority_order` plus actor/reason/audit metadata; it does not assign `eligibility_order` early and does not alter `registration_order`;
+- when that waiting entry later checks in, its `eligibility_order` is still assigned from the committed arrival cohort, while its pre-existing `priority_order` becomes effective in call selection;
+- changing/removing `priority_order` for a `waiting` or `checked_in` entry is transactional, authorized, reasoned and audited;
+- two entries may not commit the same effective priority slot in one session; the implementation must use a deterministic tie-breaker or transactional renumbering strategy, defined before coding;
 - assignment of `eligibility_order`, check-in mutation, estimate recomputation and any related audit event happen transactionally;
-- concurrent check-in-versus-call operations must serialize so exactly one committed history determines whether a newly arrived patient was present before or after the call boundary;
+- concurrent priority-change/check-in/call operations serialize through the same session mutation boundary so one committed history determines which priority state was effective at the call boundary;
 - direct `waiting -> called` is disallowed in normal workflow; staff must check the patient in first unless a separately audited administrative override exists.
 
-Required tests include mixed arrival ordering, late arrival behind an existing checked-in cohort, simultaneous check-ins, and concurrent check-in/call races against PostgreSQL.
+Required tests include mixed arrival ordering, late arrival behind an existing checked-in cohort, simultaneous check-ins, waiting-entry priority before check-in, checked-in priority changes, deterministic priority ties, and concurrent priority/check-in/call races against PostgreSQL.
 
 ### Consultation session lifecycle
 
@@ -140,10 +146,10 @@ All queue/session mutations are server-side gated by the current session state a
 | add/register `waiting` entry | allowed | allowed | allowed | reject | reject | reject |
 | check in (`waiting -> checked_in`) | allowed | allowed | allowed | reject | reject | reject |
 | call next (`checked_in -> called`) | reject | allowed | reject | reject | reject | reject |
-| start consultation (`called -> in_consultation`) | reject | allowed | reject | reject | reject | reject |
+| start consultation (`called -> in_consultation`) | reject | allowed, only if no other `in_consultation` entry exists | reject | reject | reject | reject |
 | complete active consultation | reject | allowed | allowed | reject | reject | reject |
 | cancel/no-show individual non-consulting entry | allowed | allowed | allowed | reject | reject | reject |
-| manual reorder/priority insertion | allowed for waiting/checked-in only | allowed | allowed | reject | reject | reject |
+| manual reorder/priority insertion | allowed for waiting/checked-in only | allowed for waiting/checked-in only | allowed for waiting/checked-in only | reject | reject | reject |
 | pause session | reject | allowed | idempotent no-op/reject by API policy | reject | reject | reject |
 | resume session | reject | reject | allowed | reject | reject | reject |
 | begin normal close | reject | allowed | allowed | n/a | reject | reject |
@@ -153,6 +159,9 @@ Additional rules:
 - a planned session may accumulate registrations and early check-ins because clinics can receive patients before the doctor starts; nobody can be called until the session is `open`;
 - a paused session can continue accepting registrations/check-ins and resolving non-consulting entries, but cannot call a new patient or start a new consultation;
 - a consultation already `in_consultation` may be completed while the session is paused;
+- for the MVP, one consultation session represents one doctor's sequential service stream and therefore has a hard invariant of at most one `in_consultation` entry;
+- `start consultation` must re-check that invariant after acquiring the session-level serialization boundary; a second sequential or concurrent start request must fail once another entry is active;
+- call/start selection and the one-active-consultation invariant must be enforced in PostgreSQL-backed integration tests, not only application-memory tests;
 - operations rejected by lifecycle state fail without partial mutation or outbox/audit side effects;
 - open/pause/resume/close/cancel races must serialize and produce one valid committed history.
 
@@ -186,7 +195,7 @@ Keep estimator as a pure/domain-oriented component receiving a snapshot of relev
 
 For an entry in `checked_in`, the deterministic model should combine:
 - all committed work ahead, including `called` entries ahead because a called patient still owns a pending consultation unless they are explicitly cancelled/no-show;
-- other call-eligible `checked_in` entries ahead by `eligibility_order`;
+- other call-eligible `checked_in` entries ahead by effective service order (`priority_order` first when present, then normal `eligibility_order` with a deterministic tie-breaker);
 - doctor/session baseline duration;
 - robust statistic from completed consultations in current session when enough samples exist;
 - active consultation elapsed/remaining-time estimate;
@@ -195,16 +204,17 @@ For an entry in `checked_in`, the deterministic model should combine:
 
 A `called` entry contributes one pending consultation-duration unit (using the same current robust/baseline duration model) until it transitions to `in_consultation`, `cancelled`, or `no_show`; once `in_consultation`, its contribution is represented by active-consultation remaining time rather than counted twice.
 
-Late arrivals join behind the current normal checked-in cohort, so they do not worsen existing arrived patients' work-ahead estimates unless a separately authorized priority override is applied.
+Late arrivals join behind the current normal checked-in cohort, so they do not worsen existing arrived patients' work-ahead estimates unless a separately authorized persisted priority override is applied.
 
 ### Waiting/unarrived provisional estimate
 
-An unarrived `waiting` patient has no `eligibility_order` and therefore must not be shown a fabricated exact live queue position. Instead the product exposes a clearly labelled **provisional arrival estimate/window** derived from session planned/open state, baseline/observed consultation duration, immutable registration/schedule context, current clinic delay, and explicit uncertainty from patients who may check in before them.
+An unarrived `waiting` patient has no `eligibility_order` and therefore must not be shown a fabricated exact live queue position. Instead the product exposes a clearly labelled **provisional arrival estimate/window** derived from session planned/open state, baseline/observed consultation duration, immutable registration/schedule context, current clinic delay, any persisted priority override, and explicit uncertainty from patients who may check in before them.
 
 Rules:
 - provisional output is semantically distinct from the live checked-in estimate and must include a confidence/uncertainty indicator or range;
 - it must never imply that `registration_order` reserves service capacity;
-- upon `waiting -> checked_in`, the provisional estimate is discarded and replaced atomically from the committed `eligibility_order`/live queue snapshot;
+- a persisted `priority_order` may influence the provisional scenario but must be labelled as priority-sensitive because actual call eligibility still begins only at check-in;
+- upon `waiting -> checked_in`, the provisional estimate is discarded and replaced atomically from the committed eligibility/service-order live queue snapshot;
 - mixed-arrival tests must verify that provisional estimates cannot change service ordering and that check-in deterministically switches estimate mode.
 
 The first estimator must expose which inputs produced each estimate. Avoid hidden ML in the MVP.
