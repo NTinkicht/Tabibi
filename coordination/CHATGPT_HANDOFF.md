@@ -13,13 +13,18 @@ Foundation review only. No production implementation has started.
 - SECURITY.md — security/privacy baseline
 - coordination/STATE.json — durable agent state
 
-## Independent Codex review already resolved
-Codex reviewed the initial foundation and raised four findings. ChatGPT accepted all four and updated the specification/architecture before Claude's independent review:
+## Independent Codex review history
 
-- TAB-FND-001 MAJOR — unarrived entries and call eligibility were ambiguous. Resolved by explicitly defining `waiting` as not call-eligible, `checked_in` as eligible, preventing unarrived entries from blocking arrived patients, and defining estimate behavior plus required concurrency/state-machine tests.
-- TAB-FND-002 MAJOR — session closing behavior with active entries was undefined. Resolved by defining session lifecycle/normal close preconditions, atomic close semantics, deterministic handling of concurrent close operations, and deferring force-close from MVP.
-- TAB-FND-003 MAJOR — public display labels could be confused with guest bearer credentials. Resolved by requiring distinct fields/security semantics and tests proving public labels never authorize guest access.
-- TAB-FND-004 MINOR — `called -> cancelled` was missing. Resolved by explicitly allowing cancellation before consultation begins and keeping `no_show` semantically distinct.
+### Round A — resolved
+- TAB-FND-001 MAJOR — defined waiting vs checked-in call eligibility and estimator behavior.
+- TAB-FND-002 MAJOR — defined safe session closure semantics.
+- TAB-FND-003 MAJOR — separated public queue labels from secret guest credentials.
+- TAB-FND-004 MINOR — added `called -> cancelled` and kept no-show distinct.
+
+### Round B — resolved
+- TAB-FND-005 MAJOR — removed late-arrival ambiguity. Queue entries now keep immutable `registration_order` for audit, while normal service uses `eligibility_order` assigned transactionally at `waiting -> checked_in`. A late arrival joins behind the current normal checked-in cohort and cannot overtake patients who were already present unless an explicit authorized priority override applies. Concurrent check-in/call behavior must be covered by PostgreSQL tests.
+- TAB-FND-006 MAJOR — defined whole-session cancellation. Cancellation requires authorization/reason, is rejected while an entry is `in_consultation`, serializes against queue mutation, atomically moves remaining `waiting`/`checked_in`/`called` entries to `cancelled`, terminates estimates, writes audit records and durable `session_cancelled` notification intents, and requires concurrency tests.
+- TAB-FND-007 MINOR — standardized canonical persisted/API queue states as snake_case: `waiting`, `checked_in`, `called`, `in_consultation`, `completed`, `cancelled`, `no_show`.
 
 Claude must independently validate these resolutions rather than assuming Codex was correct.
 
@@ -32,7 +37,7 @@ Claude should independently challenge:
 5. notification/outbox separation;
 6. MVP boundary and whether anything critical is missing or prematurely included;
 7. testing strategy required before implementation;
-8. the four Codex resolutions above, including whether they introduce new edge cases.
+8. all Codex resolutions above, especially whether the dual-order model or session-cancellation transaction introduces new edge cases.
 
 Do not treat proposed technology choices as settled. Identify blocking decisions separately from optional recommendations.
 
