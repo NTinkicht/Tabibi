@@ -1,4 +1,4 @@
-# Tabibi Product Specification — Foundation v0.3
+# Tabibi Product Specification — Foundation v0.4
 
 ## Problem
 
@@ -23,7 +23,7 @@ Can eventually:
 - discover a doctor/clinic;
 - reserve an appointment or join a supported queue;
 - see queue status without exposing other patients' identities;
-- receive an estimated consultation time;
+- receive a provisional arrival estimate before check-in and a live queue estimate after check-in;
 - receive delay/acceleration/approaching-turn notifications;
 - confirm arrival;
 - cancel, including after being called but before consultation starts when clinic policy permits;
@@ -79,7 +79,7 @@ MVP capabilities:
 - add scheduled or walk-in queue entry;
 - queue states: `waiting`, `checked_in`, `called`, `in_consultation`, `completed`, `cancelled`, `no_show`;
 - deterministic queue ordering and transitions;
-- estimated waiting/consultation time;
+- provisional pre-arrival estimate plus live checked-in waiting/consultation estimate;
 - patient lookup using a privacy-preserving access mechanism;
 - notification-domain events (delivery provider can initially be mocked/adapted);
 - audit trail for operational queue changes;
@@ -108,7 +108,7 @@ A consultation session belongs to exactly one doctor and clinic and represents a
 Each queue entry has:
 - an immutable internal identifier;
 - a distinct public display label/number suitable for clinic workflow;
-- for guest access, a separate secret high-entropy access credential that is never the display label and can never be inferred from it;
+- for guest access, a separate secret high-entropy access credential issued to the patient/contact channel while only a one-way verifier is persisted server-side; the credential is never the display label and can never be inferred from it;
 - an immutable registration/booking-order reference for audit and scheduling context;
 - a call-eligibility order assigned when the patient becomes `checked_in`.
 
@@ -143,21 +143,36 @@ Cancelling an entire session is a distinct MVP operation:
 - audit events and durable `session_cancelled` notification intents for affected patients are written in the same transaction as the session and queue dispositions;
 - concurrent cancel-versus-add/check-in/call/start operations must produce one deterministic winner and may not leave serviceable entries inside a cancelled session.
 
+## Session-state product behavior
+
+Lifecycle gating is part of the product contract, not an implementation preference:
+- `planned`: registration and early check-in are allowed; calling/consultation start are not;
+- `open`: normal queue service operations are allowed;
+- `paused`: registration/check-in and resolution of non-consulting entries remain allowed, but no new patient may be called and no new consultation may start; an already active consultation may be completed;
+- `closing`, `closed`, `cancelled`: new queue-service mutations are rejected except the atomic transitions that created those states.
+
+The detailed operation matrix and concurrency rules live in `ARCHITECTURE.md` and are mandatory for implementation/tests.
+
 ## Initial estimation model
 
 Start with an explainable estimator using a configurable baseline consultation duration and live session observations.
 
-Candidate inputs:
-- number of active, call-eligible entries ahead;
+For a `checked_in` patient, live estimate inputs include:
+- all committed work ahead, including a patient already `called` but not yet resolved;
+- checked-in entries ahead by call-eligibility order;
 - configured baseline duration for the doctor/session;
 - completed consultation durations from the current session;
 - active pause/delay duration;
 - cancellations/no-shows;
-- current consultation elapsed time.
+- current consultation elapsed/remaining-time estimate.
+
+A `called` patient remains committed work ahead until consultation starts or that entry is explicitly cancelled/no-show; the estimator must not drop that pending consultation from patients behind them.
+
+For an unarrived `waiting` patient, Tabibi must not present an exact live queue position because no call-eligibility order exists yet. Instead it presents a clearly labelled **provisional arrival estimate/window** based on schedule/registration context, current session delay and observed/baseline service pace, with visible uncertainty. The provisional value never reserves service capacity. At check-in it is atomically replaced by the live checked-in estimate derived from the new call-eligibility order.
 
 Unarrived `waiting` entries are not treated as guaranteed active work ahead of already checked-in patients. When a late patient checks in, the patient joins behind the current normal checked-in cohort, so already-arrived patients' estimates are not worsened by the late arrival unless an explicit authorized priority rule applies. The clinic dashboard may still expose unarrived counts separately for operational awareness.
 
-Do not promise exact times. Estimates must be represented as estimates and may include a confidence/range later.
+Do not promise exact times. Estimates must be represented as estimates; provisional estimates should use a range/uncertainty indication from the MVP, and live estimates may also expose a range where appropriate.
 
 ## Notification-domain events
 
@@ -178,16 +193,20 @@ Notification generation and notification delivery should be separate concerns.
 
 We have a deployable, tested vertical slice when:
 - a receptionist can create a session and manage patients through the complete queue lifecycle;
-- a patient can securely retrieve their own current queue position/estimate;
+- a waiting/unarrived patient can securely retrieve a clearly provisional estimate without being shown a fabricated exact call position;
+- a checked-in patient can securely retrieve their own current live queue position/estimate;
+- a `called` patient is counted as committed work ahead for patients behind them until resolved;
 - concurrent queue mutations preserve consistency;
 - the queue estimator responds deterministically to state changes;
 - mixed arrived/unarrived queues have deterministic call eligibility and estimates;
 - late arrivals cannot unexpectedly overtake patients already checked in;
+- session-state gates reject invalid operations and boundary races produce one valid history;
 - normal session closure cannot strand active entries;
 - session cancellation atomically disposes all eligible active entries and rejects unsafe cancellation during an active consultation;
 - public display labels cannot authorize guest access;
+- raw guest bearer tokens are not persisted and stored verifiers cannot authenticate;
 - persisted/API state names are canonical and consistent;
 - operational mutations are auditable;
 - French and Arabic strings are externalized/localizable;
 - CI passes deterministic tests;
-- no unresolved BLOCKER or MAJOR Claude findings remain.
+- no unresolved BLOCKER or MAJOR reviewer findings remain.
