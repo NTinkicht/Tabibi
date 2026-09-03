@@ -40,6 +40,9 @@ Foundation review only. No production implementation has started.
 - TAB-FND-014 MAJOR — session opening is now an explicit serialized `planned -> open` operation with defined behavior from every lifecycle state, idempotent retry semantics, authorization/audit rules, and open-boundary race tests.
 - TAB-FND-015 MAJOR — priority collisions now use one canonical policy: equal persisted `priority_order` values are forbidden. A priority mutation transactionally renumbers affected priority slots into a unique contiguous sequence; the committed sequence is authoritative for call selection and ETA, with collision/concurrency tests required.
 
+### Round F — resolved
+- TAB-FND-016 MAJOR — priority-slot bounds are now canonical. Slot requests are one-based integers; insertion into a cohort of size `N` permits `1..N+1`, moving an existing priority entry permits `1..N`, and all invalid/out-of-range requests are rejected rather than clamped or reinterpreted. Bounds are revalidated after acquiring the session serialization boundary, with explicit PostgreSQL tests for invalid and concurrent cases.
+
 Claude must independently validate these resolutions rather than assuming Codex was correct.
 
 ## Review request
@@ -52,7 +55,7 @@ Claude should independently challenge:
 6. notification/outbox separation;
 7. MVP boundary and whether anything critical is missing or prematurely included;
 8. testing strategy required before implementation;
-9. all Codex resolutions above, especially triple ordering semantics, priority collision/renumbering behavior, one-active-consultation enforcement, cancellation serialization, lifecycle gating/opening, provisional estimates and guest-token verifier design.
+9. all Codex resolutions above, especially triple ordering semantics, priority collision/renumbering and slot-bound behavior, one-active-consultation enforcement, cancellation serialization, lifecycle gating/opening, provisional estimates and guest-token verifier design.
 
 Do not treat proposed technology choices as settled. Identify blocking decisions separately from optional recommendations.
 
