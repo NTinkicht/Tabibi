@@ -1,4 +1,4 @@
-# Tabibi Product Specification — Foundation v0.1
+# Tabibi Product Specification — Foundation v0.2
 
 ## Problem
 
@@ -26,7 +26,7 @@ Can eventually:
 - receive an estimated consultation time;
 - receive delay/acceleration/approaching-turn notifications;
 - confirm arrival;
-- cancel;
+- cancel, including after being called but before consultation starts when clinic policy permits;
 - manage preferred language/contact channel.
 
 ### Receptionist / clinic staff
@@ -103,23 +103,42 @@ MVP capabilities:
 
 A consultation session belongs to exactly one doctor and clinic and represents a bounded service period.
 
-Each queue entry has an immutable internal identifier and a visible privacy-preserving token/number appropriate to the clinic workflow.
+Each queue entry has:
+- an immutable internal identifier;
+- a distinct public display label/number suitable for clinic workflow;
+- for guest access, a separate secret high-entropy access credential that is never the display label and can never be inferred from it.
 
 Queue ordering must be explicit and deterministic. Any manual priority/urgent insertion must be authorized, auditable, and must cause estimates for affected patients to be recomputed.
 
+Arrival semantics are explicit:
+- `waiting` = registered/booked but not confirmed physically present and ready to be called;
+- `checked-in` = present and eligible to be called;
+- unarrived `waiting` patients do not block checked-in patients behind them;
+- their arrival later triggers deterministic re-evaluation of eligible order and estimates.
+
+Cancellation semantics are distinct from no-show semantics. A patient or authorized staff member may move an entry to `cancelled` from `waiting`, `checked-in`, or `called` before consultation begins. `no-show` is reserved for operational absence according to clinic policy and must not be used merely because a patient cancels after being called.
+
 The system must never silently lose or duplicate queue entries because of concurrent updates.
+
+## Consultation session closure contract
+
+Normal session closure is permitted only when no entries remain active in `waiting`, `checked-in`, `called`, or `in-consultation`.
+
+If active entries remain, staff must resolve them explicitly as completed, cancelled, or no-show as appropriate before closure. The final close operation must atomically validate the queue, close the session, record its audit event and create any required notification intents. A force-close workflow, if ever added, requires elevated authorization, an explicit reason and deterministic disposition of every affected entry; it is not part of the initial MVP.
 
 ## Initial estimation model
 
 Start with an explainable estimator using a configurable baseline consultation duration and live session observations.
 
 Candidate inputs:
-- number of active entries ahead;
+- number of active, call-eligible entries ahead;
 - configured baseline duration for the doctor/session;
 - completed consultation durations from the current session;
 - active pause/delay duration;
 - cancellations/no-shows;
 - current consultation elapsed time.
+
+Unarrived `waiting` entries are not treated as guaranteed active work ahead of already checked-in patients. The clinic dashboard may still expose their count separately for operational awareness.
 
 Do not promise exact times. Estimates must be represented as estimates and may include a confidence/range later.
 
@@ -145,6 +164,9 @@ We have a deployable, tested vertical slice when:
 - a patient can securely retrieve their own current queue position/estimate;
 - concurrent queue mutations preserve consistency;
 - the queue estimator responds deterministically to state changes;
+- mixed arrived/unarrived queues have deterministic call eligibility and estimates;
+- normal session closure cannot strand active entries;
+- public display labels cannot authorize guest access;
 - operational mutations are auditable;
 - French and Arabic strings are externalized/localizable;
 - CI passes deterministic tests;
