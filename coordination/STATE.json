@@ -1,13 +1,13 @@
 {
   "project": "Tabibi",
   "phase": "foundation",
-  "round": 0,
+  "round": 1,
   "state": "awaiting_claude_foundation_review",
-  "current_pr": null,
+  "current_pr": 1,
   "last_actor": "chatgpt",
   "next_actor": "claude",
   "open_blockers": 0,
   "open_majors": 0,
   "human_decision_required": false,
-  "notes": "Foundation product, architecture, security and operating protocol prepared for independent Claude review before implementation."
+  "notes": "Two Codex foundation passes completed. Findings TAB-FND-001 through TAB-FND-007 have been addressed in specification/architecture. Awaiting independent Claude review; no production implementation has started."
 }
