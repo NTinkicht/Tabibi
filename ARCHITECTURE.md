@@ -1,4 +1,4 @@
-# Tabibi Architecture — Foundation Proposal v0.3
+# Tabibi Architecture — Foundation Proposal v0.4
 
 This is a proposal for independent review before production implementation.
 
@@ -119,7 +119,6 @@ Rules:
 - `registration_order` remains immutable and is never silently rewritten to mimic service order;
 - assignment of `eligibility_order`, check-in mutation, estimate recomputation and any related audit event happen transactionally;
 - concurrent check-in-versus-call operations must serialize so exactly one committed history determines whether a newly arrived patient was present before or after the call boundary;
-- the estimator excludes unarrived `waiting` entries from active work-ahead for patients already `checked_in`;
 - direct `waiting -> called` is disallowed in normal workflow; staff must check the patient in first unless a separately audited administrative override exists.
 
 Required tests include mixed arrival ordering, late arrival behind an existing checked-in cohort, simultaneous check-ins, and concurrent check-in/call races against PostgreSQL.
@@ -131,6 +130,31 @@ Proposed normal states:
 planned -> open -> paused -> open -> closing -> closed
 
 A separate terminal state `cancelled` represents an abandoned service session.
+
+#### Session-state operation matrix
+
+All queue/session mutations are server-side gated by the current session state and must participate in the same session serialization strategy used for queue mutation.
+
+| Operation | planned | open | paused | closing | closed | cancelled |
+| --- | --- | --- | --- | --- | --- | --- |
+| add/register `waiting` entry | allowed | allowed | allowed | reject | reject | reject |
+| check in (`waiting -> checked_in`) | allowed | allowed | allowed | reject | reject | reject |
+| call next (`checked_in -> called`) | reject | allowed | reject | reject | reject | reject |
+| start consultation (`called -> in_consultation`) | reject | allowed | reject | reject | reject | reject |
+| complete active consultation | reject | allowed | allowed | reject | reject | reject |
+| cancel/no-show individual non-consulting entry | allowed | allowed | allowed | reject | reject | reject |
+| manual reorder/priority insertion | allowed for waiting/checked-in only | allowed | allowed | reject | reject | reject |
+| pause session | reject | allowed | idempotent no-op/reject by API policy | reject | reject | reject |
+| resume session | reject | reject | allowed | reject | reject | reject |
+| begin normal close | reject | allowed | allowed | n/a | reject | reject |
+| cancel entire session | allowed | allowed | allowed | reject | reject | reject |
+
+Additional rules:
+- a planned session may accumulate registrations and early check-ins because clinics can receive patients before the doctor starts; nobody can be called until the session is `open`;
+- a paused session can continue accepting registrations/check-ins and resolving non-consulting entries, but cannot call a new patient or start a new consultation;
+- a consultation already `in_consultation` may be completed while the session is paused;
+- operations rejected by lifecycle state fail without partial mutation or outbox/audit side effects;
+- open/pause/resume/close/cancel races must serialize and produce one valid committed history.
 
 #### Normal closure
 - a normal `close` operation is rejected while any queue entry remains in `waiting`, `checked_in`, `called`, or `in_consultation`;
@@ -158,17 +182,32 @@ Contract:
 
 Keep estimator as a pure/domain-oriented component receiving a snapshot of relevant session/queue facts.
 
-Initial deterministic model should combine:
-- active call-eligible entries ahead by `eligibility_order`;
+### Checked-in/live estimate
+
+For an entry in `checked_in`, the deterministic model should combine:
+- all committed work ahead, including `called` entries ahead because a called patient still owns a pending consultation unless they are explicitly cancelled/no-show;
+- other call-eligible `checked_in` entries ahead by `eligibility_order`;
 - doctor/session baseline duration;
 - robust statistic from completed consultations in current session when enough samples exist;
-- active consultation elapsed time;
+- active consultation elapsed/remaining-time estimate;
 - pauses/delays;
 - known terminal/non-serving entries excluded from work ahead.
 
+A `called` entry contributes one pending consultation-duration unit (using the same current robust/baseline duration model) until it transitions to `in_consultation`, `cancelled`, or `no_show`; once `in_consultation`, its contribution is represented by active-consultation remaining time rather than counted twice.
+
 Late arrivals join behind the current normal checked-in cohort, so they do not worsen existing arrived patients' work-ahead estimates unless a separately authorized priority override is applied.
 
-The first model must expose which inputs produced the estimate. Avoid hidden ML in the MVP.
+### Waiting/unarrived provisional estimate
+
+An unarrived `waiting` patient has no `eligibility_order` and therefore must not be shown a fabricated exact live queue position. Instead the product exposes a clearly labelled **provisional arrival estimate/window** derived from session planned/open state, baseline/observed consultation duration, immutable registration/schedule context, current clinic delay, and explicit uncertainty from patients who may check in before them.
+
+Rules:
+- provisional output is semantically distinct from the live checked-in estimate and must include a confidence/uncertainty indicator or range;
+- it must never imply that `registration_order` reserves service capacity;
+- upon `waiting -> checked_in`, the provisional estimate is discarded and replaced atomically from the committed `eligibility_order`/live queue snapshot;
+- mixed-arrival tests must verify that provisional estimates cannot change service ordering and that check-in deterministically switches estimate mode.
+
+The first estimator must expose which inputs produced each estimate. Avoid hidden ML in the MVP.
 
 ## Patient queue access
 
@@ -176,7 +215,16 @@ Patient-facing queue access must not expose sequential identifiers that make enu
 
 For account-linked patients, authenticated ownership can authorize access.
 
-For guest/reception-entered patients, use a high-entropy, revocable external access credential. This bearer credential must be stored and transmitted as a secret and must never appear on public waiting-room displays, printed queue boards or casually logged URLs.
+For guest/reception-entered patients, issue a high-entropy, revocable external access bearer credential exactly once to the client/contact channel. The raw bearer credential is never persisted after issuance. Persist only a one-way verifier (for example a keyed cryptographic hash/HMAC or password-token verifier selected during implementation) plus non-sensitive metadata required for lookup, rotation, revocation and expiry.
+
+Guest-token contract:
+- raw token is generated from a CSPRNG with sufficient entropy and returned only at issuance/rotation;
+- database storage contains a non-reversible verifier, never the usable bearer token;
+- authentication compares a presented token to the verifier using a timing-safe strategy appropriate to the chosen construction;
+- rotation/reissue revokes the previous verifier atomically before or with activation of the replacement;
+- revocation/expiry immediately prevents further lookup or mutation authorization;
+- operational logs, analytics, URLs and notification payload logs must never contain raw tokens;
+- tests must prove that the persisted verifier itself cannot authenticate to guest endpoints.
 
 Every queue entry may also have a distinct public display label (for example a short queue number). A public display label is non-secret, non-identifying, may be shown in the clinic, and can never authorize patient lookup or mutation. Guest access credentials and public display labels are separate fields with separate security semantics. Authorization tests must verify that possession of a display label alone is rejected by all guest lookup/mutation endpoints.
 
