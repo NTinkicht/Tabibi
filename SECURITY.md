@@ -1,4 +1,4 @@
-# Tabibi Security & Privacy Baseline v0.1
+# Tabibi Security & Privacy Baseline v0.2
 
 Tabibi is healthcare-adjacent software. Treat patient and operational clinic data as sensitive by default.
 
@@ -12,13 +12,17 @@ Tabibi is healthcare-adjacent software. Treat patient and operational clinic dat
 - Clinic staff must authenticate.
 - Authorization is clinic-scoped and role-aware.
 - Patient access to an account-linked queue entry requires ownership or explicit delegated access.
-- Guest/reception-created queue access requires a high-entropy secret token or equivalent mechanism.
+- Guest/reception-created queue access requires a high-entropy secret bearer token or equivalent mechanism.
+- The raw guest bearer token is issued only to the intended patient/contact channel and is never persisted server-side after issuance.
+- Persist only a one-way verifier suitable for validating a presented token; the stored verifier itself must not be a usable credential.
+- Rotation/reissue must revoke the prior verifier atomically; expiry/revocation must immediately prevent authorization.
 - Administrative operations such as reorder/priority insertion/recovery transitions require explicit permission and audit reason.
 
 ## Secrets
 - Never commit secrets, provider credentials, tokens or production connection strings.
 - Use environment variables/secrets management.
 - Example env files must contain placeholders only.
+- Guest bearer credentials are application secrets even though they are patient-scoped; never log, persist in plaintext, expose in analytics, or place in publicly shared URLs.
 
 ## Auditability
 Audit meaningful operational changes including:
@@ -37,7 +41,7 @@ Audit records should identify actor, action, target, clinic/session context, tim
 Operational logs must not include:
 - passwords;
 - session tokens;
-- guest access tokens;
+- raw guest access tokens;
 - phone numbers unless strictly redacted;
 - patient names unless unavoidable and appropriately protected;
 - raw notification payloads containing sensitive data.
@@ -47,10 +51,12 @@ Operational logs must not include:
 - Do not reveal identities of patients ahead/behind another patient.
 - Patient-facing queue position should be derived only for the authorized entry.
 - Public waiting-room displays must use non-identifying labels if implemented.
+- Public display labels and guest credentials are separate values; display labels never authorize lookup or mutation.
 
 ## Integrity and concurrency
 - Queue state/order changes require a transaction/consistency strategy.
 - State transitions are validated server-side.
+- Session lifecycle state gates every queue mutation; rejected operations must have no partial side effects.
 - Client-provided queue position/order is never trusted directly.
 - Idempotency is required for externally retried mutation/notification flows where duplicate effects would be harmful.
 
@@ -62,6 +68,7 @@ Before public pilot:
 - input/schema validation at trust boundaries;
 - rate limiting for authentication and guest-token endpoints;
 - protections against token enumeration/brute force;
+- timing-safe guest-token verifier comparison appropriate to the chosen token construction;
 - safe headers/CSP appropriate to framework;
 - dependency and secret scanning in CI where feasible.
 
@@ -77,6 +84,9 @@ SMS/WhatsApp/push content should reveal the minimum required information. Avoid 
 - cross-clinic authorization bypass;
 - patient A reading patient B queue state;
 - guest token enumeration;
+- database verifier copied and presented as though it were a raw guest token;
+- revoked/rotated guest token replay;
+- public display label used against guest lookup/mutation endpoints;
 - stale concurrent reorder/update causing lost entries;
 - duplicate request causing duplicate queue entry;
 - privilege escalation receptionist -> platform/other clinic;
