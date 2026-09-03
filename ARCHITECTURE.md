@@ -1,4 +1,4 @@
-# Tabibi Architecture — Foundation Proposal v0.1
+# Tabibi Architecture — Foundation Proposal v0.2
 
 This is a proposal for independent review before production implementation.
 
@@ -93,17 +93,48 @@ Implementation strategy (row locks, optimistic versioning, serializable transact
 waiting -> checked_in -> called -> in_consultation -> completed
 
 Allowed alternate terminal paths where context permits:
-- waiting/checked_in -> cancelled
+- waiting/checked_in/called -> cancelled
 - waiting/checked_in/called -> no_show
 
 Rollback/recovery transitions must be explicit administrative actions and audited; do not silently permit arbitrary state mutation.
+
+### Arrival and call eligibility contract
+
+`waiting` means the patient has a place in the session but is not yet confirmed physically present and ready to be called. `checked_in` means the patient is present and eligible for normal calling.
+
+Rules:
+- only `checked_in` entries are normally call-eligible;
+- a `waiting` entry never blocks an eligible `checked_in` entry behind it;
+- among call-eligible entries, the persisted queue order determines who is next, subject only to an explicit authorized priority override;
+- an unarrived `waiting` entry retains its persisted relative order for when it later checks in, but it does not reserve service capacity ahead of already checked-in patients;
+- when an entry changes from `waiting` to `checked_in`, the system recomputes eligible order and all affected estimates transactionally;
+- the estimator excludes unarrived `waiting` entries from active work-ahead for patients who are already `checked_in`, while separately exposing that additional booked/waiting patients exist if useful to clinic staff;
+- direct `waiting -> called` is disallowed in normal workflow; staff must check the patient in first unless a separately audited administrative override exists.
+
+This contract must be covered by state-machine and PostgreSQL integration tests for mixed arrived/unarrived ordering and concurrent check-in/call operations.
+
+### Consultation session lifecycle and closing contract
+
+Proposed session states:
+
+planned -> open -> paused -> open -> closing -> closed
+
+Cancellation of an entire session is a separate terminal path and must be audited.
+
+Rules for closure:
+- a normal `close` operation is rejected while any queue entry remains in `waiting`, `checked_in`, `called`, or `in_consultation`;
+- staff must first resolve remaining entries explicitly as `completed`, `cancelled`, or `no_show` as appropriate;
+- `closing` is an internal/administrative transition used to serialize shutdown and reject new queue mutations while final invariants are checked;
+- the transition to `closed`, final queue-entry validation, session timestamps, audit event and any notification intents are committed atomically;
+- concurrent close-versus-check-in/call/add/reorder operations must produce one deterministic winner rather than stranded active entries;
+- forced administrative closure, if introduced later, must require elevated permission, an audit reason, deterministic disposition of every active entry, and explicit patient notifications. It is not part of the initial MVP API.
 
 ## Estimation engine
 
 Keep estimator as a pure/domain-oriented component receiving a snapshot of relevant session/queue facts.
 
 Initial deterministic model should combine:
-- active entries ahead;
+- active call-eligible entries ahead;
 - doctor/session baseline duration;
 - robust statistic from completed consultations in current session when enough samples exist;
 - active consultation elapsed time;
@@ -118,7 +149,9 @@ Patient-facing queue access must not expose sequential identifiers that make enu
 
 For account-linked patients, authenticated ownership can authorize access.
 
-For guest/reception-entered patients, use a high-entropy, revocable external access token or equivalent privacy-preserving mechanism. Public queue displays should use non-identifying labels/tokens.
+For guest/reception-entered patients, use a high-entropy, revocable external access credential. This bearer credential must be stored and transmitted as a secret and must never appear on public waiting-room displays, printed queue boards or URLs that may be casually observed/logged where avoidable.
+
+Every queue entry may also have a distinct public display label (for example a short queue number). A public display label is non-secret, non-identifying, may be shown in the clinic, and can never authorize patient lookup or mutation. Guest access credentials and public display labels are separate fields with separate security semantics. Authorization tests must verify that possession of a display label alone is rejected by all guest lookup/mutation endpoints.
 
 ## Notifications
 
@@ -134,7 +167,7 @@ All user-facing strings externalized. Locale resolution should support French an
 
 ## Observability
 
-Application logs must not casually include patient names, phone numbers, access tokens or sensitive identifiers.
+Application logs must not casually include patient names, phone numbers, access credentials or sensitive identifiers.
 
 Audit events are distinct from operational logs.
 
