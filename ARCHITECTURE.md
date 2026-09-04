@@ -1,4 +1,4 @@
-# Tabibi Architecture — Foundation Proposal v0.8
+# Tabibi Architecture — Foundation Proposal v0.9
 
 This is a proposal for independent review before production implementation.
 
@@ -68,7 +68,7 @@ Represents one patient's place in one consultation session. Must support both ac
 Append-oriented event history for operationally meaningful mutations such as creation, check-in, reordering, priority insertion, call, consultation start/end, cancellation, no-show and session pause/resume/cancellation/delay changes.
 
 ### NotificationIntent
-Records that a domain event warrants a notification. Provider-specific delivery should not be part of queue mutation transactions except through durable outbox-style handoff.
+Records that a domain event warrants a notification. Provider-specific delivery should not be part of queue mutation transactions except through durable outbox-style handoff. Mutable state-derived notification families must also carry ordering/supersession metadata so stale intents cannot be delivered after a newer or terminal state has committed.
 
 ## Queue consistency
 
@@ -186,17 +186,24 @@ Session-opening contract:
 Doctor delay is an explicit session mutation because it changes patient estimates and can create notification intents.
 
 Rules:
-- `declare/update doctor delay` accepts an explicit non-negative delay duration/offset and optional staff-facing reason; setting a positive value creates or replaces the current delay snapshot, while `clear doctor delay` removes it explicitly rather than relying on wall-clock inference;
+- `declare/update doctor delay` accepts a **strictly positive** delay duration/offset and optional staff-facing reason; `0`, negative values, non-numeric/malformed values and non-finite values are rejected without state, audit, estimator-version or outbox side effects;
+- a positive value creates or replaces the current delay snapshot; removing delay state is represented only by the distinct `clear doctor delay` command, so zero is never interpreted as an implicit clear;
+- an exact retry of a committed declare/update command is idempotent and cannot create a new delay version or duplicate audit/outbox effects; a later explicit clear remains valid whenever a delay snapshot exists;
 - declare/update/clear is permitted only in `planned`, `open` or `paused` as shown in the matrix; `closing`, `closed` and `cancelled` reject delay mutations without state, audit or outbox side effects;
 - every delay mutation acquires the same session serialization boundary used by pause/resume/close/cancel and queue mutations, then revalidates lifecycle state before committing;
 - the session delay snapshot, estimator inputs/output version, actor/reason metadata, audit event and durable notification intents are committed atomically;
 - a positive newly declared or materially changed delay creates idempotent/versioned `session_delayed` notification intents for affected active patient entries according to product notification policy; retries cannot duplicate the same logical notification version;
 - clearing a delay atomically removes its estimator contribution, recomputes affected estimates and records an audit event; any patient-facing recovery/update notification must also be represented by a durable, idempotent outbox intent rather than sent inline;
+- every delay/recovery intent is assigned the committed session state version and a monotonically increasing per-entry delay-notification stream version in the same transaction as the state change;
+- declare/update/clear for the same entry use one replaceable notification stream: committing a newer stream version marks all older undelivered delay/recovery intents in that stream superseded/obsolete; workers must never deliver a superseded version even when an older job was already queued or is being retried;
+- session cancellation is terminal precedence over delay/recovery messaging: cancellation atomically advances the session state version and renders every undelivered non-terminal delay/recovery intent for the affected entries obsolete before `session_cancelled` intents become deliverable;
+- the delivery worker revalidates an intent's supersession flag, notification-stream head version and terminal/session state immediately before provider dispatch; if it is no longer current/relevant, it records a skipped-obsolete delivery outcome and does not call the provider;
+- if an obsolete intent races with a newer commit after worker selection but before provider dispatch, the final revalidation is authoritative; provider calls occur only after that check. Provider-level duplicate suppression/idempotency keys still protect retry-after-unknown-result scenarios;
 - delay contributes to the estimator exactly once as an explicit session delay input; paused time remains a separate input and must not be double-counted as doctor delay merely because the clock advanced while paused;
 - if a delay races with pause, resume, normal close or session cancellation, serialization determines a single valid committed order. A delay command that observes `closing`, `closed` or `cancelled` after acquiring the boundary fails with no side effects; if the delay commits first, the later lifecycle operation observes that committed delay and proceeds according to its own contract;
 - session cancellation makes the delay snapshot operationally terminal with the session; normal closure preserves it only as historical/audit context and no further delay mutation is possible.
 
-Required tests include declare/update/clear in every lifecycle state, duplicate/idempotent requests, estimator recomputation, outbox deduplication, and delay-versus-pause/resume/close/cancel races against PostgreSQL.
+Required tests include declare/update/clear in every lifecycle state, rejection of zero/negative/malformed declare/update values with no side effects, duplicate/idempotent requests, explicit clear after a positive delay, estimator recomputation, outbox deduplication, declare-update-clear supersession before delivery, retry of an obsolete delay intent after clear, delay-then-cancel with stale intent suppression, terminal-state delivery-time revalidation, and delay-versus-pause/resume/close/cancel races against PostgreSQL.
 
 Additional rules:
 - a planned session may accumulate registrations and early check-ins because clinics can receive patients before the doctor starts; nobody can be called until the session is `open`;
@@ -227,8 +234,9 @@ Contract:
 - any affected `waiting`/`checked_in` live priority slot is cleared; after the transaction no active priority cohort exists in the cancelled session, while audit events preserve prior priority context;
 - their pending/live estimates become terminal/unavailable;
 - the session transitions to `cancelled` with cancellation timestamp, actor and reason;
+- the session state version advances; pending replaceable non-terminal intents such as delay/recovery messages are marked obsolete for affected entries before terminal cancellation intents are committed;
 - audit records and durable `session_cancelled` notification intents for affected entries are inserted transactionally with the state changes;
-- notification delivery happens asynchronously after commit and may retry idempotently;
+- notification delivery happens asynchronously after commit and may retry idempotently, but terminal/current-state pre-dispatch validation prevents superseded delay/recovery messages from being sent after cancellation;
 - concurrent cancellation-versus-add/check-in/call/start-consultation/delay tests must prove there is no state where a cancelled session retains a serviceable active queue entry.
 
 ## Estimation engine
@@ -288,7 +296,7 @@ Queue mutation emits domain events / durable notification intents.
 
 A worker/provider adapter later delivers SMS/push/WhatsApp/email. Failed delivery must not roll back queue state.
 
-Notification deduplication/idempotency is required before enabling real provider delivery.
+Notification deduplication/idempotency is required before enabling real provider delivery. For mutable state-derived notifications, deduplication alone is insufficient: each replaceable stream must have a monotonic version/supersession rule, and the worker must perform current-state/terminal-state relevance validation immediately before dispatch. Obsolete intents are retained for audit but are marked skipped rather than delivered. Provider dispatch uses stable idempotency keys so retries after an unknown provider result cannot intentionally create duplicate logical notifications.
 
 ## Localization
 
