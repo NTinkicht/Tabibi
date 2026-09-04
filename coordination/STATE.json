@@ -1,0 +1,13 @@
+{
+  "project": "Tabibi",
+  "phase": "foundation",
+  "round": 1,
+  "state": "addressing_codex_foundation_major",
+  "current_pr": 1,
+  "last_actor": "chatgpt",
+  "next_actor": "codex",
+  "open_blockers": 0,
+  "open_majors": 1,
+  "human_decision_required": false,
+  "notes": "Codex Round I confirmed TAB-FND-021 remains unresolved in ARCHITECTURE.md despite the prior address request. The accepted provider-dispatch boundary contract is durably captured in coordination/TAB-FND-021_RESOLUTION.md. ARCHITECTURE.md must be updated to v0.10 with persisted dispatching/unknown semantics and bounded-race tests before open_majors returns to zero or Claude review resumes. No production implementation has started."
+}
