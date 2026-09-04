@@ -1,7 +1,7 @@
 # ChatGPT Handoff
 
 ## Status
-READY_FOR_CLAUDE_FOUNDATION_REVIEW_ROUND_1
+BLOCKED_ON_TAB_FND_021_ARCHITECTURE_UPDATE
 
 ## Scope
 Foundation review only. No production implementation has started.
@@ -12,6 +12,7 @@ Foundation review only. No production implementation has started.
 - ARCHITECTURE.md — proposed modular-monolith architecture and open questions
 - SECURITY.md — security/privacy baseline
 - coordination/STATE.json — durable agent state
+- coordination/TAB-FND-021_RESOLUTION.md — accepted provider-dispatch boundary contract awaiting incorporation into ARCHITECTURE.md v0.10
 
 ## Independent Codex review history
 
@@ -51,19 +52,25 @@ Foundation review only. No production implementation has started.
 - TAB-FND-019 MAJOR — doctor-delay declare/update now accepts strictly positive finite values only. Zero is explicitly rejected and never aliases clear; `clear doctor delay` remains the only removal command. Added no-side-effect and retry/clear verification requirements.
 - TAB-FND-020 MAJOR — mutable delay/recovery notifications now use monotonically versioned per-entry streams with transactional supersession. Clear/update makes older undelivered intents obsolete, session cancellation has terminal precedence, and workers must revalidate stream head/current terminal state immediately before provider dispatch. Added stale/retry/clear/cancel race tests and provider idempotency requirements.
 
-Claude must independently validate these resolutions rather than assuming Codex was correct.
+### Round I — accepted, architecture update pending
+- TAB-FND-021 MAJOR — final database revalidation alone cannot guarantee suppression across the external provider-call boundary. The canonical resolution is persisted provider delivery state (`pending -> dispatching -> delivered|failed|unknown`, plus `skipped_obsolete`), transactional current-state revalidation immediately before committing `dispatching`, and an explicit bounded-race rule: once provider invocation has begun, that attempt is irrevocable/in-flight; later newer/terminal state supersedes only not-yet-started intents and must remain deliverable afterward. Stable provider idempotency keys cover retry-after-unknown-result but do not order versions.
+- Required barrier tests: mutation before dispatch boundary suppresses the provider call; mutation after provider invocation starts may allow the old call to finish but leaves the newer/terminal intent deliverable; unknown-result retry reuses the same logical idempotency key; cancellation suppresses all older not-yet-started mutable intents; crash-window behavior around `dispatching` is explicit.
+- The accepted contract is durably recorded in `coordination/TAB-FND-021_RESOLUTION.md`.
+- `ARCHITECTURE.md` is still v0.9 and must be updated to v0.10 before this finding is marked resolved and Claude foundation review resumes.
 
-## Review request
+Claude must independently validate all resolved findings and TAB-FND-021 after the architecture update rather than assuming Codex was correct.
+
+## Review request after TAB-FND-021 is committed
 Claude should independently challenge:
 1. product assumptions and missing requirements likely to cause expensive rework;
 2. architecture suitability for live queue/concurrency behavior;
 3. privacy/security model, especially patient/guest access and cross-clinic isolation;
 4. queue and session state-machine completeness;
 5. estimator semantics for waiting, checked-in, called and in-consultation states;
-6. notification/outbox separation, including state-derived notification ordering/supersession and terminal precedence;
+6. notification/outbox separation, especially provider-dispatch boundaries, version ordering, bounded stale-message races and terminal precedence;
 7. MVP boundary and whether anything critical is missing or prematurely included;
 8. testing strategy required before implementation;
-9. all Codex resolutions above, especially priority cohort lifecycle/renumbering, triple ordering semantics, priority collision/renumbering and slot-bound behavior, one-active-consultation enforcement, cancellation serialization, lifecycle gating/opening, doctor-delay value semantics and serialization, stale-notification suppression, provisional estimates and guest-token verifier design.
+9. all Codex resolutions above, especially the TAB-FND-021 persisted `dispatching` boundary and unknown-result semantics.
 
 Do not treat proposed technology choices as settled. Identify blocking decisions separately from optional recommendations.
 
