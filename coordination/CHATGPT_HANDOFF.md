@@ -47,6 +47,10 @@ Foundation review only. No production implementation has started.
 - TAB-FND-017 MAJOR — defined the live priority cohort exactly as `waiting`/`checked_in` entries with non-null `priority_order`. Leaving that cohort via call/cancel/no-show atomically clears the live priority slot and renumbers the remaining cohort; historical priority context lives in audit/queue events, not terminal records. Session cancellation also clears all affected live priority slots. Added lifecycle/race/bounded-insertion test requirements.
 - TAB-FND-018 MAJOR — added doctor-delay mutations to the lifecycle matrix. Declare/update/clear is allowed only in `planned`/`open`/`paused`, serialized with all session mutations, and atomically updates estimator state, audit data and idempotent outbox intents. Added delay-vs-pause/resume/close/cancel and estimator/outbox verification requirements.
 
+### Round H — resolved
+- TAB-FND-019 MAJOR — doctor-delay declare/update now accepts strictly positive finite values only. Zero is explicitly rejected and never aliases clear; `clear doctor delay` remains the only removal command. Added no-side-effect and retry/clear verification requirements.
+- TAB-FND-020 MAJOR — mutable delay/recovery notifications now use monotonically versioned per-entry streams with transactional supersession. Clear/update makes older undelivered intents obsolete, session cancellation has terminal precedence, and workers must revalidate stream head/current terminal state immediately before provider dispatch. Added stale/retry/clear/cancel race tests and provider idempotency requirements.
+
 Claude must independently validate these resolutions rather than assuming Codex was correct.
 
 ## Review request
@@ -56,10 +60,10 @@ Claude should independently challenge:
 3. privacy/security model, especially patient/guest access and cross-clinic isolation;
 4. queue and session state-machine completeness;
 5. estimator semantics for waiting, checked-in, called and in-consultation states;
-6. notification/outbox separation;
+6. notification/outbox separation, including state-derived notification ordering/supersession and terminal precedence;
 7. MVP boundary and whether anything critical is missing or prematurely included;
 8. testing strategy required before implementation;
-9. all Codex resolutions above, especially priority cohort lifecycle/renumbering, triple ordering semantics, priority collision/renumbering and slot-bound behavior, one-active-consultation enforcement, cancellation serialization, lifecycle gating/opening, doctor-delay serialization, provisional estimates and guest-token verifier design.
+9. all Codex resolutions above, especially priority cohort lifecycle/renumbering, triple ordering semantics, priority collision/renumbering and slot-bound behavior, one-active-consultation enforcement, cancellation serialization, lifecycle gating/opening, doctor-delay value semantics and serialization, stale-notification suppression, provisional estimates and guest-token verifier design.
 
 Do not treat proposed technology choices as settled. Identify blocking decisions separately from optional recommendations.
 
