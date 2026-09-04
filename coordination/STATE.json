@@ -9,5 +9,5 @@
   "open_blockers": 0,
   "open_majors": 0,
   "human_decision_required": false,
-  "notes": "Seven Codex foundation passes completed. Findings TAB-FND-001 through TAB-FND-018 have been addressed. Awaiting independent Claude review; no production implementation has started."
+  "notes": "Eight Codex foundation passes completed. Findings TAB-FND-001 through TAB-FND-020 have been addressed. Awaiting independent Claude review; no production implementation has started."
 }
