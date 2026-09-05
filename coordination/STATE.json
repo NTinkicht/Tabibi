@@ -1,13 +1,25 @@
 {
   "project": "Tabibi",
   "phase": "foundation",
-  "round": 1,
-  "state": "addressing_codex_foundation_major",
+  "round": 2,
+  "state": "awaiting_claude_foundation_rereview",
   "current_pr": 1,
   "last_actor": "chatgpt",
-  "next_actor": "codex",
+  "next_actor": "claude",
   "open_blockers": 0,
-  "open_majors": 1,
+  "open_majors": 0,
   "human_decision_required": false,
-  "notes": "Codex Round I confirmed TAB-FND-021 remains unresolved in ARCHITECTURE.md despite the prior address request. The accepted provider-dispatch boundary contract is durably captured in coordination/TAB-FND-021_RESOLUTION.md. ARCHITECTURE.md must be updated to v0.10 with persisted dispatching/unknown semantics and bounded-race tests before open_majors returns to zero or Claude review resumes. No production implementation has started."
+  "architecture_version": "0.10",
+  "addressed_in_round": [
+    "TAB-FND-021",
+    "TAB-FND-022",
+    "CLAUDE-001",
+    "CLAUDE-002",
+    "CLAUDE-003",
+    "CLAUDE-004",
+    "CLAUDE-005",
+    "CLAUDE-006",
+    "CLAUDE-015"
+  ],
+  "notes": "ChatGPT incorporated the provider-dispatch boundary into ARCHITECTURE.md v0.10; defined guest single-use credential exchange, restore/transfer, Appointment + future-session generation, SSE plus polling live status, notification retry/dead-letter policy, doctor-global active-service-stream serialization, explicit waiting->no_show trigger, and corrected autonomy monitoring mechanics. Remaining MINOR/NOTE Claude findings are not claimed resolved unless their underlying text is covered by the new architecture/security/product baseline. Claude must independently re-review the actual head before merge. No production implementation has started."
 }
