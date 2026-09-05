@@ -15,7 +15,7 @@ Tabibi must progress without Nassim acting as messenger, scheduler, reviewer coo
 - Defines merge gates and pre-approves the next work unit so event-driven execution does not stop after a successful review.
 
 ### Codex Cloud — Primary implementation runtime and mechanical merge executor
-- Executes approved work from committed specs, issues, PR handoffs, ChatGPT architectural decisions, and accepted consensus-fast-path candidates.
+- Executes approved work from committed specs, issues, PR handoffs, ChatGPT architectural decisions, and eligible consensus-fast-path candidates. A valid nomination authorizes exactly one bounded implementation attempt; acceptance occurs only after Claude re-review.
 - Owns routine coding, refactoring, migrations, tests, deterministic documentation updates, CI setup/remediation, and reviewer fixes that do not require changing a disqualified or unresolved product/architecture contract.
 - Must read `PRODUCT.md`, `ARCHITECTURE.md`, `SECURITY.md`, `AGENTS.md`, this protocol, and current coordination state before material implementation.
 - Must not silently invent or alter consequential product/security/architecture policy. If a requested fix is outside the consensus fast-path eligibility rules, hand control to ChatGPT instead of guessing.
@@ -109,6 +109,8 @@ The marker identifies intended control transfer even when GitHub comments are au
 ## Consensus fast path for conservative architecture/spec clarifications
 The purpose is to remove unnecessary ChatGPT latency without allowing Claude and Codex to redesign Tabibi by convenience.
 
+This path may clarify canonical `PRODUCT.md`, `ARCHITECTURE.md`, or `SECURITY.md` text only when the clarification is already logically entailed by committed invariants and has one conservative deterministic interpretation. It may not establish previously unstated product, security, or architecture policy. A genuinely new canonical contract, a materially different valid design, or a security/privacy/authentication/authorization/tenant-isolation/data-ownership/policy choice is disqualified and must route to ChatGPT.
+
 Claude may nominate `CONSENSUS_FAST_PATH_CANDIDATE` only when **all** of the following are true:
 1. The change narrows, clarifies, or makes executable an already-committed product/architecture/security invariant rather than introducing a new product capability or business rule.
 2. There is one clearly safer/more deterministic interpretation; materially competing valid designs do not exist.
@@ -121,7 +123,7 @@ Claude may nominate `CONSENSUS_FAST_PATH_CANDIDATE` only when **all** of the fol
 Fast-path procedure:
 1. Claude posts `CONSENSUS_FAST_PATH_CANDIDATE` with stable finding ID, why all eligibility rules are satisfied, the smallest acceptable contract change, and verification criteria.
 2. In the same comment Claude posts `HANDOFF_TO_CODEX` plus `@codex address that feedback`.
-3. Codex implements only the smallest nominated change and its regression tests/evidence. It may not opportunistically broaden the design.
+3. Before editing, Codex independently checks every eligibility criterion. If any criterion fails, Codex posts `HANDOFF_TO_CHATGPT` instead. If all pass, the candidate authorizes exactly one bounded implementation attempt: Codex implements only the smallest nominated change and its regression tests/evidence, without opportunistically broadening the design. `CONSENSUS_FAST_PATH_ACCEPTED` is not a prerequisite to begin and is reserved for Claude's post-implementation verdict.
 4. Codex posts `HANDOFF_TO_CLAUDE` with exact SHA and verification.
 5. Claude re-reviews once. If correct, it posts `CONSENSUS_FAST_PATH_ACCEPTED` and continues the normal PASS/merge path when applicable.
 6. If Claude disagrees with the implementation, discovers a disqualifier, sees a materially competing design, or the same finding survives this one implementation/re-review cycle, it immediately posts `HANDOFF_TO_CHATGPT`. No second autonomous architecture cycle is allowed.
