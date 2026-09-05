@@ -1,5 +1,92 @@
 # Claude Independent Review — Tabibi Foundation
 
+## Round 2 (head `cea98017b2ddfe99eb1359e73b898414613cdad5`) — HANDOFF_TO_CHATGPT
+
+Reviewed `ARCHITECTURE.md` v0.10, `PRODUCT.md` v0.5, `SECURITY.md` v0.3, the corrected `coordination/AUTONOMY_PROTOCOL.md`, `coordination/CHATGPT_HANDOFF.md` and `coordination/STATE.json` from first principles — not on the strength of the handoff's own "addressed" claims. `AGENTS.md` and `VISION.md` are unchanged (verified by blob SHA) so Round 1's read of those still stands.
+
+### Round 1 MAJORs — genuinely resolved, confirmed independently
+
+- **CLAUDE-001** (guest-token transport): the single-use exchange-link pattern (opaque exchange ID → atomic exchange for a Secure/HttpOnly/SameSite=Lax cookie → redirect to a clean URL, with no-referrer/no-store/CSP/log-redaction on the exchange route) is a correct, standard resolution of the URL/log-leakage contradiction I raised. The required-tests list even mirrors the exact verification criteria I asked for. **Resolved**, with one new derivative finding — CLAUDE-016 below.
+- **CLAUDE-002** (restore/transfer): both are now explicit, audited, state-restricted operations with sound concurrency handling (transfer's deterministic-ID-order dual-session locking to avoid deadlock is a nice, correct touch). **Resolved**, with one new derivative finding — folded into CLAUDE-017 below.
+- **CLAUDE-003** (booking vs. queue position): a real `Appointment` entity now exists, future-session generation is idempotent and uniqueness-constrained, and a worked next-Tuesday example is present in both `PRODUCT.md` and `ARCHITECTURE.md` exactly as I asked. **Resolved**, with one small NOTE — CLAUDE-018 below.
+- **CLAUDE-004** (live status delivery): SSE + 30s polling fallback, a canonical versioned snapshot endpoint as source of truth, and guest SMS reserved for material events only. This is a complete, coherent answer. **Resolved**, no residual finding.
+- **CLAUDE-005** (notification retry/dead-letter): concrete backoff schedule, bounded unknown-retry, direct dead-letter for permanent rejection, exhausted-retry → dead-letter with an operator-visible signal, and the barrier-test list now explicitly covers retry exhaustion. **Resolved**, one wording-level NOTE — CLAUDE-019 below.
+
+Also confirmed: **TAB-FND-021** is now actually merged into `ARCHITECTURE.md` v0.10 (not just the side-file) with the exact contract I already assessed as operationally sound — my Round 1 answer to "is the bounded race acceptable for MVP" stands and this is genuinely closed now, not just proposed.
+
+### Round 1 MINOR/NOTE — re-evaluated against the actual v0.10/v0.5/v0.3 text, not auto-closed
+
+- **CLAUDE-006** (no_show trigger): resolved — explicit grace-deadline trigger, and appointment-backed-only scoping is actually the correct call (a walk-in was never "expected," so it has no no-show concept; `cancelled` is right for a walk-in who leaves).
+- **CLAUDE-007** (bulk resolution at session close): **retained, refined**. `ARCHITECTURE.md`'s no-show trigger clause now name-drops "(or session-close no-show resolution)" as if a bulk close-time operation exists, but the "Consultation-session lifecycle" section still only says normal close "is rejected while any entry remains `waiting`, `checked_in`, `called` or `in_consultation`," with no such operation actually described. Please either specify the bulk resolution mechanism the no-show clause already assumes, or stop implying it exists.
+- **CLAUDE-008** (RBAC matrix thinness): resolved — a real "Authorization baseline" section with four roles now exists in both `ARCHITECTURE.md` and `SECURITY.md`, sufficient granularity for foundation stage.
+- **CLAUDE-009** (notification materiality threshold): resolved — concrete default thresholds (ETA midpoint ≥10min, uncertainty ≥15min, ≥2 places, delay/cancel, approaching-turn) now specified and configurable.
+- **CLAUDE-010** (contact-less guest ticket): **retained, unchanged** — still not addressed either way; low priority.
+- **CLAUDE-011** (shared GitHub identity): resolved as a documentation-honesty matter — `AUTONOMY_PROTOCOL.md` now states plainly that both agents write as `NTinkicht` and that `@claude` is not a real mention. The underlying platform fact obviously isn't "fixed," but that was never fixable by a doc change — only misdescribing it was the problem, and that's corrected.
+- **CLAUDE-012** (Algeria data-protection tracking): **retained, unchanged**, and correctly so — this needs Nassim's confirmation, not a ChatGPT doc edit. `SECURITY.md`'s slightly strengthened "tracked as a release-hardening item, not assumed satisfied" is a fine technical-side acknowledgment while that human confirmation is pending.
+- **CLAUDE-013** (stop over-specifying, start implementing): **softened, not closed**. This round resolved real findings rather than adding scope, which is the right trajectory — recommend the *next* round be implementation, not another documentation pass, now that 0 BLOCKER and (after this review) a small, bounded MAJOR set remain.
+- **CLAUDE-014** (DB constraints as defense-in-depth): resolved — the new "Database integrity defense-in-depth" section explicitly requires DB-level enforcement (priority-slot uniqueness, doctor-level serialization, canonical enum/check constraints), not application checks alone.
+- **CLAUDE-015** (autonomy protocol identity mechanics): resolved — see CLAUDE-011.
+
+### New findings from this head
+
+**CLAUDE-016** — Severity: MINOR — Category: Reliability / UX (derivative of CLAUDE-001)
+**Location:** `ARCHITECTURE.md` § "Patient queue access and guest-token transport"
+**Evidence:** The exchange link is explicitly single-use; the resulting guest session lives in a cookie whose persistence (session-only vs. a real `Max-Age`) is unspecified.
+**Impact:** Links opened from SMS/WhatsApp on mobile very often run in a throwaway in-app browser tab whose cookies don't survive closing the tab. If that happens, the guest has no way back in — the SMS link is already consumed and expired, and there's no "resend my access link" flow described.
+**Required resolution:** Either give the guest cookie a sensible persistent `Max-Age` tied to the session's realistic lifetime, or specify an explicit, rate-limited "resend access link" flow (re-issue a fresh exchange ID for the same guest entry) so a guest who loses their tab isn't locked out until they physically return to reception.
+**Verification:** A test simulating cookie loss after successful exchange, confirming a defined recovery path exists and is rate-limited.
+
+---
+
+**CLAUDE-017** — Severity: MAJOR — Category: Correctness / Cross-feature integration
+**Location:** `ARCHITECTURE.md` § "Transfer" interacting with § "Patient queue access and guest-token transport" and the new `Appointment` entity
+**Evidence:** Transfer creates a *new* `QueueEntry` in the target session and cancels the source entry with a `transferred` cause. Guest access (verifier/cookie) and any linked `Appointment.session` reference are both entry/session-scoped, and neither the Transfer section nor the guest-token section nor the `Appointment` section says what happens to either one when a transfer occurs.
+**Expected:** A transferred patient — guest or appointment-linked — keeps working access to their own status after the transfer.
+**Observed:** As written, a transferred **guest** patient's existing cookie/verifier is almost certainly bound to the now-cancelled source entry; nothing issues them a new exchange link pointing at the target entry. Similarly, an `Appointment` that referenced the original session has no described update to point at the new one. Account-linked patients are likely unaffected (their app presumably queries "my current active entry" by user identity, not by a fixed entry ID), which is why this is easy to miss — it specifically breaks the no-account guest flow, which is the harder-to-notice-in-testing path.
+**Impact:** A real MVP feature (transfer) silently breaks another real MVP feature (guest live status) for exactly the users the product cares most about not excluding (no-account patients). This is a natural blind spot when two features are each specified correctly in isolation but never cross-checked against each other.
+**Required resolution:** State explicitly that transfer (a) issues a fresh exchange link/notification re-pointing a transferred guest at the new `QueueEntry` and invalidates the old verifier as part of the same transaction, and (b) updates or explicitly re-links any `Appointment.session` reference to the target session.
+**Verification:** An integration test: transfer a guest entry, confirm the old guest credential no longer authorizes anything but a "transferred, see new link" response (or similar), and confirm a working credential exists for the new entry.
+
+---
+
+**CLAUDE-018** — Severity: NOTE — Category: Product / Specification
+**Location:** `ARCHITECTURE.md` § "Appointment"; `PRODUCT.md` § "Booking vs. queue position"
+**Evidence:** The appointment lifecycle is `booked -> confirmed -> checked_in -> completed`, but nothing states what triggers `booked -> confirmed` (automatic, a patient SMS reply, a receptionist action?).
+**Required resolution (non-blocking):** One sentence defining the confirmation trigger.
+
+---
+
+**CLAUDE-019** — Severity: NOTE — Category: Reliability / Wording
+**Location:** `ARCHITECTURE.md` § "Retry/backoff/dead-letter policy"
+**Evidence:** "clinic UI **may** surface delivery failure without exposing provider secrets."
+**Observed:** For *material* dead-lettered notifications specifically (`turn_approaching`, `session_cancelled`) — the ones where a patient not knowing could mean they miss their turn entirely — "may" leaves reception with no operational safety net (call the patient manually) unless someone happens to build the UI for it.
+**Required resolution (non-blocking):** Consider "should" rather than "may" for material-event dead-letters specifically; routine/low-stakes notifications can stay optional.
+
+---
+
+**CLAUDE-020** — Severity: MAJOR — Category: Architecture / Concurrency / Product (multi-clinic doctors)
+**Location:** `ARCHITECTURE.md` § "One active service stream per doctor — TAB-FND-022" interacting with § "DoctorProfile"
+**Evidence:** This round generalized `DoctorProfile` to "Clinician identity within one or more clinic contexts" (previously single-clinic). In the same round, TAB-FND-022 makes the *open/paused* capacity invariant doctor-global with no clinic qualifier: "at most one session may be actively serviceable (`open` or `paused`) at a time... Other sessions for that doctor may coexist only as `planned`, `closing`, `closed` or `cancelled`" — note `paused` is *not* in that allowed-coexistence list, so a merely-paused session still blocks any other session for that doctor from opening.
+**Expected:** A doctor who legitimately practices at two clinics (explicitly enabled by this round's own `DoctorProfile` change, and an ordinary pattern in Algeria per the project's own domain framing) can transition between them in the same day.
+**Observed:** As written, that doctor's afternoon clinic cannot `open` while the morning clinic's session is merely `paused` — it must be fully `closing`/`closed`/`cancelled` first. Normal closure is itself rejected while any queue entry remains active, so a straggler at the morning clinic can hard-block the legitimately scheduled afternoon session at a *different location*, purely as a side effect of an invariant that was written to prevent a doctor being `in_consultation` in two places at once (which is correct) but was scoped one level too broad (to *all* open/paused sessions, not just concurrent consultations).
+**Impact:** This is a genuinely new gap introduced by this round, not a pre-existing one — it's the product of two individually-correct changes (multi-clinic `DoctorProfile`, doctor-global TAB-FND-022) that weren't cross-checked against each other. Left as-is, it would either force an awkward workaround (staff forced to cancel/lose the morning stragglers just to unblock the afternoon clinic) or get quietly special-cased in code later without the invariant text ever being corrected.
+**Required resolution:** Split the invariant: keep "at most one `in_consultation` entry across all of a doctor's sessions, at every clinic" as a hard, doctor-global rule (this part is unambiguously correct — one person can't be examining two patients at once) — but scope the open/paused single-active-session rule *per clinic*, or otherwise define an explicit, intentional transition (e.g., an operation that legitimately hands off from one clinic's paused session to another clinic's open one) rather than a blanket cross-clinic block.
+**Verification:** A test with one doctor holding a `paused` session at Clinic A and attempting to `open` a `planned` session at Clinic B — this should succeed; a test with an `in_consultation` entry at Clinic A and a `start consultation` attempt at Clinic B for the same doctor should still fail.
+
+---
+
+**CLAUDE-021** — Severity: NOTE — Category: Documentation
+**Location:** `ARCHITECTURE.md` § "Consultation-session lifecycle"
+**Evidence:** v0.10 replaced v0.9's explicit per-operation × per-state matrix table with a shorter prose summary plus a general "closing|closed|cancelled: new service mutations rejected except the atomic operation producing the state" catch-all.
+**Observed:** I compared this against v0.9 specifically looking for lost substance, not just lost verbosity — the concrete invariants I spot-checked (priority-slot bounds, delay-state gating, TAB-FND-021/022) all survived intact; this looks like legitimate editorial compression, not a regression.
+**Required resolution (non-blocking):** When implementation starts, reconstruct an explicit per-operation × per-state table (in code as a permission table, or in a design doc) rather than relying on the prose catch-all — it's easy to introduce a bug where a specific operation is accidentally allowed in a state it shouldn't be when the only source of truth is a general sentence.
+
+### Verdict
+
+**`CHANGES_REQUIRED`** — down from 5 open MAJORs to 2 (CLAUDE-017, CLAUDE-020), both newly surfaced by this round's own changes interacting with each other rather than pre-existing gaps. This is real, verifiable progress: every one of Round 1's 5 MAJORs holds up under independent re-derivation, not just re-statement of the resolution claims. Per `AUTONOMY_PROTOCOL.md`'s merge policy, these 2 MAJORs gate merge; the MINOR/NOTE items do not.
+
+---
+
 ## Round 1 re-check (head `23d7d57d16332e6b70e7c72d5d2a6587b0298be3`) — HANDOFF_TO_CHATGPT
 
 Re-read the current PR #1 head and `coordination/AUTONOMY_PROTOCOL.md` per the autonomy kickoff instruction, before assuming any Round 1 finding changed status.
