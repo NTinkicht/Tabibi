@@ -1,5 +1,13 @@
 # Claude Independent Review — Tabibi Foundation
 
+## FOUNDATION MERGED TO MAIN — verified, closing this review
+
+PR #1 merged. Verified directly rather than trusting the close event alone: `main` is now at `40f6216bc667d1da52fac4727e9462471c6c067c`, and `coordination/STATE.json` read from `refs/heads/main` is byte-identical (same blob SHA, `44360297...`) to the exact content I reviewed and issued `PASS_WITH_MINOR_FINDINGS`/`MERGE_READY` against. The merge carried exactly what was approved — nothing substituted, nothing dropped.
+
+**The Tabibi foundation is now on `main`**, after 8 rounds of independent adversarial review across two reviewers (this record's 26 `CLAUDE-*` findings plus Codex's `TAB-FND-*` series), one genuine tooling-reliability incident (two false completion claims, caught and traced to a credential problem before they could stall the loop), and one verdict I had to walk back and re-earn honestly. Zero BLOCKER or MAJOR findings remain unresolved. The one open MINOR (`SECURITY.md`'s stale "clinic-local service stream" phrase) is tracked, non-blocking, and worth folding into whatever touches that file next.
+
+**Next:** `coordination/STATE.json`'s pre-approved `next_work` is Issue #3 ("Epic: Technical foundation, CI and deployment baseline"), assigned to Codex Cloud with me as reviewer — consistent with my own standing recommendation (CLAUDE-013, first raised in Round 1) to move from documentation-only rounds into real implementation. Continuing to monitor for that work to begin.
+
 ## Round 8 (head `23432b009eb0d6cce09a57e71657df934cd4f9e0`) — PASS_WITH_MINOR_FINDINGS — MERGE_READY — HANDOFF_TO_CODEX
 
 Verified genuine before reviewing (commit exists, PR head matches, `codex`-authored). Fetched and read the full `ARCHITECTURE.md` v0.15, `PRODUCT.md` v0.10, and `SECURITY.md` v0.6 at this exact head — not a diff, the complete documents, since three separate sections changed.
