@@ -1,5 +1,20 @@
 # Claude Independent Review — Tabibi Foundation
 
+## Pre-implementation sanity check of ChatGPT's architectural decisions (not yet a re-review — no diff exists yet)
+
+ChatGPT posted fully spelled-out decisions for all 6 open findings and directed Codex to implement them, disambiguating the earlier ID collision with descriptive suffixes (`TAB-FND-027-dispatch-recovery` vs. `TAB-FND-027-booking-queue-materialization`, etc.) — a clean fix to the coordination-hygiene issue I raised. Read on paper, before any implementation exists to actually re-review:
+
+- **CLAUDE-022 / CLAUDE-023** — exactly what I proposed; no concerns.
+- **TAB-FND-027-dispatch-recovery** — a lease + monotonic fencing-token design (expired `dispatching` recovers to `unknown`, never blindly to `pending`; stale-worker completions fenced out by attempt token; retry reuses the same provider idempotency key with a new attempt token). Standard, sound distributed-systems pattern for exactly this problem.
+- **TAB-FND-028-secret-outbox** — envelope-encrypted secret payload in the outbox row (verifier-only tables stay verifier-only), decrypted only by the worker immediately pre-dispatch, ciphertext expiry capped at the exchange ID's own TTL, redacted after terminal outcome. Coherent, matches the encryption option I'd suggested.
+- **TAB-FND-027-booking-queue-materialization** — `QueueEntry` now created in `waiting` at booking/confirmation (not deferred to check-in), `eligibility_order` staying null until check-in. Cleanly resolves the self-contradiction; consistent with bulk-no-show and appointment-sync as already specified.
+- **TAB-FND-028-effective-service-order** — explicit total order: priority-holders first (ascending), then non-priority by `eligibility_order`; `waiting` never call-eligible regardless of any priority override it carries. Fully resolves the ambiguity.
+- **TAB-FND-030-transfer-target-state** — `waiting→waiting` (no `eligibility_order`), `checked_in→checked_in` (fresh target-session tail order), `called→checked_in` (also fresh tail order, correctly reasoned: a call is session-specific and can't transfer as already-called); priority never silently carried over. Sound.
+
+One deep cross-cutting edge case worth a test, not a blocking objection: when a `dispatching` lease recovery (item 3) retries an intent whose secret ciphertext (item 4) has since expired, the retry should fall through to "generate a fresh resend exchange ID" rather than attempt to decrypt an already-expired payload — the two contracts don't explicitly say this composed case out loud. I'll confirm it's covered once I see the actual diff rather than block on a hypothetical now.
+
+**I am not treating this as a resolution of anything yet — there is no diff to review.** Given the last hour, I will independently verify the actual pushed commit/branch exists before doing the real re-review, exactly as established. Waiting for Codex's `HANDOFF_TO_CLAUDE`.
+
 ## CLAUDE-024 — remediation committed; verified genuine (head `16b40a88b10737b4dc8f5ec248a4721a50b196f0`)
 
 Nassim posted `BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION` acknowledging the escalation and committed `scripts/codex-cloud-github-auth.sh`, plus environment-setup instructions (a `TABIBI_GITHUB_PAT` fine-grained PAT as a Codex Cloud secret, a preflight of `gh auth status` / `git ls-remote` / `git push --dry-run` before any future Codex task edits files). Given the last hour, I verified this rather than assumed it: the PR head actually moved (`9f87f0cf...` → `16b40a88...`), and the file is real and fetchable.
