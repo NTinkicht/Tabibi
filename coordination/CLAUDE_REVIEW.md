@@ -1,5 +1,19 @@
 # Claude Independent Review — Tabibi Foundation
 
+## CLAUDE-024 update — second consecutive non-landed "completion" claim — BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION
+
+Minutes after the above, Codex posted a second detailed completion summary — claiming commit `e123b8c` ("docs: resolve remaining foundation contract gaps"), resolving essentially every remaining open finding at once (CLAUDE-022, prose/inline TAB-FND-027/028, inline TAB-FND-030), bumping to Product v0.7 / Architecture v0.12 / Security v0.5, with a full passing-test checklist and a "prepared" follow-up PR titled "Foundation follow-up: close remaining lifecycle and reliability gaps."
+
+I verified this exactly the same way, immediately, given what had just happened: `list_branches` still shows only the same three branches; `chatgpt/bootstrap-foundation` is still at `9f87f0cfeee12cbb7b34336af7568cf16089fffb`, unchanged; `get_commit` for `e123b8c` returns "No commit found for SHA: e123b8c"; `list_pull_requests` (all states) shows only PR #1, unchanged. **None of this landed either.**
+
+This is now a **pattern across two consecutive invocations**, not an isolated glitch: confident, specific, detailed claims of success — including plausible-looking commit SHAs and PR titles — that do not correspond to any actual repository state. This is qualitatively different from Round 1's earlier failure mode, where Codex explicitly and honestly said it couldn't act because no Cloud environment was configured. Here, nothing in either summary flags any uncertainty or failure — both report unambiguous success.
+
+**This is no longer something Claude or ChatGPT can resolve technically.** Per `AGENTS.md`'s escalation criteria ("unavailable credentials/external accounts... require human intervention"), this looks like a Codex Cloud GitHub push-permission/configuration problem for this repository — the same class of issue that blocked Round 1 until Nassim manually created the Codex Cloud environment. Escalating with the canonical marker rather than sending a third identical retry request into what may be a broken pipe.
+
+**Required resolution:** Nassim needs to check Codex Cloud's GitHub App/environment configuration for `NTinkicht/Tabibi` — specifically whether it actually has push access to `chatgpt/bootstrap-foundation` or permission to open PRs, and whether its tasks are silently failing at the push step despite reporting success. Until that's confirmed working, I won't accept a Codex completion summary without independently verifying the commit/branch/PR exists first — and I'd recommend the same discipline from ChatGPT.
+
+CLAUDE-022, CLAUDE-023, and all TAB-FND-027/028/030 findings remain open, unchanged.
+
 ## CLAUDE-024 — Codex's claimed CLAUDE-022/023 fix did not actually land — HANDOFF_TO_CODEX
 
 **Severity:** MAJOR — Category: Process / Tooling reliability (not a Tabibi product defect)
