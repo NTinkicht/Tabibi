@@ -22,7 +22,7 @@ For each implementation cycle:
 4. Run/inspect deterministic checks and repair CI where feasible.
 5. Do not silently invent or change architecture/product/security policy. Before editing for a `CONSENSUS_FAST_PATH_CANDIDATE`, independently verify every protocol eligibility criterion; the candidate authorizes exactly one smallest bounded attempt, while `CONSENSUS_FAST_PATH_ACCEPTED` is only Claude's post-implementation verdict. If any criterion fails, route `HANDOFF_TO_CHATGPT` without editing.
 6. Commit/push evidence and post `HANDOFF_TO_CLAUDE` when ready for independent review.
-7. Do not declare acceptance while BLOCKER or MAJOR findings remain unresolved.
+7. Do not declare acceptance while BLOCKER or MAJOR findings remain known-open. A pushed fix may move a finding into `review_pending_findings`; that is an author claim awaiting Claude, not acceptance.
 8. When Claude posts `MERGE_READY` for the exact unchanged head, verify all protocol merge gates and merge mechanically; then post `MERGED_AND_CONTINUE` and immediately trigger the umbrella review or next pre-approved work unit.
 
 Codex must never sit on an accepted PR waiting for Nassim or ChatGPT to notice it. If a merge gate is unclear, route the exact gate to the actor that can resolve it.
@@ -34,7 +34,7 @@ Claude should try to falsify correctness, not confirm ChatGPT/Codex assumptions.
 
 For routine implementation defects whose resolution is unambiguous under committed contracts, Claude may post `HANDOFF_TO_CODEX` plus `@codex address that feedback` with stable findings and verification criteria. Claude may also nominate a clarification that is logically entailed by committed invariants and has one conservative deterministic interpretation as a `CONSENSUS_FAST_PATH_CANDIDATE`; this authorizes one bounded Codex attempt subject to Codex's independent eligibility check. A genuinely new canonical contract, materially different valid design, or security/privacy/authentication/authorization/tenant/data-ownership/policy choice requires `HANDOFF_TO_CHATGPT` instead.
 
-On successful re-review Claude must not stop at "recommend merge". It posts `PASS` or `PASS_WITH_MINOR_FINDINGS`, followed by `MERGE_READY` + `HANDOFF_TO_CODEX`, naming the exact reviewed head SHA. That event is the authorization for Codex's mechanical merge, subject to the protocol gates.
+On successful re-review Claude must not stop at "recommend merge". It posts `PASS` or `PASS_WITH_MINOR_FINDINGS`, followed by `MERGE_READY` + `HANDOFF_TO_CODEX`, naming the exact reviewed head SHA and including `@codex merge this PR if gates pass`. For that exact SHA, Claude's verdict resolves the relevant `review_pending_findings` for merge purposes without requiring a post-review bookkeeping commit.
 
 ## Finding severity
 - BLOCKER — unsafe to merge: severe correctness, security, privacy, data-loss, or direct core-spec violation.
@@ -71,14 +71,16 @@ Every action must end with an executable continuation. "Waiting for merge", "wai
 - Codex resolves routine implementation findings by fixing them and adding appropriate verification/tests.
 - ChatGPT resolves findings that require architecture/product/security-policy decisions or technical rebuttal.
 - Claude independently re-reviews every claimed resolution and checks for regressions.
+- A finding with a concrete pushed fix may be recorded as `review_pending`; it becomes independently resolved only through Claude's exact-SHA verdict.
 - If the same MAJOR survives two direct Claude<->Codex cycles, or they disagree on contract interpretation, route to ChatGPT rather than looping indefinitely.
 
 ## Definition of done
 A scoped engineering change is accepted only when:
 - relevant product/security/architecture contracts are satisfied;
 - deterministic CI passes when configured and required CI exists for production implementation after the CI-foundation work is complete;
-- zero unresolved BLOCKER findings remain;
-- zero unresolved MAJOR findings remain;
+- zero known-open BLOCKER findings remain;
+- zero known-open MAJOR findings remain;
+- all review-pending findings affecting the exact head are accepted by Claude's `PASS`/`PASS_WITH_MINOR_FINDINGS` and `MERGE_READY` verdict;
 - handoff/review state is current;
 - no required external/human decision is outstanding.
 
