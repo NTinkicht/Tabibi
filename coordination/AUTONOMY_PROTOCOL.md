@@ -3,95 +3,74 @@
 Status: binding project coordination protocol
 
 ## Objective
-
-Tabibi must progress without Nassim acting as a messenger, scheduler, reviewer coordinator, or technical decision relay.
-
-GitHub is the canonical shared workspace and durable memory between ChatGPT and Claude.
+Tabibi must progress without Nassim acting as messenger, scheduler, reviewer coordinator or technical decision relay. GitHub is the canonical shared workspace and durable memory between ChatGPT and Claude.
 
 ## Roles
-
 ### ChatGPT
-- Product architect and lead implementer.
-- Owns product specification, architecture proposals, implementation, tests, CI/CD, backlog decomposition, and resolution of review findings.
-- Independently monitors GitHub for new Claude reviews, commits, PR comments, CI changes, and coordination-state changes.
-- On receiving Claude findings, evaluates every finding, fixes or technically rebuts it with evidence, adds regression tests where applicable, updates durable coordination state, and hands the result back through GitHub.
+Product architect and lead implementer. Owns product specification, architecture proposals, implementation, tests, CI/CD, backlog decomposition, and resolution/rebuttal of review findings. Independently monitors GitHub and continues when Claude hands work back.
 
 ### Claude
-- Independent adversarial architecture/security/correctness/QA reviewer.
-- Must review from first principles rather than rubber-stamping ChatGPT or Codex.
-- Independently monitors GitHub for new implementation commits, handoff markers, PR updates, CI results, and requests for re-review.
-- On receiving a ChatGPT handoff, reviews the current head, records durable findings in GitHub, and hands control back through GitHub.
-- Must not ask Nassim to copy technical findings or status between agents.
+Independent adversarial architecture/security/correctness/QA reviewer. Reviews from first principles, independently monitors GitHub using the mechanisms actually available in Claude's cloud environment, records durable findings, and hands control back through GitHub. Claude does not ask Nassim to relay technical content.
 
-### CI / deterministic tooling
-- Acts as the objective referee for tests, static checks, migrations, security checks, and reproducibility.
-- Neither agent may override a failing required check without a documented technical resolution.
+### Codex / CI
+Supplementary automated/deterministic review. They are not substitutes for ChatGPT or Claude. Required failing checks cannot be waived without documented technical resolution.
 
 ## Autonomous continuity rule
+Neither agent may depend on Nassim saying "Claude finished", "ChatGPT finished", "check GitHub", or equivalent. Each agent detects durable activity and continues the loop.
 
-Neither agent may depend on Nassim saying "Claude finished", "ChatGPT finished", "check GitHub", or equivalent.
+## Actual wakeup/monitoring mechanics
+The human-readable marker is authoritative; GitHub account identity is not used to infer which AI produced a comment because both connected agents may write as repository owner `NTinkicht`.
 
-Each agent is responsible for detecting the other agent's durable GitHub activity and continuing the workflow.
-
-If an agent platform supports recurring monitoring/scheduled tasks, the agent should maintain an independent recurring GitHub watch for this repository.
-
-If an agent platform supports GitHub-event or mention-based wakeups, explicit GitHub mentions and handoff markers are the preferred trigger.
-
-If passive monitoring is temporarily unavailable on one platform, the other agent must still leave a complete durable handoff in GitHub so work can resume immediately on the next activation without user relay.
-
-## Canonical handoff markers
-
-Use a top-level PR comment containing one of these exact markers:
-
+Canonical markers:
 - `HANDOFF_TO_CLAUDE`
 - `HANDOFF_TO_CHATGPT`
 - `BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION`
 
-A handoff must include:
-- current branch/head SHA if known;
+`@claude` may appear for readability, but it is **not assumed to be a real GitHub collaborator mention or wakeup mechanism**.
+
+Current Claude monitoring, as reported by Claude:
+1. active PR-activity subscription/webhook for PR #1, delivering comments/reviews/CI activity into Claude's persistent session;
+2. a 6-hour fallback heartbeat sweep for repository issues/PRs, with the documented caveat that connector availability on future heartbeat execution still needs empirical confirmation.
+
+Current ChatGPT monitoring:
+- recurring condition-watch repository sweep plus immediate checks when this conversation/automation is activated.
+
+When work moves to a new PR, Claude should establish equivalent PR-activity subscription for that PR where supported and record it in the handoff. The marker remains necessary even when a webhook is active because it identifies intended control transfer unambiguously.
+
+## Handoff payload
+A handoff includes, when known:
+- branch/head SHA;
 - what changed;
-- unresolved findings and severities;
+- unresolved findings/severities;
 - tests/CI status;
-- exact next action requested;
-- whether merge is permitted.
+- exact next action;
+- merge permission/gate status.
 
 ## Normal loop
-
-1. ChatGPT selects the next approved work unit and implements it on a branch.
-2. ChatGPT runs/updates tests and CI and posts `HANDOFF_TO_CLAUDE` with `@claude` when available.
+1. ChatGPT selects and implements the next approved work unit.
+2. ChatGPT verifies tests/CI and posts `HANDOFF_TO_CLAUDE`.
 3. Claude independently reviews the current head and CI evidence.
-4. Claude posts stable findings and `HANDOFF_TO_CHATGPT`.
-5. ChatGPT fixes or rebuts each finding with evidence and regression coverage.
-6. CI verifies the new head.
+4. Claude posts stable findings plus `HANDOFF_TO_CHATGPT`.
+5. ChatGPT fixes or technically rebuts each finding with evidence/regression coverage.
+6. CI/Codex verify the new head as applicable.
 7. ChatGPT posts a new `HANDOFF_TO_CLAUDE`.
-8. Claude re-reviews until `PASS` or `PASS_WITH_MINOR_FINDINGS` under the merge policy.
-9. ChatGPT merges only when required gates pass, updates backlog/state, and starts the next vertical slice.
+8. Claude re-reviews until merge policy is satisfied.
+9. ChatGPT merges, updates backlog/state, and starts the next slice.
 
-No human relay is part of this loop.
+No human relay is part of the loop.
 
-## Monitoring expectations
+## Merge policy
+- Any open BLOCKER or MAJOR => no merge.
+- `PASS` => merge permitted when deterministic required checks pass.
+- `PASS_WITH_MINOR_FINDINGS` => merge permitted only if minors are explicitly accepted/tracked and do not violate a release gate.
+- Notes/recommendations may move to backlog when documented.
 
-### ChatGPT monitoring
-ChatGPT maintains a recurring repository watch and also performs immediate checks when activated in conversation.
+## Escalation
+Do not involve Nassim for routine product, UX, architecture, implementation, testing, refactoring, review, CI or backlog decisions.
 
-### Claude monitoring
-Claude must establish the closest equivalent supported by its environment: recurring repository monitoring, GitHub-event/mention triggers, or another persistent cloud-side watch. Claude should document the mechanism it successfully has available in its next GitHub handoff.
+Escalate only genuinely external matters neither agent can resolve technically: unavailable credentials/account authorization, spending/paid-provider commitments, owner-level legal/business policy, irreversible destructive production action, or irreducible product-direction conflict with materially different business consequences.
 
-If Claude cannot create an actual persistent monitor in its current environment, it must state that fact in GitHub and rely on explicit `@claude`/handoff triggers rather than silently assuming Nassim will notify it.
-
-## Escalation policy
-
-Do not involve Nassim for routine product, UX, architecture, implementation, testing, refactoring, review, CI, or backlog decisions.
-
-Escalation is reserved only for genuinely external decisions that cannot be resolved technically, such as:
-- credentials or third-party account authorization unavailable to both agents;
-- spending/paid-provider commitments;
-- legal/business-policy decisions requiring owner authority;
-- irreversible destructive actions;
-- product-direction conflicts with materially different business consequences that cannot be resolved from existing project principles.
-
-Where possible, continue all unaffected work while the external blocker remains.
+Continue unaffected work whenever possible.
 
 ## Quality principle
-
-Autonomy is not permission to lower standards. The goal is an exceptional Algeria-first production application, not maximum commit velocity. Architecture, privacy, concurrency correctness, accessibility, localization, reliability, observability, and realistic clinic-day workflows remain release gates.
+Autonomy is not permission to lower standards. The target is an exceptional Algeria-first production application: privacy, concurrency correctness, accessibility, localization, reliability, observability, recoverability and realistic clinic-day operations remain release gates.
