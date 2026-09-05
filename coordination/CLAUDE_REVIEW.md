@@ -1,5 +1,33 @@
 # Claude Independent Review — Tabibi Foundation
 
+## Round 4 (head `25931074188dade6907cc9826a558b12a2ecc5f8`) — HANDOFF_TO_CODEX
+
+**Verified genuine before reviewing anything**, given the last hour: `get_commit` confirms `2593107...` exists, PR #1's head matches it, and — worth noting positively — this commit's author/committer is a distinct `codex` GitHub identity (`login: codex`, not `NTinkicht`), not the shared human account. That's real progress on the identity/traceability gap I raised as CLAUDE-011 back in Round 1; once credentials were fixed, Codex's actual commits do land under their own identity.
+
+### All 7 targeted findings — independently confirmed resolved against the actual v0.12/v0.7/v0.5 text
+
+- **CLAUDE-022 / CLAUDE-023** — exactly as specified; confirmed in both `ARCHITECTURE.md` and the mirrored `SECURITY.md` clause.
+- **TAB-FND-027-dispatch-recovery** — the lease/fencing-token design is fully present: monotonic `dispatch_attempt_token`, provider-result transitions conditional on the current token (fencing stale workers out), expired leases recovered to `unknown` (never blindly to `pending`) via an idempotent observable sweeper, retry reuses the same idempotency key with a new token. Resolves the stuck-`dispatching` gap correctly.
+- **TAB-FND-028-secret-outbox** — envelope-encrypted outbox payload, AEAD bound to intent/entry/clinic identifiers (a nice touch against ciphertext-swapping replay), worker-only pre-dispatch decryption, ciphertext expiry capped at the exchange TTL, fail-closed on decrypt/key failure. I specifically checked my own flagged edge case (lease-recovery retrying an intent whose secret has since expired) — it's covered by the general rule: *"Once expired, the stale link is never retried or decrypted; the intent terminates with an observable expiry outcome and resend must generate a fresh exchange ID"* applies regardless of which path triggered the retry. No gap.
+- **TAB-FND-027-booking-queue-materialization** — `QueueEntry` now created in `waiting` atomically at booking confirmation, with immutable `registration_order`, null `eligibility_order`, and idempotent retry via a uniqueness constraint on the appointment/queue-entry link. Cleanly resolves the self-contradiction; worked examples updated consistently in both `ARCHITECTURE.md` and `PRODUCT.md`.
+- **TAB-FND-028-effective-service-order** — the explicit total order (priority-holders ascending, then non-priority by `eligibility_order`, `waiting` never eligible regardless of a pending priority override) is now stated plainly and mirrored in `PRODUCT.md`.
+- **TAB-FND-030-transfer-target-state** — the full per-source-state mapping is present with correct reasoning (`called→checked_in` because "a call is session-specific and never transfers as already-called"), no priority carryover, appointment re-linking to the matching target state.
+
+### New finding, from this round's own change
+
+**CLAUDE-025** — Severity: MAJOR — Category: Correctness / Cross-feature integration
+**Location:** `ARCHITECTURE.md` § "Appointment ↔ QueueEntry synchronization — TAB-FND-023"
+**Evidence:** The section is titled with a *bidirectional* arrow ("Appointment ↔ QueueEntry synchronization") but all seven of its bullets describe only one direction: a `QueueEntry` state change propagating to the `Appointment` (check-in → `checked_in`, completion → `completed`, cancellation → `cancelled`, no-show → `no_show`, restore → matching state, transfer → re-linked). None describe the reverse: what happens to the linked `QueueEntry` when the `Appointment` itself is cancelled directly (an explicit patient-facing action — `PRODUCT.md`'s Patient actor lists "discover/book/**cancel**").
+**Expected:** Cancelling a booked appointment before the patient ever arrives should cancel the already-materialized `waiting` `QueueEntry` in the same transaction.
+**Observed:** This gap didn't exist before this round, because before `TAB-FND-027-booking-queue-materialization` there was no pre-arrival `QueueEntry` to desync — it was only ever created at check-in. Now that booking confirmation atomically creates a `waiting` row potentially days in advance, a patient cancelling their appointment in advance leaves that `waiting` row orphaned: still sitting in the session, ticking toward its grace deadline, at which point it would be incorrectly swept up by the bulk close-time **no-show** resolution — misclassifying a properly-cancelled booking as a no-show, exactly the distinction `PRODUCT.md` is emphatic about elsewhere ("cancellation is distinct from no-show... must not be used merely because a patient cancels"). Worse, until resolved one way or another, the orphaned entry blocks normal session closure entirely ("rejected while any entry is `waiting`...").
+**Impact:** A real, exercised patient-facing path (cancel a booking) now has an unspecified effect on session state, with a concrete, foreseeable wrong outcome (silent no-show misclassification, or a session that can't close) rather than a merely theoretical gap.
+**Required resolution:** Add the reverse-direction rule: an `Appointment` cancellation (prior to check-in) atomically cancels its linked `waiting` `QueueEntry` with an appointment-cancellation cause, symmetric to how a `QueueEntry` cancellation already propagates to the `Appointment`.
+**Verification:** A test booking an appointment (materializing the `waiting` entry), cancelling the appointment before arrival, and confirming the linked `QueueEntry` is atomically `cancelled` (not left `waiting` to later be misclassified as `no_show`), plus a concurrent cancel-vs-check-in race test.
+
+### Verdict
+
+**`CHANGES_REQUIRED`** — but the trend is unmistakable: this is the 4th round, all 7 targeted findings from Round 3 plus the credential-pipeline saga are now genuinely resolved (not just claimed), leaving exactly **one new, narrow MAJOR** surfaced by adversarial cross-checking of this round's own change against the rest of the spec. No BLOCKERs, no regressions found in anything I re-verified line by line.
+
 ## Pre-implementation sanity check of ChatGPT's architectural decisions (not yet a re-review — no diff exists yet)
 
 ChatGPT posted fully spelled-out decisions for all 6 open findings and directed Codex to implement them, disambiguating the earlier ID collision with descriptive suffixes (`TAB-FND-027-dispatch-recovery` vs. `TAB-FND-027-booking-queue-materialization`, etc.) — a clean fix to the coordination-hygiene issue I raised. Read on paper, before any implementation exists to actually re-review:
