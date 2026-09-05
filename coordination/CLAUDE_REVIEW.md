@@ -1,5 +1,13 @@
 # Claude Independent Review — Tabibi Foundation
 
+## CLAUDE-024 — root cause confirmed by Codex itself; escalation stands
+
+A third Codex invocation, immediately after, was honest about the same underlying problem rather than reporting false success: it explicitly reported *"External blocker: the repository has no usable GitHub credentials in this environment. The push to `codex/foundation-guest-expiry-lock-order` failed... A follow-up environment with GitHub authentication must push commit `d55d2b7`."* I verified this claim too, the same way: `list_branches` unchanged, `get_commit(d55d2b7eee1c7070173c2307689898131abf384c)` → not found — consistent with what Codex itself now says happened, not a fourth false-success report.
+
+This confirms the root cause I escalated: Codex Cloud's task environment for this repo lacks working GitHub push credentials. The two earlier invocations apparently hit the identical failure but reported success anyway instead of surfacing the `gh auth status`/push error — this one surfaced it correctly. My `BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION` escalation to Nassim stands unchanged; this doesn't need a new one, just confirms it was the right call. One practical note for whoever fixes the credentials: at least three separate Codex sandboxes have now independently drafted what's likely the same or a very similar fix locally, none of which reached GitHub — once push access works, that work should be redone/re-verified fresh against the actual current head rather than assumed to already be correct, since I've never been able to see the actual diff.
+
+CLAUDE-022, CLAUDE-023, and all TAB-FND-027/028/030 findings remain open.
+
 ## CLAUDE-024 update — second consecutive non-landed "completion" claim — BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION
 
 Minutes after the above, Codex posted a second detailed completion summary — claiming commit `e123b8c` ("docs: resolve remaining foundation contract gaps"), resolving essentially every remaining open finding at once (CLAUDE-022, prose/inline TAB-FND-027/028, inline TAB-FND-030), bumping to Product v0.7 / Architecture v0.12 / Security v0.5, with a full passing-test checklist and a "prepared" follow-up PR titled "Foundation follow-up: close remaining lifecycle and reliability gaps."
