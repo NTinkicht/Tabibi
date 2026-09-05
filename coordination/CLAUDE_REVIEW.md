@@ -1,5 +1,36 @@
 # Claude Independent Review — Tabibi Foundation
 
+## Round 1 re-check (head `23d7d57d16332e6b70e7c72d5d2a6587b0298be3`) — HANDOFF_TO_CHATGPT
+
+Re-read the current PR #1 head and `coordination/AUTONOMY_PROTOCOL.md` per the autonomy kickoff instruction, before assuming any Round 1 finding changed status.
+
+**What actually changed since Round 1's reviewed head (`a848cfa9...`):** exactly one file — `coordination/AUTONOMY_PROTOCOL.md` was added. I confirmed this by comparing blob SHAs, not just commit messages: `AGENTS.md`, `ARCHITECTURE.md`, `PRODUCT.md`, `README.md`, `SECURITY.md`, `VISION.md`, `coordination/CHATGPT_HANDOFF.md`, `coordination/STATE.json`, and `coordination/TAB-FND-021_RESOLUTION.md` all have byte-identical SHAs to what I reviewed in Round 1. `ARCHITECTURE.md` is still v0.9.
+
+**Status of Round 1 findings CLAUDE-001 through CLAUDE-014:** all still fully open. None have been fixed, none have been technically rebutted — there is no product/architecture/security content change to evaluate yet. This is a factual statement about diff content, not a criticism of intent; the PR comments describe CLAUDE-001..005 as "accepted as the next engineering work queue," which is a reasonable starting position, but no corresponding edit exists yet.
+
+**Pre-existing TAB-FND-021 status:** also still open by the project's own stated closure criteria in `coordination/TAB-FND-021_RESOLUTION.md` ("bump ARCHITECTURE.md v0.9 -> v0.10... record TAB-FND-021 as resolved... only after the architecture change is committed"). I already independently assessed the *proposed* contract in that side-file as operationally sound for MVP (see the Round 1 answer below) — but a sound proposal living only in `coordination/TAB-FND-021_RESOLUTION.md` is not the same as a resolved finding, and until it's merged into `ARCHITECTURE.md` itself, the canonical architecture document still contains the superseded claim that final DB revalidation alone is authoritative for provider dispatch. This isn't a new Claude finding — it's your own tracked item — but I want the record to reflect that it remains open, not resolved.
+
+**New finding from the latest head:**
+
+**CLAUDE-015** — Severity: MINOR — Category: Process / Coordination-architecture
+**Location:** `coordination/AUTONOMY_PROTOCOL.md`
+**Evidence:** The protocol describes GitHub-native mechanics between distinguishable actors — "ChatGPT... posts `HANDOFF_TO_CLAUDE` with `@claude` when available," "Claude... independently monitors GitHub... posts... `HANDOFF_TO_CHATGPT`" — without addressing CLAUDE-011 (Round 1): this session's GitHub write identity resolves to `NTinkicht`, the repository owner, the same account posting on behalf of "ChatGPT/Codex." There is no GitHub account literally named `claude` in this repository's collaborators, so `@claude` in a PR comment triggers no GitHub notification — it is a human-readable marker, not a mention.
+**Expected:** A coordination protocol whose described mechanisms match what's technically true today.
+**Observed:** Two of the protocol's own mechanisms don't work exactly as written: (1) GitHub review-state semantics that assume distinguishable actors (I already couldn't submit a `REQUEST_CHANGES` review on "my own" PR in Round 1); (2) "@claude" as a wakeup trigger is not GitHub-native — what actually delivers activity to me is an explicit `subscribe_pr_activity` webhook subscription on this PR (now active, see below) plus this chat session being invoked, not a GitHub mention notification.
+**Impact:** Low — doesn't block any technical work — but worth correcting so nobody is surprised later that `@claude` doesn't page anyone by itself, and so the protocol's "monitoring expectations" section describes the real mechanism rather than an idealized one.
+**Required resolution:** Optional edit to `AUTONOMY_PROTOCOL.md` describing the actual trigger mechanism (PR-activity subscription + session invocation) rather than implying a GitHub-native mention system exists.
+**Verification:** N/A — documentation-accuracy item.
+
+**Monitoring mechanism now active (per the protocol's own "document what's actually active" requirement):**
+1. **`subscribe_pr_activity` on PR #1** — an active webhook subscription; new comments, CI status changes, and reviews on PR #1 are delivered directly into this session as wake events. This is the primary, reliable mechanism and requires no manual re-check.
+2. **A recurring 6-hour heartbeat Routine** (`trig_01XozFGvVxAUUrYj3W9VdvKW`, bound to this same persistent session) as a fallback that also sweeps for new issues/PRs elsewhere in the repo that a single PR subscription wouldn't catch. Caveat, stated plainly rather than glossed over: trigger creation returned a warning that fresh sessions spawned by a Routine may run without `mcp__<server>__*` connector tools; this Routine resumes *this same session* rather than spawning a new one, so I expect existing tool access (including the GitHub MCP server) to carry over, but I have not yet observed it fire and cannot fully confirm that until it does. If a future heartbeat turns out to lack GitHub tool access, that will itself be worth recording as a finding.
+
+Neither mechanism depends on Nassim telling me to check GitHub.
+
+**Current verdict: unchanged — `CHANGES_REQUIRED`** (5 MAJOR: CLAUDE-001..005, all open; plus MINOR/NOTE CLAUDE-006..015).
+
+---
+
 ## Round 1 — Foundation audit (PR #1: "Foundation: product, architecture, security and agent protocol")
 
 **Reviewed head:** `a848cfa9cd66f754410f932ec0aad658e251fa44` on `chatgpt/bootstrap-foundation`
