@@ -1,14 +1,14 @@
 # ChatGPT Handoff
 
 ## Status
-HANDOFF_TO_CLAUDE — FOUNDATION ROUND 4 RE-REVIEW
+HANDOFF_TO_CLAUDE — FOUNDATION ROUND 5 RE-REVIEW
 
 ## Scope
 Foundation/specification review only. No production implementation has started.
 
 ## Current canonical documents
-- `PRODUCT.md` — Foundation v0.7
-- `ARCHITECTURE.md` — Foundation Proposal v0.12
+- `PRODUCT.md` — Foundation v0.8
+- `ARCHITECTURE.md` — Foundation Proposal v0.13
 - `SECURITY.md` — Baseline v0.5
 - `AGENTS.md`
 - `VISION.md`
@@ -78,3 +78,9 @@ The canonical documents now incorporate all seven qualified findings from the la
 - **TAB-FND-030-transfer-target-state:** source `waiting` maps to target `waiting`; source `checked_in|called` maps to target `checked_in` at a fresh target tail; priority/called status never silently carries.
 
 No production feature code was started. Independent Claude re-review of the actual pushed SHA is required. Merge remains forbidden until Claude confirms zero BLOCKER/MAJOR findings.
+
+## Round 5 routine reviewer fix — CLAUDE-025
+
+The mirrored Appointment ↔ QueueEntry contract is now explicitly symmetric for advance cancellation: cancelling an appointment before check-in atomically cancels its linked `waiting` queue entry with the machine-readable `appointment_cancelled` cause. The two records share one transaction, so the entry cannot remain `waiting` for later no-show classification or block session closure.
+
+Required PostgreSQL integration verification now includes booking confirmation followed by appointment cancellation before arrival, asserting that both records commit as `cancelled`, the queue entry records the appointment-cancellation cause, and no intermediate committed state leaves the entry `waiting`. Independent Claude re-review remains the merge gate; no production feature code has started.

@@ -1,4 +1,4 @@
-# Tabibi Architecture — Foundation Proposal v0.12
+# Tabibi Architecture — Foundation Proposal v0.13
 
 This is the canonical foundation architecture for independent review before production implementation.
 
@@ -44,6 +44,7 @@ An appointment is not itself guaranteed call eligibility. Successful booking/con
 
 ### Appointment ↔ QueueEntry synchronization — TAB-FND-023
 Appointment and queue state are separate models but may not drift once linked.
+- Cancelling an appointment before check-in atomically transitions its linked `waiting` queue entry to `cancelled` with a machine-readable `appointment_cancelled` cause. The appointment and queue-entry mutation share one transaction, so neither side may commit alone.
 - `waiting -> checked_in` on an appointment-backed queue entry atomically sets the linked appointment to `checked_in`.
 - `in_consultation -> completed` atomically sets the linked appointment to `completed`.
 - queue-entry `cancelled` atomically sets the linked appointment to `cancelled`, except transfer where the appointment remains active and is re-linked to the target session/entry in the same transaction.
@@ -52,7 +53,7 @@ Appointment and queue state are separate models but may not drift once linked.
 - transfer atomically updates `Appointment.session_id` and `Appointment.queue_entry_id` to the target while preserving booking identity/audit history.
 - no committed state may leave a terminal queue entry paired with a non-terminal stale appointment unless the queue entry is a transfer source whose appointment was already re-linked to the target.
 
-Required PostgreSQL integration tests cover check-in, complete, cancel, no-show, restore and transfer mappings plus retry/idempotency.
+Required PostgreSQL integration tests cover booking followed by appointment cancellation before arrival (the linked entry becomes `cancelled` with the appointment-cancellation cause in the same commit and is never left `waiting`), plus check-in, complete, queue-entry cancel, no-show, restore and transfer mappings, concurrent terminal mutations, and retry/idempotency.
 
 ### ConsultationSession
 A bounded service period for one doctor at one clinic with lifecycle state, planned/actual start/end, delay/pause state and estimator configuration snapshot.

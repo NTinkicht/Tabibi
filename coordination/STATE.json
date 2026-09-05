@@ -1,7 +1,7 @@
 {
   "project": "Tabibi",
   "phase": "foundation",
-  "round": 4,
+  "round": 5,
   "state": "awaiting_claude_foundation_rereview",
   "current_pr": 1,
   "last_actor": "codex_cloud",
@@ -15,8 +15,8 @@
   "open_majors": 0,
   "open_minors": 0,
   "human_decision_required": false,
-  "product_version": "0.7",
-  "architecture_version": "0.12",
+  "product_version": "0.8",
+  "architecture_version": "0.13",
   "security_version": "0.5",
   "pending_findings": [],
   "addressed_findings": [
@@ -26,7 +26,8 @@
     "TAB-FND-028-secret-outbox",
     "TAB-FND-027-booking-queue-materialization",
     "TAB-FND-028-effective-service-order",
-    "TAB-FND-030-transfer-target-state"
+    "TAB-FND-030-transfer-target-state",
+    "CLAUDE-025"
   ],
-  "notes": "Round 4 canonical contract updates exist on the active PR branch and address all seven qualified pending findings. Author-recorded open findings are zero, but acceptance and merge remain blocked pending Claude's independent re-review of the pushed SHA. No production implementation may begin before that review gate passes."
+  "notes": "Round 5 adds symmetric pre-check-in appointment-cancellation synchronization and its required PostgreSQL verification, addressing CLAUDE-025. Author-recorded open findings are zero, but acceptance and merge remain blocked pending Claude's independent re-review of the pushed SHA. No production implementation may begin before that review gate passes."
 }

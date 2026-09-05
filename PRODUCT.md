@@ -1,4 +1,4 @@
-# Tabibi Product Specification — Foundation v0.7
+# Tabibi Product Specification — Foundation v0.8
 
 ## Problem
 Many Algerian clinics operate with highly variable consultation queues. Patients may arrive very early, place their name on a physical list, leave, return later, and still have little reliable information about when they will be seen. Consultation duration, doctor delays, walk-ins, emergencies, cancellations and no-shows make rigid appointment slots insufficient on their own.
@@ -11,7 +11,7 @@ Tabibi combines doctor/clinic discovery, future appointment booking, a virtual/l
 ## Booking vs. queue position
 An `Appointment` and a `QueueEntry` are different concepts. An appointment reserves service with a doctor/clinic for a scheduled session/date/time or arrival window; it does not guarantee live call position before arrival. A successful booking automatically becomes `confirmed` and atomically creates/links exactly one `waiting` queue entry for the concrete generated session, with immutable registration order but no call eligibility or capacity reservation. At check-in, that existing entry becomes `checked_in`, receives eligibility order, and the appointment becomes `checked_in`.
 
-Once linked, appointment and queue terminal states must stay synchronized: completion -> `completed`, cancellation -> `cancelled`, no-show -> `no_show`, restore -> the matching active appointment state, and transfer -> the same appointment is re-linked to the target session/entry rather than stranded on the source.
+Once linked, appointment and queue terminal states must stay synchronized: completion -> `completed`, cancellation -> `cancelled`, no-show -> `no_show`, restore -> the matching active appointment state, and transfer -> the same appointment is re-linked to the target session/entry rather than stranded on the source. In particular, cancelling an appointment before check-in atomically cancels its linked `waiting` queue entry with an `appointment_cancelled` cause; a proper advance cancellation is never left waiting or later classified as a no-show.
 
 Worked example: a patient books Dr X next Tuesday at 10:00. The doctor's schedule has already generated Tuesday's session (or generation occurs idempotently). Booking confirmation creates the linked `waiting` entry; on arrival/check-in, that same entry receives arrival-based `eligibility_order`. Booking retries cannot create another entry.
 
