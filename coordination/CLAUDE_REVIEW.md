@@ -1,5 +1,17 @@
 # Claude Independent Review — Tabibi Foundation
 
+## Round 5 — CLAUDE-025 fix reviewed and correct, but lives on an unmerged PR #8
+
+Codex reported fixing CLAUDE-025, this time via a **separate PR (#8)** rather than a direct push to `chatgpt/bootstrap-foundation`. Verified before reviewing: PR #8 exists, its base is `chatgpt/bootstrap-foundation` at exactly the commit I reviewed in Round 4 (`25931074...`), and its head commit `c6f0be851f91de195fb4f7ba0887c158117f467b` exists and is authored by the `codex` identity. Genuine.
+
+**The fix itself is correct and minimal** (20 additions, 12 deletions, 4 files — reviewed the actual diff, not the summary): adds exactly the symmetric rule I asked for — *"Cancelling an appointment before check-in atomically transitions its linked `waiting` queue entry to `cancelled` with a machine-readable `appointment_cancelled` cause. The appointment and queue-entry mutation share one transaction, so neither side may commit alone"* — to both `ARCHITECTURE.md` and `PRODUCT.md`'s mirrored text, plus the required test scenario (booking → advance cancellation → linked entry becomes `cancelled` with the right cause, never left `waiting`), plus a "concurrent terminal mutations" test addition covering the race I asked for without needing a separate named test. Nothing to fault here.
+
+**But: PR #1's head is still `25931074...`, unchanged.** PR #8 targets `chatgpt/bootstrap-foundation` (PR #1's own source branch) but has not been merged into it — I checked PR #1 directly after reviewing PR #8's diff rather than assuming the fix had landed where it needs to be. Until PR #8 is merged into `chatgpt/bootstrap-foundation`, PR #1 itself — the actual foundation PR this whole review governs — does not yet contain the CLAUDE-025 fix.
+
+**Milestone worth stating plainly:** once PR #8 merges, every BLOCKER and MAJOR finding raised across all 5 rounds by both reviewers (mine: CLAUDE-001 through CLAUDE-025; Codex's: TAB-FND-006 revisit through TAB-FND-031) is resolved and independently confirmed. What remains open is NOTE-level only — CLAUDE-012 (Algeria data-protection tracking, needs Nassim's confirmation, not an engineering fix) and CLAUDE-013 (a process recommendation to move to implementation next, which this round's own trajectory already satisfies). Neither gates merge per `AGENTS.md`'s severity rules.
+
+**Verdict for PR #1 as it stands right now: `CHANGES_REQUIRED`** (technically unchanged from Round 4, since PR #1's head hasn't moved) — but this is now purely a merge-sequencing step, not an open technical finding. Recommending PR #8 be merged into `chatgpt/bootstrap-foundation` next; I'll re-check PR #1's head immediately after and post `PASS_WITH_MINOR_FINDINGS` once it reflects the merge, rather than assume the merge happened.
+
 ## Round 4 (head `25931074188dade6907cc9826a558b12a2ecc5f8`) — HANDOFF_TO_CODEX
 
 **Verified genuine before reviewing anything**, given the last hour: `get_commit` confirms `2593107...` exists, PR #1's head matches it, and — worth noting positively — this commit's author/committer is a distinct `codex` GitHub identity (`login: codex`, not `NTinkicht`), not the shared human account. That's real progress on the identity/traceability gap I raised as CLAUDE-011 back in Round 1; once credentials were fixed, Codex's actual commits do land under their own identity.
