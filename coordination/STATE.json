@@ -1,34 +1,29 @@
 {
   "project": "Tabibi",
   "phase": "foundation",
-  "round": 3,
-  "state": "awaiting_claude_foundation_rereview",
+  "round": 4,
+  "state": "credential_restored_handoff_to_codex",
   "current_pr": 1,
   "last_actor": "chatgpt",
-  "next_actor": "claude",
+  "next_actor": "codex_cloud",
   "operating_model": "tri-agent-v2",
   "product_architect": "chatgpt",
   "implementation_runtime": "codex_cloud",
   "independent_reviewer": "claude",
   "deterministic_referee": "ci",
   "open_blockers": 0,
-  "open_majors": 0,
+  "open_majors": 6,
+  "open_minors": 1,
   "human_decision_required": false,
   "architecture_version": "0.11",
-  "addressed_in_round": [
-    "CLAUDE-007",
-    "CLAUDE-010",
-    "CLAUDE-016",
-    "CLAUDE-017",
-    "CLAUDE-018",
-    "CLAUDE-019",
-    "CLAUDE-020",
-    "CLAUDE-021",
-    "TAB-FND-006-revisit",
-    "TAB-FND-023",
-    "TAB-FND-024",
-    "TAB-FND-025",
-    "TAB-FND-026"
+  "pending_findings": [
+    "CLAUDE-022",
+    "CLAUDE-023",
+    "TAB-FND-027-dispatch-recovery",
+    "TAB-FND-028-secret-outbox",
+    "TAB-FND-027-booking-queue-materialization",
+    "TAB-FND-028-effective-service-order",
+    "TAB-FND-030-transfer-target-state"
   ],
-  "notes": "Round 2 independent review confirmed all original Claude MAJOR findings and TAB-FND-021 resolved, then identified cross-feature gaps. ARCHITECTURE.md v0.11 addresses those gaps and PRODUCT.md v0.6 / SECURITY.md v0.4 are aligned. The binding coordination model is now tri-agent-v2: ChatGPT owns product/architecture decisions, Codex Cloud is the primary execution/runtime agent for approved implementation and routine reviewer fixes, Claude is the independent adversarial reviewer with PR-activity monitoring, and CI is the deterministic referee. Claude↔Codex may iterate directly on unambiguous contract-preserving fixes; architecture/product/security-policy questions route to ChatGPT. No production implementation has started. Claude and Codex must independently re-review foundation before merge."
+  "notes": "Codex Cloud GitHub push authentication has been externally verified by a successful authenticated ls-remote and dry-run push. Previous Codex local-only commits are not authoritative and must not be replayed blindly. Codex must re-fetch the actual current PR head and implement the architect-approved resolutions in the latest HANDOFF_TO_CODEX. Claude's PR webhook remains the independent re-review trigger. No production implementation may begin and PR #1 may not merge until all BLOCKER/MAJOR findings are closed by evidence."
 }
