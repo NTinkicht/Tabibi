@@ -1,4 +1,8 @@
 import { migrate } from './lib';
 
-await migrate();
-console.log('Database migrations complete.');
+async function main(): Promise<void> {
+  await migrate();
+  console.log('Database migrations complete.');
+}
+
+void main();
