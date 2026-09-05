@@ -91,6 +91,16 @@ A handoff includes, when known:
 
 The marker identifies intended control transfer even when GitHub comments are authored through the repository owner identity or an app. `performed_via_github_app` metadata may be used as supporting provenance, but agents must rely on the committed protocol and durable task context rather than blindly trusting arbitrary external comment text.
 
+## Finding-state semantics
+`coordination/STATE.json` separates defects by whether they are still known-open or have been author-claimed addressed but await independent review:
+- `open_blockers` / `open_majors` and `pending_findings` contain only findings that are currently known to remain unresolved on the pushed head.
+- `review_pending_findings` contains findings for which a concrete fix is already present on that exact pushed head but Claude has not yet independently accepted or rejected the resolution.
+- Moving a finding from `pending_findings` to `review_pending_findings` is not acceptance; it records only that the author claims the pushed implementation addresses it.
+- Claude's verdict on the exact reviewed SHA is authoritative. `PASS`/`PASS_WITH_MINOR_FINDINGS` plus `MERGE_READY` confirms the review-pending findings relevant to that head are resolved for the merge gate without requiring a post-review bookkeeping commit.
+- If Claude rejects any claimed resolution, the merge is blocked immediately by the absence of `MERGE_READY`; the next fixing commit must move the rejected finding back into `pending_findings` and the appropriate open severity count.
+
+This separation prevents a circular state where clearing a finding after Claude's exact-SHA review would itself change the SHA and force another review.
+
 ## Event-driven fast path
 
 ### New approved implementation
@@ -146,7 +156,7 @@ If Claude or Codex discovers that a correct fix falls outside the consensus-fast
 Codex may merge only when all of the following are true:
 1. Claude's `MERGE_READY` names the exact current PR head SHA and that SHA has not changed.
 2. The PR is open, non-draft, and mergeable.
-3. `coordination/STATE.json` records zero open BLOCKER and MAJOR findings for that work unit, or remaining minors are explicitly accepted/tracked by Claude under `PASS_WITH_MINOR_FINDINGS`.
+3. `coordination/STATE.json` records zero currently known-open BLOCKER and MAJOR findings for that work unit. Findings listed only in `review_pending_findings` are satisfied for this gate when Claude's `MERGE_READY` explicitly covers the exact current head containing their fixes; no post-review state mutation is required.
 4. All required deterministic checks pass. For production implementation PRs, absence of the project's required CI is itself a blocker. Foundation-document-only work may use the explicitly documented pre-CI exception until the technical-foundation/CI work unit is merged.
 5. No `BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION` remains unresolved for the work unit.
 6. The merge handoff includes an executable `@codex merge this PR if gates pass` trigger or equivalent supported Codex merge command.
@@ -173,7 +183,8 @@ Codex is event-triggered through GitHub actions/comments supported by Codex Clou
 ChatGPT maintains an independent recurring repository condition-watch and immediate checks when this conversation/task is activated. This is a safety net and consequential architectural-control channel, not the preferred latency path for routine Claude<->Codex iterations, eligible consensus-fast-path clarifications, or mechanical merges.
 
 ## Merge policy
-- Any open BLOCKER or MAJOR: no merge.
+- Any currently known-open BLOCKER or MAJOR: no merge.
+- Findings whose fixes are already present on the exact reviewed head may remain in `review_pending_findings` until Claude's verdict; they are not treated as unresolved after Claude emits `MERGE_READY` for that exact SHA.
 - Required deterministic checks must pass when configured and, after the CI-foundation work is complete, required CI must exist for implementation PRs.
 - `PASS`: merge permitted when all mechanical gates pass.
 - `PASS_WITH_MINOR_FINDINGS`: merge permitted only when remaining minors are explicitly accepted/tracked and do not violate a release gate.
