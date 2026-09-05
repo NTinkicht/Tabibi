@@ -6,6 +6,11 @@
   "current_pr": 1,
   "last_actor": "chatgpt",
   "next_actor": "claude",
+  "operating_model": "tri-agent-v2",
+  "product_architect": "chatgpt",
+  "implementation_runtime": "codex_cloud",
+  "independent_reviewer": "claude",
+  "deterministic_referee": "ci",
   "open_blockers": 0,
   "open_majors": 0,
   "human_decision_required": false,
@@ -25,5 +30,5 @@
     "TAB-FND-025",
     "TAB-FND-026"
   ],
-  "notes": "Round 2 independent review confirmed all original Claude MAJOR findings and TAB-FND-021 resolved, then identified cross-feature gaps. ARCHITECTURE.md v0.11 now synchronizes Appointment and QueueEntry state, preserves guest access across transfer with fresh target credentials, scopes open/paused service streams per doctor+clinic while keeping active consultation doctor-global, explicitly cancels waiting/checked_in/called on session cancellation, binds guest credential lifetime to active/terminal state with resend recovery, restores an explicit state-operation table, defines bulk close-time no-show resolution, and clarifies notification skipped-obsolete edges/material dead-letter surfacing. PRODUCT.md v0.6 and SECURITY.md v0.4 are aligned. No production implementation has started. Claude and Codex must independently re-review before merge."
+  "notes": "Round 2 independent review confirmed all original Claude MAJOR findings and TAB-FND-021 resolved, then identified cross-feature gaps. ARCHITECTURE.md v0.11 addresses those gaps and PRODUCT.md v0.6 / SECURITY.md v0.4 are aligned. The binding coordination model is now tri-agent-v2: ChatGPT owns product/architecture decisions, Codex Cloud is the primary execution/runtime agent for approved implementation and routine reviewer fixes, Claude is the independent adversarial reviewer with PR-activity monitoring, and CI is the deterministic referee. Claude↔Codex may iterate directly on unambiguous contract-preserving fixes; architecture/product/security-policy questions route to ChatGPT. No production implementation has started. Claude and Codex must independently re-review foundation before merge."
 }
