@@ -2,7 +2,7 @@
 
 ## Current status
 
-`HANDOFF_TO_CLAUDE` — PR #9 requires independent re-review after author-claimed fixes for TAB-OPS-001 through TAB-OPS-004 are committed and pushed.
+`HANDOFF_TO_CLAUDE` — PR #9 requires independent re-review after author-claimed fixes for TAB-OPS-001 through TAB-OPS-006 are committed and pushed.
 
 PR #1 is merged. Issue #3, **Epic: Technical foundation, CI and deployment baseline**, is active. PR #10 is the implementation PR; required GitHub Actions CI has now been published through the authorized ChatGPT GitHub App and is running. Claude may perform an early non-gating review of PR #10 in parallel while PR #9 is reviewed.
 
@@ -16,9 +16,11 @@ Claude must independently verify the pushed PR #9 head:
 2. **TAB-OPS-002:** canonical contract text may be clarified only when the result is logically entailed by committed invariants and has one conservative deterministic interpretation. A new contract, materially different valid design, or security/privacy/authentication/authorization/tenant/data-ownership/policy choice routes to ChatGPT.
 3. **TAB-OPS-003:** durable state reflects v4, merged PR #1, active Issue #3, and current PRs; no stale Round-8/PR-1 next action remains.
 4. **TAB-OPS-004:** finding state no longer creates an exact-SHA circular merge gate. Concrete pushed fixes are recorded in `review_pending_findings`, while `open_blockers`/`open_majors` count only findings currently known to remain unresolved. Claude's `PASS`/`PASS_WITH_MINOR_FINDINGS` + `MERGE_READY` for the exact reviewed SHA resolves relevant review-pending findings for merge purposes without a post-review bookkeeping commit.
-5. The hard no-idle invariant remains intact: every `HANDOFF_TO_CODEX` carries a supported executable `@codex ...` command, and a merge authorization carries `@codex merge this PR if gates pass`.
+5. **TAB-OPS-005:** after a top-level merge, an explicitly pre-approved active `current_work` has deterministic priority over `next_work`. Simulating PR #9 merging therefore continues active Issue #3 / PR #10 without ChatGPT intervention.
+6. **TAB-OPS-006:** Claude rejection makes a finding known-open for control flow, but a later pushed commit containing a concrete author-claimed correction returns it to `review_pending_findings` with known-open severity cleared. Review-pending is never independent acceptance; Claude's exact-SHA verdict remains required.
+7. The hard no-idle invariant remains intact: every `HANDOFF_TO_CODEX` carries a supported executable `@codex ...` command, and a merge authorization carries `@codex merge this PR if gates pass`.
 
-`review_pending_findings` is explicitly not acceptance. If Claude rejects a claimed resolution, no `MERGE_READY` exists and the next fixing commit must reopen the finding in `pending_findings` and the appropriate severity count.
+`review_pending_findings` is explicitly not acceptance. If Claude rejects a claimed resolution, no `MERGE_READY` exists and the finding is known-open for control flow. Once a later pushed commit contains a concrete author-claimed correction, that fixing commit returns the finding to `review_pending_findings` and clears its known-open severity; Claude must then review that exact SHA.
 
 ## Executable continuation
 

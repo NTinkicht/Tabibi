@@ -63,15 +63,15 @@ Every action must end with an executable continuation. "Waiting for merge", "wai
 
 - Claude PASS -> `MERGE_READY` + `HANDOFF_TO_CODEX` + `@codex merge this PR if gates pass`.
 - Codex merge into an integration branch -> immediately wake Claude on the updated umbrella PR.
-- Codex merge into `main` -> immediately start `next_work` from coordination state when pre-approved.
-- Missing/ambiguous `next_work` -> `HANDOFF_TO_CHATGPT`, not silence.
+- Codex merge into `main` -> immediately continue an explicitly pre-approved active `current_work`; if none is actionable, start pre-approved `next_work`.
+- Neither `current_work` nor `next_work` actionable, or either selected record ambiguous -> `HANDOFF_TO_CHATGPT`, not silence.
 - Genuine external inability -> `BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION`.
 
 ## Resolution protocol
 - Codex resolves routine implementation findings by fixing them and adding appropriate verification/tests.
 - ChatGPT resolves findings that require architecture/product/security-policy decisions or technical rebuttal.
 - Claude independently re-reviews every claimed resolution and checks for regressions.
-- A finding with a concrete pushed fix may be recorded as `review_pending`; it becomes independently resolved only through Claude's exact-SHA verdict.
+- A finding with a concrete pushed fix must return to `review_pending_findings` with its known-open severity cleared; it becomes independently resolved only through Claude's exact-SHA verdict.
 - If the same MAJOR survives two direct Claude<->Codex cycles, or they disagree on contract interpretation, route to ChatGPT rather than looping indefinitely.
 
 ## Definition of done

@@ -97,7 +97,7 @@ The marker identifies intended control transfer even when GitHub comments are au
 - `review_pending_findings` contains findings for which a concrete fix is already present on that exact pushed head but Claude has not yet independently accepted or rejected the resolution.
 - Moving a finding from `pending_findings` to `review_pending_findings` is not acceptance; it records only that the author claims the pushed implementation addresses it.
 - Claude's verdict on the exact reviewed SHA is authoritative. `PASS`/`PASS_WITH_MINOR_FINDINGS` plus `MERGE_READY` confirms the review-pending findings relevant to that head are resolved for the merge gate without requiring a post-review bookkeeping commit.
-- If Claude rejects any claimed resolution, the merge is blocked immediately by the absence of `MERGE_READY`; the next fixing commit must move the rejected finding back into `pending_findings` and the appropriate open severity count.
+- If Claude rejects any claimed resolution, the finding becomes known-open immediately for control flow: it belongs in `pending_findings` and the appropriate open severity count while no concrete correction is present. When a later pushed commit contains a concrete author-claimed correction, that same commit must return the finding to `review_pending_findings` and clear its known-open severity. This transition is not independent acceptance; only Claude's exact-SHA verdict can provide that.
 
 This separation prevents a circular state where clearing a finding after Claude's exact-SHA review would itself change the SHA and force another review.
 
@@ -114,7 +114,7 @@ This separation prevents a circular state where clearing a finding after Claude'
 8. Codex verifies merge gates and mechanically merges the unchanged reviewed PR.
 9. Codex posts `MERGED_AND_CONTINUE` and actively triggers the next required action.
 10. If the merged PR targeted an integration/umbrella branch with an open umbrella PR, Codex immediately posts `HANDOFF_TO_CLAUDE` on that umbrella PR for cumulative review of its new head.
-11. If the merged PR targeted `main`, Codex reads the pre-approved `next_work` from coordination state. If present, it immediately starts that work unit with an executable Codex task. If absent or ambiguous, it posts `HANDOFF_TO_CHATGPT` rather than idling.
+11. If the merged PR targeted `main`, Codex first continues an explicitly pre-approved active `current_work` from coordination state. If no such work is actionable, Codex starts pre-approved `next_work`. Only when neither record is actionable, or the selected record is ambiguous, does it post `HANDOFF_TO_CHATGPT` rather than idling.
 
 ## Consensus fast path for conservative architecture/spec clarifications
 The purpose is to remove unnecessary ChatGPT latency without allowing Claude and Codex to redesign Tabibi by convenience.
@@ -165,8 +165,8 @@ If any gate is false or ambiguous, Codex must not merge; it routes to the actor 
 
 ## Umbrella and top-level continuation
 - Child PR accepted into an integration branch: merge immediately, then trigger Claude on the updated umbrella PR.
-- Umbrella PR accepted into `main`: merge immediately, then actively start the recorded `next_work` without waiting for a human or periodic monitor.
-- A next work unit is considered pre-approved when it is identified by issue number/title in coordination state and does not require an unresolved external decision.
+- Umbrella or other top-level PR accepted into `main`: merge immediately, then actively continue an explicitly pre-approved active `current_work`; only if none is actionable, start recorded pre-approved `next_work`, without waiting for a human or periodic monitor.
+- A current or next work unit is explicitly pre-approved when it is identified by issue number/title in coordination state, its status makes it actionable, and it does not require an unresolved external decision. `current_work` takes deterministic priority when both records exist.
 
 ## Loop-stability rule
 Claude and Codex may iterate directly on routine findings under the committed specification. Architecture/spec clarifications may use only the single-cycle consensus fast path above. If the same MAJOR survives two routine implementation cycles, or one consensus-fast-path cycle, or Claude and Codex disagree about what the contract requires, route it to ChatGPT with evidence rather than looping indefinitely. Do not route routine disagreement to Nassim.
