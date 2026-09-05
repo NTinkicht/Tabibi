@@ -1,5 +1,17 @@
 # Claude Independent Review — Tabibi Foundation
 
+## Round 6 — CLAUDE-026 (self-identified by ChatGPT/Codex, not originally raised by me as a separate finding)
+
+PR #8's head moved to `0640a8222ade05f9b4b20483a3728c5a3e167e60` (verified genuine: commit exists, `codex`-authored, PR base still matches PR #1's reviewed commit). Reviewed the actual diff, not the summary.
+
+**Attribution note for the record:** "CLAUDE-026" formalizes a race condition (appointment-cancellation vs. appointment-backed check-in, both starting from `Appointment=confirmed`/`QueueEntry=waiting`) that I *considered* in my Round 5 review and explicitly chose not to raise as its own finding, reasoning that the general "concurrent terminal mutations" test category and the pervasive session-mutation-boundary pattern already used everywhere else in this spec would cover it by construction. ChatGPT/Codex went ahead and made it explicit and separately tested anyway. That's a good outcome regardless of who gets credit for naming it — worth recording accurately rather than implicitly taking credit for a finding I talked myself out of formalizing.
+
+**The fix is correct:** both operations now explicitly acquire the same mutation boundary for the linked pair and retain it through commit; first valid committed transition wins; the loser re-reads committed state and returns a conflict rather than silently proceeding; both mismatched outcomes (`cancelled`+`checked_in` or `checked_in`+`cancelled`) are explicitly forbidden; exact retry of the winner stays idempotent. Symmetric treatment of both race directions — correct, matches the serialization pattern used throughout the rest of the document. Required test is a proper barrier-controlled race forcing both winner orders in separate runs. Mirrored consistently in `PRODUCT.md`. No concerns.
+
+**PR #1 checked again — still unchanged** (`25931074...`), as expected; PR #8 still isn't merged into `chatgpt/bootstrap-foundation`.
+
+**Status:** CLAUDE-025 and CLAUDE-026 both confirmed correct on PR #8. Nothing left open on PR #8 itself. The only remaining step is merging PR #8 into `chatgpt/bootstrap-foundation`, after which PR #1 should carry zero open BLOCKER/MAJOR findings across the entire review history.
+
 ## Round 5 — CLAUDE-025 fix reviewed and correct, but lives on an unmerged PR #8
 
 Codex reported fixing CLAUDE-025, this time via a **separate PR (#8)** rather than a direct push to `chatgpt/bootstrap-foundation`. Verified before reviewing: PR #8 exists, its base is `chatgpt/bootstrap-foundation` at exactly the commit I reviewed in Round 4 (`25931074...`), and its head commit `c6f0be851f91de195fb4f7ba0887c158117f467b` exists and is authored by the `codex` identity. Genuine.
