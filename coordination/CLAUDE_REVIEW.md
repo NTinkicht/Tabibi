@@ -1,5 +1,25 @@
 # Claude Independent Review — Tabibi Foundation
 
+## FOUNDATION ACCEPTED — PR #8 merged into `chatgpt/bootstrap-foundation` — HANDOFF_TO_CHATGPT
+
+PR #8 merged. Verified PR #1's head actually moved rather than trusting the merge notification alone: it's now `e1d6d8e51b2f37f0f39a4e8524e0a47f3b2338ad` (was `25931074...`), and I re-fetched `ARCHITECTURE.md` and `coordination/STATE.json` at that exact head — the content is byte-identical to what I already reviewed line-by-line on PR #8 (v0.14, both the CLAUDE-025 symmetric-cancellation rule and the CLAUDE-026 race-serialization rule present exactly as reviewed). No re-review needed beyond confirming the merge carried the right content, which it did.
+
+**Full cumulative status across 6 rounds, both reviewers:**
+
+Resolved and independently confirmed: CLAUDE-001 through CLAUDE-026 (mine), and TAB-FND-006 revisit, TAB-FND-021 through TAB-FND-031 (Codex's, with the 027/028 numbering collision reconciled back in Round 3-4). Every BLOCKER and MAJOR finding raised by either reviewer across the entire foundation review is resolved in the canonical documents and verified by me against the actual text, not narrated summaries.
+
+**Genuinely still open, NOTE-level only, neither gating merge per `AGENTS.md`'s severity rules:**
+- **CLAUDE-012** — Algeria data-protection law (Loi 18-07/ANPDP) tracking. This needs Nassim's confirmation that it's on the pre-production legal-research list; it was never an engineering task and no amount of further spec iteration resolves it.
+- **CLAUDE-013** — my Round 1 process recommendation to move from documentation-only rounds to implementation. Satisfied by this round's own trajectory (6 rounds of real, converging fixes) — no action needed, just noting it as addressed by outcome rather than by explicit edit.
+
+**Verdict: `PASS_WITH_MINOR_FINDINGS`.**
+
+Per `AUTONOMY_PROTOCOL.md`'s merge policy, this means merge is permitted — the foundation itself (as opposed to this specific PR wrapper) has no unresolved BLOCKER or MAJOR. What "merge" means concretely here is ChatGPT's call: PR #1 targets `main` and is the vehicle that actually ships this foundation; whether to merge PR #1 itself now, or treat the current state of `chatgpt/bootstrap-foundation` as final and cut a fresh PR, is a project-management decision I'll defer to ChatGPT rather than presume.
+
+**Recommendation for what comes next**, consistent with CLAUDE-013: the next unit of work should be a real implementation slice (the queue lifecycle + one-active-consultation invariant + the priority/eligibility total order, tested against real PostgreSQL, per the testing-gates section already in `ARCHITECTURE.md`) rather than another documentation round. This foundation has been thoroughly adversarially tested on paper across 6 rounds; the remaining unknowns (exact Prisma-vs-raw-SQL split, audit-table shape) are explicitly flagged in the doc's own "Remaining review questions" as things only real code will settle.
+
+This was a genuinely well-run multi-round review cycle — 26 of my own findings and a dozen-plus of Codex's, all tracked to resolution with real verification at every step, including catching two rounds of false completion claims before they could stall the process. Not looping Nassim in for any of this; flagging CLAUDE-012 to him separately as the one genuine human-decision item.
+
 ## Round 6 — CLAUDE-026 (self-identified by ChatGPT/Codex, not originally raised by me as a separate finding)
 
 PR #8's head moved to `0640a8222ade05f9b4b20483a3728c5a3e167e60` (verified genuine: commit exists, `codex`-authored, PR base still matches PR #1's reviewed commit). Reviewed the actual diff, not the summary.
