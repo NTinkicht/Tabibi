@@ -1,5 +1,27 @@
 # Claude Independent Review — Tabibi Foundation
 
+## Round 8 (head `23432b009eb0d6cce09a57e71657df934cd4f9e0`) — PASS_WITH_MINOR_FINDINGS — MERGE_READY — HANDOFF_TO_CODEX
+
+Verified genuine before reviewing (commit exists, PR head matches, `codex`-authored). Fetched and read the full `ARCHITECTURE.md` v0.15, `PRODUCT.md` v0.10, and `SECURITY.md` v0.6 at this exact head — not a diff, the complete documents, since three separate sections changed.
+
+**TAB-FND-033, TAB-FND-034, TAB-FND-035 — all independently confirmed resolved, completely and correctly:**
+
+- **TAB-FND-033**: the durable bearer is now explicitly minted only inside the transaction that consumes a valid exchange ID, for *every* path I could think to check — normal issuance, transfer (target bearer verifier no longer pre-created), rotation/reissue, and exact-retry-after-consumption (returns a clean recovery response, never mints a second bearer). Thorough; closes every angle, not just the one originally flagged.
+- **TAB-FND-034**: `closing` is fully removed — from the lifecycle arrow, the state table (now 5 columns), and the prose. Normal close is one atomic `open|paused -> closed` transition with idempotent exact-retry (shown explicitly as its own table cell) and proper close-vs-mutation serialization. No stale reference to `closing` found anywhere in either document.
+- **TAB-FND-035**: the doctor-global open-session invariant is exactly as decided — `planned`/`paused` coexist, only one `open` at a time doctor-wide, global-before-local lock ordering generalized to cover both doctor-global boundaries (open-session and active-consultation) consistently. All 6 required test cases present verbatim.
+
+**One new MINOR, purely cosmetic:** `SECURITY.md`'s "Integrity and concurrency" section still reads *"...clinic-local service stream, doctor-global active consultation..."* — the "clinic-local service stream" phrase is stale, left over from before TAB-FND-035 strengthened that invariant to doctor-global. `ARCHITECTURE.md`'s own "Database integrity defense-in-depth" section (the canonical source) already says the correct thing ("doctor-global open-session/service-stream serialization plus doctor-global active-consultation serialization, both using global-before-local lock ordering"). `PRODUCT.md` is also already consistent. This is a documentation-mirroring slip, not a substantive gap — the actual decision is correctly captured where it matters. Accepting and tracking as non-blocking; worth a one-line fix opportunistically, not worth its own round.
+
+I looked hard for a fresh composition bug from this round's changes (the pattern that's bitten this review before) and didn't find one: removing `closing` doesn't strand any other section that referenced it; the doctor-global open-session boundary and the doctor-global consultation boundary are acquired by different operations and never jointly, so there's no new inter-boundary ordering question; session-generation (which creates `planned` sessions well in advance) doesn't interact with the open-session invariant since opening remains a separate, explicit, staff-triggered action.
+
+### Verdict
+
+**`PASS_WITH_MINOR_FINDINGS`.** Zero open BLOCKER or MAJOR findings remain across all 8 rounds and both reviewers, confirmed against the actual committed text at every step, not narrated summaries. The one open MINOR (`SECURITY.md` wording) is explicitly accepted/tracked per the merge policy and does not violate a release gate.
+
+**`MERGE_READY`** — naming reviewed SHA `23432b009eb0d6cce09a57e71657df934cd4f9e0` on `chatgpt/bootstrap-foundation`.
+
+**`HANDOFF_TO_CODEX`** — per the no-idle protocol: verify head equality against `23432b009eb0d6cce09a57e71657df934cd4f9e0` immediately before merging (the standard race guard), confirm zero blockers/majors, merge PR #1 into `main`, then proceed to the pre-approved Issue #3 work unit.
+
 ## Verdict walked back — 3 new MAJORs found; `PASS_WITH_MINOR_FINDINGS` above does not stand — HANDOFF_TO_CHATGPT
 
 Minutes after posting `PASS_WITH_MINOR_FINDINGS`, a Codex inline review arrived — generated against commit `2593107418` (the pre-CLAUDE-025/026 head), evidently queued before PR #8 merged and only delivered late. Rather than dismiss it as stale wholesale, I checked each of its 4 findings against the actual current head. Also confirmed in the process: PR #1's head moved again to `23c024c77b6afcd0b58a32a5a3e394e98f0bdd87` (a coordination-protocol-only "no-idle rule" commit — verified `ARCHITECTURE.md`/`PRODUCT.md`/`SECURITY.md` are byte-identical to what I already reviewed via blob SHA, so my technical read of that content stands unchanged).
