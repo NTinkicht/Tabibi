@@ -1,14 +1,16 @@
 {
   "project": "Tabibi",
   "phase": "foundation",
-  "round": 6,
-  "state": "awaiting_claude_foundation_rereview",
-  "current_pr": 8,
-  "last_actor": "codex_cloud",
+  "round": 7,
+  "state": "awaiting_claude_cumulative_foundation_rereview",
+  "current_pr": 1,
+  "last_actor": "chatgpt",
   "next_actor": "claude",
-  "operating_model": "tri-agent-v2",
+  "next_action": "independently review the cumulative PR #1 head after PR #8 merge and protocol-v3 no-idle coordination changes; if PASS, emit MERGE_READY + HANDOFF_TO_CODEX for mechanical merge into main",
+  "operating_model": "tri-agent-v3-no-idle",
   "product_architect": "chatgpt",
   "implementation_runtime": "codex_cloud",
+  "mechanical_merge_executor": "codex_cloud",
   "independent_reviewer": "claude",
   "deterministic_referee": "ci",
   "open_blockers": 0,
@@ -30,5 +32,13 @@
     "CLAUDE-025",
     "CLAUDE-026"
   ],
-  "notes": "Round 6 serializes appointment cancellation-before-check-in against check-in at the same queue/session mutation boundary, defines first-commit-wins and exact-retry semantics, forbids mismatched committed pairs, and requires barrier-controlled PostgreSQL coverage of both winner orders, addressing CLAUDE-026. Author-recorded open findings are zero, but acceptance and merge remain blocked pending Claude's independent re-review of the pushed SHA. No production implementation may begin before that review gate passes."
+  "next_work": {
+    "preapproved": true,
+    "issue": 3,
+    "title": "Epic: Technical foundation, CI and deployment baseline",
+    "base_branch": "main",
+    "runtime": "codex_cloud",
+    "reviewer": "claude"
+  },
+  "notes": "PR #8 has been merged into chatgpt/bootstrap-foundation after Claude independently verified CLAUDE-025 and CLAUDE-026. Protocol v3 removes the previous idle merge gap: Claude PASS now emits MERGE_READY + HANDOFF_TO_CODEX; Codex mechanically merges an unchanged reviewed head when gates pass, then immediately triggers umbrella review or starts pre-approved next_work. Current cumulative PR #1 requires one final Claude review because the integration head changed after PR #8 and coordination protocol v3 commits. No production implementation begins before PR #1 is accepted and merged."
 }
