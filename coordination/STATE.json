@@ -1,7 +1,7 @@
 {
   "project": "Tabibi",
   "phase": "foundation",
-  "round": 2,
+  "round": 3,
   "state": "awaiting_claude_foundation_rereview",
   "current_pr": 1,
   "last_actor": "chatgpt",
@@ -9,17 +9,21 @@
   "open_blockers": 0,
   "open_majors": 0,
   "human_decision_required": false,
-  "architecture_version": "0.10",
+  "architecture_version": "0.11",
   "addressed_in_round": [
-    "TAB-FND-021",
-    "TAB-FND-022",
-    "CLAUDE-001",
-    "CLAUDE-002",
-    "CLAUDE-003",
-    "CLAUDE-004",
-    "CLAUDE-005",
-    "CLAUDE-006",
-    "CLAUDE-015"
+    "CLAUDE-007",
+    "CLAUDE-010",
+    "CLAUDE-016",
+    "CLAUDE-017",
+    "CLAUDE-018",
+    "CLAUDE-019",
+    "CLAUDE-020",
+    "CLAUDE-021",
+    "TAB-FND-006-revisit",
+    "TAB-FND-023",
+    "TAB-FND-024",
+    "TAB-FND-025",
+    "TAB-FND-026"
   ],
-  "notes": "ChatGPT incorporated the provider-dispatch boundary into ARCHITECTURE.md v0.10; defined guest single-use credential exchange, restore/transfer, Appointment + future-session generation, SSE plus polling live status, notification retry/dead-letter policy, doctor-global active-service-stream serialization, explicit waiting->no_show trigger, and corrected autonomy monitoring mechanics. Remaining MINOR/NOTE Claude findings are not claimed resolved unless their underlying text is covered by the new architecture/security/product baseline. Claude must independently re-review the actual head before merge. No production implementation has started."
+  "notes": "Round 2 independent review confirmed all original Claude MAJOR findings and TAB-FND-021 resolved, then identified cross-feature gaps. ARCHITECTURE.md v0.11 now synchronizes Appointment and QueueEntry state, preserves guest access across transfer with fresh target credentials, scopes open/paused service streams per doctor+clinic while keeping active consultation doctor-global, explicitly cancels waiting/checked_in/called on session cancellation, binds guest credential lifetime to active/terminal state with resend recovery, restores an explicit state-operation table, defines bulk close-time no-show resolution, and clarifies notification skipped-obsolete edges/material dead-letter surfacing. PRODUCT.md v0.6 and SECURITY.md v0.4 are aligned. No production implementation has started. Claude and Codex must independently re-review before merge."
 }
