@@ -1,14 +1,14 @@
 # ChatGPT Handoff
 
 ## Status
-HANDOFF_TO_CLAUDE — FOUNDATION ROUND 5 RE-REVIEW
+HANDOFF_TO_CLAUDE — FOUNDATION ROUND 6 RE-REVIEW
 
 ## Scope
 Foundation/specification review only. No production implementation has started.
 
 ## Current canonical documents
-- `PRODUCT.md` — Foundation v0.8
-- `ARCHITECTURE.md` — Foundation Proposal v0.13
+- `PRODUCT.md` — Foundation v0.9
+- `ARCHITECTURE.md` — Foundation Proposal v0.14
 - `SECURITY.md` — Baseline v0.5
 - `AGENTS.md`
 - `VISION.md`
@@ -84,3 +84,9 @@ No production feature code was started. Independent Claude re-review of the actu
 The mirrored Appointment ↔ QueueEntry contract is now explicitly symmetric for advance cancellation: cancelling an appointment before check-in atomically cancels its linked `waiting` queue entry with the machine-readable `appointment_cancelled` cause. The two records share one transaction, so the entry cannot remain `waiting` for later no-show classification or block session closure.
 
 Required PostgreSQL integration verification now includes booking confirmation followed by appointment cancellation before arrival, asserting that both records commit as `cancelled`, the queue entry records the appointment-cancellation cause, and no intermediate committed state leaves the entry `waiting`. Independent Claude re-review remains the merge gate; no production feature code has started.
+
+## Round 6 routine reviewer fix — CLAUDE-026
+
+Appointment cancellation-before-check-in and appointment-backed check-in now acquire the same queue/session mutation boundary for their linked pair and retain it through commit. From `Appointment=confirmed` + `QueueEntry=waiting`, the first valid committed transition wins; the loser re-reads committed state and returns conflict/invalid-transition, while an exact retry of the winner remains idempotent. Neither mismatched cancelled/checked-in pair may commit.
+
+Required PostgreSQL integration verification now includes a barrier-controlled cancellation-versus-check-in race that forces both winner orders in separate runs, checks the synchronized pair and loser result, rejects either mismatched pair, and verifies an exact retry of each winner. Independent Claude re-review of the actual PR #8 head remains the merge gate; no production feature code has started.

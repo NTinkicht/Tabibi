@@ -1,9 +1,9 @@
 {
   "project": "Tabibi",
   "phase": "foundation",
-  "round": 5,
+  "round": 6,
   "state": "awaiting_claude_foundation_rereview",
-  "current_pr": 1,
+  "current_pr": 8,
   "last_actor": "codex_cloud",
   "next_actor": "claude",
   "operating_model": "tri-agent-v2",
@@ -15,8 +15,8 @@
   "open_majors": 0,
   "open_minors": 0,
   "human_decision_required": false,
-  "product_version": "0.8",
-  "architecture_version": "0.13",
+  "product_version": "0.9",
+  "architecture_version": "0.14",
   "security_version": "0.5",
   "pending_findings": [],
   "addressed_findings": [
@@ -27,7 +27,8 @@
     "TAB-FND-027-booking-queue-materialization",
     "TAB-FND-028-effective-service-order",
     "TAB-FND-030-transfer-target-state",
-    "CLAUDE-025"
+    "CLAUDE-025",
+    "CLAUDE-026"
   ],
-  "notes": "Round 5 adds symmetric pre-check-in appointment-cancellation synchronization and its required PostgreSQL verification, addressing CLAUDE-025. Author-recorded open findings are zero, but acceptance and merge remain blocked pending Claude's independent re-review of the pushed SHA. No production implementation may begin before that review gate passes."
+  "notes": "Round 6 serializes appointment cancellation-before-check-in against check-in at the same queue/session mutation boundary, defines first-commit-wins and exact-retry semantics, forbids mismatched committed pairs, and requires barrier-controlled PostgreSQL coverage of both winner orders, addressing CLAUDE-026. Author-recorded open findings are zero, but acceptance and merge remain blocked pending Claude's independent re-review of the pushed SHA. No production implementation may begin before that review gate passes."
 }

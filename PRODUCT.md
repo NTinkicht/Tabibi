@@ -1,4 +1,4 @@
-# Tabibi Product Specification — Foundation v0.8
+# Tabibi Product Specification — Foundation v0.9
 
 ## Problem
 Many Algerian clinics operate with highly variable consultation queues. Patients may arrive very early, place their name on a physical list, leave, return later, and still have little reliable information about when they will be seen. Consultation duration, doctor delays, walk-ins, emergencies, cancellations and no-shows make rigid appointment slots insufficient on their own.

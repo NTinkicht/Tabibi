@@ -1,4 +1,4 @@
-# Tabibi Architecture — Foundation Proposal v0.13
+# Tabibi Architecture — Foundation Proposal v0.14
 
 This is the canonical foundation architecture for independent review before production implementation.
 
