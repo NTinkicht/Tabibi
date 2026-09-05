@@ -1,4 +1,4 @@
-# Tabibi Product Specification — Foundation v0.9
+# Tabibi Product Specification — Foundation v0.10
 
 ## Problem
 Many Algerian clinics operate with highly variable consultation queues. Patients may arrive very early, place their name on a physical list, leave, return later, and still have little reliable information about when they will be seen. Consultation duration, doctor delays, walk-ins, emergencies, cancellations and no-shows make rigid appointment slots insufficient on their own.
@@ -48,9 +48,9 @@ Cancellation is distinct from no-show. `waiting -> no_show` is valid only for an
 Restore preserves audit history and assigns fresh live ordering when required. Transfer cancels the source with a transfer cause and creates a target entry: waiting stays waiting, while checked-in/called becomes checked-in at the target tail. Called status and live priority never silently carry across sessions. Transfer re-links any appointment, revokes source guest credentials and issues a fresh target exchange link when remote guest access exists.
 
 ## Session behavior
-`planned`: registration/early check-in allowed, no call/start. `open`: normal service. `paused`: registration/check-in/non-consulting resolution allowed, no new call/start. `closing/closed/cancelled`: no new service mutations except the state-producing operation.
+`planned`: registration/early check-in allowed, no call/start. `open`: normal service. `paused`: registration/check-in/non-consulting resolution allowed, no new call/start. `closed` and `cancelled` are terminal. MVP has no persisted/API-visible `closing` state: normal close atomically transitions `open|paused -> closed` after revalidating all preconditions.
 
-For one `(doctor, clinic)` pair, at most one session may be `open` or `paused`. Across all clinics, one doctor may have at most one patient `in_consultation` at a time. A paused morning session at Clinic A therefore does not block opening an afternoon session at Clinic B if no consultation is active.
+Across all clinics, one doctor may have at most one `open` session and at most one patient `in_consultation` at a committed moment. Planned and paused sessions may coexist; a paused morning session at Clinic A therefore does not block opening an afternoon session at Clinic B when no consultation is active, but Clinic A cannot resume until Clinic B is no longer open.
 
 Normal closure requires no active entries. Before close, reception may bulk-resolve only appointment-backed `waiting` entries whose arrival grace deadline has elapsed. Whole-session cancellation atomically cancels **all** remaining `waiting`, `checked_in`, and `called` entries and is rejected while a consultation is active.
 

@@ -1,12 +1,12 @@
 {
   "project": "Tabibi",
   "phase": "foundation",
-  "round": 7,
-  "state": "awaiting_claude_cumulative_foundation_rereview",
+  "round": 8,
+  "state": "awaiting_claude_foundation_rereview",
   "current_pr": 1,
-  "last_actor": "chatgpt",
+  "last_actor": "codex_cloud",
   "next_actor": "claude",
-  "next_action": "independently review the cumulative PR #1 head after PR #8 merge and protocol-v3 no-idle coordination changes; if PASS, emit MERGE_READY + HANDOFF_TO_CODEX for mechanical merge into main",
+  "next_action": "independently review cumulative PR #1 head for TAB-FND-033/034/035; if acceptable, emit PASS or PASS_WITH_MINOR_FINDINGS plus MERGE_READY and HANDOFF_TO_CODEX naming the exact reviewed SHA",
   "operating_model": "tri-agent-v3-no-idle",
   "product_architect": "chatgpt",
   "implementation_runtime": "codex_cloud",
@@ -17,9 +17,9 @@
   "open_majors": 0,
   "open_minors": 0,
   "human_decision_required": false,
-  "product_version": "0.9",
-  "architecture_version": "0.14",
-  "security_version": "0.5",
+  "product_version": "0.10",
+  "architecture_version": "0.15",
+  "security_version": "0.6",
   "pending_findings": [],
   "addressed_findings": [
     "CLAUDE-022",
@@ -30,7 +30,10 @@
     "TAB-FND-028-effective-service-order",
     "TAB-FND-030-transfer-target-state",
     "CLAUDE-025",
-    "CLAUDE-026"
+    "CLAUDE-026",
+    "TAB-FND-033",
+    "TAB-FND-034",
+    "TAB-FND-035"
   ],
   "next_work": {
     "preapproved": true,
@@ -40,5 +43,5 @@
     "runtime": "codex_cloud",
     "reviewer": "claude"
   },
-  "notes": "PR #8 has been merged into chatgpt/bootstrap-foundation after Claude independently verified CLAUDE-025 and CLAUDE-026. Protocol v3 removes the previous idle merge gap: Claude PASS now emits MERGE_READY + HANDOFF_TO_CODEX; Codex mechanically merges an unchanged reviewed head when gates pass, then immediately triggers umbrella review or starts pre-approved next_work. Current cumulative PR #1 requires one final Claude review because the integration head changed after PR #8 and coordination protocol v3 commits. No production implementation begins before PR #1 is accepted and merged."
+  "notes": "TAB-FND-033/034/035 are author-claimed addressed in canonical v0.15/v0.10/v0.6 documents: bearer minting occurs only on atomic exchange consumption; closing is removed in favor of atomic close; and doctor-global open-session capacity is serialized global-before-local. Claude must independently review the exact pushed head. Merge remains forbidden until MERGE_READY names that unchanged head."
 }

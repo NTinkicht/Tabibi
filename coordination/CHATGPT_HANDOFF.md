@@ -25,10 +25,7 @@ Claude independently confirmed CLAUDE-001..005 and TAB-FND-021 resolved, then re
 Transfer now atomically revokes source guest verifiers/exchange IDs, creates target-entry credential material and a new single-use exchange link, commits a transfer notification, and limits the old cookie to a non-sensitive transferred response. Linked appointments are atomically re-linked to target session/entry.
 
 ### CLAUDE-020 / TAB-FND-022 — multi-clinic doctor capacity
-Capacity is split correctly:
-- doctor-global: at most one `in_consultation` entry across all clinics;
-- clinic-local: at most one `open`/`paused` session per `(doctor, clinic)`.
-A paused Clinic A session no longer blocks opening Clinic B when no consultation is active. Explicit cross-clinic concurrency tests are required.
+This Round 3 decision was superseded by the stronger doctor-global open-session invariant in Round 8 below. The retained doctor-global rule allows at most one `in_consultation` entry across all clinics; see TAB-FND-035 for canonical open/resume capacity and lock ordering. Explicit cross-clinic concurrency tests are required.
 
 ### TAB-FND-006 revisit
 Whole-session cancellation explicitly enumerates and atomically cancels every remaining `waiting`, `checked_in`, and `called` entry. No ambiguous `serviceable` wording remains.
@@ -90,3 +87,13 @@ Required PostgreSQL integration verification now includes booking confirmation f
 Appointment cancellation-before-check-in and appointment-backed check-in now acquire the same queue/session mutation boundary for their linked pair and retain it through commit. From `Appointment=confirmed` + `QueueEntry=waiting`, the first valid committed transition wins; the loser re-reads committed state and returns conflict/invalid-transition, while an exact retry of the winner remains idempotent. Neither mismatched cancelled/checked-in pair may commit.
 
 Required PostgreSQL integration verification now includes a barrier-controlled cancellation-versus-check-in race that forces both winner orders in separate runs, checks the synchronized pair and loser result, rejects either mismatched pair, and verifies an exact retry of each winner. Independent Claude re-review of the actual PR #8 head remains the merge gate; no production feature code has started.
+
+## Round 8 architect-arbitrated fixes — TAB-FND-033/034/035
+
+`HANDOFF_TO_CLAUDE` after Codex commits and pushes this round.
+
+- **TAB-FND-033:** a durable guest bearer/verifier pair is created only in the transaction that validates and consumes a single-use exchange ID. Registration, resend and transfer persist only the target-bound exchange verifier and permitted encrypted delivery material. Transfer revokes old credentials/exchanges and creates no target bearer verifier. Exact consumed-link retries mint nothing and use the clean recovery/resend outcome. Normal and transfer issuance must prove the returned cookie works without recoverable bearer material in persistence or logs.
+- **TAB-FND-034:** `closing` is removed from the canonical lifecycle and operation table. Normal close is a single serialized `open|paused -> closed` transaction that revalidates all active-entry preconditions and records final timestamp/audit metadata in the same commit. Exact retries are idempotent; close-versus-mutation races serialize and re-read committed state.
+- **TAB-FND-035:** at most one session per doctor may be `open` globally, while `planned` and `paused` sessions may coexist. Open/resume and start-consultation operations acquire the applicable doctor-global boundary before the clinic/session boundary, revalidate after locking and hold both through commit. The required cross-clinic race matrix covers open/open, open/resume, paused-session consultation conflicts, permitted paused/no-consultation opening, rejected resume while another session is open, and start/start.
+
+Canonical versions are Product v0.10, Architecture v0.15 and Security v0.6. Coordination records zero author-claimed open BLOCKER/MAJOR findings, but this is not acceptance: Claude must independently review the exact pushed SHA. If no BLOCKER/MAJOR remains, Claude must emit `MERGE_READY` + `HANDOFF_TO_CODEX`; Codex then applies the mechanical merge gates and immediately continues to pre-approved Issue #3 after merging PR #1 to `main`.

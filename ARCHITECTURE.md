@@ -1,4 +1,4 @@
-# Tabibi Architecture — Foundation Proposal v0.14
+# Tabibi Architecture — Foundation Proposal v0.15
 
 This is the canonical foundation architecture for independent review before production implementation.
 
@@ -126,29 +126,29 @@ Transfer moves a not-yet-consulting patient to another compatible session/doctor
 - Original registration history remains immutable. Source `waiting` creates target `waiting` with null `eligibility_order`; source `checked_in` creates target `checked_in` with a fresh tail `eligibility_order` in the target session; source `called` also creates target `checked_in` with a fresh target-session tail `eligibility_order`, because a call is session-specific and never transfers as already-called.
 - Live `priority_order` is never copied to the target. Target priority requires a separate authorized, reasoned and audited priority operation.
 - Any linked `Appointment` is atomically re-linked to the target session and target queue entry. Its state becomes `confirmed` for target `waiting` and `checked_in` for target `checked_in`.
-- For a guest entry, every source-entry guest verifier and outstanding exchange ID is invalidated in the same transaction. A fresh target-entry guest credential verifier + single-use exchange ID are created, and a `queue_entry_transferred` notification containing only the fresh exchange link is committed transactionally. The old cookie can return only a non-sensitive terminal/transferred response and cannot read the target status.
+- For a guest entry, every source-entry guest verifier and outstanding exchange ID is invalidated in the same transaction. The transaction creates only a fresh target-bound single-use exchange ID/verifier and its encrypted delivery material; it does **not** mint a target bearer or create a target bearer verifier. A `queue_entry_transferred` notification containing the fresh exchange link is committed transactionally. The target bearer and its verifier come into existence only when that target exchange ID is consumed. The old cookie can return only a non-sensitive terminal/transferred response and cannot read the target status.
 - Transfer requires authorization, reason, target-session lifecycle validation and notification/estimate recomputation.
 
 Required transfer tests cover every allowed source-state mapping, fresh target tail ordering, no accidental priority/called carryover, guest access continuity, old-credential rejection, fresh-link usability, appointment state/re-linking, exact retry idempotency and transfer/check-in/call races.
 
 ## Consultation-session lifecycle
-States: `planned -> open -> paused -> open -> closing -> closed`, plus terminal `cancelled`.
+States: `planned -> open -> paused -> open -> closed`, plus terminal `cancelled`. `closing` is not a persisted or API-visible state in MVP.
 
 ### Canonical state × operation table
-| Operation | planned | open | paused | closing | closed | cancelled |
-| --- | --- | --- | --- | --- | --- | --- |
-| add/register waiting entry | allow | allow | allow | reject | reject | reject |
-| check in | allow | allow | allow | reject | reject | reject |
-| call next | reject | allow | reject | reject | reject | reject |
-| start consultation | reject | allow | reject | reject | reject | reject |
-| complete active consultation | reject | allow | allow | reject | reject | reject |
-| cancel/no-show non-consulting entry | allow | allow | allow | reject | reject | reject |
-| priority/reorder | allow | allow | allow | reject | reject | reject |
-| delay declare/update/clear | allow | allow | allow | reject | reject | reject |
-| pause | reject | allow | no-op/reject by API policy | reject | reject | reject |
-| resume | reject | reject | allow | reject | reject | reject |
-| normal close | reject | allow | allow | n/a | reject | reject |
-| cancel entire session | allow | allow | allow | reject | reject | reject |
+| Operation | planned | open | paused | closed | cancelled |
+| --- | --- | --- | --- | --- | --- |
+| add/register waiting entry | allow | allow | allow | reject | reject |
+| check in | allow | allow | allow | reject | reject |
+| call next | reject | allow | reject | reject | reject |
+| start consultation | reject | allow | reject | reject | reject |
+| complete active consultation | reject | allow | allow | reject | reject |
+| cancel/no-show non-consulting entry | allow | allow | allow | reject | reject |
+| priority/reorder | allow | allow | allow | reject | reject |
+| delay declare/update/clear | allow | allow | allow | reject | reject |
+| pause | reject | allow | no-op/reject by API policy | reject | reject |
+| resume | reject | reject | allow | reject | reject |
+| normal close | reject | allow | allow | idempotent success for exact retry | reject |
+| cancel entire session | allow | allow | allow | reject | reject |
 
 Opening is an explicit serialized `planned -> open` command with idempotent retry behavior and audit metadata.
 
@@ -160,24 +160,26 @@ To avoid forcing reception to touch every absent appointment individually, an au
 - Concurrent check-in versus bulk resolution serializes at the session boundary; whichever commits first determines the valid outcome.
 - The bulk action is idempotent for already-resolved entries.
 
-Normal close remains rejected while any entry is `waiting`, `checked_in`, `called` or `in_consultation` after any optional bulk resolution.
+Normal close is one serialized atomic command from `open|paused` directly to `closed`; there is no begin/finalize protocol. After acquiring the session mutation boundary it re-reads the lifecycle and revalidates that no entry remains `waiting`, `checked_in`, `called` or `in_consultation` after any optional bulk resolution. The same commit records the final timestamp and audit event. An exact retry returns the already-closed result without another event; a distinct close or mutation observes the committed state and is rejected when no longer valid. Close-versus-queue/lifecycle mutations share this boundary, so the later transaction must re-read the winner's state.
 
 ### Session cancellation — TAB-FND-006 revisit
 Session cancellation is rejected while a consultation is active. Otherwise, after acquiring the session mutation boundary, it atomically transitions **every remaining `waiting`, `checked_in`, and `called` entry** to `cancelled`, clears affected priority slots, synchronizes linked appointments, terminates estimates, records audit events and creates durable cancellation intents. There is no ambiguous `serviceable` subset: all three enumerated states are disposed of. No serviceable or unreachable active row may remain inside a cancelled session.
 
-### Multi-clinic doctor capacity — CLAUDE-020 / TAB-FND-022
-The capacity model has two distinct scopes:
-- **doctor-global hard invariant:** across all clinics and sessions for a doctor, at most one queue entry may be `in_consultation` at any committed moment;
-- **clinic-local service-stream invariant:** for a given `(doctor, clinic)` pair, at most one session may be `open` or `paused` at a time in MVP.
+### Multi-clinic doctor capacity — CLAUDE-020 / TAB-FND-022 / TAB-FND-035
+The capacity model has two doctor-global hard invariants across every clinic and session:
+- at most one queue entry may be `in_consultation` for a doctor at any committed moment;
+- at most one session may be `open` for a doctor at any committed moment. `planned` and `paused` sessions may coexist, and a paused session does not reserve the doctor's open service stream.
 
-Therefore a doctor may have a paused session at Clinic A while a planned session at Clinic B opens, provided there is no active `in_consultation` entry anywhere for that doctor. Opening/resuming within the same clinic is serialized against that doctor's sessions at that clinic; starting consultation additionally acquires the doctor-global consultation boundary and rejects if another clinic/session already has an active consultation.
+`open` and `resume` acquire the doctor-global service-stream boundary before the clinic/session boundary and hold both through commit. After locking, they re-read all relevant state and reject if another session for that doctor is already `open` or an `in_consultation` entry exists in another session. Thus paused Clinic A plus planned Clinic B may open when no consultation is active, but Clinic A cannot resume while Clinic B remains open. An active consultation in paused Clinic A prevents Clinic B from opening.
 
-Any operation acquiring both consultation boundaries, including `start consultation`, always acquires the doctor-global consultation boundary first and then the clinic-local session boundary, and holds both through commit. No code path may invert this order.
+`start consultation` keeps the doctor-global active-consultation invariant and uses the same global-before-local ordering. Any operation acquiring a doctor-global boundary and a clinic/session boundary always acquires the applicable doctor-global boundary first and holds both through commit. No code path may invert this order.
 
 Required tests:
-- paused Clinic A + open planned Clinic B => allowed when no consultation is active;
-- open/paused competing sessions in the same clinic => one winner;
-- `in_consultation` at Clinic A + start consultation at Clinic B => rejected;
+- concurrent cross-clinic open/open => one winner;
+- cross-clinic open versus resume => one winner;
+- active consultation in paused Clinic A + open Clinic B => rejected;
+- paused Clinic A with no active consultation + open Clinic B => allowed;
+- resume Clinic A while Clinic B remains open => rejected;
 - concurrent cross-clinic start/start => one doctor-global winner.
 
 ## Doctor delay
@@ -197,25 +199,26 @@ Material notification threshold is configurable by clinic but defaults to: notif
 ## Patient queue access and guest-token transport — CLAUDE-001 / CLAUDE-016 / TAB-FND-024
 Account-linked patients use authenticated ownership/delegation.
 
-Guest entries use a high-entropy revocable bearer credential whose raw value is issued once and never persisted. Only a one-way verifier is stored. Public display labels are separate non-secret values and can never authorize access.
+Guest entries use a high-entropy revocable bearer credential. Its raw value is generated only while atomically consuming a valid single-use exchange ID, returned only in the cookie response, and never persisted or logged. Only the resulting one-way bearer verifier is stored. Public display labels are separate non-secret values and can never authorize access.
 
 MVP transport: **single-use exchange link**.
 - SMS/other contact channel contains a short-TTL, single-use opaque exchange ID, never the durable bearer credential.
-- Exchange ID default TTL is 10 minutes, has only a one-way verifier, is single-use and rate-limited.
-- `/g/exchange/<opaque-id>` atomically consumes the exchange ID, sets the real guest credential in a `Secure`, `HttpOnly`, `SameSite=Lax` cookie, and redirects to a clean status URL.
+- Exchange ID default TTL is 10 minutes, has only a one-way verifier, is single-use and rate-limited. Before consumption, persistence is limited to that exchange record/verifier, its target entry/session binding, expiry, purpose, rate-limit metadata and the encrypted delivery material defined below; no durable bearer verifier exists yet.
+- `/g/exchange/<opaque-id>` transactionally validates and consumes the exchange ID, generates a fresh high-entropy bearer, stores only its one-way verifier bound to the target entry/session, sets the raw bearer only in a `Secure`, `HttpOnly`, `SameSite=Lax` cookie response, and redirects to a clean status URL. The raw bearer is never persisted or logged.
+- An exact retry after successful exchange consumption never mints a second bearer. It returns an already-consumed, credential-free recovery response; if the cookie was lost, the patient must use the rate-limited resend flow to obtain a fresh exchange ID.
 - The guest cookie has explicit `Max-Age` bounded by the earlier of 24 hours or the credential's server-side expiry. Session timing never shortens this cap; terminal-state revocation below remains authoritative however late a session runs. Active entries can obtain a fresh exchange link through a rate-limited resend flow without changing queue state.
 - A credential is additionally bound to the current queue-entry/session state. On `completed`, `cancelled`, `no_show`, or whole-session `closed/cancelled`, authorization to live queue data is revoked immediately except for a <=15 minute terminal-summary grace window containing only the final non-sensitive status needed for UX. After that grace period the verifier is invalid and the cookie cannot authorize any queue read.
 - Resend is allowed only while the target entry remains active (`waiting|checked_in|called|in_consultation`) and the intended contact channel still matches the entry; it issues a new exchange ID and rate-limits by entry/contact/IP.
 - For contact-less guest entries, no remote bearer/exchange credential is created. They remain fully serviceable in-clinic but notification/live-remote features are explicitly unavailable unless contact information is later added by authorized staff.
 - Exchange/status responses set `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, restrictive CSP; no third-party resources on exchange route; analytics disabled; logs redact exchange path segments.
-- Rotation/reissue revokes previous verifier and outstanding exchange IDs atomically.
+- Rotation/reissue revokes previous bearer verifiers and outstanding exchange IDs atomically, then creates only a new exchange ID/verifier and permitted encrypted delivery material. It never pre-creates the replacement bearer verifier.
 
 ### Encrypted exchange-link delivery exception — TAB-FND-028-secret-outbox
 Credential and exchange tables remain verifier-only. A notification that must deliver an exchange link may persist only a short-lived envelope-encrypted secret payload in its outbox row, alongside non-secret routing and delivery metadata. The data-encryption key is protected by a runtime secret/KMS-equivalent key that is never stored in the database or Git; authenticated encryption binds the ciphertext to the intent, entry and clinic identifiers. Only the notification worker may decrypt, immediately before provider dispatch.
 
 Ciphertext expiry may not exceed the exchange ID TTL (default 10 minutes). Retry before expiry reuses the same logical exchange ID and provider idempotency key. Once expired, the stale link is never retried or decrypted; the intent terminates with an observable expiry outcome and resend must generate a fresh exchange ID, verifier, ciphertext and logical notification. Recoverable ciphertext is redacted/deleted as soon as audit requirements allow after successful delivery, terminal failure, or expiry, while non-secret delivery metadata remains. Plaintext links and decrypted payloads are forbidden in logs, metrics, errors, audit snapshots and general outbox columns. Key lookup/decryption failure is explicit, retry-bounded while the ciphertext is live, observable, and must never fall back to plaintext or dispatch corrupted data.
 
-Required tests: raw bearer never in URL/log/referrer; link single-use/expiry; verifier cannot authenticate; public label cannot authenticate; cookie-loss + resend recovery; resend rate limit; terminal-state credential invalidation; terminal-summary grace expiry; a session already more than four hours past planned end still receives a positive/full bounded `Max-Age`; contact-less entry cannot access remote status until contact is added; transfer continuity tests above; database-dump/log safety for encrypted links, restart-safe retry before expiry, no retry after expiry, ciphertext redaction, and key/decrypt failure behavior.
+Required tests: normal and transfer exchange issuance each produce a working cookie credential while database/outbox/log inspection proves no recoverable bearer material was persisted; no bearer verifier exists before exchange consumption; raw bearer never appears in URL/log/referrer; exact consumed-link retry mints no second credential and returns the recovery outcome; link single-use/expiry; verifier cannot authenticate; public label cannot authenticate; cookie-loss + resend recovery; resend rate limit; terminal-state credential invalidation; terminal-summary grace expiry; a session already more than four hours past planned end still receives a positive/full bounded `Max-Age`; contact-less entry cannot access remote status until contact is added; transfer continuity tests above; database-dump/log safety for encrypted links, restart-safe retry before expiry, no retry after expiry, ciphertext redaction, and key/decrypt failure behavior.
 
 ## Live status delivery — CLAUDE-004
 MVP web transport is **Server-Sent Events (SSE)** with polling fallback.
@@ -259,7 +262,7 @@ Implementation must use PostgreSQL constraints/indexes/locking where possible, n
 - uniqueness of generated future session occurrence;
 - uniqueness/consistency of active priority slots within a session;
 - no duplicate appointment->queue linkage where cardinality is one;
-- clinic-local doctor service-stream serialization plus doctor-global active-consultation serialization;
+- doctor-global open-session/service-stream serialization plus doctor-global active-consultation serialization, both using global-before-local lock ordering;
 - optimistic/version fields where stale client mutation must be rejected.
 
 Exact DDL strategy is selected during implementation and proved by PostgreSQL integration tests.

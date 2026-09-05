@@ -1,4 +1,4 @@
-# Tabibi Security & Privacy Baseline v0.5
+# Tabibi Security & Privacy Baseline v0.6
 
 Tabibi is healthcare-adjacent software. Treat patient and operational clinic data as sensitive by default.
 
@@ -18,7 +18,7 @@ Tabibi is healthcare-adjacent software. Treat patient and operational clinic dat
 - Priority, restore and transfer require explicit permission and non-empty audit reason.
 
 ## Guest access credential model
-The durable guest credential is a high-entropy bearer secret. The raw bearer value is issued once and never persisted. Persist only a one-way verifier; the verifier itself must not authenticate.
+The durable guest credential is a high-entropy bearer secret minted only when a valid single-use exchange ID is atomically consumed. The raw bearer is returned only in the Secure/HttpOnly cookie response and is never persisted or logged. Persist only its one-way verifier, created in that consumption transaction and bound to the target entry/session; the verifier itself must not authenticate.
 
 ### Single-use exchange transport
 The patient contact channel receives a short-TTL single-use opaque exchange ID, not the durable bearer credential.
@@ -26,8 +26,9 @@ The patient contact channel receives a short-TTL single-use opaque exchange ID, 
 Rules:
 - exchange ID default TTL <=10 minutes;
 - only a one-way exchange verifier is stored;
-- first successful use atomically consumes it;
-- server sets the durable guest credential in a `Secure`, `HttpOnly`, `SameSite=Lax` cookie and redirects to a clean credential-free URL;
+- before consumption, store only the exchange record/verifier, target entry/session binding, expiry, purpose, rate-limit metadata and permitted envelope-encrypted delivery material; never pre-create a bearer verifier;
+- first successful use transactionally validates and consumes it, generates a fresh high-entropy bearer, persists only the bearer verifier, and sets the raw bearer in a `Secure`, `HttpOnly`, `SameSite=Lax` cookie before redirecting to a clean credential-free URL;
+- an exact retry of a consumed exchange cannot mint another credential; return an already-consumed clean recovery outcome and require rate-limited resend if the cookie was lost;
 - cookie `Max-Age` is bounded by the earlier of 24 hours or server-side credential expiry; planned session timing never shortens it, while terminal-state revocation remains authoritative;
 - exchange route uses `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, restrictive CSP, no third-party resources and no analytics;
 - access logging redacts exchange path segments before persistence;
@@ -45,7 +46,7 @@ Guest credentials are state-bound, not merely time-bound.
 ### Transfer — CLAUDE-017
 A transfer must never silently carry a source-entry credential into a target entry.
 - In the same transfer transaction, invalidate every source verifier and outstanding exchange ID.
-- Create the target-entry verifier and a new single-use exchange ID.
+- Create a new target-bound single-use exchange ID/verifier and permitted encrypted delivery material, but no target bearer verifier; the bearer/verifier pair is created only when this exchange is consumed.
 - Commit a transfer notification containing only the fresh exchange link.
 - The old cookie may receive only a non-sensitive `transferred` terminal response and cannot read target status.
 
@@ -98,6 +99,7 @@ Explicit retention/anonymization policy is required before production for accoun
 - patient A reading patient B state;
 - guest/exchange enumeration/brute force;
 - persisted verifier used as credential;
+- bearer verifier existing before exchange consumption or recoverable bearer material persisted during normal/transfer issuance;
 - exchange replay;
 - revoked/rotated/transferred credential replay;
 - credential surviving terminal queue/session state;
