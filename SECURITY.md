@@ -1,100 +1,105 @@
-# Tabibi Security & Privacy Baseline v0.2
+# Tabibi Security & Privacy Baseline v0.3
 
 Tabibi is healthcare-adjacent software. Treat patient and operational clinic data as sensitive by default.
 
 ## Data minimization
 - Do not collect diagnosis, treatment, prescription or insurance data for the MVP.
-- Separate authentication identity from queue-specific operational data.
-- Prefer opaque internal IDs and non-enumerable external access tokens.
-- Do not expose patient names or phone numbers in shared/public queue views.
+- Separate authentication identity from queue operational data.
+- Prefer opaque internal IDs and non-enumerable external access credentials.
+- Do not expose patient names/phone numbers in shared/public queue views.
 
 ## Authentication and authorization
-- Clinic staff must authenticate.
+- Clinic staff authenticate.
 - Authorization is clinic-scoped and role-aware.
-- Patient access to an account-linked queue entry requires ownership or explicit delegated access.
-- Guest/reception-created queue access requires a high-entropy secret bearer token or equivalent mechanism.
-- The raw guest bearer token is issued only to the intended patient/contact channel and is never persisted server-side after issuance.
-- Persist only a one-way verifier suitable for validating a presented token; the stored verifier itself must not be a usable credential.
-- Rotation/reissue must revoke the prior verifier atomically; expiry/revocation must immediately prevent authorization.
-- Administrative operations such as reorder/priority insertion/recovery transitions require explicit permission and audit reason.
+- Minimum MVP roles: `doctor`, `receptionist`, `clinic_admin`, `platform_admin`.
+- `platform_admin` has no implicit unrestricted patient-data access.
+- Account-linked patient access requires ownership or explicit delegated access.
+- Every mutation revalidates clinic scope server-side; client-supplied IDs never expand scope.
+- Priority, restore and transfer require explicit permission and non-empty audit reason.
+
+## Guest access credential model
+The durable guest credential is a high-entropy bearer secret. The raw bearer value is issued once and never persisted. Persist only a one-way verifier; the verifier itself must not authenticate.
+
+### Transport decision: single-use exchange link
+The patient contact channel receives a short-TTL single-use opaque **exchange ID**, not the durable guest bearer credential.
+
+Rules:
+- exchange ID default TTL <=10 minutes;
+- only a one-way exchange verifier is stored;
+- first successful use atomically consumes the exchange ID;
+- the server sets the real guest bearer credential in a `Secure`, `HttpOnly`, `SameSite=Lax` cookie and redirects to a clean URL with no credential;
+- exchange route uses `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, restrictive CSP and no third-party resources;
+- analytics are disabled on exchange endpoints;
+- reverse-proxy/CDN/application access logging must redact the exchange path segment before persistence;
+- browser history may contain the expired one-time exchange URL but it cannot grant access after first use/expiry;
+- rotation/reissue atomically revokes previous guest verifier and outstanding exchange links;
+- exchange and guest endpoints are rate-limited and protected against brute force/enumeration.
+
+Never place the durable guest bearer credential in a URL, logs, analytics or notification payload logs.
 
 ## Secrets
-- Never commit secrets, provider credentials, tokens or production connection strings.
-- Use environment variables/secrets management.
-- Example env files must contain placeholders only.
-- Guest bearer credentials are application secrets even though they are patient-scoped; never log, persist in plaintext, expose in analytics, or place in publicly shared URLs.
+- Never commit secrets/provider credentials/production connection strings.
+- Use environment secrets management.
+- Example env files contain placeholders only.
+- Guest bearer and exchange IDs are patient-scoped secrets and require redaction controls above.
 
 ## Auditability
-Audit meaningful operational changes including:
-- queue entry creation/removal;
-- check-in;
-- call;
-- consultation start/completion;
-- cancellation/no-show;
-- manual reorder/priority insertion;
-- session pause/resume/delay;
-- administrative recovery transitions.
+Audit: queue creation/removal, appointment changes, check-in, call, consultation start/completion, cancellation/no-show, priority, restore/transfer, session open/pause/resume/delay/close/cancel, credential rotation/revocation and elevated admin recovery.
 
-Audit records should identify actor, action, target, clinic/session context, timestamp and relevant reason while avoiding unnecessary sensitive snapshots.
+Audit records identify actor/action/target/clinic/session/timestamp/reason while avoiding unnecessary sensitive snapshots.
 
 ## Logging
-Operational logs must not include:
-- passwords;
-- session tokens;
-- raw guest access tokens;
-- phone numbers unless strictly redacted;
-- patient names unless unavoidable and appropriately protected;
-- raw notification payloads containing sensitive data.
+Operational logs must not contain passwords, session tokens, raw guest credentials, raw exchange IDs, unredacted phone numbers/patient names, or raw sensitive notification bodies. Correlation IDs must be non-sensitive.
 
 ## Queue privacy
-- Never provide an API that allows unauthenticated enumeration of queue entries.
-- Do not reveal identities of patients ahead/behind another patient.
-- Patient-facing queue position should be derived only for the authorized entry.
-- Public waiting-room displays must use non-identifying labels if implemented.
-- Public display labels and guest credentials are separate values; display labels never authorize lookup or mutation.
+- No unauthenticated enumeration endpoint.
+- Never reveal identities of patients ahead/behind.
+- Public waiting-room labels are non-secret and cannot authorize any patient endpoint.
+- Guest credential and public label are distinct fields.
 
 ## Integrity and concurrency
-- Queue state/order changes require a transaction/consistency strategy.
-- State transitions are validated server-side.
-- Session lifecycle state gates every queue mutation; rejected operations must have no partial side effects.
-- Client-provided queue position/order is never trusted directly.
-- Idempotency is required for externally retried mutation/notification flows where duplicate effects would be harmful.
+- Queue/session/appointment transitions validated server-side.
+- Lifecycle state gates every mutation.
+- Client-provided queue order is never trusted directly.
+- PostgreSQL constraints/locking provide defense-in-depth for canonical states, session generation uniqueness, priority-slot consistency, one active doctor service stream and appointment/queue cardinality.
+- Idempotency is mandatory for externally retried mutation/notification flows.
 
-## Web/API baseline
-Before public pilot:
-- HTTPS only in production;
-- secure cookies/session configuration where applicable;
+## Web/API baseline before pilot
+- HTTPS only;
+- secure cookie/session configuration;
 - CSRF protection for cookie-authenticated mutations;
-- input/schema validation at trust boundaries;
-- rate limiting for authentication and guest-token endpoints;
-- protections against token enumeration/brute force;
-- timing-safe guest-token verifier comparison appropriate to the chosen token construction;
-- safe headers/CSP appropriate to framework;
-- dependency and secret scanning in CI where feasible.
+- trust-boundary schema validation;
+- rate limits for auth/exchange/guest endpoints;
+- timing-safe verifier comparison appropriate to construction;
+- CSP/security headers;
+- dependency/secret scanning in CI;
+- tenant-isolation API tests.
 
-## Retention and deletion
-Retention rules must be explicit before production. Operational queue history should not be retained indefinitely merely because storage is cheap.
+## Notification privacy and reliability
+Messages reveal only minimum operational information. Avoid medical specialty/condition information in lock-screen-visible text.
 
-Deletion/anonymization requirements must be considered separately for authentication accounts, queue records, audit obligations and analytics.
+Notification provider failure never rolls queue state back. Delivery lifecycle, retry limits, idempotency, supersession and dead-letter behavior are defined in `ARCHITECTURE.md`. Dead-letter/operator signals must not expose raw provider credentials or sensitive payloads.
 
-## Notification privacy
-SMS/WhatsApp/push content should reveal the minimum required information. Avoid medical specialty/condition details in lock-screen-visible messages unless product policy explicitly permits it.
+## Retention/deletion
+Explicit retention/anonymization policy is required before production for accounts, appointments, queue records, audit history and analytics. Do not retain operational history indefinitely merely because storage is cheap.
 
-## Threats to explicitly test/review
+## Threats to test/review
 - cross-clinic authorization bypass;
-- patient A reading patient B queue state;
-- guest token enumeration;
-- database verifier copied and presented as though it were a raw guest token;
-- revoked/rotated guest token replay;
-- public display label used against guest lookup/mutation endpoints;
-- stale concurrent reorder/update causing lost entries;
-- duplicate request causing duplicate queue entry;
-- privilege escalation receptionist -> platform/other clinic;
-- stored/reflected XSS through clinic/patient-entered display strings;
-- SQL/query injection at dynamic filters;
-- sensitive-data leakage through logs/errors/analytics;
-- notification sent to wrong/recycled contact information;
-- replay of state-transition requests.
+- patient A reading patient B state;
+- guest/exchange enumeration or brute force;
+- persisted verifier used as a credential;
+- exchange-link replay;
+- revoked/rotated credential replay;
+- credential leakage through URL/access log/Referer/browser history;
+- public label used for guest authorization;
+- stale concurrent reorder/update/lifecycle races;
+- duplicate requests creating duplicate appointments/queue entries;
+- privilege escalation;
+- XSS/SQL/query injection;
+- sensitive log/error/analytics leakage;
+- notification to wrong/recycled contact;
+- state-transition replay;
+- cross-session same-doctor parallel consultation.
 
 ## Regulatory note
-The engineering team must not invent legal compliance claims. Algeria-specific health/privacy regulatory requirements must be researched and confirmed before production deployment and translated into explicit requirements/decisions.
+Do not invent legal compliance claims. Algeria-specific personal-data/health-adjacent requirements must be researched and confirmed before production deployment and translated into explicit requirements/decisions. This is tracked as a release-hardening item, not assumed satisfied by this baseline.
