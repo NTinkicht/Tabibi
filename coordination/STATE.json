@@ -2,21 +2,24 @@
   "project": "Tabibi",
   "phase": "foundation",
   "round": 4,
-  "state": "credential_restored_handoff_to_codex",
+  "state": "awaiting_claude_foundation_rereview",
   "current_pr": 1,
-  "last_actor": "chatgpt",
-  "next_actor": "codex_cloud",
+  "last_actor": "codex_cloud",
+  "next_actor": "claude",
   "operating_model": "tri-agent-v2",
   "product_architect": "chatgpt",
   "implementation_runtime": "codex_cloud",
   "independent_reviewer": "claude",
   "deterministic_referee": "ci",
   "open_blockers": 0,
-  "open_majors": 6,
-  "open_minors": 1,
+  "open_majors": 0,
+  "open_minors": 0,
   "human_decision_required": false,
-  "architecture_version": "0.11",
-  "pending_findings": [
+  "product_version": "0.7",
+  "architecture_version": "0.12",
+  "security_version": "0.5",
+  "pending_findings": [],
+  "addressed_findings": [
     "CLAUDE-022",
     "CLAUDE-023",
     "TAB-FND-027-dispatch-recovery",
@@ -25,5 +28,5 @@
     "TAB-FND-028-effective-service-order",
     "TAB-FND-030-transfer-target-state"
   ],
-  "notes": "Codex Cloud GitHub push authentication has been externally verified by a successful authenticated ls-remote and dry-run push. Previous Codex local-only commits are not authoritative and must not be replayed blindly. Codex must re-fetch the actual current PR head and implement the architect-approved resolutions in the latest HANDOFF_TO_CODEX. Claude's PR webhook remains the independent re-review trigger. No production implementation may begin and PR #1 may not merge until all BLOCKER/MAJOR findings are closed by evidence."
+  "notes": "Round 4 canonical contract updates exist on the active PR branch and address all seven qualified pending findings. Author-recorded open findings are zero, but acceptance and merge remain blocked pending Claude's independent re-review of the pushed SHA. No production implementation may begin before that review gate passes."
 }

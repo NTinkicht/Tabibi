@@ -1,4 +1,4 @@
-# Tabibi Security & Privacy Baseline v0.4
+# Tabibi Security & Privacy Baseline v0.5
 
 Tabibi is healthcare-adjacent software. Treat patient and operational clinic data as sensitive by default.
 
@@ -28,7 +28,7 @@ Rules:
 - only a one-way exchange verifier is stored;
 - first successful use atomically consumes it;
 - server sets the durable guest credential in a `Secure`, `HttpOnly`, `SameSite=Lax` cookie and redirects to a clean credential-free URL;
-- cookie `Max-Age` is bounded by the earlier of 24 hours, session planned end + 4 hours, or server-side credential expiry;
+- cookie `Max-Age` is bounded by the earlier of 24 hours or server-side credential expiry; planned session timing never shortens it, while terminal-state revocation remains authoritative;
 - exchange route uses `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, restrictive CSP, no third-party resources and no analytics;
 - access logging redacts exchange path segments before persistence;
 - exchange and guest endpoints are rate-limited and protected against enumeration.
@@ -52,6 +52,11 @@ A transfer must never silently carry a source-entry credential into a target ent
 Contact-less guest/walk-in entries are permitted. They receive no remote credential and no notification/live-remote feature until authorized staff add a valid contact channel.
 
 Never place durable guest credentials in URLs, logs, analytics or notification payload logs.
+
+### Encrypted exchange-link outbox exception — TAB-FND-028-secret-outbox
+Credential and exchange tables store only one-way verifiers. To preserve durable asynchronous exchange-link delivery, an outbox row may contain a short-lived envelope-encrypted secret payload plus non-secret metadata; plaintext exchange IDs/links remain forbidden in database columns, logs, metrics, errors and audit snapshots. The wrapping key comes from runtime secret management/KMS-equivalent, never the database or Git, and only the notification worker may decrypt immediately before dispatch.
+
+Ciphertext lifetime cannot exceed the exchange ID TTL (default 10 minutes). Before expiry, retry uses the same logical exchange ID/provider idempotency key. After expiry the stale link is not retried; resend creates a fresh exchange ID and encrypted payload. Recoverable ciphertext is scrubbed after delivery, terminal failure or expiry as soon as audit requirements permit. Missing keys or decryption/authentication failures fail closed, are observable and retry-bounded, and never fall back to plaintext.
 
 ## Secrets
 - Never commit provider credentials/production connection strings.

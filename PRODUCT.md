@@ -1,4 +1,4 @@
-# Tabibi Product Specification — Foundation v0.6
+# Tabibi Product Specification — Foundation v0.7
 
 ## Problem
 Many Algerian clinics operate with highly variable consultation queues. Patients may arrive very early, place their name on a physical list, leave, return later, and still have little reliable information about when they will be seen. Consultation duration, doctor delays, walk-ins, emergencies, cancellations and no-shows make rigid appointment slots insufficient on their own.
@@ -9,11 +9,11 @@ Tabibi digitizes that reality instead of assuming every clinic will immediately 
 Tabibi combines doctor/clinic discovery, future appointment booking, a virtual/live queue, receptionist-entered and walk-in patients, continuously updated estimates, material-change notifications, and reception-first controls that still work for patients without an app/account.
 
 ## Booking vs. queue position
-An `Appointment` and a `QueueEntry` are different concepts. An appointment reserves service with a doctor/clinic for a scheduled session/date/time or arrival window; it does not guarantee live call position before arrival. A successful booking automatically becomes `confirmed` when the booking transaction commits against a still-valid session/slot. At check-in, the appointment atomically links to a queue entry and becomes `checked_in`.
+An `Appointment` and a `QueueEntry` are different concepts. An appointment reserves service with a doctor/clinic for a scheduled session/date/time or arrival window; it does not guarantee live call position before arrival. A successful booking automatically becomes `confirmed` and atomically creates/links exactly one `waiting` queue entry for the concrete generated session, with immutable registration order but no call eligibility or capacity reservation. At check-in, that existing entry becomes `checked_in`, receives eligibility order, and the appointment becomes `checked_in`.
 
 Once linked, appointment and queue terminal states must stay synchronized: completion -> `completed`, cancellation -> `cancelled`, no-show -> `no_show`, restore -> the matching active appointment state, and transfer -> the same appointment is re-linked to the target session/entry rather than stranded on the source.
 
-Worked example: a patient books Dr X next Tuesday at 10:00. The doctor's schedule has already generated Tuesday's session (or generation occurs idempotently). On arrival/check-in, the queue entry is linked and receives arrival-based `eligibility_order`.
+Worked example: a patient books Dr X next Tuesday at 10:00. The doctor's schedule has already generated Tuesday's session (or generation occurs idempotently). Booking confirmation creates the linked `waiting` entry; on arrival/check-in, that same entry receives arrival-based `eligibility_order`. Booking retries cannot create another entry.
 
 ## Primary actors
 Patient: discover/book/cancel, confirm arrival, view privacy-preserving status, receive provisional/live ETA and material notifications, choose language/contact preferences.
@@ -41,9 +41,11 @@ Staff authentication/roles; clinic/doctor scheduling; deterministic session gene
 
 `registration_order` is immutable historical context; `eligibility_order` is assigned at check-in; `priority_order` is an auditable override.
 
+The total eligible service order is priority checked-in entries first by `priority_order`, then non-priority checked-in entries by `eligibility_order`. This same order controls calling and checked-in ETA/work-ahead. Waiting entries, even with a future priority override, are not eligible and do not block checked-in patients.
+
 Cancellation is distinct from no-show. `waiting -> no_show` is valid only for an appointment-backed patient past the configured grace deadline or through the explicit bulk close-time no-show operation. Walk-ins/contact-less guests are not auto-no-showed simply for remaining waiting.
 
-Restore preserves audit history and assigns fresh live ordering when required. Transfer cancels the source with a transfer cause, creates a target entry, re-links any appointment, revokes source guest credentials and issues a fresh target exchange link when remote guest access exists.
+Restore preserves audit history and assigns fresh live ordering when required. Transfer cancels the source with a transfer cause and creates a target entry: waiting stays waiting, while checked-in/called becomes checked-in at the target tail. Called status and live priority never silently carry across sessions. Transfer re-links any appointment, revokes source guest credentials and issues a fresh target exchange link when remote guest access exists.
 
 ## Session behavior
 `planned`: registration/early check-in allowed, no call/start. `open`: normal service. `paused`: registration/check-in/non-consulting resolution allowed, no new call/start. `closing/closed/cancelled`: no new service mutations except the state-producing operation.

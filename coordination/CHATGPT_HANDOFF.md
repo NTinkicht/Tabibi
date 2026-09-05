@@ -1,15 +1,15 @@
 # ChatGPT Handoff
 
 ## Status
-HANDOFF_TO_CLAUDE — FOUNDATION ROUND 3 RE-REVIEW
+HANDOFF_TO_CLAUDE — FOUNDATION ROUND 4 RE-REVIEW
 
 ## Scope
 Foundation/specification review only. No production implementation has started.
 
 ## Current canonical documents
-- `PRODUCT.md` — Foundation v0.6
-- `ARCHITECTURE.md` — Foundation Proposal v0.11
-- `SECURITY.md` — Baseline v0.4
+- `PRODUCT.md` — Foundation v0.7
+- `ARCHITECTURE.md` — Foundation Proposal v0.12
+- `SECURITY.md` — Baseline v0.5
 - `AGENTS.md`
 - `VISION.md`
 - `coordination/AUTONOMY_PROTOCOL.md`
@@ -64,3 +64,17 @@ Merge remains blocked unless verdict is `PASS` or `PASS_WITH_MINOR_FINDINGS` wit
 
 ## Handoff rule
 Post `HANDOFF_TO_CHATGPT` directly in PR #1. Do not ask Nassim to relay findings.
+
+## Round 4 architect-approved resolutions implemented by Codex
+
+The canonical documents now incorporate all seven qualified findings from the latest `HANDOFF_TO_CODEX` against the real PR head:
+
+- **CLAUDE-022:** guest-cookie `Max-Age` is the earlier of 24 hours or credential expiry; planned session end never shortens it, and delayed-session verification is required.
+- **CLAUDE-023:** dual-boundary operations acquire doctor-global before clinic-local and retain both through commit, with deadlock-order verification.
+- **TAB-FND-027-dispatch-recovery:** `dispatching` uses a persisted lease and monotonic attempt fence; expiry recovers to `unknown`, stale completions are rejected, and retries retain the logical provider key with a new token.
+- **TAB-FND-028-secret-outbox:** exchange-link outbox secrets use short-lived envelope encryption with runtime/KMS key separation, worker-only decryption, TTL-bounded retries and ciphertext scrubbing.
+- **TAB-FND-027-booking-queue-materialization:** booking confirmation atomically and idempotently creates the linked `waiting` row; check-in activates eligibility rather than creating it.
+- **TAB-FND-028-effective-service-order:** eligible priority entries precede eligible normal entries; waiting entries never participate; call and ETA use exactly that total order.
+- **TAB-FND-030-transfer-target-state:** source `waiting` maps to target `waiting`; source `checked_in|called` maps to target `checked_in` at a fresh target tail; priority/called status never silently carries.
+
+No production feature code was started. Independent Claude re-review of the actual pushed SHA is required. Merge remains forbidden until Claude confirms zero BLOCKER/MAJOR findings.

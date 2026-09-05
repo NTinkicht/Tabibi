@@ -1,4 +1,4 @@
-# Tabibi Architecture — Foundation Proposal v0.11
+# Tabibi Architecture — Foundation Proposal v0.12
 
 This is the canonical foundation architecture for independent review before production implementation.
 
@@ -40,7 +40,7 @@ Canonical appointment lifecycle for MVP: `booked -> confirmed -> checked_in -> c
 
 `booked -> confirmed` is automatic when the booking transaction commits successfully and the chosen session/slot remains valid; clinics may later add an explicit patient-confirmation workflow without changing the queue semantics.
 
-An appointment is not itself a guaranteed live queue position. At check-in it resolves into, or links to, exactly one `QueueEntry` in the relevant session.
+An appointment is not itself guaranteed call eligibility. Successful booking/confirmation for a concrete generated session atomically creates and links exactly one `QueueEntry` in `waiting`, with immutable `registration_order` and null `eligibility_order`. The appointment/queue-entry link is protected by a uniqueness constraint and the booking idempotency key, so an exact retry returns the existing pair rather than creating another entry. This provisional row reserves neither call eligibility nor service capacity; check-in activates eligibility instead of materializing the row.
 
 ### Appointment ↔ QueueEntry synchronization — TAB-FND-023
 Appointment and queue state are separate models but may not drift once linked.
@@ -59,7 +59,7 @@ A bounded service period for one doctor at one clinic with lifecycle state, plan
 
 Future sessions are created deterministically from a doctor/clinic schedule template by an idempotent scheduler job at least 7 days ahead (configurable), and may also be created manually by authorized clinic staff. Session generation uses a uniqueness constraint over clinic/doctor/service-date/template occurrence so retries cannot duplicate sessions. Appointment booking for a date with no generated session must either trigger idempotent generation from a valid schedule template or fail clearly; it may not create an implicit unconstrained queue.
 
-Worked example: patient books Dr X next Tuesday at 10:00. A Tuesday session already exists from schedule generation (or is generated idempotently from the doctor's Tuesday template). The `Appointment` references that session but does not reserve call eligibility. When the patient arrives and checks in, a `QueueEntry` is created/linked and receives `eligibility_order` according to arrival semantics.
+Worked example: patient books Dr X next Tuesday at 10:00. A Tuesday session already exists from schedule generation (or is generated idempotently from the doctor's Tuesday template). Booking confirmation atomically creates the appointment-backed `waiting` `QueueEntry` with immutable `registration_order`; it reserves no call eligibility or service capacity. When the patient arrives, `waiting -> checked_in` assigns `eligibility_order` and activates live eligibility on that existing row. A retry of either booking or check-in cannot duplicate the row or ordering assignment.
 
 ### QueueEntry
 One patient's operational place in exactly one consultation session. Supports account-linked and receptionist-created guests. Contains canonical queue state, immutable `registration_order`, check-in-assigned `eligibility_order`, optional live `priority_order`, timestamps, appointment link where applicable, public display label and guest-access metadata.
@@ -98,6 +98,8 @@ Each entry has three distinct ordering concepts:
 
 Only `checked_in` entries are normally call-eligible. `waiting` never blocks arrived patients. Late check-in joins behind the current normal checked-in cohort unless an authorized priority override applies. Registration order is never rewritten to mimic service order.
 
+The authoritative total order for both `call next` and checked-in position/ETA work-ahead is: first, `checked_in` entries with non-null `priority_order`, ascending by unique `priority_order`; then `checked_in` entries with null `priority_order`, ascending by unique `eligibility_order`. No other state is call-eligible. In particular, a `waiting` entry carrying a future priority override neither blocks nor contributes checked-in work ahead until check-in.
+
 The active priority cohort is exactly `waiting`/`checked_in` entries with non-null `priority_order`. Leaving it via call/cancel/no-show clears the live slot and transactionally renumbers the remaining priority cohort to contiguous `1..N`; history stays in audit events. Duplicate non-null priority slots are forbidden.
 
 Priority requests are one-based integers. Insert permits `1..N+1`; move permits `1..N`; invalid or out-of-range values are rejected, not clamped. Bounds are revalidated after acquiring the session mutation boundary. Concurrent mutations serialize and the later transaction observes committed state.
@@ -118,12 +120,13 @@ Transfer moves a not-yet-consulting patient to another compatible session/doctor
 - Allowed source states: `waiting`, `checked_in`, `called`; never `in_consultation`/`completed`.
 - Transfer is one serialized transaction spanning source and target session locks in deterministic ID order to avoid deadlock.
 - Source entry becomes `cancelled` with machine-readable `transferred` cause; a new target `QueueEntry` is created with a link to the source/transfer event.
-- Original registration history remains immutable; target receives new target-session registration/eligibility semantics.
-- Any linked `Appointment` is atomically re-linked to the target session and target queue entry and remains `confirmed` or `checked_in` according to the target entry's resulting state.
+- Original registration history remains immutable. Source `waiting` creates target `waiting` with null `eligibility_order`; source `checked_in` creates target `checked_in` with a fresh tail `eligibility_order` in the target session; source `called` also creates target `checked_in` with a fresh target-session tail `eligibility_order`, because a call is session-specific and never transfers as already-called.
+- Live `priority_order` is never copied to the target. Target priority requires a separate authorized, reasoned and audited priority operation.
+- Any linked `Appointment` is atomically re-linked to the target session and target queue entry. Its state becomes `confirmed` for target `waiting` and `checked_in` for target `checked_in`.
 - For a guest entry, every source-entry guest verifier and outstanding exchange ID is invalidated in the same transaction. A fresh target-entry guest credential verifier + single-use exchange ID are created, and a `queue_entry_transferred` notification containing only the fresh exchange link is committed transactionally. The old cookie can return only a non-sensitive terminal/transferred response and cannot read the target status.
 - Transfer requires authorization, reason, target-session lifecycle validation and notification/estimate recomputation.
 
-Required transfer tests include guest access continuity, old-credential rejection, fresh-link usability, appointment re-linking and transfer retry idempotency.
+Required transfer tests cover every allowed source-state mapping, fresh target tail ordering, no accidental priority/called carryover, guest access continuity, old-credential rejection, fresh-link usability, appointment state/re-linking, exact retry idempotency and transfer/check-in/call races.
 
 ## Consultation-session lifecycle
 States: `planned -> open -> paused -> open -> closing -> closed`, plus terminal `cancelled`.
@@ -166,6 +169,8 @@ The capacity model has two distinct scopes:
 
 Therefore a doctor may have a paused session at Clinic A while a planned session at Clinic B opens, provided there is no active `in_consultation` entry anywhere for that doctor. Opening/resuming within the same clinic is serialized against that doctor's sessions at that clinic; starting consultation additionally acquires the doctor-global consultation boundary and rejects if another clinic/session already has an active consultation.
 
+Any operation acquiring both consultation boundaries, including `start consultation`, always acquires the doctor-global consultation boundary first and then the clinic-local session boundary, and holds both through commit. No code path may invert this order.
+
 Required tests:
 - paused Clinic A + open planned Clinic B => allowed when no consultation is active;
 - open/paused competing sessions in the same clinic => one winner;
@@ -195,14 +200,19 @@ MVP transport: **single-use exchange link**.
 - SMS/other contact channel contains a short-TTL, single-use opaque exchange ID, never the durable bearer credential.
 - Exchange ID default TTL is 10 minutes, has only a one-way verifier, is single-use and rate-limited.
 - `/g/exchange/<opaque-id>` atomically consumes the exchange ID, sets the real guest credential in a `Secure`, `HttpOnly`, `SameSite=Lax` cookie, and redirects to a clean status URL.
-- The guest cookie has explicit `Max-Age` bounded by the earlier of 24 hours, the consultation session's planned end + 4 hours, or the credential's server-side expiry. Active entries can obtain a fresh exchange link through a rate-limited resend flow without changing queue state.
+- The guest cookie has explicit `Max-Age` bounded by the earlier of 24 hours or the credential's server-side expiry. Session timing never shortens this cap; terminal-state revocation below remains authoritative however late a session runs. Active entries can obtain a fresh exchange link through a rate-limited resend flow without changing queue state.
 - A credential is additionally bound to the current queue-entry/session state. On `completed`, `cancelled`, `no_show`, or whole-session `closed/cancelled`, authorization to live queue data is revoked immediately except for a <=15 minute terminal-summary grace window containing only the final non-sensitive status needed for UX. After that grace period the verifier is invalid and the cookie cannot authorize any queue read.
 - Resend is allowed only while the target entry remains active (`waiting|checked_in|called|in_consultation`) and the intended contact channel still matches the entry; it issues a new exchange ID and rate-limits by entry/contact/IP.
 - For contact-less guest entries, no remote bearer/exchange credential is created. They remain fully serviceable in-clinic but notification/live-remote features are explicitly unavailable unless contact information is later added by authorized staff.
 - Exchange/status responses set `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, restrictive CSP; no third-party resources on exchange route; analytics disabled; logs redact exchange path segments.
 - Rotation/reissue revokes previous verifier and outstanding exchange IDs atomically.
 
-Required tests: raw bearer never in URL/log/referrer; link single-use/expiry; verifier cannot authenticate; public label cannot authenticate; cookie-loss + resend recovery; resend rate limit; terminal-state credential invalidation; terminal-summary grace expiry; contact-less entry cannot access remote status until contact is added; transfer continuity tests above.
+### Encrypted exchange-link delivery exception — TAB-FND-028-secret-outbox
+Credential and exchange tables remain verifier-only. A notification that must deliver an exchange link may persist only a short-lived envelope-encrypted secret payload in its outbox row, alongside non-secret routing and delivery metadata. The data-encryption key is protected by a runtime secret/KMS-equivalent key that is never stored in the database or Git; authenticated encryption binds the ciphertext to the intent, entry and clinic identifiers. Only the notification worker may decrypt, immediately before provider dispatch.
+
+Ciphertext expiry may not exceed the exchange ID TTL (default 10 minutes). Retry before expiry reuses the same logical exchange ID and provider idempotency key. Once expired, the stale link is never retried or decrypted; the intent terminates with an observable expiry outcome and resend must generate a fresh exchange ID, verifier, ciphertext and logical notification. Recoverable ciphertext is redacted/deleted as soon as audit requirements allow after successful delivery, terminal failure, or expiry, while non-secret delivery metadata remains. Plaintext links and decrypted payloads are forbidden in logs, metrics, errors, audit snapshots and general outbox columns. Key lookup/decryption failure is explicit, retry-bounded while the ciphertext is live, observable, and must never fall back to plaintext or dispatch corrupted data.
+
+Required tests: raw bearer never in URL/log/referrer; link single-use/expiry; verifier cannot authenticate; public label cannot authenticate; cookie-loss + resend recovery; resend rate limit; terminal-state credential invalidation; terminal-summary grace expiry; a session already more than four hours past planned end still receives a positive/full bounded `Max-Age`; contact-less entry cannot access remote status until contact is added; transfer continuity tests above; database-dump/log safety for encrypted links, restart-safe retry before expiry, no retry after expiry, ciphertext redaction, and key/decrypt failure behavior.
 
 ## Live status delivery — CLAUDE-004
 MVP web transport is **Server-Sent Events (SSE)** with polling fallback.
@@ -225,6 +235,11 @@ After `dispatching` commits and provider invocation begins, that attempt is irre
 
 Provider idempotency keys suppress duplicate retry of the same logical intent/unknown result; they do not order different stream versions.
 
+### Dispatch lease, recovery and fencing — TAB-FND-027-dispatch-recovery
+Entering `dispatching` atomically increments/assigns a monotonic `dispatch_attempt_token` and sets `lease_expires_at`. Provider-result transitions to `delivered|failed|unknown|dead_letter` are conditional on the same current token. Thus a worker whose lease was reclaimed is fenced out and cannot finalize or overwrite the reclaimed attempt.
+
+An idempotent, observable sweeper/claim path transactionally converts an expired `dispatching` lease to `unknown`, never blindly to `pending`, because provider invocation may already have occurred. A subsequent claim from recovered `unknown` uses the **same logical provider idempotency key** but a new attempt token and lease; provider status reconciliation may run first where available but is not required for MVP. Providers without sufficient idempotency/status guarantees follow the bounded unknown retry policy and ultimately surface `dead_letter` rather than silently duplicating forever. Recovery emits structured metrics/events and guarantees no expired `dispatching` row remains silently stuck.
+
 ### Retry/backoff/dead-letter policy
 - transient `failed`: exponential backoff with jitter at approximately 1m, 5m, 15m, 1h, 4h; max 5 delivery attempts unless provider contract is stricter;
 - `unknown`: same provider idempotency key; max 3 unknown-result retries after initial attempt;
@@ -233,7 +248,7 @@ Provider idempotency keys suppress duplicate retry of the same logical intent/un
 - **material-event dead letters** (`turn_approaching`, `patient_called`, `session_cancelled`, material delay/acceleration) must also surface in the clinic operations UI so staff have an explicit manual-contact fallback; routine low-stakes dead letters may remain metric-only;
 - newer superseding/terminal versions can make not-yet-started retries `skipped_obsolete`.
 
-Required barrier/crash tests cover pre-dispatch suppression, post-dispatch bounded race, same-key unknown retry, terminal precedence, crash after `dispatching`, and retry exhaustion/operator surfacing.
+Required barrier/crash tests cover pre-dispatch suppression; post-dispatch bounded race; crash before provider call; crash during/after provider call; lease expiry/reclaim; stale-worker completion fenced out; same-key retry with a new attempt token; terminal precedence; idempotent sweeper/claim observability; no silently stuck `dispatching` row; and retry exhaustion/operator surfacing. Concurrency tests also prove doctor-global-before-clinic-local lock acquisition and mixed priority/non-priority/waiting ordering under check-in, priority and call mutations.
 
 ## Database integrity defense-in-depth
 Implementation must use PostgreSQL constraints/indexes/locking where possible, not application checks alone, including:
