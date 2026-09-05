@@ -1,4 +1,4 @@
-# Tabibi Product Specification — Foundation v0.5
+# Tabibi Product Specification — Foundation v0.6
 
 ## Problem
 Many Algerian clinics operate with highly variable consultation queues. Patients may arrive very early, place their name on a physical list, leave, return later, and still have little reliable information about when they will be seen. Consultation duration, doctor delays, walk-ins, emergencies, cancellations and no-shows make rigid appointment slots insufficient on their own.
@@ -6,100 +6,70 @@ Many Algerian clinics operate with highly variable consultation queues. Patients
 Tabibi digitizes that reality instead of assuming every clinic will immediately adopt appointment-only operations.
 
 ## Product proposition
-Tabibi combines:
-1. doctor/clinic discovery;
-2. appointment booking for a future service session;
-3. a virtual/live queue;
-4. receptionist-entered and walk-in patients;
-5. continuously updated estimated consultation times;
-6. material-change notifications;
-7. reception-first operational controls that still work for patients without an app/account.
+Tabibi combines doctor/clinic discovery, future appointment booking, a virtual/live queue, receptionist-entered and walk-in patients, continuously updated estimates, material-change notifications, and reception-first controls that still work for patients without an app/account.
 
 ## Booking vs. queue position
-An **Appointment** and a **QueueEntry** are different concepts.
+An `Appointment` and a `QueueEntry` are different concepts. An appointment reserves service with a doctor/clinic for a scheduled session/date/time or arrival window; it does not guarantee live call position before arrival. A successful booking automatically becomes `confirmed` when the booking transaction commits against a still-valid session/slot. At check-in, the appointment atomically links to a queue entry and becomes `checked_in`.
 
-An appointment reserves service with a doctor/clinic for a scheduled session/date/time or arrival window. It does **not** guarantee a live call position before arrival. The live queue position begins only when the patient checks in and the appointment resolves into/links to a `QueueEntry` in that consultation session.
+Once linked, appointment and queue terminal states must stay synchronized: completion -> `completed`, cancellation -> `cancelled`, no-show -> `no_show`, restore -> the matching active appointment state, and transfer -> the same appointment is re-linked to the target session/entry rather than stranded on the source.
 
-Worked example: a patient books Dr X for next Tuesday at 10:00. The doctor's schedule has already generated Tuesday's consultation session (or generation occurs idempotently from the schedule template). The appointment references that future session. On arrival/check-in, Tabibi creates/links the queue entry and assigns `eligibility_order` after the current normal arrived cohort, unless an authorized priority policy applies.
+Worked example: a patient books Dr X next Tuesday at 10:00. The doctor's schedule has already generated Tuesday's session (or generation occurs idempotently). On arrival/check-in, the queue entry is linked and receives arrival-based `eligibility_order`.
 
 ## Primary actors
-### Patient
-Can discover a doctor/clinic, book/cancel an appointment, join supported queues, confirm arrival, view privacy-preserving status, receive provisional/live ETA, receive delay/acceleration/approaching-turn notifications, and choose language/contact preferences.
+Patient: discover/book/cancel, confirm arrival, view privacy-preserving status, receive provisional/live ETA and material notifications, choose language/contact preferences.
 
-### Receptionist / clinic staff
-Can manage consultation sessions, create guests/walk-ins without accounts, check in/cancel/no-show/call patients, pause/resume sessions, record doctor delay, apply authorized priority, restore an operationally misclassified entry, and transfer an eligible patient to another compatible session/doctor at the same clinic with a mandatory reason/audit trail.
+Receptionist/clinic staff: manage sessions, create guests/walk-ins with or without contact information, check in/cancel/no-show/call, pause/resume, record delay, apply authorized priority, restore mistakes, transfer eligible non-consulting patients, and bulk-resolve qualifying absent appointment-backed waiting entries as no-show before close.
 
-### Doctor
-Can manage schedule/availability, view/progress their active service stream, configure basic consultation policies, and review operational statistics.
+Doctor: manage schedule/availability, progress consultations, configure basic service policies, review operational statistics.
 
-### Platform administrator
-Manages platform-level configuration/support/abuse workflows without implicit unrestricted access to patient data.
+Platform administrator: platform support/abuse workflows without implicit unrestricted patient-data access.
 
 ## Core principles
-- Hybrid by design: scheduled appointments, virtual queues, walk-ins and receptionist-created guests coexist.
+- Hybrid by design.
 - No smartphone prerequisite.
-- Deterministic/explainable estimates first; no hidden ML in MVP.
+- Contact information is **not required** to create a receptionist guest/walk-in entry. A contact-less entry remains fully serviceable in clinic but has no remote live-status or notification features until contact information is added.
+- Deterministic/explainable estimates first.
 - Privacy by design and clinic-tenant isolation.
-- Arabic and French first-class, RTL-ready; Tamazight extensible later.
+- Arabic and French first-class, RTL-ready.
 - Reception simplicity matters as much as patient convenience.
 
 ## MVP scope
-- staff authentication and clinic-scoped roles;
-- clinic/doctor schedule configuration;
-- deterministic generation/manual creation of consultation sessions;
-- appointments linked to future sessions;
-- session lifecycle `planned/open/paused/closing/closed/cancelled`;
-- queue states `waiting`, `checked_in`, `called`, `in_consultation`, `completed`, `cancelled`, `no_show`;
-- deterministic registration/eligibility/priority ordering;
-- receptionist guest/walk-in entry;
-- restore/transfer operations with explicit audit semantics;
-- provisional pre-arrival ETA and live checked-in ETA;
-- patient status via secure web view using SSE with polling fallback;
-- durable notification-domain/outbox semantics, initially provider-adapted/mocked where required;
-- audit trail;
-- French/Arabic localization foundation;
-- automated tests and CI.
+Staff authentication/roles; clinic/doctor scheduling; deterministic session generation; appointments; session lifecycle; deterministic queue states/order; guests/walk-ins; restore/transfer; provisional/live ETA; secure SSE status with polling fallback; durable notification outbox; audit; Arabic/French foundation; automated tests/CI.
 
 ## Queue semantics
-`waiting` means registered/booked but not confirmed present and ready to call. `checked_in` means present and normally call-eligible. Waiting patients do not block checked-in patients. A late check-in joins behind the current normal checked-in cohort unless an authorized priority override applies.
+`waiting` = registered/booked but not confirmed present. `checked_in` = present and normally call-eligible. Waiting entries never block checked-in entries. Late check-in joins behind the current normal checked-in cohort unless authorized priority applies.
 
-`registration_order` is immutable historical context. `eligibility_order` is assigned at check-in. `priority_order` is an authorized auditable live override and never rewrites registration history.
+`registration_order` is immutable historical context; `eligibility_order` is assigned at check-in; `priority_order` is an auditable override.
 
-Cancellation is distinct from no-show. A patient/staff cancellation uses `cancelled`. `waiting -> no_show` is allowed only for an appointment-backed patient who fails to check in by the clinic-configured grace deadline (or is resolved as absent during session close). Staff may not use no-show as an arbitrary substitute for cancellation.
+Cancellation is distinct from no-show. `waiting -> no_show` is valid only for an appointment-backed patient past the configured grace deadline or through the explicit bulk close-time no-show operation. Walk-ins/contact-less guests are not auto-no-showed simply for remaining waiting.
 
-Reception recovery:
-- restore corrects a mistaken `cancelled`/`no_show` classification without deleting audit history; a restored arrived patient gets a fresh eligibility position rather than reclaiming an old live slot;
-- transfer moves a non-consulting patient to a compatible target session through an explicit audited operation and preserves source history.
-
-The system must never silently lose/duplicate queue entries under concurrent updates.
+Restore preserves audit history and assigns fresh live ordering when required. Transfer cancels the source with a transfer cause, creates a target entry, re-links any appointment, revokes source guest credentials and issues a fresh target exchange link when remote guest access exists.
 
 ## Session behavior
-- `planned`: registration and early check-in allowed; no call/start;
-- `open`: normal service;
-- `paused`: registration/check-in and non-consulting resolution remain allowed; no new call/start; active consultation may complete;
-- `closing/closed/cancelled`: new service mutations rejected except the atomic transition creating the state.
+`planned`: registration/early check-in allowed, no call/start. `open`: normal service. `paused`: registration/check-in/non-consulting resolution allowed, no new call/start. `closing/closed/cancelled`: no new service mutations except the state-producing operation.
 
-One doctor has at most one active service stream (`open`/`paused`) at a time in MVP and at most one active consultation across all of that doctor's sessions.
+For one `(doctor, clinic)` pair, at most one session may be `open` or `paused`. Across all clinics, one doctor may have at most one patient `in_consultation` at a time. A paused morning session at Clinic A therefore does not block opening an afternoon session at Clinic B if no consultation is active.
 
-Normal closure requires no active queue entries. Whole-session cancellation atomically cancels remaining eligible entries but is rejected while a consultation is active.
+Normal closure requires no active entries. Before close, reception may bulk-resolve only appointment-backed `waiting` entries whose arrival grace deadline has elapsed. Whole-session cancellation atomically cancels **all** remaining `waiting`, `checked_in`, and `called` entries and is rejected while a consultation is active.
+
+## Guest access
+Remote guest access uses a single-use short-TTL exchange link which yields a secure HttpOnly cookie. The cookie has bounded persistence appropriate to the active session and a rate-limited resend/recovery path if the patient loses the browser cookie. Credentials are revoked on terminal queue/session state after a short terminal-summary grace period. Contact-less entries intentionally have no remote guest credential until contact is added.
 
 ## Estimation model
-For checked-in patients, live ETA uses committed work ahead, including `called` patients, effective checked-in order, baseline consultation duration, robust same-session observations, active-consultation remaining time, pauses/delays and terminal exclusions.
+Checked-in ETA uses committed work ahead (including `called`), effective order, configured/observed duration, active consultation remaining time, pause/delay and terminal exclusions. Waiting patients receive a provisional arrival window with uncertainty, never a fabricated exact live position.
 
-Waiting/unarrived patients receive a clearly labelled provisional arrival window with uncertainty, never a fabricated exact live position. Check-in atomically switches to live estimate mode.
-
-Default material-change notification policy (clinic configurable): notify on >=10 minute ETA-midpoint movement, >=15 minute uncertainty-window movement, >=2 queue-place movement, doctor/session delay/cancellation, or approaching-turn threshold crossing.
+Default material-change policy (clinic configurable): notify on >=10 minute ETA-midpoint movement, >=15 minute uncertainty movement, >=2 places, doctor/session delay/cancellation, or approaching-turn threshold.
 
 ## Live status delivery
-SSE is the preferred MVP web transport with a canonical versioned status snapshot endpoint and a 30-second polling fallback. SMS/push-style messages are for material events, not every queue tick. Patients without an active web session can still receive important notifications.
+SSE is preferred with canonical versioned snapshots and 30-second polling fallback. SMS/push-style messages are for material events rather than each position tick.
 
 ## Notification-domain events
 Examples: `appointment_confirmed`, `queue_entry_created`, `estimate_changed_materially`, `turn_approaching`, `patient_called`, `session_delayed`, `session_cancelled`, `queue_entry_cancelled`, `queue_entry_transferred`.
 
-Generation and provider delivery are separate concerns. Delivery failure never rolls queue state back.
+Material notification dead-letters must be visible to clinic operations staff so manual contact can be attempted when appropriate.
 
 ## Explicitly out of MVP unless separately approved
 EMR, diagnosis/treatment data, prescriptions, insurance claims, payments, telemedicine, AI diagnosis, medical recommendation engines, nationwide ranking, automated emergency triage.
 
 ## First engineering milestone success criteria
-A realistic clinic day can be run end-to-end with scheduled appointments, guests/walk-ins, check-in/call/consultation progression, delay, no-show, restore/transfer, live patient status, deterministic ETA, session close/cancel and audit; concurrent mutations preserve invariants; guest access does not leak credentials; Arabic/French strings are externalized; CI passes; and no unresolved BLOCKER/MAJOR reviewer finding remains.
+A realistic clinic day runs end-to-end with appointments, guests/walk-ins including contact-less entries, check-in/call/consultation progression, delay, no-show/bulk close resolution, restore/transfer with guest-access continuity, live status, deterministic ETA, multi-clinic doctor scheduling, session close/cancel, synchronized appointment/queue state, secure credential expiry/recovery and audit; concurrent mutations preserve invariants; Arabic/French strings are externalized; CI passes; and no unresolved BLOCKER/MAJOR reviewer finding remains.
