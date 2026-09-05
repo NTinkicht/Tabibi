@@ -1,87 +1,74 @@
 # ChatGPT Handoff
 
 ## Status
-BLOCKED_ON_TAB_FND_021_ARCHITECTURE_UPDATE
+HANDOFF_TO_CLAUDE — FOUNDATION ROUND 2 RE-REVIEW
 
 ## Scope
-Foundation review only. No production implementation has started.
+Foundation/specification review only. No production implementation has started.
 
-## Materials prepared
-- PRODUCT.md — Algeria-first product model and MVP boundary
-- AGENTS.md — multi-agent operating agreement
-- ARCHITECTURE.md — proposed modular-monolith architecture and open questions
-- SECURITY.md — security/privacy baseline
-- coordination/STATE.json — durable agent state
-- coordination/TAB-FND-021_RESOLUTION.md — accepted provider-dispatch boundary contract awaiting incorporation into ARCHITECTURE.md v0.10
+## Current canonical documents
+- `PRODUCT.md` — Foundation v0.5
+- `ARCHITECTURE.md` — Foundation Proposal v0.10
+- `SECURITY.md` — Baseline v0.3
+- `AGENTS.md`
+- `VISION.md`
+- `coordination/AUTONOMY_PROTOCOL.md`
+- `coordination/STATE.json`
+- `coordination/TAB-FND-021_RESOLUTION.md`
 
-## Independent Codex review history
+## Prior Codex foundation history
+TAB-FND-001 through TAB-FND-020 were previously addressed in the foundation. Claude independently reported no objection to those resolutions.
 
-### Round A — resolved
-- TAB-FND-001 MAJOR — defined waiting vs checked-in call eligibility and estimator behavior.
-- TAB-FND-002 MAJOR — defined safe session closure semantics.
-- TAB-FND-003 MAJOR — separated public queue labels from secret guest credentials.
-- TAB-FND-004 MINOR — added `called -> cancelled` and kept no-show distinct.
+## This round
 
-### Round B — resolved
-- TAB-FND-005 MAJOR — removed late-arrival ambiguity using immutable `registration_order` plus transactional `eligibility_order` assigned at check-in.
-- TAB-FND-006 MAJOR — defined whole-session cancellation transaction, authorization, dispositions, audit/outbox and concurrency behavior.
-- TAB-FND-007 MINOR — standardized canonical persisted/API queue states as snake_case.
+### TAB-FND-021 — addressed in canonical architecture
+`ARCHITECTURE.md` v0.10 now contains persisted notification delivery lifecycle:
+`pending -> dispatching -> delivered|failed|unknown|skipped_obsolete|dead_letter`.
 
-### Round C — resolved
-- TAB-FND-008 MAJOR — `called` entries are explicitly committed work ahead in live ETA calculations until they enter consultation or terminate; active consultation remaining time replaces, rather than duplicates, that contribution.
-- TAB-FND-009 MAJOR — unarrived `waiting` patients receive a clearly provisional arrival estimate/window with uncertainty; check-in atomically switches them to the live eligibility-order estimator.
-- TAB-FND-010 MAJOR — added an explicit consultation-session state/operation matrix covering `planned`, `open`, `paused`, `closing`, `closed`, and `cancelled`, including deterministic boundary-race requirements.
-- TAB-FND-011 MAJOR — raw guest bearer tokens are one-time issued and never persisted; only one-way verifiers are stored, with explicit rotation/revocation/expiry and negative authentication tests.
+Immediately before entering `dispatching`, the worker transactionally revalidates supersession, stream head, terminal/session state and attempt eligibility. Once provider invocation begins, that attempt is explicitly irrevocable/in-flight. Newer state supersedes only not-yet-started intents, while the newer/terminal version remains deliverable afterward. Provider idempotency covers retry/unknown-result duplicate suppression but does not order versions.
 
-### Round D — resolved
-- TAB-FND-012 MAJOR — added a hard one-doctor-session invariant of at most one `in_consultation` entry; start-consultation must re-check after session serialization, with sequential and concurrent PostgreSQL tests.
-- TAB-FND-013 MAJOR — introduced a separate persisted `priority_order` override so waiting-entry priority/reorder never rewrites immutable registration history or prematurely assigns arrival order; its effect at check-in/call is deterministic and concurrency-tested.
+Barrier/crash-window verification requirements are canonical in the architecture.
 
-### Round E — resolved
-- TAB-FND-014 MAJOR — session opening is now an explicit serialized `planned -> open` operation with defined behavior from every lifecycle state, idempotent retry semantics, authorization/audit rules, and open-boundary race tests.
-- TAB-FND-015 MAJOR — priority collisions now use one canonical policy: equal persisted `priority_order` values are forbidden. A priority mutation transactionally renumbers affected priority slots into a unique contiguous sequence; the committed sequence is authoritative for call selection and ETA, with collision/concurrency tests required.
+### TAB-FND-022 — addressed
+Doctor capacity is now doctor-scoped, not session-scoped. At most one session per doctor can be `open`/`paused` in MVP, and at most one consultation can be active across all sessions for the doctor. Open/resume/start operations use a doctor-level serialization boundary with PostgreSQL integration tests for cross-session races.
 
-### Round F — resolved
-- TAB-FND-016 MAJOR — priority-slot bounds are now canonical. Slot requests are one-based integers; insertion into a cohort of size `N` permits `1..N+1`, moving an existing priority entry permits `1..N`, and all invalid/out-of-range requests are rejected rather than clamped or reinterpreted. Bounds are revalidated after acquiring the session serialization boundary, with explicit PostgreSQL tests for invalid and concurrent cases.
+## Claude Round 1 MAJOR findings
 
-### Round G — resolved
-- TAB-FND-017 MAJOR — defined the live priority cohort exactly as `waiting`/`checked_in` entries with non-null `priority_order`. Leaving that cohort via call/cancel/no-show atomically clears the live priority slot and renumbers the remaining cohort; historical priority context lives in audit/queue events, not terminal records. Session cancellation also clears all affected live priority slots. Added lifecycle/race/bounded-insertion test requirements.
-- TAB-FND-018 MAJOR — added doctor-delay mutations to the lifecycle matrix. Declare/update/clear is allowed only in `planned`/`open`/`paused`, serialized with all session mutations, and atomically updates estimator state, audit data and idempotent outbox intents. Added delay-vs-pause/resume/close/cancel and estimator/outbox verification requirements.
+### CLAUDE-001 — addressed
+Guest transport decision is a short-TTL, single-use exchange link containing only an opaque exchange ID. It is atomically exchanged for the real guest bearer credential stored in Secure/HttpOnly/SameSite cookie, then redirected to a clean URL. No durable bearer appears in URL/log/referrer. Exchange endpoints use no-referrer/no-store/CSP/no analytics and log-path redaction. Security tests are required for replay, expiry, logs, Referrer and public-label rejection.
 
-### Round H — resolved
-- TAB-FND-019 MAJOR — doctor-delay declare/update now accepts strictly positive finite values only. Zero is explicitly rejected and never aliases clear; `clear doctor delay` remains the only removal command. Added no-side-effect and retry/clear verification requirements.
-- TAB-FND-020 MAJOR — mutable delay/recovery notifications now use monotonically versioned per-entry streams with transactional supersession. Clear/update makes older undelivered intents obsolete, session cancellation has terminal precedence, and workers must revalidate stream head/current terminal state immediately before provider dispatch. Added stale/retry/clear/cancel race tests and provider idempotency requirements.
+### CLAUDE-002 — addressed
+Architecture now defines audited `restore` and `transfer` operations. Restore corrects mistaken cancelled/no-show state without restoring old live priority/eligibility history. Transfer atomically closes source service position with transferred cause and creates a linked target entry under target-session ordering rules.
 
-### Round I — accepted, architecture update pending
-- TAB-FND-021 MAJOR — final database revalidation alone cannot guarantee suppression across the external provider-call boundary. The canonical resolution is persisted provider delivery state (`pending -> dispatching -> delivered|failed|unknown`, plus `skipped_obsolete`), transactional current-state revalidation immediately before committing `dispatching`, and an explicit bounded-race rule: once provider invocation has begun, that attempt is irrevocable/in-flight; later newer/terminal state supersedes only not-yet-started intents and must remain deliverable afterward. Stable provider idempotency keys cover retry-after-unknown-result but do not order versions.
-- Required barrier tests: mutation before dispatch boundary suppresses the provider call; mutation after provider invocation starts may allow the old call to finish but leaves the newer/terminal intent deliverable; unknown-result retry reuses the same logical idempotency key; cancellation suppresses all older not-yet-started mutable intents; crash-window behavior around `dispatching` is explicit.
-- The accepted contract is durably recorded in `coordination/TAB-FND-021_RESOLUTION.md`.
-- `ARCHITECTURE.md` is still v0.9 and must be updated to v0.10 before this finding is marked resolved and Claude foundation review resumes.
+### CLAUDE-003 — addressed
+`Appointment` is now distinct from `QueueEntry`; appointments reference future consultation sessions. Future sessions are generated idempotently from doctor/clinic schedule templates (default >=7 days ahead) or manually by authorized staff, with uniqueness protection. Product/architecture include a next-Tuesday worked example.
 
-Claude must independently validate all resolved findings and TAB-FND-021 after the architecture update rather than assuming Codex was correct.
+### CLAUDE-004 — addressed
+MVP live status transport is explicitly SSE with canonical authorized snapshot endpoint and 30-second polling fallback. SMS/push-style channels carry material events rather than every position change.
 
-## Review request after TAB-FND-021 is committed
-Claude should independently challenge:
-1. product assumptions and missing requirements likely to cause expensive rework;
-2. architecture suitability for live queue/concurrency behavior;
-3. privacy/security model, especially patient/guest access and cross-clinic isolation;
-4. queue and session state-machine completeness;
-5. estimator semantics for waiting, checked-in, called and in-consultation states;
-6. notification/outbox separation, especially provider-dispatch boundaries, version ordering, bounded stale-message races and terminal precedence;
-7. MVP boundary and whether anything critical is missing or prematurely included;
-8. testing strategy required before implementation;
-9. all Codex resolutions above, especially the TAB-FND-021 persisted `dispatching` boundary and unknown-result semantics.
+### CLAUDE-005 — addressed
+Notification retry policy is explicit: bounded exponential retry for transient failures, bounded unknown-result retry with same provider idempotency key, direct/terminal dead-letter for permanent failure or exhausted retries, and operator-visible structured failure signal.
 
-Do not treat proposed technology choices as settled. Identify blocking decisions separately from optional recommendations.
+## Additional findings handled
+- CLAUDE-006 MINOR: `waiting -> no_show` now has an explicit trigger: appointment-backed patient misses configured arrival grace deadline or is resolved absent during close; arbitrary staff discretion uses cancellation.
+- CLAUDE-015 MINOR: autonomy protocol no longer assumes `@claude` is a real collaborator mention. It documents Claude's reported PR-activity subscription + heartbeat and uses marker text as the canonical control-transfer signal.
 
-Record findings durably in `coordination/CLAUDE_REVIEW.md` on a Claude branch and/or in the foundation PR review.
+## Findings intentionally not overclaimed
+Claude's remaining MINOR/NOTE findings from Round 1 are not automatically marked resolved merely because the architecture was rewritten. Claude should re-evaluate them against the actual v0.10/v0.5/v0.3 texts and either close them, keep them open, or create refined findings.
 
-Verdict must be one of:
-- PASS
-- PASS_WITH_MINOR_FINDINGS
-- CHANGES_REQUIRED
+## Required independent re-review
+Claude should review the current PR head from first principles and specifically verify:
+1. guest exchange-link security is internally consistent and testable;
+2. restore/transfer semantics do not break ordering/audit invariants;
+3. appointment/session generation model avoids expensive schema rework;
+4. SSE + polling is sufficient for the MVP deployment shape;
+5. retry/dead-letter and TAB-FND-021 bounded-race semantics compose correctly;
+6. doctor-global active-stream invariant handles overlapping sessions and races;
+7. cross-clinic RBAC/data-minimization remain sound;
+8. any remaining CLAUDE-007..014/015 findings against the new head;
+9. no new BLOCKER/MAJOR was introduced by the rewrite.
 
-If there are BLOCKER/MAJOR findings, include concrete required resolutions and verification criteria.
+Verdict: `PASS`, `PASS_WITH_MINOR_FINDINGS`, or `CHANGES_REQUIRED`.
 
 ## Handoff rule
-Do not ask Nassim to relay findings to ChatGPT. Put them in GitHub. ChatGPT will read and respond there.
+Do not ask Nassim to relay findings. Post `HANDOFF_TO_CHATGPT` directly in PR #1 after review. ChatGPT monitors GitHub and will continue autonomously.
