@@ -45,9 +45,7 @@ export async function migrate(): Promise<void> {
       }
     }
   } finally {
-    await client
-      .query('SELECT pg_advisory_unlock($1)', [730031])
-      .catch(() => undefined);
+    await client.query('SELECT pg_advisory_unlock($1)', [730031]);
     await client.end();
   }
 }
