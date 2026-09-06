@@ -11,7 +11,6 @@ permissions:
 
 jobs:
   ingest:
-    if: vars.TABIBI_SLACK_BRIDGE_ENABLED == 'true'
     runs-on: ubuntu-latest
     env:
       SLACK_CHANNEL_ID: C0C0RV36QP2
