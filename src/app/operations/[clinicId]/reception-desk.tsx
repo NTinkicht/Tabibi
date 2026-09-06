@@ -291,6 +291,14 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
                   {t.clear}
                 </button>
               )}
+              {['planned', 'open', 'paused'].includes(session.status) && (
+                <a
+                  className="queueLink"
+                  href={`/operations/${clinicId}/sessions/${session.id}/queue`}
+                >
+                  {t.walkIns}
+                </a>
+              )}
             </div>
             {pending === session.id && (
               <div className="pending" aria-live="polite">
