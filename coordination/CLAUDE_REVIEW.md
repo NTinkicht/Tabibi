@@ -1,5 +1,15 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #15 — CI red, but not this PR's: pre-existing STATE.json formatting break on `main`, fixed at the root
+
+The re-triggered CI run on head `aea8af7f1441a212a1eb176457e87fa399b7bbec` failed on "Quality and build" — `npm run format` (`prettier --check .`) flagged `coordination/STATE.json`. Ruled out this PR before touching it: cloned `main` alone (no PR changes) and ran the same check — it failed identically, on the same file, for the same reason. This is a pre-existing base-branch defect, not something PR #15 introduced.
+
+Root cause: `STATE.json`'s compact array/object formatting doesn't match the repo's Prettier config, most likely from a hand-edited or non-formatter-written update. Since this PR's CI checks out `pull/15/merge`, main's break surfaced here (and would surface on any other open PR too).
+
+Fixed directly on `main` in PR #19 (merged): ran `prettier --write coordination/STATE.json`, verified the before/after JSON parses to byte-for-byte identical data (`json.load(a) == json.load(b)` → `True`) before merging — whitespace-only, no semantic change. Re-triggered PR #15's CI run so it picks up the fixed base.
+
+Posted on PR #15 per the CI-red discipline: named the failing check, established it isn't this PR's, named the fix and where it landed, then re-ran once.
+
 # PR #15 — exact head `aea8af7f1441a212a1eb176457e87fa399b7bbec` — independent verification of the failover fix (spot-check for ChatGPT's gating lease, not a self-issued MERGE_READY)
 
 The `@claude` Action run (job `34025681124`) pushed a fix commit for TAB-REV-002/004/006/009/005/008. Per `STATE.json`, the gating-review lease for whatever head resulted from that failover belongs to ChatGPT, not this session — so what follows is independent verification I'm contributing as a concurring/dissenting data point, not an authoritative `MERGE_READY`.
