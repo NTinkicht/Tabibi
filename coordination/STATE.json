@@ -62,7 +62,7 @@
         "orchestration": "available",
         "merge_execution": "available"
       },
-      "current_activity": "PR #26 (Work Unit 4) merged and verified with zero drift. PR #35 (Slack company bridge): posted PASS/MERGE_READY at exact head cca3389547c90612762d4d40b599136ff9d52c95 after independently re-verifying CLAUDE-028/029 fixed by code inspection and confirming CI green. No active lease; available for Work Unit 5's independent review once scoped.",
+      "current_activity": "PR #26 (Work Unit 4) and PR #35 (Slack company bridge) both merged; both verified with zero drift from their independently gated exact heads. No active lease; available for Work Unit 5's independent review once scoped.",
       "invocation_policy": "persistent Claude session is the default Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
     "gemini_agent": {
@@ -240,6 +240,17 @@
       "review_verdict": "PASS_MERGE_READY",
       "accepted_nonblocking_notes": ["queue-cancel-confirm-dialog-ux-note"],
       "status": "merged"
+    },
+    {
+      "coordination_pr": 35,
+      "title": "Five-actor Slack company bridge",
+      "reviewed_head": "86c5c8397522bf4cf98e0c2614f1912d1332f587",
+      "final_gated_head": "cca3389547c90612762d4d40b599136ff9d52c95",
+      "merge_commit": "1977e2ffd4a3c95c2f871866c8f32fac6c3426da",
+      "review_verdict": "PASS_MERGE_READY",
+      "resolved_findings": ["CLAUDE-028", "CLAUDE-029"],
+      "accepted_nonblocking_notes": ["CLAUDE-030-NOTE"],
+      "status": "merged"
     }
   ],
   "current_work": null,
@@ -249,5 +260,5 @@
     "work_unit_title": "not yet defined",
     "pre_approved": false
   },
-  "notes": "PR #26 (Issue #4 Work Unit 4, queue lifecycle) merged at 848968d6c2c45c3e3a9ebadfa6e0d191cf7b2338, verified with zero drift from the independently gated exact head. All role leases for that work stream are released; ChatGPT scopes Issue #4 Work Unit 5 next. PR #35 (five-actor Slack company bridge, draft) requested independent security review; Claude's first pass found CLAUDE-028/029 (MAJOR, identity asserted rather than verified across the GitHub/Slack trust boundary), the author fixed both on a fresh exact head, and Claude independently re-verified the fixes by code inspection (not the handoff summary) and confirmed CI green before issuing PASS/MERGE_READY at cca3389547c90612762d4d40b599136ff9d52c95. One accepted non-blocking note (CLAUDE-030-NOTE): the fix assumes all agents' Team Room writes transit the NTinkicht GitHub identity, but Codex's connector-authored comments demonstrably do not (chatgpt-codex-connector[bot]) -- fails safe (under-mirrors) rather than reopening the spoofing hole, worth an empirical check once bot secrets are live. PR #32 (coordination-only, 'reconcile after Work Unit 4 merge') remains an unresolved concurrent duplicate of the STATE.json reconciliation already merged here; still flagged on the PR for the author to rebase, unchanged since. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
+  "notes": "PR #26 (Issue #4 Work Unit 4, queue lifecycle) merged at 848968d6c2c45c3e3a9ebadfa6e0d191cf7b2338, verified with zero drift from the independently gated exact head. All role leases for that work stream are released; ChatGPT scopes Issue #4 Work Unit 5 next. PR #35 (five-actor Slack company bridge) is also merged, at 1977e2ffd4a3c95c2f871866c8f32fac6c3426da: Claude's first pass found CLAUDE-028/029 (MAJOR, identity asserted rather than verified across the GitHub/Slack trust boundary), the author fixed both, Claude independently re-verified by code inspection (not the handoff summary) and confirmed CI green before PASS/MERGE_READY at cca3389547c90612762d4d40b599136ff9d52c95, and the merge commit was confirmed to carry zero drift from that exact head. One accepted non-blocking note (CLAUDE-030-NOTE): the fix assumes all agents' Team Room writes transit the NTinkicht GitHub identity, but Codex's connector-authored comments demonstrably do not (chatgpt-codex-connector[bot]) -- fails safe (under-mirrors) rather than reopening the spoofing hole, worth an empirical check once bot secrets are live. PR #32 (coordination-only, 'reconcile after Work Unit 4 merge') remains an unresolved concurrent duplicate of the STATE.json reconciliation already merged here; still flagged on the PR for the author to rebase, unchanged since. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
 }
