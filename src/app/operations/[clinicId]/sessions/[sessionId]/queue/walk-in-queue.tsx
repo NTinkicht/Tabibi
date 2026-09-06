@@ -14,6 +14,8 @@ type WaitingEntry = {
   hasContact: boolean;
 };
 
+const RECEPTION_LOCALE_KEY = 'tabibi_reception_locale';
+
 function key() {
   return crypto.randomUUID();
 }
@@ -32,6 +34,17 @@ export function WalkInQueue({
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
   const pendingKeysRef = useRef(new Map<string, string>());
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(RECEPTION_LOCALE_KEY);
+    if (stored === 'ar' || stored === 'fr') setLocale(stored);
+  }, []);
+
+  function toggleLocale() {
+    const next = locale === 'ar' ? 'fr' : 'ar';
+    window.localStorage.setItem(RECEPTION_LOCALE_KEY, next);
+    setLocale(next);
+  }
 
   const load = useCallback(async () => {
     setState('loading');
@@ -115,10 +128,7 @@ export function WalkInQueue({
           <h1>{t.queueTitle}</h1>
           <p>{t.queueSubtitle}</p>
         </div>
-        <button
-          className="locale"
-          onClick={() => setLocale(locale === 'ar' ? 'fr' : 'ar')}
-        >
+        <button className="locale" onClick={toggleLocale}>
           {locale === 'ar' ? 'Français' : 'العربية'}
         </button>
       </header>
