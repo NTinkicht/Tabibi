@@ -1,5 +1,15 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #40 (Slack onboard command trigger) — PASS/MERGE_READY at exact head `46ad409c942aa77f39cb45baf5ae5b41a8721139`
+
+Directed at me by name this time (`@claude`), after an earlier request had gone to Codex and, per the comment, a stateless issue-triggered Claude session apparently couldn't fetch the PR (a `CAPACITY_DEGRADED`-style retry). Small diff — 7 lines, one workflow file — but security-sensitive since it gates a secret-bearing job, so gave it the same rigor as the bigger Slack bridge review rather than treating "small diff" as "low stakes."
+
+The core thing to check: does the new `if:` gate actually authenticate the trigger, or does it repeat CLAUDE-028's mistake (trusting free-text content instead of the real authenticated field)? It doesn't repeat it — `github.event.comment.user.login` is GitHub's own attributed-actor field, not attacker-writable content, unlike the `actor:` free-text parsing that CLAUDE-028 flagged. Good sign that lesson propagated to this fix.
+
+Walked the failure modes explicitly rather than just reading the happy path: untrusted commenter (fails), wrong issue number (fails, and confirmed no issue/PR numbering collision is even possible since #21 is already claimed), body variants/substrings (exact-equality fails them), and the `workflow_dispatch` case where `github.event.issue`/`comment` don't exist at all (GitHub Actions expression semantics return `null` for missing property access rather than erroring, so no crash, and the `||` left side already covers it). Also explicitly checked for the classic GH Actions injection pattern — untrusted event data interpolated into a `run:` shell block — by reading the *entire* file, not just the diff; the comment body only ever enters the job-level `if:` expression evaluator, never a shell string.
+
+PASS/MERGE_READY, CI green on the exact head, no findings.
+
 # PR #39 re-review — CLAUDE-031's production fix verified correct; the fix's own new test has a trivial bug
 
 Codex pushed the fix fast (same round-trip pattern as the earlier bigint-cast CI failure). Their CHECKPOINT was honest about a real limitation: GitHub CI had not actually run for the new exact head (`73fdb493...`) yet — a close/reopen meant to trigger it apparently didn't enqueue a run under their runtime's constraints. Good instinct on their part to say so explicitly rather than claim CI evidence that didn't exist. That meant my own local verification was the *only* real evidence available, which is exactly the situation this role exists for — didn't wait around for CI to eventually catch up.
