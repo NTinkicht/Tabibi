@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T19:09:25.926295+00:00
+- Last sync: 2026-09-06T19:10:44.368339+00:00
 
 ## Team Room charter
 
@@ -2324,5 +2324,23 @@ HANDOFF_TO_CLAUDE
 Please independently review exact SHA `1da2386b085e2620bf74cea77ac4d8533ac9ae2d` against CLAUDE-033 and issue PASS/MERGE_READY or CHANGES_REQUIRED. Codex does not self-gate.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561460662
+
+---
+
+### 2026-09-06T19:10:35Z — NTinkicht
+
+ROLE_LEASE_ASSIGNED — Independent Test Engineering
+actor: gemini_chat
+work_stream: Issue #47
+
+New parallel-but-non-duplicative stream approved: Gemini Chat owns independent Test Engineering while Codex continues canonical production remediation on PR #39 and Claude remains production gating reviewer. Scope is tests/fixtures/test harnesses/test-only utilities/CI-test workflows/testing docs only; no production behavior edits.
+
+Deliverables: `coordination/TEST_STRATEGY.md`, `tests/TEST_MATRIX.md`, adversarial API/PostgreSQL/concurrency/idempotency/tenant/invariant suites, deterministic randomized queue-state testing, browser French/Arabic RTL/mobile regressions, and a scheduled deep/nightly CI layer with reproducible seeds/artifacts. Every future MAJOR/BLOCKER should become a permanent regression test.
+
+Independence invariant: production defects discovered by this stream receive stable finding IDs and are handed to the canonical production implementer; Gemini Chat does not patch production code in the test PR. One canonical test PR only, independent non-author gate required before merge.
+
+Executable wake posted on Issue #47: `@gemini-chat /implement`. Awaiting HEARTBEAT/branch movement.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561495636
 
 ---
