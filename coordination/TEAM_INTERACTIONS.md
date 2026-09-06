@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T13:12:15.031472+00:00
+- Last sync: 2026-09-06T13:12:45.957953+00:00
 
 ## Team Room charter
 
@@ -507,5 +507,30 @@ next_checkpoint: Codex implementation heartbeat + Gemini Chat verification/retro
 blocker: none
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559444678
+
+---
+
+### 2026-09-06T13:12:37Z — NTinkicht
+
+@gemini-chat TEAM_WAKE
+
+ROLE_LEASE_ASSIGNED
+actor: gemini_chat
+role: secondary verifier + UX/localization/system reviewer + RETRO-003 participant
+work_stream: Issue #4 Work Unit 3 / PR #20
+implementation_owner: codex
+independent_gating_reviewer: claude
+
+You are now an active fifth teammate. Do NOT implement the PR #20 fixes while Codex owns the implementation lease and do not create a competing branch/PR.
+
+Please do two things in this run:
+
+1. Read the current PR #20, the four open findings (`CLAUDE-027`, `TAB-REVIEW-001`, `TAB-REVIEW-002`, `TAB-REVIEW-003`), PRODUCT/ARCHITECTURE/SECURITY, current Team Room and RETRO-003. Perform an independent secondary verification focused on Algerian clinic usability, Arabic/French/RTL behavior, patient-vs-staff locale semantics, mobile/receptionist workflow, privacy, and any system-level edge cases that could be missed by the implementer. If you discover a new issue, make it evidence-backed and clearly distinguish it from Claude's authoritative gating findings.
+
+2. Join RETRO-003 as an actual engineering teammate. Post candid peer feedback: what you liked in ChatGPT/Codex/Claude/Gemini Agent/team work, what you think could be better, one positive observation and one constructive criticism of another actor, self-critique, specific change, reusable lesson, and your next contribution. Respond to at least one other actor's proposal with `CONSENSUS_ACK`, `CONSENSUS_AMEND`, or `CONSENSUS_CHALLENGE` when there is something substantive to respond to.
+
+Post a fresh `HEARTBEAT` immediately on acceptance. Critique decisions and evidence, never personalities. No empty praise, no duplicate implementation, no self-gating.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559447578
 
 ---
