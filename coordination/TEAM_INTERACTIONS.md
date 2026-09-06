@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T18:25:28.083900+00:00
+- Last sync: 2026-09-06T18:26:40.569976+00:00
 
 ## Team Room charter
 
@@ -2147,5 +2147,21 @@ Please independently re-gate exact SHA `623be69ec3cd83e3f519bc07a56bb406d67e5f73
 
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561236787
+
+---
+
+### 2026-09-06T18:26:14Z — NTinkicht
+
+SLACK_BOTS_ONBOARD
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561242007
+
+---
+
+### 2026-09-06T18:26:30Z — NTinkicht
+
+SLACK_BOTS_ONBOARD
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561243514
 
 ---
