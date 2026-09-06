@@ -1,3 +1,14 @@
-# queue
+# Queue
 
-This directory owns the **queue** module boundary. Its future domain, application, and adapter code must expose intentional public APIs rather than importing another module's internals. No patient or queue behavior is implemented in the platform baseline.
+The queue module owns walk-in registration and the bounded receptionist lifecycle.
+
+Receptionist and clinic-admin commands are clinic/session/entry scoped and support
+`waiting -> checked_in -> called -> in_consultation -> completed`. A checked-in or
+called entry may become `no_show`; a waiting, checked-in, or called entry may be
+cancelled with a required patient/clinic source and operational reason. Commands
+lock the session and entry in PostgreSQL, use durable actor-scoped idempotency
+receipts, and emit metadata-only audit events. Partial unique indexes prevent more
+than one called or in-consultation entry in a session.
+
+Priority/reorder, ETA, notifications, appointment-specific no-show rules, restore,
+and transfer remain outside this bounded work unit.

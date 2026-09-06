@@ -117,23 +117,17 @@
       "status": "active"
     },
     "implementer": {
-      "actor": null,
-      "status": "unassigned_between_work_units"
+      "actor": "codex",
+      "status": "active",
+      "work_stream": "Issue #4 Work Unit 4"
     },
     "gating_reviewer": {
-      "actor": null,
-      "status": "unassigned_between_work_units",
-      "last_verdict": {
-        "actor": "claude",
-        "review_target_sha": "fb8b2c0471921118362ee789ee5baf1b6b123184",
-        "verdict": "PASS_MERGE_READY",
-        "pr_comment": "https://github.com/NTinkicht/Tabibi/pull/20#issuecomment-5559555708"
-      }
+      "actor": "claude",
+      "status": "assigned_pending_review"
     },
     "secondary_verifier": {
-      "actor": null,
-      "status": "superseded_by_merge",
-      "note": "gemini_chat was assigned secondary verification on fb8b2c04...; PR #20 merged before that verification was posted. Not a process failure -- the gating verdict alone is sufficient per protocol; secondary verification is supplementary."
+      "actor": "gemini_chat",
+      "status": "assigned_pending_review"
     },
     "merge_executor": {
       "actor": null,
@@ -226,12 +220,14 @@
       "status": "merged"
     }
   ],
-  "current_work": null,
-  "next_work": {
+  "current_work": {
     "issue": 4,
     "work_unit": 4,
-    "work_unit_title": "not yet defined",
-    "pre_approved": false
+    "title": "Receptionist queue lifecycle controls",
+    "status": "implementation_active",
+    "canonical_branch": "codex/issue-4-work-unit-4-queue-lifecycle",
+    "implementer": "codex"
   },
-  "notes": "PR #20 (Issue #4 Work Unit 3) is merged: commit 21f3ff363ce7a797c4a4de8d545dded28cd01c07, exact head fb8b2c0471921118362ee789ee5baf1b6b123184, matching Claude's independently-verified PASS/MERGE_READY verdict. Process note for the record: a separate automation, tabibi-coordination-bot, also writes coordination/STATE.json based on parsed handoff comments (distinct from the tabibi-team-room sync bot, which only touches TEAM_INTERACTIONS.md/TEAM_STATUS.md). It raced Claude's manual reconciliation: Claude's PASS/MERGE_READY update (commit cd99e926, 13:32:11Z) was overwritten 23 seconds later by the bot's own reconciliation (commit 9d8062a4, 13:32:34Z), which was based on a since-superseded handoff comment and reverted the state to PENDING_REREVIEW even though the real verdict already existed. This STATE.json write (following PR #20's actual merge) corrects that. Flagged in Team Room as a systemic risk -- two independent writers to the same coordination file with no staleness/ordering check will keep producing lost updates -- not a one-off mistake to just re-fix silently."
+  "next_work": null,
+  "notes": "Issue #4 Work Unit 4 approved. Codex holds the sole implementation/CI-remediation lease; Claude is the independent gate and Gemini Chat the supplementary UX/system verifier."
 }

@@ -153,6 +153,38 @@ h1 {
 .actions .danger {
   background: #a93b45;
 }
+.queueActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.queueActions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.55rem 0.75rem;
+  background: #0a6f61;
+  color: white;
+  font-weight: 750;
+  cursor: pointer;
+}
+.queueActions .danger {
+  background: #a93b45;
+}
+.queueActions .quiet {
+  background: #e8f1ef;
+  color: #285e56;
+}
+.queueActions button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.queueState {
+  border-radius: 999px;
+  padding: 0.35rem 0.6rem;
+  background: #edf5f3;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
 .actions .quiet {
   background: #e8f1ef;
   color: #285e56;
