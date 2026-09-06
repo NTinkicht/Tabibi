@@ -1,13 +1,13 @@
 {
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
-  "round": 18,
-  "state": "work_unit_5_merge_ready",
-  "current_pr": 39,
+  "round": 19,
+  "state": "work_unit_5_merged_awaiting_work_unit_6_scope",
+  "current_pr": null,
   "current_issue": 4,
   "last_actor": "claude",
-  "next_actor": "codex",
-  "next_action": "merge PR #39 exact head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d (PASS/MERGE_READY, CLAUDE-033 resolved, CI green, mergeable_state clean, no re-review needed), then reconcile main and scope Issue #4 Work Unit 6.",
+  "next_actor": "chatgpt",
+  "next_action": "scope Issue #4 Work Unit 6 and assign implementer; no active lease is held.",
   "operating_model": "five-actor-capability-mesh-v6-role-failover-with-heartbeats-retrospectives",
   "binding_protocols": [
     "coordination/AUTONOMY_PROTOCOL.md",
@@ -38,7 +38,7 @@
         "review": "available",
         "merge_execution": "available"
       },
-      "current_activity": "orchestrator/state reconciler; Work Unit 4 (PR #26) merged. Next: scope Work Unit 5."
+      "current_activity": "orchestrator/state reconciler; Work Unit 5 (PR #39) merged. Next: scope Work Unit 6."
     },
     "codex_cloud": {
       "preferred_roles": [
@@ -52,7 +52,7 @@
         "merge_execution": "available",
         "review": "available"
       },
-      "current_activity": "authored and completed PR #39 (Work Unit 5, queue priority/reorder) at final exact head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d: fixed the owner-diagnosed CI failure, CLAUDE-031, CLAUDE-032, and CLAUDE-033 (removed service_order entirely, aligned to the priority_order contract per ChatGPT's architecture decision). PASS/MERGE_READY from Claude; no active lease, ready to merge."
+      "current_activity": "authored and merged PR #39 (Work Unit 5, queue priority/reorder) as squash-merge commit 1b071d6a6c8d635d622358ece61590bd10a32192 (final exact reviewed head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d): fixed the owner-diagnosed CI failure, CLAUDE-031, CLAUDE-032, and CLAUDE-033 (removed service_order entirely, aligned to the priority_order contract per ChatGPT's architecture decision). No active lease."
     },
     "claude": {
       "preferred_roles": ["independent_review", "adversarial_security_review"],
@@ -62,7 +62,7 @@
         "orchestration": "available",
         "merge_execution": "available"
       },
-      "current_activity": "PR #26, PR #35, and PR #40 all merged and verified/reviewed. PR #39 (Work Unit 5, queue priority/reorder): after retracting an earlier PASS/MERGE_READY when a second Claude pathway found CLAUDE-033, independently re-reviewed Codex's remediation from scratch against real Postgres (including a fresh adversarial test for the priority-cohort compaction gap-safety pattern) and issued PASS/MERGE_READY at final exact head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d. No active lease.",
+      "current_activity": "PR #26, PR #35, PR #40, and PR #39 all merged and verified/reviewed. PR #39 (Work Unit 5, queue priority/reorder): after retracting an earlier PASS/MERGE_READY when a second Claude pathway found CLAUDE-033, independently re-reviewed Codex's remediation from scratch against real Postgres (including a fresh adversarial test for the priority-cohort compaction gap-safety pattern), issued PASS/MERGE_READY at final exact head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d, then confirmed the squash-merge commit 1b071d6 carried zero application-code drift from that head before reconciling STATE.json. No active lease. Standing by for Work Unit 6.",
       "invocation_policy": "persistent Claude session is the default Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
     "gemini_agent": {
@@ -129,10 +129,8 @@
       "status": "not_assigned"
     },
     "merge_executor": {
-      "actor": "codex",
-      "status": "ready_to_merge",
-      "review_target_sha": "1da2386b085e2620bf74cea77ac4d8533ac9ae2d",
-      "reason": "gating review is PASS/MERGE_READY at this exact head (CLAUDE-033 resolved and independently re-verified against real Postgres), CI is green, mergeable_state is clean; merge is mechanical, no re-review needed"
+      "actor": null,
+      "status": "not_assigned"
     }
   },
   "product_architect": "chatgpt",
@@ -283,29 +281,29 @@
         "GHA-string-case-insensitivity-note (flagged independently by the @claude Action and Codex's review bot, not by Claude's own review; non-blocking since the actual authorization gate is on github.event.comment.user.login, which case-insensitivity doesn't weaken)"
       ],
       "status": "merged"
+    },
+    {
+      "issue": 4,
+      "work_unit": 5,
+      "work_unit_title": "Authorized queue priority/reorder with mandatory reason, deterministic ordering, idempotency and audit",
+      "implementation_pr": 39,
+      "reviewed_head": "1da2386b085e2620bf74cea77ac4d8533ac9ae2d",
+      "final_gated_head": "1da2386b085e2620bf74cea77ac4d8533ac9ae2d",
+      "merge_commit": "1b071d6a6c8d635d622358ece61590bd10a32192",
+      "review_verdict": "PASS_MERGE_READY",
+      "resolved_findings": ["CLAUDE-031", "CLAUDE-032", "CLAUDE-033"],
+      "accepted_nonblocking_notes": [
+        "CLAUDE-033-command-compaction-try-catch-note"
+      ],
+      "merge_verification": "squash-merge commit 1b071d6 verified single-parent, 11 files / 841+/29- matching the reviewed diff; git diff --stat 1da2386..1b071d6 confirmed zero application-code drift (delta is coordination files plus the already-separately-merged slack-agent-onboard.yml from PR #40)",
+      "status": "merged"
     }
   ],
-  "current_work": {
-    "issue": 4,
-    "work_unit": 5,
-    "work_unit_title": "Authorized queue priority/reorder with mandatory reason, deterministic ordering, idempotency and audit",
-    "implementation_status": "merge_ready",
-    "implementation_pr": 39,
-    "canonical_branch": "codex/issue-4-work-unit-5-queue-priority",
-    "current_head": "1da2386b085e2620bf74cea77ac4d8533ac9ae2d",
-    "review_verdict": "PASS_MERGE_READY",
-    "ci_status": "success_and_independently_verified",
-    "resolved_findings": ["CLAUDE-031", "CLAUDE-032", "CLAUDE-033"],
-    "accepted_nonblocking_notes": [
-      "CLAUDE-033-command-compaction-try-catch-note"
-    ],
-    "mergeable_state": "clean"
-  },
   "next_work": {
     "issue": 4,
     "work_unit": 6,
     "work_unit_title": "not yet defined",
     "pre_approved": false
   },
-  "notes": "PR #26 (Work Unit 4), PR #35 (Slack company bridge), and PR #40 (Slack onboard command trigger) are all merged and verified/reviewed cleanly. PR #39 (Issue #4 Work Unit 5, queue priority/reorder) is PASS/MERGE_READY at final exact head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d after a five-round review: an owner-diagnosed CI failure, CLAUDE-031 (MAJOR, reorder gap-collision), CLAUDE-032 (MINOR, that fix's own test bug), and CLAUDE-033 (MAJOR, architecture) -- the last one caught by a second Claude pathway after Claude's own three rounds missed it, then independently re-verified and concurred by Claude rather than defended against, and recorded plainly as Claude's own miss. Codex's remediation removed the competing service_order mechanism entirely and aligned implementation to the pre-existing priority_order contract in ARCHITECTURE.md:96-108 per ChatGPT's ARCHITECTURE_DECISION. Claude independently re-reviewed the full remediation from scratch (not just the named finding) against real Postgres: 3 consecutive full-suite runs (34/34), typecheck/lint/format/unit+API clean, plus a fresh adversarial test for the priority-cohort compaction gap-safety pattern (reused correctly from CLAUDE-031 in a new location). CI confirmed tied to the actual exact head, all green. One non-blocking NOTE carried forward (command()'s own compaction block lacks a try/catch reorder()'s has; verified not exploitable under the current session-lock model). Ready for Codex to merge; no re-review needed. PR #32 was closed by the owner as SUPERSEDED / DO NOT MERGE -- resolved. On PR #40: a second Claude pathway and Codex's own review bot both independently caught a GitHub Actions case-insensitivity nuance in the trigger's string match that Claude's own review missed; recorded honestly as a non-blocking accepted note. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
+  "notes": "PR #26 (Work Unit 4), PR #35 (Slack company bridge), PR #40 (Slack onboard command trigger), and now PR #39 (Issue #4 Work Unit 5, queue priority/reorder) are all merged and verified/reviewed cleanly. PR #39 merged as squash commit 1b071d6a6c8d635d622358ece61590bd10a32192 on top of final exact reviewed head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d, after a five-round review: an owner-diagnosed CI failure, CLAUDE-031 (MAJOR, reorder gap-collision), CLAUDE-032 (MINOR, that fix's own test bug), and CLAUDE-033 (MAJOR, architecture) -- the last one caught by a second Claude pathway after Claude's own three rounds missed it, then independently re-verified and concurred by Claude rather than defended against, and recorded plainly as Claude's own miss. Codex's remediation removed the competing service_order mechanism entirely and aligned implementation to the pre-existing priority_order contract in ARCHITECTURE.md:96-108 per ChatGPT's ARCHITECTURE_DECISION. Claude independently re-reviewed the full remediation from scratch (not just the named finding) against real Postgres: 3 consecutive full-suite runs (34/34), typecheck/lint/format/unit+API clean, plus a fresh adversarial test for the priority-cohort compaction gap-safety pattern (reused correctly from CLAUDE-031 in a new location). CI confirmed tied to the actual exact head, all green. Post-merge, Claude independently confirmed the squash commit is single-parent, matches the reviewed diff stats exactly, and carries zero application-code drift versus the reviewed head. One non-blocking NOTE carried forward (command()'s own compaction block lacks a try/catch reorder()'s has; verified not exploitable under the current session-lock model). Issue #4 Work Unit 6 is not yet scoped -- ChatGPT to define next. PR #32 was closed by the owner as SUPERSEDED / DO NOT MERGE -- resolved. On PR #40: a second Claude pathway and Codex's own review bot both independently caught a GitHub Actions case-insensitivity nuance in the trigger's string match that Claude's own review missed; recorded honestly as a non-blocking accepted note. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
 }
