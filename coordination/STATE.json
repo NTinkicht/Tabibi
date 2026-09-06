@@ -1,13 +1,13 @@
 {
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
-  "round": 6,
-  "state": "claude_implementer_failover_for_pr15_findings",
+  "round": 7,
+  "state": "pr15_chatgpt_gate_with_ci_formatting_remediation",
   "current_pr": 15,
   "current_issue": 4,
   "last_actor": "chatgpt",
-  "next_actor": "claude",
-  "next_action": "as temporary implementer on the existing canonical PR #15 branch, fix TAB-REV-002, TAB-REV-004, TAB-REV-006, TAB-REV-009, TAB-REV-005 and close the residual TAB-REV-008 stale-card race if feasible; add regression coverage, run CI, push to the same PR, then release the implementer lease and hand the exact new SHA to ChatGPT as independent gating reviewer (Gemini may join as secondary verifier once authenticated)",
+  "next_actor": "chatgpt",
+  "next_action": "repair the deterministic formatting-only CI failure caused by coordination/STATE.json on main, rerun CI for PR #15 exact head aea8af7f1441a212a1eb176457e87fa399b7bbec, independently gate that Claude-authored head using the verified diff/tests plus green CI, then merge if acceptable",
   "operating_model": "four-agent-capability-mesh-v5-role-failover",
   "binding_protocols": [
     "coordination/AUTONOMY_PROTOCOL.md",
@@ -26,7 +26,8 @@
         "implementation": "available",
         "review": "available",
         "merge_execution": "available"
-      }
+      },
+      "current_activity": "orchestrating PR #15, remediating CI formatting failure, and holding the independent gating-review lease"
     },
     "codex_cloud": {
       "preferred_roles": [
@@ -40,17 +41,21 @@
         "merge_execution": "limited",
         "review": "limited"
       },
-      "constraint": "Codex returned a generic account usage-limit response to a non-review protocol acknowledgement command on Issue #17; affected active leases must fail over until CAPACITY_RECOVERED is observed"
+      "constraint": "Codex returned a generic account usage-limit response even to a non-review protocol acknowledgement on Issue #17; keep leases failed over until CAPACITY_RECOVERED is observed"
     },
     "claude": {
-      "preferred_roles": ["independent_review", "adversarial_security_review"],
+      "preferred_roles": [
+        "independent_review",
+        "adversarial_security_review"
+      ],
       "capability_status": {
         "review": "available",
         "implementation": "available",
         "orchestration": "available",
         "merge_execution": "available"
       },
-      "current_activity": "temporary implementation failover on PR #15 after its independent review found unresolved defects"
+      "current_activity": "persistent Claude session independently verified PR #15 head aea8af7f1441a212a1eb176457e87fa399b7bbec and confirmed all four MAJOR findings fixed; two NOTE-level residuals remain non-blocking",
+      "invocation_policy": "persistent Claude session is the autonomous Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
     "gemini": {
       "preferred_roles": [
@@ -58,14 +63,14 @@
         "secondary_independent_review"
       ],
       "capability_status": {
-        "qa_ux_system_verification": "unavailable",
-        "review": "unavailable",
-        "implementation": "unavailable",
-        "orchestration": "unavailable",
-        "merge_execution": "unavailable"
+        "qa_ux_system_verification": "available",
+        "review": "available",
+        "implementation": "available",
+        "orchestration": "available",
+        "merge_execution": "available"
       },
-      "integration": "GEMINI.md and .github/workflows/gemini-agent.yml installed and trigger path proven; run 34025540623 failed because no Gemini/Google authentication secret is configured",
-      "external_blocker": "configure GEMINI_API_KEY or another supported Google authentication method"
+      "integration": "Gemini Agent Mesh authenticated successfully in run 34025900550; Gemini acknowledged the v5 anti-chaos protocol and is available as secondary verifier and failover runtime",
+      "current_activity": "standing by as secondary verifier; not interfering with the current PR #15 gate"
     }
   },
   "role_leases": {
@@ -75,48 +80,48 @@
     },
     "implementer": {
       "actor": "claude",
-      "status": "active_failover",
+      "status": "completed_waiting_gate",
       "work_stream": "issue-4-work-unit-2-pr-15",
-      "reason": "codex usage limit"
+      "implemented_head_sha": "aea8af7f1441a212a1eb176457e87fa399b7bbec",
+      "reason": "Codex usage-limit failover"
     },
     "gating_reviewer": {
       "actor": "chatgpt",
-      "status": "waiting_for_claude_new_head",
-      "review_target_sha": null,
-      "reason": "Claude is now the implementer and cannot self-gate its new SHA; Gemini is not authenticated yet"
+      "status": "active",
+      "review_target_sha": "aea8af7f1441a212a1eb176457e87fa399b7bbec",
+      "reason": "Claude materially authored the exact head and cannot self-gate it"
     },
     "secondary_verifier": {
       "actor": "gemini",
-      "status": "blocked_external_auth",
-      "review_target_sha": null
+      "status": "available_standby",
+      "review_target_sha": "aea8af7f1441a212a1eb176457e87fa399b7bbec"
     },
     "merge_executor": {
       "actor": "chatgpt",
       "preferred_actor_when_recovered": "codex_cloud",
-      "fallback_order": ["gemini", "claude"],
-      "status": "waiting_for_merge_ready",
+      "fallback_order": [
+        "gemini",
+        "claude"
+      ],
+      "status": "waiting_for_green_ci_and_gate",
       "reason": "Codex currently usage-limited"
     }
   },
   "product_architect": "chatgpt",
-  "implementation_runtime": "claude_failover",
+  "implementation_runtime": "claude_failover_completed",
   "mechanical_merge_executor": "chatgpt_failover",
-  "independent_reviewer": "chatgpt_for_next_claude_authored_head",
-  "experience_system_verifier": "gemini_pending_auth",
+  "independent_reviewer": "chatgpt_for_claude_authored_head",
+  "experience_system_verifier": "gemini_available",
   "deterministic_referee": "ci",
-  "open_blockers": 0,
-  "open_majors": 4,
-  "open_minors": 2,
+  "open_blockers": 1,
+  "open_majors": 0,
+  "open_minors": 0,
   "human_decision_required": false,
-  "pending_findings": [
-    "TAB-REV-002",
-    "TAB-REV-004",
-    "TAB-REV-006",
-    "TAB-REV-009",
-    "TAB-REV-005",
-    "TAB-REV-008"
+  "pending_findings": [],
+  "review_pending_findings": [
+    "CLAUDE-025-NOTE",
+    "CLAUDE-026-NOTE"
   ],
-  "review_pending_findings": [],
   "addressed_findings": [
     "TAB-OPS-001",
     "TAB-OPS-002",
@@ -125,8 +130,14 @@
     "TAB-OPS-005",
     "TAB-OPS-006",
     "TAB-REV-001",
+    "TAB-REV-002",
     "TAB-REV-003",
+    "TAB-REV-004",
+    "TAB-REV-005",
+    "TAB-REV-006",
     "TAB-REV-007",
+    "TAB-REV-008",
+    "TAB-REV-009",
     "TAB-REV-010",
     "TAB-REV-011"
   ],
@@ -138,7 +149,7 @@
   ],
   "runtime_constraints": [
     "codex.general=limited by account usage limit as observed on Issue #17",
-    "gemini.authentication=unavailable until GEMINI_API_KEY or another supported Google auth method is configured"
+    "PR #15 CI run 34026169641 attempt 2 failed only because coordination/STATE.json on main was not Prettier-formatted; PostgreSQL integration and Browser smoke passed"
   ],
   "completed_work": [
     {
@@ -158,6 +169,11 @@
       "implementation_pr": 12,
       "merge_commit": "a4f0ceb3f12f830fa412b6823196f585cebeee7c",
       "status": "merged"
+    },
+    {
+      "coordination_pr": 18,
+      "merge_commit": "6abdba258fd40bcca8ff2b975f510e20b6607274",
+      "status": "merged"
     }
   ],
   "current_work": {
@@ -166,10 +182,13 @@
     "work_unit": 2,
     "work_unit_title": "Receptionist operational session controls",
     "pre_approved": true,
-    "implementation_status": "claude_failover_fixing_independent_review_findings",
+    "implementation_status": "fixes_pushed_verified_waiting_green_ci_and_chatgpt_gate",
     "implementation_pr": 15,
-    "implementation_head_before_failover": "88baa111151ae0ed8a9b194811c408797b290c52",
-    "last_green_ci_run": 34017576261
+    "implementation_head": "aea8af7f1441a212a1eb176457e87fa399b7bbec",
+    "previous_head": "88baa111151ae0ed8a9b194811c408797b290c52",
+    "last_green_ci_run": 34017576261,
+    "current_ci_run": 34026169641,
+    "current_ci_status": "failure_formatting_only"
   },
   "next_work": {
     "issue": 4,
@@ -178,5 +197,5 @@
     "work_unit_title": "Walk-in/guest patient intake and queue-entry materialization",
     "pre_approved": false
   },
-  "notes": "Claude completed the authoritative gating review of PR #15 head 88baa111151ae0ed8a9b194811c408797b290c52 and found TAB-REV-002/004/006/009 MAJOR plus TAB-REV-005 and residual TAB-REV-008 MINOR. Codex then proved generally usage-limited on a non-review acknowledgement command, so the v5 failover protocol transfers the implementer lease to Claude on the existing PR. Because Claude will author the next head, ChatGPT holds the gating-review lease. Gemini integration is installed but its first real run proved authentication is missing; adding a supported Google credential will activate Gemini as secondary verifier and future failover runtime."
+  "notes": "Claude failover implementation pushed PR #15 head aea8af7f1441a212a1eb176457e87fa399b7bbec. The persistent Claude session independently ran npm ci, typecheck, lint, unit/API tests (11/11), and real PostgreSQL integration tests (16/16) and verified all four prior MAJOR findings fixed. CI attempt 2 then passed PostgreSQL integration and Browser smoke but failed Quality and build at the Prettier check solely because coordination/STATE.json on main was not formatted. Gemini authentication is recovered and Gemini is available. ChatGPT now owns CI remediation plus the authoritative exact-head gate."
 }
