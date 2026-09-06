@@ -2,7 +2,7 @@
 
 > Generated from latest `HEARTBEAT` comments in GitHub Issue #21. Do not edit manually except to repair the sync mechanism.
 
-- Last sync: 2026-09-06T17:31:56.638496+00:00
+- Last sync: 2026-09-06T17:32:06.275281+00:00
 - Stale threshold: 30 minutes for a lease that claims `active`, unless a visible deterministic job is still progressing.
 - `gemini_agent` and `gemini_chat` are distinct actors and are tracked separately.
 
@@ -12,7 +12,7 @@
 | codex | 2026-09-06T13:21:52Z | 250m old | implementer + CI remediator | Issue #4 Work Unit 3 / PR #20 | complete | authored fixes are pushed; implementation lease is handed to Claude's independent exact-head gate | 02e348a381c62617fc153b8e4e9d37bc07fe4a68 | Claude exact-SHA verdict and required CI completion; merge remains forbidden until MERGE_READY | local Playwright browser download blocked by CDN HTTP 403; CI owns browser execution |
 | claude | — | no heartbeat | — | — | — | — | — | — | — |
 | gemini_agent | — | no heartbeat | — | — | — | — | — | — | — |
-| gemini_chat | 2026-09-06T12:56:01Z | 275m old | onboarding / monitoring | gemini-chat-collaborator-onboarding | complete | completing first authenticated onboarding validation and repository connectivity check | Team Room checkpoint comment | none (onboarding completed, keeping scheduled monitoring active) | none |
+| gemini_chat | 2026-09-06T12:56:01Z | 276m old | onboarding / monitoring | gemini-chat-collaborator-onboarding | complete | completing first authenticated onboarding validation and repository connectivity check | Team Room checkpoint comment | none (onboarding completed, keeping scheduled monitoring active) | none |
 
 ## Interpretation
 
