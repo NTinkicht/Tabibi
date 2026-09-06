@@ -51,6 +51,27 @@ export interface StaffWaitingEntry {
   hasContact: boolean;
 }
 
+export type QueueCommand =
+  | 'check_in'
+  | 'call'
+  | 'no_show'
+  | 'cancel'
+  | 'start_consultation'
+  | 'complete_consultation';
+
+export interface StaffQueueEntry extends StaffWaitingEntry {
+  eligibilityOrder: number | null;
+  priorityOrder: number | null;
+}
+
+export interface QueueCommandInput {
+  command: QueueCommand;
+  reason?: string;
+  cancellationSource?: 'patient' | 'clinic';
+  idempotencyKey: string;
+  correlationId: string;
+}
+
 export class QueueValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -374,6 +395,269 @@ export class QueueService {
         preferredLocale: row.preferred_locale,
         hasContact: row.contact_phone !== null || row.contact_email !== null,
       }));
+    });
+  }
+
+  async listOperational(
+    scope: ClinicScope,
+    sessionId: string,
+  ): Promise<StaffQueueEntry[]> {
+    return inTransaction(this.pool, async (client) => {
+      await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
+      const session = await client.query(
+        `SELECT 1 FROM consultation_sessions WHERE id = $1 AND clinic_id = $2`,
+        [sessionId, scope.clinicId],
+      );
+      if (session.rowCount !== 1)
+        throw new QueueConflictError(
+          'Consultation session was not found in this clinic',
+        );
+      const result = await client.query<{
+        id: string;
+        session_id: string;
+        state: QueueEntryState;
+        registration_order: string;
+        eligibility_order: string | null;
+        priority_order: string | null;
+        public_display_label: string;
+        private_display_name: string;
+        preferred_locale: 'ar' | 'fr';
+        contact_phone: string | null;
+        contact_email: string | null;
+      }>(
+        `SELECT entry.id, entry.session_id, entry.state,
+                entry.registration_order, entry.eligibility_order,
+                entry.priority_order, entry.public_display_label,
+                patient.private_display_name, patient.preferred_locale,
+                patient.contact_phone, patient.contact_email
+           FROM queue_entries entry
+           JOIN patient_operational_records patient
+             ON patient.id = entry.patient_id AND patient.clinic_id = entry.clinic_id
+          WHERE entry.clinic_id = $1 AND entry.session_id = $2
+          ORDER BY entry.registration_order`,
+        [scope.clinicId, sessionId],
+      );
+      return result.rows.map((row) => ({
+        id: row.id,
+        sessionId: row.session_id,
+        state: row.state,
+        registrationOrder: Number(row.registration_order),
+        eligibilityOrder:
+          row.eligibility_order === null ? null : Number(row.eligibility_order),
+        priorityOrder:
+          row.priority_order === null ? null : Number(row.priority_order),
+        publicDisplayLabel: row.public_display_label,
+        privateDisplayName: row.private_display_name,
+        preferredLocale: row.preferred_locale,
+        hasContact: row.contact_phone !== null || row.contact_email !== null,
+      }));
+    });
+  }
+
+  async command(
+    scope: ClinicScope,
+    sessionId: string,
+    entryId: string,
+    rawInput: QueueCommandInput,
+  ): Promise<StaffQueueEntry> {
+    const reason = rawInput.reason?.trim() || null;
+    if (!rawInput.idempotencyKey || rawInput.idempotencyKey.length > 128)
+      throw new QueueValidationError('A valid idempotency key is required');
+    if (
+      (rawInput.command === 'no_show' || rawInput.command === 'cancel') &&
+      !reason
+    )
+      throw new QueueValidationError(
+        `${rawInput.command === 'cancel' ? 'Cancellation' : 'No-show'} reason is required`,
+      );
+    if (rawInput.command === 'cancel' && !rawInput.cancellationSource)
+      throw new QueueValidationError('Cancellation source is required');
+
+    const requestFingerprint = createHash('sha256')
+      .update(
+        JSON.stringify({
+          sessionId,
+          entryId,
+          command: rawInput.command,
+          reason,
+          cancellationSource: rawInput.cancellationSource ?? null,
+        }),
+      )
+      .digest('hex');
+
+    return inTransaction(this.pool, async (client) => {
+      await client.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [
+          `queue-command:${scope.clinicId}:${scope.actorUserId}:${rawInput.idempotencyKey}`,
+        ],
+      );
+      // Retries are re-authorized; a revoked receptionist cannot use a receipt.
+      await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
+      const receipt = await client.query<{
+        request_fingerprint: string;
+        response: StaffQueueEntry;
+      }>(
+        `SELECT request_fingerprint, response FROM queue_command_receipts
+          WHERE clinic_id=$1 AND actor_user_id=$2 AND idempotency_key=$3`,
+        [scope.clinicId, scope.actorUserId, rawInput.idempotencyKey],
+      );
+      if (receipt.rows[0]) {
+        if (receipt.rows[0].request_fingerprint !== requestFingerprint)
+          throw new QueueConflictError(
+            'Idempotency key was already used for a different queue command',
+          );
+        return receipt.rows[0].response;
+      }
+
+      const session = await client.query<{ status: string }>(
+        `SELECT status FROM consultation_sessions
+          WHERE id=$1 AND clinic_id=$2 FOR UPDATE`,
+        [sessionId, scope.clinicId],
+      );
+      if (!session.rows[0])
+        throw new QueueConflictError(
+          'Consultation session was not found in this clinic',
+        );
+      if (!['open', 'paused'].includes(session.rows[0].status))
+        throw new QueueConflictError(
+          'Queue lifecycle commands require an open or paused session',
+        );
+
+      const current = await client.query<{
+        state: QueueEntryState;
+      }>(
+        `SELECT state FROM queue_entries
+          WHERE id=$1 AND session_id=$2 AND clinic_id=$3 FOR UPDATE`,
+        [entryId, sessionId, scope.clinicId],
+      );
+      const prior = current.rows[0]?.state;
+      if (!prior)
+        throw new QueueConflictError(
+          'Queue entry was not found in this clinic and session',
+        );
+      const allowed: Record<QueueCommand, readonly QueueEntryState[]> = {
+        check_in: ['waiting'],
+        call: ['checked_in'],
+        no_show: ['checked_in', 'called'],
+        cancel: ['waiting', 'checked_in', 'called'],
+        start_consultation: ['called'],
+        complete_consultation: ['in_consultation'],
+      };
+      if (!allowed[rawInput.command].includes(prior))
+        throw new QueueConflictError(
+          `Cannot apply ${rawInput.command} to queue entry in ${prior}`,
+        );
+      const target: Record<QueueCommand, QueueEntryState> = {
+        check_in: 'checked_in',
+        call: 'called',
+        no_show: 'no_show',
+        cancel: 'cancelled',
+        start_consultation: 'in_consultation',
+        complete_consultation: 'completed',
+      };
+      let eligibilityOrder: number | null = null;
+      if (rawInput.command === 'check_in') {
+        const next = await client.query<{ value: string }>(
+          `SELECT COALESCE(MAX(eligibility_order), 0) + 1 AS value
+             FROM queue_entries WHERE session_id=$1`,
+          [sessionId],
+        );
+        eligibilityOrder = Number(next.rows[0]!.value);
+      }
+      let updated;
+      try {
+        updated = await client.query<{
+          id: string;
+          session_id: string;
+          state: QueueEntryState;
+          registration_order: string;
+          eligibility_order: string | null;
+          priority_order: string | null;
+          public_display_label: string;
+          private_display_name: string;
+          preferred_locale: 'ar' | 'fr';
+          contact_phone: string | null;
+          contact_email: string | null;
+        }>(
+          `UPDATE queue_entries entry SET state=$4::queue_entry_status,
+             eligibility_order=CASE WHEN $4::queue_entry_status='checked_in' THEN $5 ELSE eligibility_order END,
+             updated_at=now()
+           FROM patient_operational_records patient
+           WHERE entry.id=$1 AND entry.session_id=$2 AND entry.clinic_id=$3
+             AND patient.id=entry.patient_id AND patient.clinic_id=entry.clinic_id
+           RETURNING entry.id, entry.session_id, entry.state,
+             entry.registration_order, entry.eligibility_order, entry.priority_order,
+             entry.public_display_label, patient.private_display_name,
+             patient.preferred_locale, patient.contact_phone, patient.contact_email`,
+          [
+            entryId,
+            sessionId,
+            scope.clinicId,
+            target[rawInput.command],
+            eligibilityOrder,
+          ],
+        );
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error &&
+          'code' in error &&
+          error.code === '23505'
+        )
+          throw new QueueConflictError(
+            rawInput.command === 'call'
+              ? 'Another patient is already called'
+              : 'Another consultation is already active',
+          );
+        throw error;
+      }
+      const row = updated.rows[0]!;
+      const response: StaffQueueEntry = {
+        id: row.id,
+        sessionId: row.session_id,
+        state: row.state,
+        registrationOrder: Number(row.registration_order),
+        eligibilityOrder:
+          row.eligibility_order === null ? null : Number(row.eligibility_order),
+        priorityOrder:
+          row.priority_order === null ? null : Number(row.priority_order),
+        publicDisplayLabel: row.public_display_label,
+        privateDisplayName: row.private_display_name,
+        preferredLocale: row.preferred_locale,
+        hasContact: row.contact_phone !== null || row.contact_email !== null,
+      };
+      await appendAuditEvent(client, {
+        ...scope,
+        entityType: 'queue_entry',
+        entityId: entryId,
+        action: `queue_entry.${rawInput.command}`,
+        metadata: {
+          command: rawInput.command,
+          outcome: 'applied',
+          sessionId,
+          from: prior,
+          to: response.state,
+          reason,
+          cancellationSource: rawInput.cancellationSource ?? null,
+          correlationId: rawInput.correlationId,
+          idempotencyKey: rawInput.idempotencyKey,
+        },
+      });
+      await client.query(
+        `INSERT INTO queue_command_receipts
+          (clinic_id,actor_user_id,idempotency_key,request_fingerprint,queue_entry_id,response)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [
+          scope.clinicId,
+          scope.actorUserId,
+          rawInput.idempotencyKey,
+          requestFingerprint,
+          entryId,
+          JSON.stringify(response),
+        ],
+      );
+      return response;
     });
   }
 }

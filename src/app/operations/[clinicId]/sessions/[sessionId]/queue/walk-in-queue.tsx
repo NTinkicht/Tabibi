@@ -4,10 +4,18 @@ import Link from 'next/link';
 import { receptionistCopy } from '@/modules/localization/receptionist';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+type EntryState =
+  | 'waiting'
+  | 'checked_in'
+  | 'called'
+  | 'in_consultation'
+  | 'completed'
+  | 'cancelled'
+  | 'no_show';
 type WaitingEntry = {
   id: string;
   sessionId: string;
-  state: 'waiting';
+  state: EntryState;
   registrationOrder: number;
   publicDisplayLabel: string;
   privateDisplayName: string;
@@ -49,6 +57,7 @@ export function WalkInQueue({
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
+  const [pendingEntry, setPendingEntry] = useState<string | null>(null);
   const pendingKeysRef = useRef(new Map<string, string>());
 
   const load = useCallback(async () => {
@@ -147,6 +156,89 @@ export function WalkInQueue({
     void load();
   }
 
+  async function command(
+    entry: WaitingEntry,
+    commandName:
+      | 'check_in'
+      | 'call'
+      | 'no_show'
+      | 'cancel'
+      | 'start_consultation'
+      | 'complete_consultation',
+  ) {
+    let reason: string | undefined;
+    let cancellationSource: 'patient' | 'clinic' | undefined;
+    if (commandName === 'no_show' || commandName === 'cancel') {
+      reason = window.prompt(t.queueReason)?.trim();
+      if (!reason) return;
+    }
+    if (commandName === 'cancel') {
+      cancellationSource = window.confirm(t.patientCancellation)
+        ? 'patient'
+        : 'clinic';
+    }
+    const operation = `${entry.id}:${commandName}:${reason ?? ''}:${cancellationSource ?? ''}`;
+    let idempotencyKey = pendingKeysRef.current.get(operation);
+    if (!idempotencyKey) {
+      idempotencyKey = key();
+      pendingKeysRef.current.set(operation, idempotencyKey);
+    }
+    setPendingEntry(entry.id);
+    setMessage('');
+    try {
+      const response = await fetch(
+        `/api/clinics/${clinicId}/sessions/${sessionId}/queue/${entry.id}/commands`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'idempotency-key': idempotencyKey,
+          },
+          body: JSON.stringify({
+            command: commandName,
+            reason,
+            cancellationSource,
+          }),
+        },
+      );
+      const body = (await response.json()) as {
+        entry?: WaitingEntry;
+        message?: string;
+      };
+      if (!response.ok || !body.entry) throw new Error(body.message);
+      pendingKeysRef.current.delete(operation);
+      setEntries((items) =>
+        items.map((item) => (item.id === entry.id ? body.entry! : item)),
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error && error.message ? error.message : t.queueError,
+      );
+    } finally {
+      setPendingEntry(null);
+    }
+  }
+
+  const actionFor: Record<
+    EntryState,
+    {
+      command: Parameters<typeof command>[1];
+      label: string;
+      danger?: boolean;
+    } | null
+  > = {
+    waiting: { command: 'check_in', label: t.checkIn },
+    checked_in: { command: 'call', label: t.call },
+    called: { command: 'start_consultation', label: t.startConsultation },
+    in_consultation: {
+      command: 'complete_consultation',
+      label: t.completeConsultation,
+    },
+    completed: null,
+    cancelled: null,
+    no_show: null,
+  };
+
   return (
     <main className="desk" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <header className="deskHeader">
@@ -242,6 +334,41 @@ export function WalkInQueue({
               <span className="registrationOrder">
                 #{entry.registrationOrder}
               </span>
+              <span className={`queueState queueState-${entry.state}`}>
+                {t.queueStatuses[entry.state]}
+              </span>
+              <div className="queueActions">
+                {actionFor[entry.state] && (
+                  <button
+                    disabled={pendingEntry !== null}
+                    onClick={() =>
+                      void command(entry, actionFor[entry.state]!.command)
+                    }
+                  >
+                    {pendingEntry === entry.id
+                      ? t.pending
+                      : actionFor[entry.state]!.label}
+                  </button>
+                )}
+                {['checked_in', 'called'].includes(entry.state) && (
+                  <button
+                    className="quiet"
+                    disabled={pendingEntry !== null}
+                    onClick={() => void command(entry, 'no_show')}
+                  >
+                    {t.noShow}
+                  </button>
+                )}
+                {['waiting', 'checked_in', 'called'].includes(entry.state) && (
+                  <button
+                    className="danger"
+                    disabled={pendingEntry !== null}
+                    onClick={() => void command(entry, 'cancel')}
+                  >
+                    {t.cancelEntry}
+                  </button>
+                )}
+              </div>
             </article>
           ))}
         </section>
