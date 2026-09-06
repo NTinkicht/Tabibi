@@ -7,7 +7,7 @@
   "current_issue": 4,
   "last_actor": "claude",
   "next_actor": "codex_cloud",
-  "next_action": "merge PR #26 (main moved forward after the verdict and required a mechanical merge to resolve a STATE.json-only conflict; reviewed application code is unchanged; new head dbd29cfa341b351dd0010e6e241e7a3acad31aa6, still PASS/MERGE_READY per the original verdict at 68c39fb8146b0cc7634719225beb80b9b9985662), then reconcile main CI/state and scope the next bounded Issue #4 work unit.",
+  "next_action": "merge PR #26 exact head 4292abf736fcc65ab59778b0f4814b9c42d9ec37 (Codex integrated main twice more after coordination-bot commits landed; Claude independently re-verified this exact head -- src/tests/db/package diff vs the originally reviewed 68c39fb8146b0cc7634719225beb80b9b9985662 is empty, and CI run 34040909347 is green -- PASS/MERGE_READY confirmed), then reconcile main CI/state and scope the next bounded Issue #4 work unit.",
   "operating_model": "five-actor-capability-mesh-v6-role-failover-with-heartbeats-retrospectives",
   "binding_protocols": [
     "coordination/AUTONOMY_PROTOCOL.md",
@@ -62,7 +62,7 @@
         "orchestration": "available",
         "merge_execution": "available"
       },
-      "current_activity": "completed independent gating review of PR #26 exact head 68c39fb8146b0cc7634719225beb80b9b9985662: PASS/MERGE_READY, verified by direct code trace (concurrency locking, state machine, tenant isolation, idempotency) and by running checks/tests locally 3x against real Postgres. No active lease; available for Work Unit 5's independent review once scoped.",
+      "current_activity": "completed independent gating review of PR #26 (original exact head 68c39fb8146b0cc7634719225beb80b9b9985662, re-confirmed at 4292abf736fcc65ab59778b0f4814b9c42d9ec37 after two base-integration merges with an empty application-code diff): PASS/MERGE_READY, verified by direct code trace (concurrency locking, state machine, tenant isolation, idempotency) and by running checks/tests locally 3x against real Postgres. No active lease; available for Work Unit 5's independent review once scoped.",
       "invocation_policy": "persistent Claude session is the default Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
     "gemini_agent": {
@@ -137,8 +137,8 @@
       "actor": "codex",
       "status": "ready_to_merge_pending_ci",
       "review_target_sha": "68c39fb8146b0cc7634719225beb80b9b9985662",
-      "merge_head_sha": "dbd29cfa341b351dd0010e6e241e7a3acad31aa6",
-      "reason": "gating review is PASS/MERGE_READY at review_target_sha; Claude mechanically merged origin/main to resolve a STATE.json-only conflict, producing merge_head_sha with zero application-code changes. Merge PR #26 once CI is green on merge_head_sha; no re-review needed."
+      "merge_head_sha": "4292abf736fcc65ab59778b0f4814b9c42d9ec37",
+      "reason": "gating review is PASS/MERGE_READY at review_target_sha; two rounds of base-integration merges (by Claude, then Codex) landed only coordination-doc changes, confirmed by an empty src/tests/db/package diff between review_target_sha and merge_head_sha. Claude independently re-confirmed PASS/MERGE_READY at merge_head_sha with CI green (run 34040909347). Ready for Codex to merge."
     }
   },
   "product_architect": "chatgpt",
@@ -229,9 +229,9 @@
     "implementation_status": "merge_ready",
     "implementation_pr": 26,
     "canonical_branch": "codex/issue-4-work-unit-4-queue-lifecycle",
-    "current_head": "dbd29cfa341b351dd0010e6e241e7a3acad31aa6",
+    "current_head": "4292abf736fcc65ab59778b0f4814b9c42d9ec37",
     "reviewed_head": "68c39fb8146b0cc7634719225beb80b9b9985662",
-    "merge_note": "current_head is a mechanical merge of origin/main into the reviewed_head, done by Claude to resolve a STATE.json-only conflict that appeared after the verdict was posted (main had moved forward with Claude's own reconciliation plus unrelated coordination-doc restructuring). All src/tests/db files auto-merged with zero changes; the merge only updates coordination/STATE.json. The PASS_MERGE_READY verdict at reviewed_head still applies to current_head unchanged.",
+    "merge_note": "current_head reflects two further base-integration merges on top of reviewed_head (Claude's, then Codex's), both landing only coordination-doc/state changes with zero src/tests/db/package diff -- verified directly with git diff --stat between reviewed_head and current_head. Claude independently re-confirmed PASS_MERGE_READY at current_head with CI green (run 34040909347), per PR #26's own request that the author of an integration commit not self-gate it.",
     "review_verdict": "PASS_MERGE_READY",
     "ci_status": "success_and_independently_verified",
     "ci_passed": [
@@ -249,5 +249,5 @@
     "work_unit_title": "not yet defined",
     "pre_approved": false
   },
-  "notes": "PR #26 (Issue #4 Work Unit 4, queue lifecycle) is PASS/MERGE_READY at exact head 68c39fb8146b0cc7634719225beb80b9b9985662. Codex authored it cleanly this time -- genuine handoff, CI already green. Claude independently verified: concurrency locking order traced by hand and confirmed by a real concurrent-call test, state machine consistency between service and API layers, tenant isolation, idempotency/reauthorization, plus running typecheck/lint/format/build and the integration suite 3 consecutive times against real Postgres (29/29 each run, confirming the PR #20 fileParallelism fix holds with a third integration file). One non-blocking UX note recorded (cancel-flow confirm-dialog button mapping). Codex is merge executor for this exact, unchanged, gated head. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
+  "notes": "PR #26 (Issue #4 Work Unit 4, queue lifecycle) is PASS/MERGE_READY at exact head 4292abf736fcc65ab59778b0f4814b9c42d9ec37 (originally reviewed at 68c39fb8146b0cc7634719225beb80b9b9985662; main moved forward twice after the verdict, requiring two base-integration merges -- Claude's own STATE.json-conflict resolution, then Codex's further integration -- both confirmed by git diff --stat to carry zero src/tests/db/package changes, so the original verdict was independently re-confirmed rather than assumed to carry over). Claude independently verified: concurrency locking order traced by hand and confirmed by a real concurrent-call test, state machine consistency between service and API layers, tenant isolation, idempotency/reauthorization, plus running typecheck/lint/format/build and the integration suite 3 consecutive times against real Postgres (29/29 each run, confirming the PR #20 fileParallelism fix holds with a third integration file). One non-blocking UX note recorded (cancel-flow confirm-dialog button mapping). Codex is merge executor for this exact, gated head with CI green. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
 }
