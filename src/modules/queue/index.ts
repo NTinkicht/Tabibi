@@ -161,10 +161,6 @@ function fingerprint(
     .digest('hex');
 }
 
-function publicDisplayLabel(entryId: string): string {
-  return `W-${entryId.replaceAll('-', '').slice(0, 10).toUpperCase()}`;
-}
-
 async function loadRegistration(
   db: PoolClient,
   clinicId: string,
@@ -295,7 +291,6 @@ export class QueueService {
       const registrationOrder = Number(orderResult.rows[0]?.next_order ?? '1');
       const patientId = randomUUID();
       const entryId = randomUUID();
-      const label = publicDisplayLabel(entryId);
 
       await client.query(
         `INSERT INTO patient_operational_records
@@ -313,16 +308,9 @@ export class QueueService {
       await client.query(
         `INSERT INTO queue_entries
            (id, clinic_id, session_id, patient_id, state, source, registration_order,
-            eligibility_order, priority_order, public_display_label)
-         VALUES ($1, $2, $3, $4, 'waiting', 'walk_in', $5, NULL, NULL, $6)`,
-        [
-          entryId,
-          scope.clinicId,
-          sessionId,
-          patientId,
-          registrationOrder,
-          label,
-        ],
+            eligibility_order, priority_order)
+         VALUES ($1, $2, $3, $4, 'waiting', 'walk_in', $5, NULL, NULL)`,
+        [entryId, scope.clinicId, sessionId, patientId, registrationOrder],
       );
       await appendAuditEvent(client, {
         clinicId: scope.clinicId,
