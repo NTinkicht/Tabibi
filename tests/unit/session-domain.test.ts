@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { CLINIC_ROLES } from '@/modules/identity';
-import { canTransitionSession } from '@/modules/session';
+import {
+  canApplySessionCommand,
+  canTransitionSession,
+} from '@/modules/session';
 
 describe('session foundation domain rules', () => {
   it('uses only clinic-scoped MVP membership roles', () => {
@@ -15,5 +18,14 @@ describe('session foundation domain rules', () => {
     expect(canTransitionSession('cancelled', 'open')).toBe(false);
     expect(canTransitionSession('closed', 'open')).toBe(false);
     expect(canTransitionSession('planned', 'paused')).toBe(false);
+  });
+
+  it('distinguishes open from resume and defines every operational command', () => {
+    expect(canApplySessionCommand('planned', 'open')).toBe(true);
+    expect(canApplySessionCommand('paused', 'open')).toBe(false);
+    expect(canApplySessionCommand('paused', 'resume')).toBe(true);
+    expect(canApplySessionCommand('open', 'pause')).toBe(true);
+    expect(canApplySessionCommand('open', 'close')).toBe(true);
+    expect(canApplySessionCommand('planned', 'cancel')).toBe(true);
   });
 });

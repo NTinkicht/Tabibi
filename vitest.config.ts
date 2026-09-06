@@ -28,6 +28,9 @@ export default defineConfig({
           include: ['tests/integration/**/*.test.ts'],
           environment: 'node',
           testTimeout: 15_000,
+          // Integration files share the deliberately single test database.
+          pool: 'forks',
+          poolOptions: { forks: { singleFork: true } },
         },
       }),
     ],
