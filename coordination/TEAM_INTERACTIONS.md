@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T14:10:27.412522+00:00
+- Last sync: 2026-09-06T14:11:47.236497+00:00
 
 ## Team Room charter
 
@@ -1013,5 +1013,63 @@ Please:
 No application code or PR in this task. Preserve your ability to independently gate WU4 later if you remain non-author.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559775045
+
+---
+
+### 2026-09-06T14:10:36Z — NTinkicht
+
+@gemini-chat TEAM_COMPANY_TASK
+
+TASK_ASSIGNMENT
+actor: gemini_chat
+task_id: WU4-UX-001
+role: Algeria-realistic UX/localization/system-design peer
+work_stream: Issue #4 / Work Unit 4 preparation
+code_changes_allowed: no
+
+Read `coordination/COMPANY_OPERATING_SYSTEM.md`, `coordination/WORK_QUEUE.md`, current `STATE.json`, product/architecture/security contracts, Issue #4, and current clinic/reception queue UI/code.
+
+Please:
+1. Post today's `STANDUP` and `TASK_CLAIM WU4-UX-001`.
+2. Build an evidence-based scenario map for the likely next queue-progression slice from the point of view of a busy Algerian clinic: receptionist, doctor, walk-in/guest patient, Arabic/French switching, RTL, mobile/desktop, weak connectivity, rapid queue movement, absent/no-show patients, doctor delays, and mistakes under pressure.
+3. Produce `UX_NOTE`, `TEST_IDEA`, `REFACTOR_IDEA`, `QUESTION`, or `RISK_CALL` entries where useful. Focus on what source-code-focused implementers/reviewers may miss.
+4. Positively critique at least one current team decision/artifact and constructively challenge at least one. Do not merely agree with Claude/Codex/ChatGPT.
+5. A short `WATERCOOLER` line is welcome after the work.
+6. Finish with `TASK_DONE WU4-UX-001` and your recommended acceptance scenarios.
+
+Do not create WU4 implementation code or a competing PR. Your output should complement, not duplicate, Claude's security/concurrency pre-mortem or Codex's refactor/test-debt audit.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559776725
+
+---
+
+### 2026-09-06T14:10:52Z — NTinkicht
+
+@gemini-cli /verify
+
+GEMINI_AGENT_COMPANY_TASK — one bounded recovery/capacity check first.
+
+TASK_ASSIGNMENT
+actor: gemini_agent
+task_id: WU4-QA-001
+role: complementary system QA / edge-case analyst if capacity is available
+work_stream: Issue #4 / Work Unit 4 preparation
+code_changes_allowed: no
+
+You are distinct from `gemini_chat`, which has WU4-UX-001. Do not duplicate its UX scenario map.
+
+First perform exactly one capacity check. If the Gemini Agent project is still quota-limited, post `CAPACITY_DEGRADED` with current provider evidence, `TASK_DONE WU4-QA-001` as blocked-by-capacity, release the task, and stop without retry spam.
+
+If capacity has recovered:
+1. post `CAPACITY_RECOVERED` for demonstrated capabilities;
+2. read `coordination/COMPANY_OPERATING_SYSTEM.md`, `coordination/WORK_QUEUE.md`, current `STATE.json`, Issue #4 and relevant contracts;
+3. post today's `STANDUP` plus `TASK_CLAIM WU4-QA-001`;
+4. produce a complementary system-QA/edge-case matrix for the likely next queue-progression slice, emphasizing cross-module failure cases, retries/unknown outcomes, time/session boundaries, rapid concurrent operations, role changes, and deterministic regression scenarios rather than duplicating Gemini Chat's UX focus;
+5. use `TEST_IDEA`, `RISK_CALL`, `THOUGHT` and peer feedback as useful;
+6. finish with `TASK_DONE WU4-QA-001`.
+
+No code/branch/PR in this task.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559778276
 
 ---
