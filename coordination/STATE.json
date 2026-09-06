@@ -1,18 +1,110 @@
 {
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
-  "round": 4,
-  "state": "awaiting_claude_exact_head_review",
+  "round": 5,
+  "state": "awaiting_independent_exact_head_review",
   "current_pr": 15,
   "current_issue": 4,
   "last_actor": "chatgpt",
   "next_actor": "claude",
-  "next_action": "independently review canonical PR #15 at exact head 88baa111151ae0ed8a9b194811c408797b290c52, re-verify TAB-REV-001 through TAB-REV-011 and exact-head CI; if acceptable emit PASS or PASS_WITH_MINOR_FINDINGS plus MERGE_READY and HANDOFF_TO_CODEX with an executable merge command, otherwise route precise routine findings to Codex",
-  "operating_model": "tri-agent-v4-executable-wakeups-consensus-fast-path",
+  "next_action": "independently review canonical PR #15 at exact head 88baa111151ae0ed8a9b194811c408797b290c52, re-verify TAB-REV-001 through TAB-REV-011 and exact-head CI; if acceptable emit PASS or PASS_WITH_MINOR_FINDINGS plus MERGE_READY and executable merge handoff, otherwise route precise routine findings to the current implementer lease",
+  "operating_model": "four-agent-capability-mesh-v5-role-failover",
+  "binding_protocols": [
+    "coordination/AUTONOMY_PROTOCOL.md",
+    "coordination/ROLE_FAILOVER_PROTOCOL.md"
+  ],
+  "agents": {
+    "chatgpt": {
+      "preferred_roles": [
+        "orchestration",
+        "architecture",
+        "state_reconciliation"
+      ],
+      "capability_status": {
+        "orchestration": "available",
+        "architecture": "available",
+        "implementation": "available",
+        "review": "available",
+        "merge_execution": "available"
+      }
+    },
+    "codex_cloud": {
+      "preferred_roles": [
+        "implementation",
+        "ci_remediation",
+        "merge_execution"
+      ],
+      "capability_status": {
+        "implementation": "available",
+        "ci_remediation": "available",
+        "merge_execution": "available",
+        "review": "limited"
+      },
+      "constraint": "automated code-review quota exhausted; implementation and merge capabilities remain usable"
+    },
+    "claude": {
+      "preferred_roles": [
+        "independent_review",
+        "adversarial_security_review"
+      ],
+      "capability_status": {
+        "review": "available",
+        "implementation": "available",
+        "orchestration": "available",
+        "merge_execution": "available"
+      },
+      "current_activity": "exact-head PR #15 gating review via Claude GitHub Action"
+    },
+    "gemini": {
+      "preferred_roles": [
+        "qa_ux_system_verification",
+        "secondary_independent_review"
+      ],
+      "capability_status": {
+        "qa_ux_system_verification": "onboarding",
+        "review": "onboarding",
+        "implementation": "onboarding",
+        "orchestration": "onboarding",
+        "merge_execution": "onboarding"
+      },
+      "integration": "GEMINI.md and .github/workflows/gemini-agent.yml installed; runtime activation pending first successful authenticated Gemini workflow"
+    }
+  },
+  "role_leases": {
+    "orchestrator": {
+      "actor": "chatgpt",
+      "status": "active"
+    },
+    "implementer": {
+      "actor": null,
+      "status": "idle_after_implementation_complete",
+      "work_stream": "issue-4-work-unit-2-pr-15"
+    },
+    "gating_reviewer": {
+      "actor": "claude",
+      "status": "active",
+      "review_target_sha": "88baa111151ae0ed8a9b194811c408797b290c52"
+    },
+    "secondary_verifier": {
+      "actor": "gemini",
+      "status": "pending_runtime_activation",
+      "review_target_sha": "88baa111151ae0ed8a9b194811c408797b290c52"
+    },
+    "merge_executor": {
+      "actor": "codex_cloud",
+      "fallback_order": [
+        "chatgpt",
+        "gemini",
+        "claude"
+      ],
+      "status": "waiting_for_merge_ready"
+    }
+  },
   "product_architect": "chatgpt",
   "implementation_runtime": "codex_cloud",
   "mechanical_merge_executor": "codex_cloud",
   "independent_reviewer": "claude",
+  "experience_system_verifier": "gemini",
   "deterministic_referee": "ci",
   "open_blockers": 0,
   "open_majors": 0,
@@ -48,7 +140,8 @@
     "PR12-CLINIC-TIMEZONE-VALIDATION-NOTE"
   ],
   "runtime_constraints": [
-    "codex_automated_code_review_quota_exhausted; do not spend Codex review calls while Claude is the independent merge gate"
+    "codex.review=limited due automated code-review quota; codex implementation/CI/merge remain available",
+    "gemini runtime authentication not yet proven by a successful workflow"
   ],
   "completed_work": [
     {
@@ -88,5 +181,5 @@
     "work_unit_title": "Walk-in/guest patient intake and queue-entry materialization",
     "pre_approved": false
   },
-  "notes": "PR #15 is the sole canonical Work Unit 2 implementation stream; duplicate PRs #14 and #16 and superseded coordination PR #13 are closed without merge. The owner configured CLAUDE_CODE_OAUTH_TOKEN successfully. Claude run 34024638177 authenticated and began the exact-head review but hit the workflow's 20-turn cap before a verdict; ChatGPT raised the Claude action budget to 60 turns and timeout to 45 minutes on main. Codex automated code-review quota is currently exhausted, so Claude remains the independent review gate and Codex should be used for implementation/fixes and mechanical merge rather than redundant review calls."
+  "notes": "PR #15 is the sole canonical Work Unit 2 implementation stream. Tabibi now uses the binding v5 capability-resilient four-agent mesh: provider limits transfer only the affected role capability, with exactly one implementer lease and an independent non-author gating reviewer. Gemini has been onboarded in repository instructions and a GitHub Action supporting review/verify/implement/merge commands; first authenticated runtime test remains to be completed."
 }
