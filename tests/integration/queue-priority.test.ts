@@ -151,6 +151,76 @@ describe('authorized deterministic queue reorder', () => {
     );
   });
 
+  it('renumbers safely after a lifecycle gap and exact-retries without duplicating audit', async () => {
+    const queue = new QueueService(pool);
+    await queue.command(scope, ids.session, entries[1]!, {
+      command: 'no_show',
+      idempotencyKey: 'gap-no-show',
+      correlationId: 'gap-no-show',
+    });
+    const fourth = await queue.registerWalkIn(scope, ids.session, {
+      privateDisplayName: 'Patient 4',
+      preferredLocale: 'fr',
+      idempotencyKey: 'gap-register-fourth',
+      correlationId: 'gap-register-fourth',
+    });
+    await queue.command(scope, ids.session, fourth.entry.id, {
+      command: 'check_in',
+      idempotencyKey: 'gap-check-in-fourth',
+      correlationId: 'gap-check-in-fourth',
+    });
+    const version = await pool.query<{ queue_order_version: string }>(
+      'SELECT queue_order_version FROM consultation_sessions WHERE id=$1',
+      [ids.session],
+    );
+
+    const result = await reorder(
+      entries[0]!,
+      3,
+      Number(version.rows[0]!.queue_order_version),
+      'gap-reorder',
+    );
+    expect(result.orderedEntryIds).toEqual([
+      entries[2],
+      fourth.entry.id,
+      entries[0],
+    ]);
+    expect(
+      await reorder(
+        entries[0]!,
+        3,
+        Number(version.rows[0]!.queue_order_version),
+        'gap-reorder',
+      ),
+    ).toEqual(result);
+
+    const rows = await pool.query<{
+      id: string;
+      registration_order: string;
+      service_order: string;
+    }>(
+      `SELECT id,registration_order,service_order FROM queue_entries
+        WHERE session_id=$1 AND state='checked_in' ORDER BY service_order`,
+      [ids.session],
+    );
+    expect(rows.rows.map((row) => [row.id, Number(row.service_order)])).toEqual(
+      [
+        [entries[2], 1],
+        [fourth.entry.id, 2],
+        [entries[0], 3],
+      ],
+    );
+    expect(
+      rows.rows.map((row) => Number(row.registration_order)).sort(),
+    ).toEqual([1, 3, 4]);
+    const audit = await pool.query<{ count: number }>(
+      `SELECT count(*)::int count FROM audit_events
+        WHERE action='queue_entry.reordered' AND entity_id=$1`,
+      [entries[0]],
+    );
+    expect(audit.rows[0]!.count).toBe(1);
+  });
+
   it('rejects missing reasons, ineligible states, cross-clinic scope, and bypassing service order', async () => {
     await expect(
       new QueueService(pool).reorder(scope, ids.session, entries[0]!, {

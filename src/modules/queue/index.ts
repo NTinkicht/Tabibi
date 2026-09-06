@@ -832,18 +832,31 @@ export class QueueService {
       const reordered = [...ordered.rows];
       const [moved] = reordered.splice(sourceIndex, 1);
       reordered.splice(rawInput.targetPosition - 1, 0, moved!);
-      // High temporary values avoid transient collisions with the partial
-      // unique index; both phases remain invisible until this transaction commits.
-      for (let index = 0; index < reordered.length; index++)
+      try {
+        // Clear the locked cohort out of the partial unique index before assigning
+        // contiguous positions. Existing service orders may contain lifecycle gaps.
         await client.query(
-          'UPDATE queue_entries SET service_order=$2 WHERE id=$1',
-          [reordered[index]!.id, reordered.length + index + 1],
+          `UPDATE queue_entries SET service_order=NULL
+            WHERE id = ANY($1::uuid[])`,
+          [reordered.map((item) => item.id)],
         );
-      for (let index = 0; index < reordered.length; index++)
-        await client.query(
-          'UPDATE queue_entries SET service_order=$2,updated_at=now() WHERE id=$1',
-          [reordered[index]!.id, index + 1],
-        );
+        for (let index = 0; index < reordered.length; index++)
+          await client.query(
+            'UPDATE queue_entries SET service_order=$2,updated_at=now() WHERE id=$1',
+            [reordered[index]!.id, index + 1],
+          );
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error &&
+          'code' in error &&
+          error.code === '23505'
+        )
+          throw new QueueConflictError(
+            'Queue order changed while the reorder was being applied',
+          );
+        throw error;
+      }
 
       const nextVersion = currentVersion + 1;
       await client.query(
