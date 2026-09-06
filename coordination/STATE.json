@@ -15,7 +15,11 @@
   ],
   "agents": {
     "chatgpt": {
-      "preferred_roles": ["orchestration", "architecture", "state_reconciliation"],
+      "preferred_roles": [
+        "orchestration",
+        "architecture",
+        "state_reconciliation"
+      ],
       "capability_status": {
         "orchestration": "available",
         "architecture": "available",
@@ -25,7 +29,11 @@
       }
     },
     "codex_cloud": {
-      "preferred_roles": ["implementation", "ci_remediation", "merge_execution"],
+      "preferred_roles": [
+        "implementation",
+        "ci_remediation",
+        "merge_execution"
+      ],
       "capability_status": {
         "implementation": "limited",
         "ci_remediation": "limited",
@@ -45,7 +53,10 @@
       "current_activity": "temporary implementation failover on PR #15 after its independent review found unresolved defects"
     },
     "gemini": {
-      "preferred_roles": ["qa_ux_system_verification", "secondary_independent_review"],
+      "preferred_roles": [
+        "qa_ux_system_verification",
+        "secondary_independent_review"
+      ],
       "capability_status": {
         "qa_ux_system_verification": "unavailable",
         "review": "unavailable",
@@ -130,9 +141,24 @@
     "gemini.authentication=unavailable until GEMINI_API_KEY or another supported Google auth method is configured"
   ],
   "completed_work": [
-    {"issue": 3, "implementation_pr": 10, "merge_commit": "411c80467fc094aef2b9028c7c0de1b9f6a43bbf", "status": "merged"},
-    {"coordination_pr": 9, "merge_commit": "69746d2c6c0ec3fa26e5644dcc7a669bd3a0322b", "status": "merged"},
-    {"issue": 4, "work_unit": 1, "implementation_pr": 12, "merge_commit": "a4f0ceb3f12f830fa412b6823196f585cebeee7c", "status": "merged"}
+    {
+      "issue": 3,
+      "implementation_pr": 10,
+      "merge_commit": "411c80467fc094aef2b9028c7c0de1b9f6a43bbf",
+      "status": "merged"
+    },
+    {
+      "coordination_pr": 9,
+      "merge_commit": "69746d2c6c0ec3fa26e5644dcc7a669bd3a0322b",
+      "status": "merged"
+    },
+    {
+      "issue": 4,
+      "work_unit": 1,
+      "implementation_pr": 12,
+      "merge_commit": "a4f0ceb3f12f830fa412b6823196f585cebeee7c",
+      "status": "merged"
+    }
   ],
   "current_work": {
     "issue": 4,
