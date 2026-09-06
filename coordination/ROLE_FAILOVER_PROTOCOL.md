@@ -62,8 +62,9 @@ Optional:
 2. **One canonical PR per work stream.** A failover continues the existing branch/PR whenever technically possible; it does not create a duplicate PR merely because the agent changed.
 3. **No self-gating.** An agent that authored or materially modified the exact head SHA cannot be the sole gating reviewer of that SHA.
 4. **Reviewer independence follows the SHA, not the agent's usual title.** If Claude becomes implementer, Gemini or ChatGPT must take the gating review lease. If Gemini becomes implementer, Claude or ChatGPT must review. If Codex becomes reviewer, it must not have authored that exact head.
-5. **Do not preempt healthy work.** A recovered preferred agent does not take a lease back in the middle of an active bounded attempt. Return to the preferred assignment at the next clean handoff boundary.
-6. **No duplicate wakeups after acknowledgement.** Once an active run, reaction, branch movement, or explicit acknowledgement proves a lease was consumed, other agents do not start the same role.
+5. **One authoritative gating verdict per exact SHA.** Only the actor holding `gating_reviewer_lease` may emit the authoritative `MERGE_READY` or merge-blocking gate verdict for that SHA. Secondary reviewers may add findings, concur, or explicitly dissent, but must not silently launch a duplicate full gate or issue a conflicting merge authorization. A secondary BLOCKER/MAJOR finding immediately invalidates merge readiness until the gating reviewer reconciles it.
+6. **Do not preempt healthy work.** A recovered preferred agent does not take a lease back in the middle of an active bounded attempt. Return to the preferred assignment at the next clean handoff boundary.
+7. **No duplicate wakeups after acknowledgement.** Once an active run, reaction, branch movement, or explicit acknowledgement proves a lease was consumed, other agents do not start the same role.
 
 ## Default assignments and failover order
 
