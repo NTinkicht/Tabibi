@@ -1,3 +1,6 @@
 # clinic
 
-This directory owns the **clinic** module boundary. Its future domain, application, and adapter code must expose intentional public APIs rather than importing another module's internals. No patient or queue behavior is implemented in the platform baseline.
+This directory owns clinics, clinic memberships, and doctor-to-clinic associations.
+Clinics default to `Africa/Algiers` and Arabic plus French. `ClinicService` performs
+server-side membership checks inside the same transaction as every mutation and
+writes metadata-only audit events.

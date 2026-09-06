@@ -1,3 +1,7 @@
 # identity
 
-This directory owns the **identity** module boundary. Its future domain, application, and adapter code must expose intentional public APIs rather than importing another module's internals. No patient or queue behavior is implemented in the platform baseline.
+This directory owns authentication identities and clinic-scoped authorization. Its
+public contract defines the `doctor`, `receptionist`, and `clinic_admin` membership
+roles and requires an explicit actor and clinic for every protected operation.
+`platform_admin` is an identity-level role only and receives no implicit clinic-data
+access. Patient identities are intentionally outside this slice.
