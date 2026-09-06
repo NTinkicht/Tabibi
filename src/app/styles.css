@@ -1,0 +1,18 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+}
+body {
+  margin: 0;
+  background: #f4f8f7;
+  color: #153b36;
+}
+main {
+  max-width: 48rem;
+  margin: 15vh auto;
+  padding: 2rem;
+}
+h1 {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
