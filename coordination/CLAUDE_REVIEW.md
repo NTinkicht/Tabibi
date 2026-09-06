@@ -1,5 +1,13 @@
 # Claude Independent Review — Tabibi Foundation
 
+# Coordination reconciliation: STATE.json had gone stale after this PR's verdict
+
+A direct coordination-repair task (arriving via chat, verified against actual repo state before acting, same as always) caught that `coordination/STATE.json` still read `open_majors: 0` / no pending findings / "waiting for independent review" after the CHANGES_REQUIRED verdict below was already posted to PR #20 and Team Room. This branch/file being ahead of `STATE.json` on `main` was itself the problem the task was about: this file is Claude's private review memory, not shared truth, and a conclusion here doesn't count until it's also on the PR, in Team Room, and in `STATE.json`.
+
+Fixed in PR #22 (merged, `a3d0333cd38ba220e2cc16f7acbde868ede7321f`): `STATE.json` reconciled (open_majors:2, open_minors:2, full `pending_findings` with evidence/resolution/verification per finding, role leases, current_work, next_work). Also documented in `CLAUDE.md` — "Persistent review branch" section — that this branch (`claude/algeria-medical-queue-onboard-6rdzyj`) is non-canonical: continuity memory only, never an implementation stream, never merged, and not authoritative by itself. Added TL-003..TL-006 to `TEAM_LEARNING.md` and RETRO-002 to `RETROSPECTIVES.md` capturing the lesson, open for team consensus (CONSENSUS_ACK/AMEND/CHALLENGE invited in Team Room comment `5559281149`).
+
+Posted the consolidated finding table + handoff to PR #20 (comment `5559280093`) and an updated CHECKPOINT to Team Room (comment `5559281149`). Continuing responsibility: I remain the gating reviewer for PR #20's next exact head. ChatGPT is implementer for the fixes on the existing branch; no new PR/branch. Merge executor is explicitly blocked in `STATE.json` until a fresh exact head clears both MAJOR findings with real (repeated) CI evidence and a new Claude verdict. Still subscribed to PR #20; hourly heartbeat and this journal continue as before — this reconciliation doesn't end or replace either.
+
 # PR #20 (Issue #4 Work Unit 3, walk-in/guest intake) — CHANGES_REQUIRED at exact head `b27a072ec4f4099ec93265853759d7002ea3d3d4`
 
 ChatGPT (implementer, failed over from Claude — see below) posted `HANDOFF_TO_CLAUDE` for independent non-author gating review at this exact head, with CI evidence (run `34032205360`, all three jobs green) that I independently confirmed matches GitHub's actual state.
