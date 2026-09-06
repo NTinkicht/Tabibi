@@ -64,6 +64,20 @@ export interface StaffQueueEntry extends StaffWaitingEntry {
   priorityOrder: number | null;
 }
 
+export interface QueueReorderInput {
+  targetPosition: number;
+  expectedVersion: number;
+  reason: string;
+  idempotencyKey: string;
+  correlationId: string;
+}
+
+export interface QueueReorderResult {
+  entry: StaffQueueEntry;
+  queueOrderVersion: number;
+  orderedEntryIds: string[];
+}
+
 export interface QueueCommandInput {
   command: QueueCommand;
   reason?: string;
@@ -401,11 +415,12 @@ export class QueueService {
   async listOperational(
     scope: ClinicScope,
     sessionId: string,
-  ): Promise<StaffQueueEntry[]> {
+  ): Promise<{ entries: StaffQueueEntry[]; queueOrderVersion: number }> {
     return inTransaction(this.pool, async (client) => {
       await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
-      const session = await client.query(
-        `SELECT 1 FROM consultation_sessions WHERE id = $1 AND clinic_id = $2`,
+      const session = await client.query<{ queue_order_version: string }>(
+        `SELECT queue_order_version FROM consultation_sessions
+          WHERE id = $1 AND clinic_id = $2 FOR SHARE`,
         [sessionId, scope.clinicId],
       );
       if (session.rowCount !== 1)
@@ -434,23 +449,34 @@ export class QueueService {
            JOIN patient_operational_records patient
              ON patient.id = entry.patient_id AND patient.clinic_id = entry.clinic_id
           WHERE entry.clinic_id = $1 AND entry.session_id = $2
-          ORDER BY entry.registration_order`,
+          ORDER BY CASE entry.state
+                     WHEN 'called' THEN 0 WHEN 'in_consultation' THEN 0
+                     WHEN 'checked_in' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END,
+                   CASE WHEN entry.priority_order IS NULL THEN 1 ELSE 0 END,
+                   entry.priority_order NULLS LAST,
+                   entry.eligibility_order NULLS LAST,
+                   entry.registration_order`,
         [scope.clinicId, sessionId],
       );
-      return result.rows.map((row) => ({
-        id: row.id,
-        sessionId: row.session_id,
-        state: row.state,
-        registrationOrder: Number(row.registration_order),
-        eligibilityOrder:
-          row.eligibility_order === null ? null : Number(row.eligibility_order),
-        priorityOrder:
-          row.priority_order === null ? null : Number(row.priority_order),
-        publicDisplayLabel: row.public_display_label,
-        privateDisplayName: row.private_display_name,
-        preferredLocale: row.preferred_locale,
-        hasContact: row.contact_phone !== null || row.contact_email !== null,
-      }));
+      return {
+        queueOrderVersion: Number(session.rows[0]!.queue_order_version),
+        entries: result.rows.map((row) => ({
+          id: row.id,
+          sessionId: row.session_id,
+          state: row.state,
+          registrationOrder: Number(row.registration_order),
+          eligibilityOrder:
+            row.eligibility_order === null
+              ? null
+              : Number(row.eligibility_order),
+          priorityOrder:
+            row.priority_order === null ? null : Number(row.priority_order),
+          publicDisplayLabel: row.public_display_label,
+          privateDisplayName: row.private_display_name,
+          preferredLocale: row.preferred_locale,
+          hasContact: row.contact_phone !== null || row.contact_email !== null,
+        })),
+      };
     });
   }
 
@@ -526,8 +552,9 @@ export class QueueService {
 
       const current = await client.query<{
         state: QueueEntryState;
+        priority_order: string | null;
       }>(
-        `SELECT state FROM queue_entries
+        `SELECT state,priority_order FROM queue_entries
           WHERE id=$1 AND session_id=$2 AND clinic_id=$3 FOR UPDATE`,
         [entryId, sessionId, scope.clinicId],
       );
@@ -548,6 +575,20 @@ export class QueueService {
         throw new QueueConflictError(
           `Cannot apply ${rawInput.command} to queue entry in ${prior}`,
         );
+      if (rawInput.command === 'call') {
+        const next = await client.query<{ id: string }>(
+          `SELECT id FROM queue_entries
+            WHERE session_id=$1 AND clinic_id=$2 AND state='checked_in'
+            ORDER BY CASE WHEN priority_order IS NULL THEN 1 ELSE 0 END,
+                     priority_order NULLS LAST, eligibility_order, registration_order
+            LIMIT 1`,
+          [sessionId, scope.clinicId],
+        );
+        if (next.rows[0]?.id !== entryId)
+          throw new QueueConflictError(
+            'This entry is not next in the committed service order',
+          );
+      }
       const target: Record<QueueCommand, QueueEntryState> = {
         check_in: 'checked_in',
         call: 'called',
@@ -582,6 +623,9 @@ export class QueueService {
         }>(
           `UPDATE queue_entries entry SET state=$4::queue_entry_status,
              eligibility_order=CASE WHEN $4::queue_entry_status='checked_in' THEN $5 ELSE eligibility_order END,
+             priority_order=CASE
+               WHEN $4::queue_entry_status IN ('waiting','checked_in') THEN priority_order
+               ELSE NULL END,
              updated_at=now()
            FROM patient_operational_records patient
            WHERE entry.id=$1 AND entry.session_id=$2 AND entry.clinic_id=$3
@@ -612,6 +656,43 @@ export class QueueService {
           );
         throw error;
       }
+      const changesEffectiveOrder =
+        rawInput.command === 'check_in' ||
+        prior === 'checked_in' ||
+        (current.rows[0]!.priority_order !== null && prior === 'waiting');
+      if (
+        current.rows[0]!.priority_order !== null &&
+        (prior === 'waiting' || prior === 'checked_in') &&
+        !['waiting', 'checked_in'].includes(target[rawInput.command])
+      ) {
+        const priorityCohort = await client.query<{ id: string }>(
+          `SELECT id FROM queue_entries
+            WHERE session_id=$1 AND clinic_id=$2
+              AND state IN ('waiting','checked_in') AND priority_order IS NOT NULL
+            ORDER BY priority_order,registration_order FOR UPDATE`,
+          [sessionId, scope.clinicId],
+        );
+        const cohortIds = priorityCohort.rows.map((item) => item.id);
+        if (cohortIds.length > 0) {
+          await client.query(
+            `UPDATE queue_entries SET priority_order=NULL
+              WHERE id=ANY($1::uuid[])`,
+            [cohortIds],
+          );
+          for (let index = 0; index < cohortIds.length; index++)
+            await client.query(
+              'UPDATE queue_entries SET priority_order=$2,updated_at=now() WHERE id=$1',
+              [cohortIds[index], index + 1],
+            );
+        }
+      }
+      if (changesEffectiveOrder)
+        await client.query(
+          `UPDATE consultation_sessions
+              SET queue_order_version=queue_order_version+1,updated_at=now()
+            WHERE id=$1`,
+          [sessionId],
+        );
       const row = updated.rows[0]!;
       const response: StaffQueueEntry = {
         id: row.id,
@@ -653,6 +734,260 @@ export class QueueService {
           scope.actorUserId,
           rawInput.idempotencyKey,
           requestFingerprint,
+          entryId,
+          JSON.stringify(response),
+        ],
+      );
+      return response;
+    });
+  }
+
+  async reorder(
+    scope: ClinicScope,
+    sessionId: string,
+    entryId: string,
+    rawInput: QueueReorderInput,
+  ): Promise<QueueReorderResult> {
+    const reason = rawInput.reason.trim();
+    if (!reason || reason.length > 500)
+      throw new QueueValidationError(
+        'An operational reason between 1 and 500 characters is required',
+      );
+    if (
+      !Number.isSafeInteger(rawInput.targetPosition) ||
+      rawInput.targetPosition < 1
+    )
+      throw new QueueValidationError(
+        'Target position must be a positive integer',
+      );
+    if (
+      !Number.isSafeInteger(rawInput.expectedVersion) ||
+      rawInput.expectedVersion < 0
+    )
+      throw new QueueValidationError(
+        'Expected queue version must be a non-negative integer',
+      );
+    if (!rawInput.idempotencyKey || rawInput.idempotencyKey.length > 128)
+      throw new QueueValidationError('A valid idempotency key is required');
+
+    const requestFingerprint = createHash('sha256')
+      .update(
+        JSON.stringify({
+          sessionId,
+          entryId,
+          targetPosition: rawInput.targetPosition,
+          expectedVersion: rawInput.expectedVersion,
+          reason,
+        }),
+      )
+      .digest('hex');
+
+    return inTransaction(this.pool, async (client) => {
+      await client.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [
+          `queue-reorder:${scope.clinicId}:${scope.actorUserId}:${rawInput.idempotencyKey}`,
+        ],
+      );
+      await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
+      const receipt = await client.query<{
+        request_fingerprint: string;
+        response: QueueReorderResult;
+      }>(
+        `SELECT request_fingerprint,response FROM queue_reorder_receipts
+          WHERE clinic_id=$1 AND actor_user_id=$2 AND idempotency_key=$3`,
+        [scope.clinicId, scope.actorUserId, rawInput.idempotencyKey],
+      );
+      if (receipt.rows[0]) {
+        if (receipt.rows[0].request_fingerprint !== requestFingerprint)
+          throw new QueueConflictError(
+            'Idempotency key was already used for a different reorder command',
+          );
+        return receipt.rows[0].response;
+      }
+
+      const session = await client.query<{
+        status: string;
+        queue_order_version: string;
+      }>(
+        `SELECT status,queue_order_version FROM consultation_sessions
+          WHERE id=$1 AND clinic_id=$2 FOR UPDATE`,
+        [sessionId, scope.clinicId],
+      );
+      const currentVersion = Number(session.rows[0]?.queue_order_version);
+      if (!session.rows[0])
+        throw new QueueConflictError(
+          'Consultation session was not found in this clinic',
+        );
+      if (!['open', 'paused'].includes(session.rows[0].status))
+        throw new QueueConflictError(
+          'Queue reorder requires an open or paused session',
+        );
+      if (currentVersion !== rawInput.expectedVersion)
+        throw new QueueConflictError(
+          `Stale queue order version; current version is ${currentVersion}`,
+        );
+
+      const ordered = await client.query<{
+        id: string;
+        registration_order: string;
+        eligibility_order: string | null;
+        priority_order: string | null;
+      }>(
+        `SELECT id,registration_order,eligibility_order,priority_order
+           FROM queue_entries
+          WHERE session_id=$1 AND clinic_id=$2
+            AND state IN ('waiting','checked_in') AND priority_order IS NOT NULL
+          ORDER BY priority_order,registration_order
+          FOR UPDATE`,
+        [sessionId, scope.clinicId],
+      );
+      const sourceIndex = ordered.rows.findIndex((row) => row.id === entryId);
+      const candidate = await client.query<{
+        id: string;
+        state: QueueEntryState;
+        registration_order: string;
+        eligibility_order: string | null;
+        priority_order: string | null;
+      }>(
+        `SELECT id,state,registration_order,eligibility_order,priority_order
+           FROM queue_entries
+          WHERE id=$1 AND session_id=$2 AND clinic_id=$3 FOR UPDATE`,
+        [entryId, sessionId, scope.clinicId],
+      );
+      if (
+        !candidate.rows[0] ||
+        !['waiting', 'checked_in'].includes(candidate.rows[0].state)
+      )
+        throw new QueueConflictError(
+          'Only waiting or checked-in entries are eligible for priority',
+        );
+      const maximumPosition =
+        sourceIndex < 0 ? ordered.rows.length + 1 : ordered.rows.length;
+      if (rawInput.targetPosition > maximumPosition)
+        throw new QueueConflictError(
+          `Target position exceeds the allowed maximum of ${maximumPosition}`,
+        );
+
+      const previousOrder = ordered.rows.map((row) => ({
+        entryId: row.id,
+        priorityOrder: Number(row.priority_order),
+      }));
+      const reordered = [...ordered.rows];
+      const [moved] =
+        sourceIndex < 0
+          ? [candidate.rows[0]]
+          : reordered.splice(sourceIndex, 1);
+      reordered.splice(rawInput.targetPosition - 1, 0, moved!);
+      try {
+        // Clear the locked cohort out of the unique partial index before assigning
+        // the canonical contiguous priority slots.
+        await client.query(
+          `UPDATE queue_entries SET priority_order=NULL
+            WHERE id = ANY($1::uuid[])`,
+          [reordered.map((item) => item.id)],
+        );
+        for (let index = 0; index < reordered.length; index++)
+          await client.query(
+            'UPDATE queue_entries SET priority_order=$2,updated_at=now() WHERE id=$1',
+            [reordered[index]!.id, index + 1],
+          );
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error &&
+          'code' in error &&
+          error.code === '23505'
+        )
+          throw new QueueConflictError(
+            'Queue order changed while the reorder was being applied',
+          );
+        throw error;
+      }
+
+      const nextVersion = currentVersion + 1;
+      await client.query(
+        'UPDATE consultation_sessions SET queue_order_version=$2,updated_at=now() WHERE id=$1',
+        [sessionId, nextVersion],
+      );
+      const row = await client.query<{
+        id: string;
+        session_id: string;
+        state: QueueEntryState;
+        registration_order: string;
+        eligibility_order: string | null;
+        priority_order: string | null;
+        public_display_label: string;
+        private_display_name: string;
+        preferred_locale: 'ar' | 'fr';
+        contact_phone: string | null;
+        contact_email: string | null;
+      }>(
+        `SELECT entry.id,entry.session_id,entry.state,entry.registration_order,
+                entry.eligibility_order,entry.priority_order,
+                entry.public_display_label,patient.private_display_name,patient.preferred_locale,
+                patient.contact_phone,patient.contact_email
+           FROM queue_entries entry JOIN patient_operational_records patient
+             ON patient.id=entry.patient_id AND patient.clinic_id=entry.clinic_id
+          WHERE entry.id=$1 AND entry.session_id=$2 AND entry.clinic_id=$3`,
+        [entryId, sessionId, scope.clinicId],
+      );
+      const movedRow = row.rows[0]!;
+      const entry: StaffQueueEntry = {
+        id: movedRow.id,
+        sessionId: movedRow.session_id,
+        state: movedRow.state,
+        registrationOrder: Number(movedRow.registration_order),
+        eligibilityOrder:
+          movedRow.eligibility_order === null
+            ? null
+            : Number(movedRow.eligibility_order),
+        priorityOrder:
+          movedRow.priority_order === null
+            ? null
+            : Number(movedRow.priority_order),
+        publicDisplayLabel: movedRow.public_display_label,
+        privateDisplayName: movedRow.private_display_name,
+        preferredLocale: movedRow.preferred_locale,
+        hasContact:
+          movedRow.contact_phone !== null || movedRow.contact_email !== null,
+      };
+      const resultingOrder = reordered.map((item, index) => ({
+        entryId: item.id,
+        priorityOrder: index + 1,
+      }));
+      const response = {
+        entry,
+        queueOrderVersion: nextVersion,
+        orderedEntryIds: reordered.map((item) => item.id),
+      };
+      await appendAuditEvent(client, {
+        ...scope,
+        entityType: 'queue_entry',
+        entityId: entryId,
+        action: 'queue_entry.reordered',
+        metadata: {
+          sessionId,
+          reason,
+          previousOrder,
+          resultingOrder,
+          previousVersion: currentVersion,
+          resultingVersion: nextVersion,
+          targetPosition: rawInput.targetPosition,
+          correlationId: rawInput.correlationId,
+          idempotencyKey: rawInput.idempotencyKey,
+        },
+      });
+      await client.query(
+        `INSERT INTO queue_reorder_receipts
+          (clinic_id,actor_user_id,idempotency_key,request_fingerprint,session_id,queue_entry_id,response)
+         VALUES($1,$2,$3,$4,$5,$6,$7)`,
+        [
+          scope.clinicId,
+          scope.actorUserId,
+          rawInput.idempotencyKey,
+          requestFingerprint,
+          sessionId,
           entryId,
           JSON.stringify(response),
         ],

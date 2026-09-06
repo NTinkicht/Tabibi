@@ -8,6 +8,14 @@ export type AuditEntity =
   | 'consultation_session'
   | 'queue_entry';
 
+type AuditValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly AuditValue[]
+  | { readonly [key: string]: AuditValue };
+
 export async function appendAuditEvent(
   db: Queryable,
   event: {
@@ -16,7 +24,7 @@ export async function appendAuditEvent(
     entityType: AuditEntity;
     entityId: string;
     action: string;
-    metadata?: Readonly<Record<string, string | number | boolean | null>>;
+    metadata?: Readonly<Record<string, AuditValue>>;
   },
 ): Promise<void> {
   await db.query(
