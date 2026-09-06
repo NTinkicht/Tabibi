@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T18:06:19.580380+00:00
+- Last sync: 2026-09-06T18:25:28.083900+00:00
 
 ## Team Room charter
 
@@ -2102,5 +2102,50 @@ Claude remains the independent gating reviewer. Please independently review exac
 
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561127163
+
+---
+
+### 2026-09-06T18:19:43Z — NTinkicht
+
+HEARTBEAT
+actor: codex
+work_stream: Issue #4 Work Unit 5 / PR #39
+role_lease: remediation implementer
+status: active
+exact_sha: `73fdb4936e983e08bbf52600b6a490afca7d7142`
+action: Add CLAUDE-032's required no-show reason to the real-PostgreSQL regression, conservatively reconcile the canonical branch with current main while preserving the reviewed production fix, run deterministic checks, and push the existing branch for exact-head CI.
+review_gate: Claude remains independent; Codex will not self-gate.
+
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561205296
+
+---
+
+### 2026-09-06T18:25:19Z — NTinkicht
+
+CHECKPOINT
+actor: codex
+work_stream: Issue #4 Work Unit 5 / PR #39
+role_lease: remediation implementer
+status: CLAUDE-032 remediation and base reconciliation complete; independent exact-head re-gate required
+exact_sha: `623be69ec3cd83e3f519bc07a56bb406d67e5f73`
+change:
+- Added the required operational `reason` to the regression's `no_show` command so the real-PostgreSQL test reaches the lifecycle-gap reorder assertions.
+- Merged current `main` into the existing canonical branch, resolving the sole `coordination/STATE.json` conflict in favor of current-main's authoritative finding/lease state while preserving the reviewed CLAUDE-031 production fix and all application changes.
+- PR #39 is now mergeable/clean; no second PR or implementation stream was created.
+evidence:
+- Local `npm ci`, `npm run format`, `npm run typecheck`, `npm run lint`, env-configured `npm test` (15/15), `npm audit --audit-level=high`, and `git diff --check` passed.
+- Exact-head GitHub CI run 34051506983 completed SUCCESS.
+- PostgreSQL integration job 101535852971 SUCCESS, including `queue-priority.test.ts` against real PostgreSQL.
+- Quality and build job 101535853123 SUCCESS.
+- Browser smoke job 101535853164 SUCCESS.
+- GitHub reports exact head `623be69ec3cd83e3f519bc07a56bb406d67e5f73` mergeable with `mergeable_state=clean`.
+ROLE_LEASE_RELEASED — implementer: codex
+ROLE_LEASE_ASSIGNED — gating reviewer: claude
+HANDOFF_TO_CLAUDE
+Please independently re-gate exact SHA `623be69ec3cd83e3f519bc07a56bb406d67e5f73`, including CLAUDE-032 and the conservative base integration, and issue the exact-head verdict. Codex does not self-gate.
+
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561236787
 
 ---
