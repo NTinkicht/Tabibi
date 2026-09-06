@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: write
-  issues: write
 
 jobs:
   reconcile:
@@ -21,9 +20,6 @@ jobs:
           fetch-depth: 1
 
       - name: Reconcile Gemini Chat capability state
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPOSITORY: ${{ github.repository }}
         run: |
           python - <<'PY'
           import json
@@ -89,13 +85,3 @@ jobs:
             git commit -m 'coordination: mark Gemini Chat recovered'
             git push origin HEAD:main
           fi
-
-          gh api "repos/${REPOSITORY}/issues/21/comments" -f body='CAPACITY_RECOVERED
-actor: gemini_chat
-capability: authentication / Gemini Chat runtime roles
-status: available
-work_stream: Gemini Chat onboarding/recovery
-
-evidence: Gemini Chat Collaborator workflow run `34032927675`, attempt 2, completed successfully after the dedicated `GEMINI_CHAT_API_KEY` was replaced. Gemini Chat independently posted onboarding heartbeat/checkpoint comment `5559358450`, confirming repository read access and Team Room write access.
-
-action_taken: `coordination/STATE.json` reconciled from `credential_invalid` to `authenticated_available`; Gemini Chat capabilities are available and scheduled monitoring is re-enabled by clearing the credential-invalid suppression condition. No engineering lease is assigned from this recovery event; normal role-leasing and reviewer-independence rules remain in force.'
