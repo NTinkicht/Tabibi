@@ -1,5 +1,17 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #39 (Issue #4 Work Unit 5, queue priority/reorder) — CHANGES_REQUIRED at exact head `909abd5381bd8e0d437125f0efc671f9eb0f447c`, CLAUDE-031 (MAJOR)
+
+Genuine `HANDOFF_TO_CLAUDE` after Codex fixed a CI failure (the `service_order` bigint/text CASE-expression ambiguity the owner had already caught and described precisely in an earlier comment — verified that fix is correctly present: `$6::bigint` cast added, sibling reorder writes audited and don't share the ambiguity).
+
+Read the full `reorder()` implementation by hand rather than trusting the CHECKPOINT's "remediation complete" framing, and found something the owner's earlier CI-failure diagnosis hadn't touched: the two-phase renumbering strategy (`UPDATE ... SET service_order = length+index+1` then `= index+1`, to dodge the partial unique index transiently) silently assumes the checked-in set's `service_order` values are always contiguous `1..length`. They aren't, guaranteed — `no_show`/`cancel` can remove *any* checked-in entry (only `call` requires "next in order"), which leaves a gap that the next check-in's `MAX+1` logic doesn't backfill. Traced a concrete data layout (`{1,3,4}`) where the "high temporary value" for one row lands exactly on another not-yet-processed row's *original* value, producing a genuine `23505` mid-transaction.
+
+Did not stop at the trace — spun up a worktree at the exact reviewed SHA, real local Postgres 16, and wrote a small standalone repro test (3 check-ins → no-show the middle one → check in a 4th → reorder the first entry to the back) to confirm empirically rather than just argue from code reading. It reproduced exactly as predicted: `duplicate key value violates unique constraint "queue_entries_session_service_order_uq"`, thrown raw (no `try/catch` around this loop, unlike `command()`'s single UPDATE a few dozen lines above it in the same file). None of the four new `queue-priority.test.ts` tests create a gap before reordering, so CI is green despite this — a good reminder that green CI here says nothing about this bug, since the untested path is exactly the realistic one (any clinic that's no-showed a non-front patient).
+
+Proposed the fix in the finding itself (set `service_order = NULL` for the whole `reordered` set first, removing them from the partial index's predicate entirely, before assigning final `1..length` values — simpler than computing a safe offset from the actual current max) plus a `try/catch` on `23505` for defense in depth, matching `command()`'s established pattern.
+
+Everything else in the diff checked out cleanly on inspection: auth-before-cache-hit ordering, idempotency/exact-retry, the session-lock-based optimistic-version serialization, the new `call()` "next in committed order" check, tenant isolation, and audit completeness. One finding, but a real one that would have shipped silently past CI.
+
 # PR #35 (Slack company bridge) — PASS/MERGE_READY at exact head `cca3389547c90612762d4d40b599136ff9d52c95`, both MAJORs closed
 
 Re-review requested via explicit `HANDOFF_TO_CLAUDE` naming the new head and asking me not to trust the summary. Read the actual diff rather than the handoff's claims:
