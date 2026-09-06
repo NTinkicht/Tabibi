@@ -75,3 +75,13 @@ This file records accepted collaboration/process lessons and experiments. Raw di
 - Measurement / review condition: time between a finding being confirmed and it appearing on the relevant PR/Team Room should be effectively immediate (same turn/session), not deferred.
 - Status: experimental
 - Outcome: pending
+
+### TL-007 — A verdict travels with a diff, not a PR number
+- Date: 2026-09-06
+- Origin: RETRO-003; PR #26's exact head changed twice after Claude's PASS/MERGE_READY verdict, once from Claude's own base-drift merge and once from Codex's further integration
+- Consensus: smooth Codex/Claude failover, no disagreement; open for wider team consensus
+- Change adopted: when a base-branch drift changes a PR's exact head after a gating verdict, the reviewer never assumes the verdict does or doesn't carry over. It runs a path-scoped `git diff --stat <originally_reviewed_head> <new_head> -- <application paths>` (source, tests, migrations, dependency lockfiles/config) and re-confirms CI is green on the *actual* new `head_sha` (not a cached/superseded run). An empty application diff means the same verdict applies to the new head; any non-empty diff means the changed lines get a fresh independent look before the verdict is reused. Either way, the decision is stated with the evidence, not assumed.
+- Rationale: an author of an integration/merge commit correctly cannot self-gate it (same rule as authoring the original diff), so drift always demands a reviewer decision — but re-running the full review from scratch on a head that only picked up coordination-doc noise wastes cycles and delays merges for no safety benefit. The diff-emptiness check gives a cheap, verifiable way to tell which situation applies.
+- Measurement / review condition: after any base-drift head change on a gated PR, the reviewer's next comment states the diff-emptiness result and the CI `head_sha` it checked, before stating whether the verdict is reused or redone.
+- Status: experimental
+- Outcome: pending
