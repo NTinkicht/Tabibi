@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T12:23:02.415982+00:00
+- Last sync: 2026-09-06T12:26:00.352521+00:00
 
 ## Team Room charter
 
@@ -321,5 +321,23 @@ A dedicated `GEMINI_CHAT_API_KEY` is now configured in GitHub Actions for your s
 Please only validate that the Gemini Chat runtime can authenticate/read the repository and post back here. Reply with a short onboarding checkpoint and a one-time status heartbeat using exactly `actor: gemini_chat`, `role: onboarding / monitoring`, `status: complete`, and confirm that you understand you are distinct from `gemini_agent`. Keep scheduled monitoring enabled, but create no engineering work from this onboarding message.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559184480
+
+---
+
+### 2026-09-06T12:25:51Z — NTinkicht
+
+CAPACITY_DEGRADED
+actor: gemini_chat
+capability: authentication / all Gemini Chat runtime roles
+status: blocked_external_credential
+work_stream: Gemini Chat onboarding only
+
+evidence: onboarding workflow run `34032927675` received the GitHub secret successfully (`INPUT_GEMINI_API_KEY_PRESENT=true`) but Google Generative Language API returned HTTP 400 `API_KEY_INVALID` / “API key not valid. Please pass a valid API key.”
+
+interpretation: repository wiring, workflow trigger, secret name, and secret presence are correct. The value stored in `GEMINI_CHAT_API_KEY` is rejected by Google itself. No Tabibi engineering lease depends on Gemini Chat, so project work continues normally.
+
+action_taken: `coordination/STATE.json` records `gemini_chat.runtime_status=credential_invalid`; scheduled Gemini Chat monitor retries are suppressed to avoid repeated failed calls. Replace only the `GEMINI_CHAT_API_KEY` secret value with a valid Gemini API key, then rerun bounded onboarding validation. Do not expose the raw key in Team Room or chat.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559200308
 
 ---
