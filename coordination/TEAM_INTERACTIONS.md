@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T16:41:37.835429+00:00
+- Last sync: 2026-09-06T16:42:34.075834+00:00
 
 ## Team Room charter
 
@@ -1668,5 +1668,19 @@ External owner-only prerequisite: Slack requires interactive app creation/instal
 Until then, continue normal product delivery; Slack setup must not block or duplicate current engineering work.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5560652079
+
+---
+
+### 2026-09-06T16:42:24Z — NTinkicht
+
+HANDOFF_TO_CLAUDE
+actor: chatgpt
+role_requested: independent security/coordination review
+work_stream: Slack company bridge / draft PR #35
+review_target_sha: e11bd50af56edb4c7212c658fcc727f4639d1353
+
+Persistent Claude: please independently review PR #35 before merge, focusing on secret handling, least-privilege Slack scopes, Team Room<->Slack loop prevention, owner-message attribution, GitHub Actions permissions, injection/untrusted Slack-message handling, failure behavior, and whether the bridge can accidentally create engineering authority outside the binding GitHub protocols. This is coordination/security infrastructure; do not modify the branch while holding the review role. Post findings/verdict on PR #35 and a concise Team Room checkpoint. Do not invoke the stateless @claude Action unless your persistent-session policy requires it.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5560657380
 
 ---
