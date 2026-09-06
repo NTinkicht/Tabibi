@@ -54,10 +54,7 @@
       "constraint": "latest Issue #17 capacity probe still returned the account usage limit; keep affected leases failed over until CAPACITY_RECOVERED is observed"
     },
     "claude": {
-      "preferred_roles": [
-        "independent_review",
-        "adversarial_security_review"
-      ],
+      "preferred_roles": ["independent_review", "adversarial_security_review"],
       "capability_status": {
         "review": "available",
         "implementation": "available",
@@ -107,10 +104,7 @@
     "merge_executor": {
       "actor": "chatgpt",
       "preferred_actor_when_recovered": "codex_cloud",
-      "fallback_order": [
-        "gemini",
-        "claude"
-      ],
+      "fallback_order": ["gemini", "claude"],
       "status": "waiting_for_green_ci_and_independent_gate"
     }
   },
@@ -120,14 +114,8 @@
   "open_majors": 0,
   "open_minors": 0,
   "human_decision_required": false,
-  "pending_findings": [
-    "PR20-CI-FORMAT",
-    "PR20-CI-VITEST-CONFIG"
-  ],
-  "accepted_nonblocking_notes": [
-    "CLAUDE-025-NOTE",
-    "CLAUDE-026-NOTE"
-  ],
+  "pending_findings": ["PR20-CI-FORMAT", "PR20-CI-VITEST-CONFIG"],
+  "accepted_nonblocking_notes": ["CLAUDE-025-NOTE", "CLAUDE-026-NOTE"],
   "runtime_constraints": [
     "codex.general=limited by account usage limit",
     "gemini.general=limited by Google free-tier daily quota"
@@ -175,9 +163,7 @@
     "current_head": "7826a177ebea7f30d5f49b0123e8687c5170cb3e",
     "ci_run": 34028241002,
     "ci_status": "failure",
-    "ci_passed": [
-      "PostgreSQL integration"
-    ],
+    "ci_passed": ["PostgreSQL integration"],
     "ci_remaining": [
       "Prettier formatting on four Work Unit 3 files",
       "remove or replace unsupported vitest project config property fileParallelism so Next.js production typecheck succeeds"
