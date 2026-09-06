@@ -5,7 +5,8 @@ export type AuditEntity =
   | 'membership'
   | 'doctor'
   | 'schedule_template'
-  | 'consultation_session';
+  | 'consultation_session'
+  | 'queue_entry';
 
 export async function appendAuditEvent(
   db: Queryable,

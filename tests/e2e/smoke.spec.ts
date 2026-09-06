@@ -16,7 +16,7 @@ test('application shell and liveness endpoint are available', async ({
   });
 });
 
-test('receptionist sees Arabic sessions and can switch to French on mobile', async ({
+test('receptionist handles Arabic/French sessions and a contact-less walk-in on mobile', async ({
   page,
 }) => {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -78,5 +78,31 @@ test('receptionist sees Arabic sessions and can switch to French on mobile', asy
   await expect(
     page.getByRole('heading', { name: 'Sessions du jour' }),
   ).toBeVisible();
+
+  await page.getByRole('link', { name: 'Patients sans rendez-vous' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'File des patients sans rendez-vous' }),
+  ).toBeVisible();
+  await page.getByLabel('Nom à l’accueil').fill('Patient test');
+  await expect(page.getByLabel('Langue préférée du patient')).toHaveValue('ar');
+  const registrationResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/sessions/${sessionId}/queue`),
+  );
+  await page.getByRole('button', { name: 'Ajouter un patient' }).click();
+  const registrationResponse = await registrationResponsePromise;
+  const registrationBody = await registrationResponse.text();
+  expect(registrationResponse.status(), registrationBody).toBe(201);
+  expect(JSON.parse(registrationBody)).toMatchObject({
+    registration: { patient: { preferredLocale: 'ar' } },
+  });
+  await expect(
+    page.getByText('Patient test', { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Sans coordonnées', { exact: true }).first(),
+  ).toBeVisible();
+  await expect(page.getByText(/^W-[A-F0-9]{10}$/).first()).toBeVisible();
   await pool.end();
 });

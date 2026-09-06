@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { receptionistCopy } from '@/modules/localization/receptionist';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -23,8 +24,14 @@ function localDateString(instant: Date): string {
   const offsetMs = instant.getTimezoneOffset() * 60_000;
   return new Date(instant.getTime() - offsetMs).toISOString().slice(0, 10);
 }
-export function ReceptionDesk({ clinicId }: { clinicId: string }) {
-  const [locale, setLocale] = useState<'ar' | 'fr'>('ar');
+export function ReceptionDesk({
+  clinicId,
+  initialLocale = 'ar',
+}: {
+  clinicId: string;
+  initialLocale?: 'ar' | 'fr';
+}) {
+  const [locale, setLocale] = useState<'ar' | 'fr'>(initialLocale);
   const t = receptionistCopy[locale];
   const [date, setDate] = useState(() => localDateString(new Date()));
   const [timezone, setTimezone] = useState('UTC');
@@ -33,6 +40,7 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
   const [pending, setPending] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const pendingKeysRef = useRef(new Map<string, string>());
+
   function keyFor(opId: string): string {
     const existing = pendingKeysRef.current.get(opId);
     if (existing) return existing;
@@ -290,6 +298,14 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
                 >
                   {t.clear}
                 </button>
+              )}
+              {['planned', 'open', 'paused'].includes(session.status) && (
+                <Link
+                  className="queueLink"
+                  href={`/operations/${clinicId}/sessions/${session.id}/queue?locale=${locale}`}
+                >
+                  {t.walkIns}
+                </Link>
               )}
             </div>
             {pending === session.id && (

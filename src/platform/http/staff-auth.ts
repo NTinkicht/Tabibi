@@ -70,8 +70,26 @@ export async function authenticatedClinicScope(
 
 export function requireSameOrigin(request: Request): void {
   const origin = request.headers.get('origin');
-  if (!origin || origin !== new URL(request.url).origin)
+  if (!origin) throw new StaffCsrfError();
+
+  let suppliedOrigin: URL;
+  try {
+    suppliedOrigin = new URL(origin);
+  } catch {
     throw new StaffCsrfError();
+  }
+
+  const requestUrl = new URL(request.url);
+  const receivedHost = request.headers.get('host');
+  const expectedHosts = new Set([requestUrl.host]);
+  if (receivedHost) expectedHosts.add(receivedHost);
+
+  if (
+    suppliedOrigin.protocol !== requestUrl.protocol ||
+    !expectedHosts.has(suppliedOrigin.host)
+  ) {
+    throw new StaffCsrfError();
+  }
 }
 
 export class StaffAuthenticationError extends Error {

@@ -1,4 +1,5 @@
 import { AuthorizationError } from '@/modules/identity';
+import { QueueConflictError, QueueValidationError } from '@/modules/queue';
 import {
   SessionConflictError,
   SessionValidationError,
@@ -7,6 +8,15 @@ import { StaffAuthenticationError, StaffCsrfError } from './staff-auth';
 import { correlationId } from './request-context';
 import { getLogger } from '@/platform/observability/logger';
 import { ZodError } from 'zod';
+
+function isPostgresCheckConflict(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === '23514'
+  );
+}
 
 export async function operationalJson(
   request: Request,
@@ -33,12 +43,17 @@ export async function operationalJson(
       code = 'csrf_rejected';
     } else if (
       error instanceof SessionValidationError ||
+      error instanceof QueueValidationError ||
       error instanceof ZodError ||
       error instanceof SyntaxError
     ) {
       status = 400;
       code = 'invalid_request';
-    } else if (error instanceof SessionConflictError) {
+    } else if (
+      error instanceof SessionConflictError ||
+      error instanceof QueueConflictError ||
+      isPostgresCheckConflict(error)
+    ) {
       status = 409;
       code = 'conflict';
     }

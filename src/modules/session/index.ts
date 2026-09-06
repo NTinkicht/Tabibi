@@ -368,6 +368,21 @@ export class SessionService {
               `Cannot transition session from ${current.status} to ${target} (${input.command})`,
             );
           try {
+            const entriesCancelledBySession =
+              target === 'cancelled'
+                ? await client.query<{
+                    id: string;
+                    prior_state: 'waiting' | 'checked_in' | 'called';
+                  }>(
+                    `SELECT id, state AS prior_state
+                       FROM queue_entries
+                      WHERE clinic_id = $1 AND session_id = $2
+                        AND state IN ('waiting', 'checked_in', 'called')
+                      ORDER BY registration_order
+                      FOR UPDATE`,
+                    [scope.clinicId, sessionId],
+                  )
+                : { rows: [] };
             const updated = await client.query<SessionRow>(
               `UPDATE consultation_sessions session SET status=$3::session_status,
               opened_at=CASE WHEN $3::session_status='open' THEN COALESCE(opened_at, now()) ELSE opened_at END,
@@ -376,6 +391,22 @@ export class SessionService {
              WHERE session.id=$1 AND session.clinic_id=$2 AND doctor.id=session.doctor_id RETURNING ${selection}`,
               [sessionId, scope.clinicId, target],
             );
+            for (const entry of entriesCancelledBySession.rows) {
+              await appendAuditEvent(client, {
+                ...scope,
+                entityType: 'queue_entry',
+                entityId: entry.id,
+                action: 'queue_entry.cancelled_by_session',
+                metadata: {
+                  from: entry.prior_state,
+                  to: 'cancelled',
+                  reason: input.reason!.trim(),
+                  sessionId,
+                  correlationId: input.correlationId,
+                  idempotencyKey: input.idempotencyKey,
+                },
+              });
+            }
             await appendAuditEvent(client, {
               ...scope,
               entityType: 'consultation_session',
