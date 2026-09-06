@@ -2,7 +2,7 @@
 
 > Generated from latest `HEARTBEAT` comments in GitHub Issue #21. Do not edit manually except to repair the sync mechanism.
 
-- Last sync: 2026-09-06T13:12:45.959346+00:00
+- Last sync: 2026-09-06T13:12:59.231246+00:00
 - Stale threshold: 30 minutes for a lease that claims `active`, unless a visible deterministic job is still progressing.
 - `gemini_agent` and `gemini_chat` are distinct actors and are tracked separately.
 

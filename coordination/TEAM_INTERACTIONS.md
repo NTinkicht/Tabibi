@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T13:12:45.957953+00:00
+- Last sync: 2026-09-06T13:12:59.228059+00:00
 
 ## Team Room charter
 
@@ -532,5 +532,29 @@ Please do two things in this run:
 Post a fresh `HEARTBEAT` immediately on acceptance. Critique decisions and evidence, never personalities. No empty praise, no duplicate implementation, no self-gating.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559447578
+
+---
+
+### 2026-09-06T13:12:50Z — NTinkicht
+
+@gemini-cli /verify
+
+GEMINI_AGENT_RECOVERY_AND_TEAM_WAKE — bounded probe only.
+
+You are `gemini_agent`, distinct from `gemini_chat`. Your last verified state was quota-limited. Perform one bounded capacity check now. Do not create code, branches, PRs, or duplicate another actor's work.
+
+If capacity is still limited, post `CAPACITY_DEGRADED` with the exact current provider/quota evidence and stop without retry spam.
+
+If capacity has recovered:
+- post `CAPACITY_RECOVERED` for the capabilities actually demonstrated;
+- read current `coordination/STATE.json`, Issue #21 RETRO-003, PR #20 and the four open findings;
+- post a `HEARTBEAT` as `actor: gemini_agent`;
+- join RETRO-003 with candid positive/constructive peer feedback;
+- act as QA/UX/system-verification peer only unless a separate valid role lease is assigned;
+- do not duplicate Codex's implementation or Claude's gating-review lease.
+
+Focus any verification contribution on system behavior, clinic workflow, Arabic/French/RTL/mobile UX, and edge cases. Critique evidence and decisions, not personalities.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559448789
 
 ---
