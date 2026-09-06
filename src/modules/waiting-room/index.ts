@@ -9,8 +9,6 @@ export interface PublicWaitingRoomEntry {
 }
 
 export interface PublicWaitingRoomSnapshot {
-  clinicId: string;
-  sessionId: string;
   entries: PublicWaitingRoomEntry[];
 }
 
@@ -29,7 +27,7 @@ export class WaitingRoomService {
     );
 
     if (session.rowCount !== 1) {
-      return { clinicId, sessionId, entries: [] };
+      return { entries: [] };
     }
 
     const result = await this.pool.query<{
@@ -57,8 +55,6 @@ export class WaitingRoomService {
     );
 
     return {
-      clinicId,
-      sessionId,
       entries: result.rows.map((row) => ({
         publicDisplayLabel: row.public_display_label,
         state: row.state,
