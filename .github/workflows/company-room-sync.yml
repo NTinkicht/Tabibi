@@ -1,0 +1,192 @@
+name: Company Room Sync
+
+on:
+  issue_comment:
+    types: [created, edited, deleted]
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: read
+
+concurrency:
+  group: company-room-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.event_name != 'issue_comment' || github.event.issue.number == 21
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 3
+
+      - name: Generate standups and engineering chat
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from collections import defaultdict
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          repo = os.environ['REPOSITORY']
+          token = os.environ['GH_TOKEN']
+          issue_number = 21
+          api = f'https://api.github.com/repos/{repo}'
+          actors = {'chatgpt', 'codex', 'claude', 'gemini_agent', 'gemini_chat'}
+
+          def get_json(url):
+              req = urllib.request.Request(url, headers={
+                  'Authorization': f'Bearer {token}',
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'User-Agent': 'tabibi-company-room-sync',
+              })
+              with urllib.request.urlopen(req) as response:
+                  return json.load(response)
+
+          comments = []
+          page = 1
+          while True:
+              batch = get_json(f'{api}/issues/{issue_number}/comments?per_page=100&page={page}')
+              comments.extend(batch)
+              if len(batch) < 100:
+                  break
+              page += 1
+
+          def actor_for(comment):
+              body = comment.get('body') or ''
+              m = re.search(r'(?mi)^actor:\s*(chatgpt|codex|claude|gemini_agent|gemini_chat|gemini)\s*$', body)
+              if m:
+                  actor = m.group(1).lower()
+                  return 'gemini_agent' if actor == 'gemini' else actor
+              login = (comment.get('user') or {}).get('login', 'unknown')
+              return login
+
+          field_names = ['actor','date','yesterday','today','blockers','risks','help_wanted','refactor_watch','team_note','watercooler']
+          field_res = {f: re.compile(rf'(?mi)^{re.escape(f)}:\s*(.+?)\s*$') for f in field_names}
+          standup_re = re.compile(r'(?mi)^STANDUP\s*$')
+          standups = []
+
+          for c in comments:
+              body = c.get('body') or ''
+              if not standup_re.search(body):
+                  continue
+              parsed = {f: (field_res[f].search(body).group(1).strip() if field_res[f].search(body) else '') for f in field_names}
+              actor = parsed.get('actor', '').lower()
+              if actor == 'gemini': actor = 'gemini_agent'
+              if actor not in actors:
+                  actor = actor_for(c)
+              parsed['actor'] = actor
+              parsed['created_at'] = c.get('created_at') or ''
+              parsed['url'] = c.get('html_url') or ''
+              standups.append(parsed)
+
+          now = datetime.now(timezone.utc)
+          latest = {}
+          for s in standups:
+              if s['actor'] in actors:
+                  latest[s['actor']] = s
+
+          lines = [
+              '# Tabibi Standups', '',
+              '> Generated from `STANDUP` posts in Team Room Issue #21. Do not edit manually except to repair the sync.', '',
+              f'- Last sync: {now.isoformat()}',
+              '- Company playbook: `coordination/COMPANY_OPERATING_SYSTEM.md`', '',
+              '## Latest standup board', '',
+              '| Actor | Date | Yesterday | Today | Blockers | Risks | Help wanted | Refactor watch | Team note |',
+              '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+          ]
+
+          def cell(v):
+              return (v or '—').replace('|','\\|').replace('\n',' ')
+
+          for actor in ['chatgpt','codex','claude','gemini_agent','gemini_chat']:
+              s = latest.get(actor)
+              if not s:
+                  lines.append(f'| {actor} | — | — | — | — | — | — | — | — |')
+              else:
+                  lines.append('| ' + ' | '.join([
+                      actor, cell(s.get('date') or s.get('created_at','')[:10]), cell(s.get('yesterday')), cell(s.get('today')),
+                      cell(s.get('blockers')), cell(s.get('risks')), cell(s.get('help_wanted')), cell(s.get('refactor_watch')), cell(s.get('team_note'))
+                  ]) + ' |')
+
+          grouped = defaultdict(list)
+          for s in standups:
+              key = s.get('date') or s.get('created_at','')[:10] or 'unknown-date'
+              grouped[key].append(s)
+
+          lines.extend(['', '## Standup archive', ''])
+          for day in sorted(grouped.keys(), reverse=True):
+              lines.extend([f'### {day}', ''])
+              for s in grouped[day]:
+                  lines.extend([
+                      f'#### {s.get("actor","unknown")}', '',
+                      f'- **Yesterday:** {s.get("yesterday") or "—"}',
+                      f'- **Today:** {s.get("today") or "—"}',
+                      f'- **Blockers:** {s.get("blockers") or "—"}',
+                      f'- **Risks:** {s.get("risks") or "—"}',
+                      f'- **Help wanted:** {s.get("help_wanted") or "—"}',
+                      f'- **Refactor watch:** {s.get("refactor_watch") or "—"}',
+                      f'- **Team note:** {s.get("team_note") or "—"}',
+                  ])
+                  if s.get('watercooler'):
+                      lines.append(f'- **Watercooler:** {s["watercooler"]}')
+                  lines.extend([f'- Source: {s.get("url") or "—"}', ''])
+
+          Path('coordination/STANDUPS.md').write_text('\n'.join(lines).rstrip() + '\n', encoding='utf-8')
+
+          markers = [
+              'STANDUP','THOUGHT','QUESTION','ANSWER','REFACTOR_IDEA','PEER_FEEDBACK','RISK_CALL','UX_NOTE','TEST_IDEA',
+              'NEWS_NOTE','WATERCOOLER','RETRO_ENTRY','PROCESS_PROPOSAL','CONSENSUS_ACK','CONSENSUS_AMEND','CONSENSUS_CHALLENGE',
+              'LESSON_LEARNED','TEAM_DECISION','TASK_CLAIM','TASK_DONE','TASK_PROPOSAL','AVAILABLE_FOR_WORK'
+          ]
+          marker_re = re.compile(r'(?mi)^(' + '|'.join(re.escape(m) for m in markers) + r')(?:\s|$)')
+          chat = [
+              '# Tabibi Engineering Chat', '',
+              '> Generated from conversational/team-learning markers in Team Room Issue #21. This is the readable company chat; `TEAM_INTERACTIONS.md` remains the complete raw mirror.', '',
+              f'- Last sync: {now.isoformat()}',
+              '- Motto: **coffee optional, evidence mandatory.**', '',
+          ]
+          for c in comments:
+              body = c.get('body') or ''
+              if not marker_re.search(body):
+                  continue
+              actor = actor_for(c)
+              created = c.get('created_at') or 'unknown-time'
+              chat.extend([
+                  f'### {created} — {actor}', '',
+                  body.strip(), '',
+                  f'Source: {c.get("html_url") or ""}', '',
+                  '---', '',
+              ])
+          Path('coordination/ENGINEERING_CHAT.md').write_text('\n'.join(chat).rstrip() + '\n', encoding='utf-8')
+          PY
+
+      - name: Commit company records
+        run: |
+          git config user.name 'tabibi-company-room[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add coordination/STANDUPS.md coordination/ENGINEERING_CHAT.md
+          if git diff --cached --quiet; then
+            echo 'No company-room changes to commit.'
+            exit 0
+          fi
+          git commit -m 'coordination: sync standups and engineering chat [skip ci]'
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            git rebase --abort || true
+            sleep 2
+          done
+          exit 1
