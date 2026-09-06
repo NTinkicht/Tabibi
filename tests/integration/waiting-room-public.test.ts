@@ -85,13 +85,15 @@ describe('privacy-preserving waiting-room projection', () => {
       ids.session,
     );
 
-    expect(snapshot.entries).toEqual([
-      {
-        publicDisplayLabel: registration.entry.publicDisplayLabel,
-        state: 'waiting',
-        called: false,
-      },
-    ]);
+    expect(snapshot).toEqual({
+      entries: [
+        {
+          publicDisplayLabel: registration.entry.publicDisplayLabel,
+          state: 'waiting',
+          called: false,
+        },
+      ],
+    });
 
     const serialized = JSON.stringify(snapshot);
     expect(serialized).not.toContain('Secret Patient Name');
@@ -99,6 +101,8 @@ describe('privacy-preserving waiting-room projection', () => {
     expect(serialized).not.toContain('Private.Patient');
     expect(serialized).not.toContain(registration.patient.id);
     expect(serialized).not.toContain(registration.entry.id);
+    expect(serialized).not.toContain(ids.clinic);
+    expect(serialized).not.toContain(ids.session);
   });
 
   it('uses a public label that is independent from the queue-entry UUID', async () => {
