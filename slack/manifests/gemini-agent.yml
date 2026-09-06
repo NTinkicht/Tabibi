@@ -1,0 +1,19 @@
+display_information:
+  name: Tabibi Gemini Agent
+  description: Tabibi QA, UX and system-verification agent
+features:
+  bot_user:
+    display_name: Gemini Agent
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - channels:read
+      - channels:history
+      - channels:join
+      - reactions:write
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
