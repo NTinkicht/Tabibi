@@ -1,0 +1,168 @@
+name: PR20 State Reconcile Once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/state-reconcile-pr20-once.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 20
+
+      - name: Reconcile live coordination state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path('coordination/STATE.json')
+          s = json.loads(p.read_text(encoding='utf-8'))
+          head = 'fb8b2c0471921118362ee789ee5baf1b6b123184'
+          fix = '02e348a381c62617fc153b8e4e9d37bc07fe4a68'
+          ci = 34035987885
+          findings = ['CLAUDE-027','TAB-REVIEW-001','TAB-REVIEW-002','TAB-REVIEW-003']
+
+          s['state'] = 'work_unit_3_gate_pending'
+          s['last_actor'] = 'chatgpt'
+          s['next_actor'] = 'claude'
+          s['next_action'] = (
+              'independently gate PR #20 exact current head ' + head +
+              ' after Codex fix commit ' + fix +
+              '; verify all four finding dispositions and repeated integration evidence; '
+              'issue exact-SHA PASS/MERGE_READY or actionable findings. Merge remains blocked until this gate passes.'
+          )
+
+          agents = s.setdefault('agents', {})
+          if 'chatgpt' in agents:
+              agents['chatgpt']['current_activity'] = (
+                  'orchestrator/state reconciler for PR #20 and RETRO-003; implementation lease released after Codex completed fixes; '
+                  'tracking exact-head Claude gate and complementary Gemini verification.'
+              )
+          codex = agents.setdefault('codex_cloud', {})
+          codex['capability_status'] = {
+              'implementation':'available','ci_remediation':'available','merge_execution':'available','review':'available'
+          }
+          codex.pop('constraint', None)
+          codex['current_activity'] = (
+              'completed PR #20 fix commit ' + fix +
+              ' with three consecutive 25/25 real-Postgres integration runs; current branch head is ' + head +
+              ' after merging main; awaiting independent Claude gate.'
+          )
+          if 'claude' in agents:
+              agents['claude']['current_activity'] = (
+                  'independent gating reviewer assigned to PR #20 exact current head ' + head +
+                  '; fresh handoff is on PR comment 5559538324; RETRO-003 peer-discussion responsibility remains active.'
+              )
+          if 'gemini_chat' in agents:
+              agents['gemini_chat']['current_activity'] = (
+                  'secondary verifier + UX/localization/system reviewer for PR #20 exact head ' + head +
+                  ' and RETRO-003 participant; clean retry dispatched in Team Room comment 5559540606.'
+              )
+
+          leases = s.setdefault('role_leases', {})
+          leases['implementer'] = {
+              'actor':'codex',
+              'status':'complete_awaiting_gate',
+              'work_stream':'issue-4-work-unit-3-pr-20',
+              'last_authored_sha':fix,
+              'current_branch_head':head,
+              'reason':'Codex completed all four reviewed fixes and released implementation to independent review; no active implementation work is allowed unless the gate returns new findings.'
+          }
+          leases['gating_reviewer'] = {
+              'actor':'claude',
+              'status':'assigned_awaiting_verdict',
+              'review_target_sha':head,
+              'verdict':'PENDING_REREVIEW',
+              'open_findings':findings,
+              'handoff_comment':'https://github.com/NTinkicht/Tabibi/pull/20#issuecomment-5559538324',
+              'reason':'Codex authored the application fixes; Claude remains an eligible non-author reviewer. Current head additionally merges main coordination-only changes and has exact-head green CI.'
+          }
+          leases['secondary_verifier'] = {
+              'actor':'gemini_chat',
+              'status':'assigned_awaiting_verification',
+              'review_target_sha':head,
+              'focus':'Algeria clinic usability, Arabic/French/RTL, patient-vs-staff locale, mobile/receptionist workflow, privacy, system edge cases',
+              'fallback_candidates':['gemini_agent'],
+              'fallback_status':'Gemini Agent bounded recovery probe pending; do not infer recovery without evidence.'
+          }
+          leases['merge_executor'] = {
+              'actor':'codex',
+              'fallback_order':['chatgpt','gemini_chat','gemini_agent','claude'],
+              'status':'blocked_on_independent_gate',
+              'reason':'Exact-head CI is green, but all four findings remain open until Claude independently verifies the current head and posts MERGE_READY.'
+          }
+
+          # Keep findings open until independent reviewer resolves them, but record the pushed fix evidence.
+          for f in s.get('pending_findings', []):
+              if f.get('id') in findings:
+                  f['fix_status'] = 'fix_pushed_awaiting_independent_review'
+                  f['fix_sha'] = fix
+                  f['current_review_target_sha'] = head
+          s['open_majors'] = 2
+          s['open_minors'] = 2
+
+          constraints = [x for x in s.get('runtime_constraints', []) if not x.startswith('codex.general=')]
+          s['runtime_constraints'] = constraints
+
+          cw = s.setdefault('current_work', {})
+          cw['implementation_status'] = 'fixes_pushed_ci_green_awaiting_independent_gate'
+          cw['current_head'] = head
+          cw['implementation_fix_sha'] = fix
+          cw['review_target_head'] = head
+          cw['reviewed_head'] = 'b27a072ec4f4099ec93265853759d7002ea3d3d4'
+          cw['review_verdict'] = 'PENDING_REREVIEW'
+          cw['ci_run'] = ci
+          cw['ci_status'] = 'success_exact_current_head'
+          cw['ci_passed'] = ['Quality and build','PostgreSQL integration','Browser smoke']
+          cw['ci_caveat'] = (
+              'Codex reported three consecutive 25/25 real-Postgres integration runs on fix SHA ' + fix +
+              '; exact current head ' + head + ' also has all required GitHub CI jobs green. '
+              'Findings remain open until Claude independently verifies and gates this exact head.'
+          )
+          cw['ci_remaining'] = []
+
+          note = (
+              ' Live reconciliation: Codex recovered and completed all four PR #20 fixes at ' + fix +
+              '; current exact head ' + head + ' has green CI run ' + str(ci) +
+              '. Claude has the independent exact-head gate; Gemini Chat has the complementary secondary-verifier/RETRO-003 lease. '
+              'Do not clear findings or merge before Claude MERGE_READY.'
+          )
+          if note.strip() not in s.get('notes',''):
+              s['notes'] = (s.get('notes','').rstrip() + note).strip()
+
+          p.write_text(json.dumps(s, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+          PY
+
+          git config user.name 'tabibi-coordination[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add coordination/STATE.json
+          git commit -m 'coordination: reconcile PR20 live gate state' || exit 0
+
+          for i in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main && git push origin HEAD:main && break
+            git rebase --abort || true
+            sleep 2
+          done
+
+          gh api "repos/${REPOSITORY}/issues/21/comments" -f body='CHECKPOINT
+actor: chatgpt
+role: orchestrator / state reconciler
+work_stream: PR #20 + RETRO-003
+status: active
+what_changed: `coordination/STATE.json` reconciled to live execution: Codex recovered/completed fixes, current PR #20 head is `fb8b2c0471921118362ee789ee5baf1b6b123184`, exact-head CI `34035987885` is green, Claude owns the pending independent gate, Gemini Chat owns complementary secondary verification. All four findings remain open until Claude independently resolves them.
+next: exact-head Claude gate + Gemini Chat RETRO/verification + bounded Gemini Agent recovery result; merge remains blocked until MERGE_READY.'
