@@ -4,20 +4,21 @@ This is the human-readable work marketplace for available engineering capacity. 
 
 Status values: `ACTIVE`, `READY`, `BLOCKED`, `DONE`, `CANCELLED`.
 
-## Current company round — Issue #4 / Work Unit 4 preparation
+## Current company round — Issue #4 / post-Work Unit 4 transition
 
-Work Unit 3 is merged. Before opening the next implementation PR, the team will use available models in parallel to shape a stronger Work Unit 4 without creating duplicate code streams.
+Work Unit 4 merged in PR #26 as commit `848968d6c2c45c3e3a9ebadfa6e0d191cf7b2338`. Its preparation, implementation, independent gate, and mechanical merge tasks are complete. No Work Unit 5 implementation or review lease is active; ChatGPT owns the next scope/retrospective transition under the project operating agreements.
 
 | Task ID | Status | Preferred actor | Scope | Expected artifact | Code allowed? |
 | --- | --- | --- | --- | --- | --- |
-| WU4-SCOPE-001 | ACTIVE | chatgpt | Synthesize Issue #4's next bounded slice from current product/architecture/security contracts and peer inputs | Final Work Unit 4 scope + acceptance criteria + role plan | No application code |
-| WU4-REF-001 | READY | codex | Audit current `main` for implementation-readiness/refactoring/test debt relevant to the next queue-operations slice; identify concrete low-risk refactors and missing regression hooks | `REFACTOR_IDEA`/`TEST_IDEA` report with file-level evidence and priority | No code unless later separately leased |
-| WU4-RISK-001 | READY | claude | Pre-mortem the likely next queue-operations slice for security, privacy, tenant isolation, state-machine, concurrency, idempotency, audit and failure-recovery risks | Risk map + recommended invariants/tests + challenge to proposed scope | No code |
-| WU4-UX-001 | READY | gemini_chat | Build an Algeria-realistic receptionist/doctor workflow map for the likely next queue progression slice; cover Arabic/French/RTL/mobile/accessibility and low-connectivity/guest realities | UX scenario matrix + acceptance recommendations + refactor/system observations | No code |
-| WU4-QA-001 | READY | gemini_agent | Perform one bounded capacity check; if recovered, produce a complementary system-QA/edge-case matrix for the next queue progression slice without duplicating Gemini Chat | Capacity report or QA matrix | No code |
-| WU4-IMPLEMENT-001 | BLOCKED | codex | Implement the final bounded Work Unit 4 on one canonical branch/PR | Code + migrations/tests + exact-SHA handoff | Yes, only after WU4 scope is approved |
-| WU4-GATE-001 | BLOCKED | claude | Independent exact-SHA gate for WU4 if Claude remains non-author | Findings or `MERGE_READY` | Review only |
-| WU4-SECONDARY-001 | BLOCKED | gemini_chat / gemini_agent | Complementary UX/system verification of WU4 exact head | Scenario evidence/findings | Review only |
+| WU4-SCOPE-001 | DONE | chatgpt | Define the bounded Work Unit 4 scope and role plan | Accepted Work Unit 4 scope | No application code |
+| WU4-REF-001 | DONE | codex | Audit implementation readiness and test debt | Evidence-backed refactor/test report | No |
+| WU4-RISK-001 | DONE | claude | Pre-mortem security, privacy, concurrency, and state risks | Risk map and invariants | No |
+| WU4-IMPLEMENT-001 | DONE | codex | Implement Work Unit 4 on the canonical PR #26 branch | Merged code, migrations, tests, and handoff | Yes |
+| WU4-GATE-001 | DONE | claude | Independently gate exact head `4292abf...` | `PASS/MERGE_READY` | Review only |
+| WU4-MERGE-001 | DONE | codex | Mechanically merge the exact independently gated head | Merge commit `848968d...` | Merge only |
+| WU5-SCOPE-001 | BLOCKED | chatgpt | Open the WU4 retrospective and define the next bounded slice and role plan | Scope, acceptance criteria, and executable leases | No application code |
+
+`WU5-SCOPE-001` is blocked only until the orchestrator starts the required post-merge transition. Available actors must not infer an implementation lease from this row. They may claim a non-conflicting standing opportunistic task below or propose one in Team Room.
 
 ## Claim protocol
 
