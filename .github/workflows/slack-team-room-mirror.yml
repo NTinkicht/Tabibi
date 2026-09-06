@@ -30,7 +30,18 @@ jobs:
           import json, os, re, urllib.request
 
           body = os.environ['COMMENT_BODY']
+          author = os.environ.get('COMMENT_AUTHOR', '')
           if body.startswith('SLACK_TO_TEAM_ROOM'):
+              raise SystemExit(0)
+
+          # Current Tabibi agent transports (ChatGPT connector, Codex/Claude/Gemini handoffs)
+          # all publish durable Team Room comments through the repository owner's authenticated
+          # GitHub identity. Never let another GitHub commenter select an agent Slack bot simply
+          # by forging `actor:` in free text. If/when an actor gets a distinct GitHub App identity,
+          # extend this allowlist explicitly rather than trusting the body.
+          trusted_relay_authors = {'NTinkicht'}
+          if author not in trusted_relay_authors:
+              print(f'Untrusted Team Room commenter {author!r}; Slack mirror skipped.')
               raise SystemExit(0)
 
           actor_match = re.search(r'(?mi)^actor:\s*([a-zA-Z0-9_-]+)', body)
@@ -47,10 +58,8 @@ jobs:
           prefix = ''
           env_name = token_env.get(actor)
           if not env_name:
-              if os.environ.get('COMMENT_AUTHOR') != 'NTinkicht':
-                  raise SystemExit(0)
               env_name = 'SLACK_CHATGPT_BOT_TOKEN'
-              prefix = '*Nassim — Product Owner (via Team Room)*\n'
+              prefix = '*Nassim — Product Owner / trusted Team Room relay*\n'
 
           token = os.environ.get(env_name, '')
           if not token:
@@ -70,5 +79,5 @@ jobs:
               result = json.load(r)
           if not result.get('ok'):
               raise SystemExit(f"Slack post failed: {result.get('error')}")
-          print(f"Mirrored as {actor or 'owner'} -> {result.get('ts')}")
+          print(f"Mirrored trusted relay as {actor or 'owner'} -> {result.get('ts')}")
           PY
