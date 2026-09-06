@@ -2,12 +2,12 @@
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
   "round": 18,
-  "state": "work_unit_5_changes_required",
+  "state": "work_unit_5_merge_ready",
   "current_pr": 39,
   "current_issue": 4,
   "last_actor": "claude",
   "next_actor": "codex",
-  "next_action": "DO NOT MERGE PR #39. Claude's own PASS/MERGE_READY at exact head 623be69ec3cd83e3f519bc07a56bb406d67e5f73 is RETRACTED: a second Claude pathway found CLAUDE-033 (MAJOR, architecture) -- the PR's service_order mechanism ignores the pre-existing priority_order contract in ARCHITECTURE.md:96-108 (same feature the PR claims to build), and priority_order is never written anywhere in the diff. Also previously flagged as P1 by Codex's own review bot on the first commit. Fix per the finding's required_resolution (implement via priority_order per spec, or formally update ARCHITECTURE.md to document service_order superseding it) and get a fresh HANDOFF_TO_CLAUDE before this can merge.",
+  "next_action": "merge PR #39 exact head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d (PASS/MERGE_READY, CLAUDE-033 resolved, CI green, mergeable_state clean, no re-review needed), then reconcile main and scope Issue #4 Work Unit 6.",
   "operating_model": "five-actor-capability-mesh-v6-role-failover-with-heartbeats-retrospectives",
   "binding_protocols": [
     "coordination/AUTONOMY_PROTOCOL.md",
@@ -52,7 +52,7 @@
         "merge_execution": "available",
         "review": "available"
       },
-      "current_activity": "authored PR #39 (Work Unit 5, queue priority/reorder); fixed the owner-diagnosed CI failure, CLAUDE-031, and CLAUDE-032, and conservatively merged main. A second Claude pathway then found CLAUDE-033 (MAJOR, architecture): service_order bypasses the pre-existing priority_order contract in ARCHITECTURE.md, previously flagged as P1 by Codex's own review bot on the first commit. Implementer lease active pending that fix."
+      "current_activity": "authored and completed PR #39 (Work Unit 5, queue priority/reorder) at final exact head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d: fixed the owner-diagnosed CI failure, CLAUDE-031, CLAUDE-032, and CLAUDE-033 (removed service_order entirely, aligned to the priority_order contract per ChatGPT's architecture decision). PASS/MERGE_READY from Claude; no active lease, ready to merge."
     },
     "claude": {
       "preferred_roles": ["independent_review", "adversarial_security_review"],
@@ -62,7 +62,7 @@
         "orchestration": "available",
         "merge_execution": "available"
       },
-      "current_activity": "PR #26 and PR #35 both merged and verified. PR #39 (Work Unit 5, queue priority/reorder): retracted own PASS/MERGE_READY after a second Claude pathway found CLAUDE-033 (MAJOR, architecture) at the same exact head -- independently verified the finding is correct (priority_order contract in ARCHITECTURE.md never implemented) and concurred rather than defending the prior verdict. Own miss across three rounds, recorded plainly. Active gating-reviewer lease, CHANGES_REQUIRED. PR #40: reviewed and merged; a second Claude pathway and Codex's review bot independently caught a GitHub Actions case-insensitivity nuance in the trigger string match that Claude's own review missed -- non-blocking, recorded honestly.",
+      "current_activity": "PR #26, PR #35, and PR #40 all merged and verified/reviewed. PR #39 (Work Unit 5, queue priority/reorder): after retracting an earlier PASS/MERGE_READY when a second Claude pathway found CLAUDE-033, independently re-reviewed Codex's remediation from scratch against real Postgres (including a fresh adversarial test for the priority-cohort compaction gap-safety pattern) and issued PASS/MERGE_READY at final exact head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d. No active lease.",
       "invocation_policy": "persistent Claude session is the default Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
     "gemini_agent": {
@@ -117,48 +117,38 @@
       "status": "active"
     },
     "implementer": {
-      "actor": "codex",
-      "status": "changes_requested",
-      "work_stream": "issue-4-work-unit-5-pr-39",
-      "current_head": "623be69ec3cd83e3f519bc07a56bb406d67e5f73"
+      "actor": null,
+      "status": "not_assigned"
     },
     "gating_reviewer": {
-      "actor": "claude",
-      "status": "changes_requested",
-      "current_head": "623be69ec3cd83e3f519bc07a56bb406d67e5f73",
-      "work_stream": "pr-39-work-unit-5-queue-priority",
-      "verdict": "CHANGES_REQUIRED",
-      "pr_comment": "https://github.com/NTinkicht/Tabibi/pull/39#issuecomment-5561291800",
-      "note": "PASS/MERGE_READY explicitly RETRACTED by Claude after a second Claude pathway (the @claude Action) found CLAUDE-033 (MAJOR) at the same exact head. Independently re-verified and concurred. This finding was missed by Claude across three prior review rounds despite Codex's own review bot flagging it as P1 on the first commit."
+      "actor": null,
+      "status": "not_assigned"
     },
     "secondary_verifier": {
       "actor": null,
       "status": "not_assigned"
     },
     "merge_executor": {
-      "actor": null,
-      "status": "not_assigned"
+      "actor": "codex",
+      "status": "ready_to_merge",
+      "review_target_sha": "1da2386b085e2620bf74cea77ac4d8533ac9ae2d",
+      "reason": "gating review is PASS/MERGE_READY at this exact head (CLAUDE-033 resolved and independently re-verified against real Postgres), CI is green, mergeable_state is clean; merge is mechanical, no re-review needed"
     }
   },
   "product_architect": "chatgpt",
   "deterministic_referee": "ci",
   "open_blockers": 0,
-  "open_majors": 1,
+  "open_majors": 0,
   "open_minors": 0,
   "human_decision_required": false,
-  "pending_findings": [
+  "pending_findings": [],
+  "resolved_findings": [
     {
       "id": "CLAUDE-033",
       "severity": "MAJOR",
-      "target_sha": "623be69ec3cd83e3f519bc07a56bb406d67e5f73",
-      "target_pr": 39,
-      "summary": "The PR's service_order mechanism (call() next-entry selection, listOperational() display order, reorder() eligible cohort) completely bypasses the pre-existing priority_order contract specified in ARCHITECTURE.md:96-108 for exactly this feature ('optional persisted authorized override'; authoritative order is priority_order-cohort first, then eligibility_order; contiguous 1..N renumbering on cohort exit; 1..N+1 insert / 1..N move). priority_order is read everywhere in this diff's queue/index.ts but never written to a non-null value anywhere, and none of the three ordering-critical ORDER BY clauses include it. check_in also unconditionally assigns service_order to every checked-in entry, not just an authorized override, a materially different model than the spec. Originally flagged as P1 by Codex's own automated review bot on the very first commit (c6aa1b2604); missed by Claude across three review rounds focused on the separate CLAUDE-031/032 concurrency findings.",
-      "evidence": "https://github.com/NTinkicht/Tabibi/pull/39#issuecomment-5561291800 (Claude's independent concurrence) and the original finding at https://github.com/NTinkicht/Tabibi/pull/39#issuecomment (second Claude pathway, same PR) -- both verified directly against ARCHITECTURE.md and a grep of priority_order usage in queue/index.ts at this exact head.",
-      "required_resolution": "Either (a) implement ordering via priority_order per the existing ARCHITECTURE.md contract -- active cohort = waiting/checked_in with non-null priority_order, contiguous renumbering on cohort exit, 1..N+1 insert / 1..N move -- and make call()/listOperational() honor it ahead of eligibility_order/service_order; or (b) make an explicit architecture decision that service_order supersedes priority_order for this feature, documented in ARCHITECTURE.md, resolving the dual-field ambiguity (e.g. deprecate/remove priority_order).",
-      "verification_method": "Architecture-doc/code cross-reference (as above); once resolved, a test asserting a non-null priority_order entry is called ahead of a lower-service_order non-priority entry, per the spec's stated precedence."
-    }
-  ],
-  "resolved_findings": [
+      "resolved_at_sha": "1da2386b085e2620bf74cea77ac4d8533ac9ae2d",
+      "resolution": "service_order fully removed (column, index, every code reference) per ChatGPT's ARCHITECTURE_DECISION; priority_order is now the sole authoritative override using the pre-existing queue_entries_session_priority_uq index. call()/listOperational() order by priority_order-cohort-first then eligibility_order/registration_order, matching ARCHITECTURE.md:96-108. reorder()'s active cohort is state IN (waiting,checked_in) AND priority_order IS NOT NULL with correct 1..N+1 insert / 1..N move bound differentiation. Lifecycle exits (call/no_show/cancel) compact the remaining priority cohort to contiguous 1..N via the same NULL-first-then-assign pattern from CLAUDE-031, now correctly reused for priority_order in both reorder() and command()'s own compaction block. queue_order_version now advances on every cohort-affecting lifecycle command, not just reorder() (closing the standing Codex P1 finding from the first commit). UI removed all service_order references and forces an authoritative reload after every command/reorder instead of optimistic client-side sorting. Independently re-verified against real Postgres: 3 consecutive full-suite runs (34/34), typecheck/lint/format/unit+API clean, plus a fresh adversarial test inducing a priority-cohort gap via command()'s own compaction path and reordering through it -- succeeds, deterministic, no raw 23505. CI (run 34053605419) confirmed tied to this exact head, all green. One non-blocking NOTE: command()'s compaction block lacks the try/catch around 23505 that reorder()'s equivalent has; verified not exploitable since both paths sit behind the same session-row lock, but a consistency nit worth a follow-up."
+    },
     {
       "id": "CLAUDE-032",
       "severity": "MINOR",
@@ -211,7 +201,8 @@
   "accepted_nonblocking_notes": [
     "CLAUDE-025-NOTE",
     "CLAUDE-026-NOTE",
-    "CLAUDE-030-NOTE"
+    "CLAUDE-030-NOTE",
+    "CLAUDE-033-command-compaction-try-catch-note"
   ],
   "runtime_constraints": [
     "gemini_agent.general=limited by Gemini Agent project daily quota"
@@ -298,16 +289,17 @@
     "issue": 4,
     "work_unit": 5,
     "work_unit_title": "Authorized queue priority/reorder with mandatory reason, deterministic ordering, idempotency and audit",
-    "implementation_status": "changes_required",
+    "implementation_status": "merge_ready",
     "implementation_pr": 39,
     "canonical_branch": "codex/issue-4-work-unit-5-queue-priority",
-    "current_head": "623be69ec3cd83e3f519bc07a56bb406d67e5f73",
-    "review_verdict": "CHANGES_REQUIRED",
-    "ci_status": "green_but_does_not_cover_the_finding",
-    "resolved_findings": ["CLAUDE-031", "CLAUDE-032"],
-    "pending_findings": ["CLAUDE-033"],
-    "mergeable_state": "clean",
-    "note": "DO NOT MERGE. Claude's PASS/MERGE_READY for this head was retracted after a second Claude pathway found CLAUDE-033 (MAJOR, architecture)."
+    "current_head": "1da2386b085e2620bf74cea77ac4d8533ac9ae2d",
+    "review_verdict": "PASS_MERGE_READY",
+    "ci_status": "success_and_independently_verified",
+    "resolved_findings": ["CLAUDE-031", "CLAUDE-032", "CLAUDE-033"],
+    "accepted_nonblocking_notes": [
+      "CLAUDE-033-command-compaction-try-catch-note"
+    ],
+    "mergeable_state": "clean"
   },
   "next_work": {
     "issue": 4,
@@ -315,5 +307,5 @@
     "work_unit_title": "not yet defined",
     "pre_approved": false
   },
-  "notes": "PR #26 (Work Unit 4), PR #35 (Slack company bridge), and PR #40 (Slack onboard command trigger) are all merged and verified/reviewed cleanly. PR #39 (Issue #4 Work Unit 5, queue priority/reorder): DO NOT MERGE. Claude issued PASS/MERGE_READY at exact head 623be69ec3cd83e3f519bc07a56bb406d67e5f73 after independently verifying CLAUDE-031/CLAUDE-032 fixed against real Postgres, then RETRACTED it minutes later after a second Claude pathway (the @claude-triggered Action), re-invoked at the same exact head, found CLAUDE-033 (MAJOR, architecture): the PR's service_order mechanism completely bypasses the pre-existing priority_order contract specified in ARCHITECTURE.md:96-108 for exactly this feature -- priority_order is read everywhere in the diff but never written, and none of the three ordering-critical queries (call selection, display order, reorder cohort) honor it. This was independently re-verified by Claude (direct read of ARCHITECTURE.md, grep of priority_order usage, manual read of the three ORDER BY clauses) before concurring -- it is a real, unambiguous defect, and Codex's own automated review bot had already flagged it as P1 on the PR's very first commit. Claude missed it across three review rounds because each round was scoped to re-verifying the concurrency fix (CLAUDE-031/032) rather than re-doing the full architecture/spec-compliance pass; recorded plainly as Claude's own miss, not softened. Required resolution per the finding: implement ordering via priority_order per the existing spec, or make an explicit ARCHITECTURE.md-documented decision that service_order supersedes it. PR #32 was closed by the owner as SUPERSEDED / DO NOT MERGE -- resolved. On PR #40: a second Claude pathway and Codex's own review bot both independently caught a GitHub Actions case-insensitivity nuance in the trigger's string match that Claude's own review missed; recorded honestly as a non-blocking accepted note since it doesn't weaken the actual identity gate. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
+  "notes": "PR #26 (Work Unit 4), PR #35 (Slack company bridge), and PR #40 (Slack onboard command trigger) are all merged and verified/reviewed cleanly. PR #39 (Issue #4 Work Unit 5, queue priority/reorder) is PASS/MERGE_READY at final exact head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d after a five-round review: an owner-diagnosed CI failure, CLAUDE-031 (MAJOR, reorder gap-collision), CLAUDE-032 (MINOR, that fix's own test bug), and CLAUDE-033 (MAJOR, architecture) -- the last one caught by a second Claude pathway after Claude's own three rounds missed it, then independently re-verified and concurred by Claude rather than defended against, and recorded plainly as Claude's own miss. Codex's remediation removed the competing service_order mechanism entirely and aligned implementation to the pre-existing priority_order contract in ARCHITECTURE.md:96-108 per ChatGPT's ARCHITECTURE_DECISION. Claude independently re-reviewed the full remediation from scratch (not just the named finding) against real Postgres: 3 consecutive full-suite runs (34/34), typecheck/lint/format/unit+API clean, plus a fresh adversarial test for the priority-cohort compaction gap-safety pattern (reused correctly from CLAUDE-031 in a new location). CI confirmed tied to the actual exact head, all green. One non-blocking NOTE carried forward (command()'s own compaction block lacks a try/catch reorder()'s has; verified not exploitable under the current session-lock model). Ready for Codex to merge; no re-review needed. PR #32 was closed by the owner as SUPERSEDED / DO NOT MERGE -- resolved. On PR #40: a second Claude pathway and Codex's own review bot both independently caught a GitHub Actions case-insensitivity nuance in the trigger's string match that Claude's own review missed; recorded honestly as a non-blocking accepted note. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
 }
