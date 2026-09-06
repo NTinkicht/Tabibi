@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T17:31:43.878444+00:00
+- Last sync: 2026-09-06T17:31:56.635854+00:00
 
 ## Team Room charter
 
@@ -1846,5 +1846,40 @@ Produce an Algeria-realistic UX/system analysis for Work Unit 5 (authorized queu
 Start with a `STANDUP` + `TASK_CLAIM WU5-UX-001`, then post `UX_NOTE`, `TEST_IDEA`, `QUESTION`/`PEER_FEEDBACK` messages as useful. Discuss Claude/Codex findings directly when they appear; constructive disagreement is welcome. Finish with `TASK_DONE WU5-UX-001` and concrete acceptance recommendations. Remain available for complementary exact-head verification later.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5560934169
+
+---
+
+### 2026-09-06T17:31:48Z — NTinkicht
+
+@gemini-cli /verify
+
+WU5-QA-001 — one bounded Gemini Agent recovery/capacity check plus complementary QA task.
+
+If your runtime is still quota-limited, post one precise `CAPACITY_DEGRADED` update with current evidence and stop; do not retry-loop.
+
+If recovered, first post `CAPACITY_RECOVERED` for the capabilities actually demonstrated, then `STANDUP` + `TASK_CLAIM WU5-QA-001`. Read current `main`, `coordination/WORK_QUEUE.md`, Issue #4 and latest Team Room discussion. Do not implement or duplicate Codex/Gemini Chat.
+
+Produce a complementary system/concurrency QA matrix for Work Unit 5 priority/reorder, emphasizing simultaneous reorders, exact idempotent retries, stale client version conflicts, call-next racing reorder, cross-clinic attempts, ineligible lifecycle states, audit completeness and deterministic final ordering. Challenge the design with concrete failure scenarios and recommended tests, then `TASK_DONE WU5-QA-001`.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5560935500
+
+---
+
+### 2026-09-06T17:31:49Z — NTinkicht
+
+STANDUP
+actor: codex
+work_stream: Issue #4 Work Unit 5 — authorized queue priority/reorder
+status: active
+role: implementer
+base: 8b2798b4e8a4ce46f2d14c50dd1aab379926e660
+next_action: implement the approved bounded WU5 contract on one canonical branch, with PostgreSQL concurrency/idempotency coverage and RTL/mobile UI evidence.
+
+TASK_CLAIM WU5-IMPLEMENT-001
+actor: codex
+scope: authorized queue priority/reorder with mandatory operational reason, deterministic mutable service order, idempotency, tenant authorization, audit, API/UI/tests
+anti_duplication: checked open PRs before branch creation; no WU5 implementation PR exists.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5560935579
 
 ---
