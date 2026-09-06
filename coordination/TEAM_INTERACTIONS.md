@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T13:00:12.985870+00:00
+- Last sync: 2026-09-06T13:12:15.031472+00:00
 
 ## Team Room charter
 
@@ -456,5 +456,56 @@ evidence: `Gemini Chat Collaborator` workflow run `34032927675`, attempt 2, comp
 action_taken: `coordination/STATE.json` is now reconciled from `credential_invalid` to `authenticated_available`; Gemini Chat capabilities are marked available, and the scheduled monitor is no longer suppressed by the credential-invalid gate. No engineering role lease was assigned from this recovery event; normal role-leasing, anti-duplication, and reviewer-independence rules remain in force.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559379472
+
+---
+
+### 2026-09-06T13:12:04Z — NTinkicht
+
+ALL_HANDS_ENGINEERING_ROUNDTABLE
+round: RETRO-003
+scope: Tabibi engineering-team quality + immediate PR #20 recovery
+owner_intent: build the best application through the best team; active execution and candid peer critique are required, not status theater.
+
+All five actors — chatgpt, codex, claude, gemini_agent, gemini_chat — must participate when their runtime is available. This is not a request for duplicate implementation. Keep one canonical PR and one implementer lease.
+
+Current live work: Issue #4 Work Unit 3 / PR #20 at reviewed head `b27a072ec4f4099ec93265853759d7002ea3d3d4`, currently `CHANGES_REQUIRED` with MAJOR `CLAUDE-027` and `TAB-REVIEW-001`, MINOR `TAB-REVIEW-002` and `TAB-REVIEW-003`.
+
+Role plan for this round:
+- ChatGPT: orchestrator/state reconciler; release implementation lease to recovered Codex and keep the team moving.
+- Codex: preferred implementer/CI remediator; take the existing PR #20 branch and fix all four findings, with required tests and 3+ consecutive real-Postgres integration runs; do not self-gate.
+- Claude: retain independent gating-review responsibility; contribute engineering critique now, then independently rereview the next exact non-Claude-authored head.
+- Gemini Chat: active secondary verifier/UX-localization-system reviewer and team-discussion participant; do not duplicate implementation.
+- Gemini Agent: perform one bounded capacity/recovery check; if available, join QA/system verification and this roundtable; if still quota-limited, report the limitation and release the lease.
+
+Each available actor must post a `RETRO_ENTRY` that is candid, evidence-based and respectful. Include:
+- `liked`: concrete things another actor/team did well;
+- `did_not_like`: concrete friction, quality risks, delays, weak assumptions or process failures;
+- `peer_feedback`: at least one positive observation and one constructive criticism of another actor's work/decision;
+- `self_critique`: what you personally should have done better;
+- `change`: a specific improvement to code, architecture, testing, UX or team process;
+- `lesson`: reusable engineering lesson;
+- `next_contribution`: the concrete thing you will do next under your valid lease.
+
+Rules for critique:
+- critique evidence, code, decisions and process — never personalities;
+- no empty praise and no adversarial posturing;
+- disagree openly when evidence supports disagreement;
+- explicitly acknowledge useful findings from other actors;
+- turn criticism into a proposed test, code change, design rule or process improvement;
+- challenge ChatGPT too; orchestration is not exempt from review.
+
+After entries, respond to each other's proposals using `CONSENSUS_ACK`, `CONSENSUS_AMEND`, or `CONSENSUS_CHALLENGE`. We want an actual engineering conversation, not five isolated reports.
+
+HEARTBEAT
+actor: chatgpt
+role: orchestrator / state reconciler
+work_stream: PR #20 + RETRO-003 all-hands
+status: active
+current_action: waking the team, transferring implementation to recovered Codex, activating Gemini Chat as secondary verifier, preserving Claude reviewer independence, and probing Gemini Agent capacity once
+last_artifact: this Team Room all-hands roundtable
+next_checkpoint: Codex implementation heartbeat + Gemini Chat verification/retro entry + Claude critique/standby + Gemini Agent recovery result
+blocker: none
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559444678
 
 ---
