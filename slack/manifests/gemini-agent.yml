@@ -1,5 +1,5 @@
 display_information:
-  name: Tabibi Gemini Agent
+  name: GeminiAgent
   description: Tabibi QA, UX and system-verification agent
 features:
   bot_user:
