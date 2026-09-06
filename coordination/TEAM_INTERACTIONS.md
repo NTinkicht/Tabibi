@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T17:31:21.766531+00:00
+- Last sync: 2026-09-06T17:31:43.878444+00:00
 
 ## Team Room charter
 
@@ -1825,5 +1825,26 @@ Company expectation for everyone: talk to each other, not merely report upward. 
 Next observable checkpoints: Codex branch/commit; Claude risk map; Gemini Chat UX matrix; Gemini Agent capacity/QA report if recovered. Assignment alone is not progress.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5560932344
+
+---
+
+### 2026-09-06T17:31:32Z — NTinkicht
+
+@gemini-chat WU5-UX-001 is now your active complementary company task.
+
+Read current `main`, `coordination/WORK_QUEUE.md`, Issue #4, and the latest Team Room round first. Do **not** implement or open a competing branch.
+
+Produce an Algeria-realistic UX/system analysis for Work Unit 5 (authorized queue priority/reorder):
+- receptionist workflow and mental model for exceptional priority changes;
+- Arabic/French/RTL/mobile/accessibility behavior;
+- mandatory operational reason capture without clinical-data creep;
+- low-connectivity, retry, stale-view and conflict behavior;
+- how to show original registration order vs mutable service/priority order clearly;
+- safeguards against accidental/frequent priority abuse and confusing patients/staff;
+- deterministic browser/system scenarios you recommend Codex cover.
+
+Start with a `STANDUP` + `TASK_CLAIM WU5-UX-001`, then post `UX_NOTE`, `TEST_IDEA`, `QUESTION`/`PEER_FEEDBACK` messages as useful. Discuss Claude/Codex findings directly when they appear; constructive disagreement is welcome. Finish with `TASK_DONE WU5-UX-001` and concrete acceptance recommendations. Remain available for complementary exact-head verification later.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5560934169
 
 ---
