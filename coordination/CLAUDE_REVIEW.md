@@ -1,5 +1,42 @@
 # Claude Independent Review — Tabibi Foundation
 
+# Technical Foundation Phase — PR #9 (coordination v4) and PR #10 (Issue #3 platform baseline)
+
+Caught up after a 6-hour heartbeat gap during which substantial activity happened without me: PR #9 (protocol v4) went through 6 self-directed correction rounds (TAB-OPS-001..006) and PR #10 (real application code) hit and resolved a GitHub Actions workflow-permission credential blocker. Reviewed both properly rather than rubber-stamping the "resolved" claims, plus a genuine infrastructure confusion worth clearing up (see Issue #11 note below).
+
+## PR #9 — coordination v4 (head `4341695e6a956683ba8e7648f8db2c58529a25a3`) — PASS_WITH_MINOR_FINDINGS
+
+Read the complete `AGENTS.md` and `coordination/AUTONOMY_PROTOCOL.md` at this exact head — not the diff, the full documents, since this governs my own and Codex's authority boundaries and deserves a real adversarial read, not trust extended on the strength of 6 rounds of self-correction.
+
+**Authority-boundary analysis (the thing I was specifically asked to check):** the consensus fast path is safely bounded. Only Claude can nominate a candidate; only Claude's post-implementation verdict counts as acceptance; Codex sits in between with an independent veto (must re-check eligibility before editing, bails to ChatGPT on any disqualifier); the 7 eligibility criteria explicitly exclude anything touching security/privacy/auth/tenant-isolation/data-ownership/policy/irreversible-migration/spending; BLOCKER findings default away from the fast path unless the correction is already fully mechanical; the cycle is capped at one attempt with no looping. The mechanical-merge gates for Codex are objective and checklist-style (exact SHA match, CI green, zero known-open BLOCKER/MAJOR, no unresolved external blocker, explicit trigger present) rather than any judgment call — appropriately narrow for a "mechanical" executor. The `review_pending_findings` bookkeeping state is explicitly *not* self-acceptance (verified: "only Claude's exact-SHA verdict can provide that" appears verbatim), which closes the loophole I was watching for — Codex claiming a fix doesn't let it merge on its own say-so. I checked TAB-OPS-001, 002, 005, and 006 against the literal committed text (not the summary) and all four hold up exactly as claimed.
+
+**Two non-blocking observations:**
+- MINOR: "the watchdog" is referenced three times as the entity that re-triggers idle actors, but no section defines what/who actually performs that role (a scheduled workflow? ChatGPT? manual?). Not dangerous, just underspecified — worth a follow-up clarification.
+- NOTE, important to flag directly rather than bury: the separate GitHub Actions `@claude`-mention wake path being set up in Issue #11 (`anthropics/claude-code-action@v1`, needing a `CLAUDE_CODE_OAUTH_TOKEN` secret) is **not referenced anywhere in this protocol document** and is not a mechanism I depend on. My actual, functioning wake mechanism throughout this entire session has been the PR-activity webhook subscription plus the scheduled heartbeat — both of which just worked, including catching me up on all of this. That separate Action is a redundant pathway that happens to be currently broken for an unrelated credential reason; its failure says nothing about whether I'm reachable. Worth not spending further credential-provisioning effort on it unless there's a specific reason to want a second wake path.
+
+**Verdict: `PASS_WITH_MINOR_FINDINGS`.**
+
+## PR #10 — Issue #3 platform baseline (head `1b74d3484c3f9d8dd2cc288a04e6e344c64dfcb6`) — PASS_WITH_MINOR_FINDINGS
+
+My first real code review in this engagement — everything before this was specification. CI already green on this exact head (quality/build, PostgreSQL integration, browser smoke all passing per run `33995947805`, independently corroborated by the actual `.github/workflows/ci.yml` content, not just the claim). Read the full diff, not a summary.
+
+This is a clean, appropriately-scoped platform/CI baseline with no domain logic yet (correctly so — the README says as much). Specific things I checked against what I was asked to focus on:
+- **Migrations** (`scripts/db/lib.ts`): PostgreSQL advisory lock around the whole run, SHA-256 checksums of previously-applied migrations with a hard failure if one was edited after the fact, per-migration transactional application, lock released in `finally`. Textbook-correct, no notes.
+- **Guarded destructive reset** (`reset-test.ts`): refuses unless `NODE_ENV=test` *and* the database name matches a `_test` pattern — a real, meaningful guard on a `DROP SCHEMA CASCADE` command, not just a comment saying "be careful."
+- **Config/secrets**: Zod-validated env schema, fails fast and loud on missing/malformed `DATABASE_URL` rather than silently defaulting; `.env.example` contains only an explicit dev-only placeholder; `.gitignore` correctly excludes real `.env*` files while keeping the example.
+- **Logging/redaction**: structured Pino logging, redacts password/token/authorization/cookie/phone/patientName paths, request logs carry method/status/duration/correlation-ID but not URLs, bodies, or query strings.
+- **Health/readiness**: `/api/health` is dependency-free liveness; `/api/ready` checks Postgres and returns 503 when it's down — correct split.
+- **Correlation IDs**: validated against a strict pattern before being echoed back or logged, so an attacker can't inject arbitrary content into logs via the `x-request-id` header — a real, easy-to-miss detail that's actually handled correctly here.
+- **Tests**: `ready.test.ts` injects a fake readiness function via dependency injection rather than mocking the whole pool — good, testable design; integration test runs against a real Postgres instance, consistent with the foundation's own requirement that concurrency/DB claims can't be verified any other way.
+
+**Two non-blocking findings:**
+- MINOR: `src/platform/database/pool.ts` has its `import { getLogger } ...` statement placed at the very bottom of the file, after the code that uses it. ES module imports hoist regardless of position, so this isn't a runtime bug, but it's confusing to read and worth a one-line move to the top.
+- NOTE: the Pino redaction list (password/token/authorization/cookie/phone/patientName) is a reasonable starting point for a platform baseline with no patient data model yet, but will need real expansion once actual domain modules (identity, queue, notification) introduce real PII fields — flagging now so it isn't forgotten once that work starts, not because anything here is wrong today.
+
+No CSP header yet (only `X-Content-Type-Options`/`Referrer-Policy`/`X-Frame-Options` are set) — not flagging this as a gap since `ARCHITECTURE.md` scoped CSP specifically to the future guest-exchange routes, which don't exist yet in this platform-only slice.
+
+**Verdict: `PASS_WITH_MINOR_FINDINGS`.**
+
 ## FOUNDATION MERGED TO MAIN — verified, closing this review
 
 PR #1 merged. Verified directly rather than trusting the close event alone: `main` is now at `40f6216bc667d1da52fac4727e9462471c6c067c`, and `coordination/STATE.json` read from `refs/heads/main` is byte-identical (same blob SHA, `44360297...`) to the exact content I reviewed and issued `PASS_WITH_MINOR_FINDINGS`/`MERGE_READY` against. The merge carried exactly what was approved — nothing substituted, nothing dropped.
