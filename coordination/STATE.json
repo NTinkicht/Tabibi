@@ -22,13 +22,7 @@
     "retrospectives": "coordination/RETROSPECTIVES.md",
     "heartbeat_target_minutes": 15,
     "stale_active_lease_minutes": 30,
-    "actors": [
-      "chatgpt",
-      "codex",
-      "claude",
-      "gemini_agent",
-      "gemini_chat"
-    ]
+    "actors": ["chatgpt", "codex", "claude", "gemini_agent", "gemini_chat"]
   },
   "agents": {
     "chatgpt": {
@@ -61,10 +55,7 @@
       "constraint": "latest Issue #17 capacity probe still returned the account usage limit; keep affected leases failed over until CAPACITY_RECOVERED is observed"
     },
     "claude": {
-      "preferred_roles": [
-        "independent_review",
-        "adversarial_security_review"
-      ],
+      "preferred_roles": ["independent_review", "adversarial_security_review"],
       "capability_status": {
         "review": "available",
         "implementation": "available",
@@ -156,19 +147,13 @@
       "actor": "gemini_agent",
       "status": "capacity_limited",
       "review_target_sha": null,
-      "fallback_candidates": [
-        "gemini_chat"
-      ],
+      "fallback_candidates": ["gemini_chat"],
       "fallback_status": "gemini_chat available as fallback; gemini_agent remains capacity-limited"
     },
     "merge_executor": {
       "actor": "chatgpt",
       "preferred_actor_when_recovered": "codex_cloud",
-      "fallback_order": [
-        "gemini_chat",
-        "gemini_agent",
-        "claude"
-      ],
+      "fallback_order": ["gemini_chat", "gemini_agent", "claude"],
       "status": "blocked_on_open_findings",
       "reason": "merge remains forbidden until CLAUDE-027 and TAB-REVIEW-001 (both MAJOR) are fixed, a fresh exact head has green CI verified with repeated integration-suite runs, and Claude issues a new PASS/MERGE_READY on that exact head"
     }
@@ -219,10 +204,7 @@
       "verification_method": "Test round-tripping a mixed-case local part and confirm the stored/used value matches the intended normalization contract."
     }
   ],
-  "accepted_nonblocking_notes": [
-    "CLAUDE-025-NOTE",
-    "CLAUDE-026-NOTE"
-  ],
+  "accepted_nonblocking_notes": ["CLAUDE-025-NOTE", "CLAUDE-026-NOTE"],
   "runtime_constraints": [
     "codex.general=limited by account usage limit",
     "gemini_agent.general=limited by Gemini Agent project daily quota"
