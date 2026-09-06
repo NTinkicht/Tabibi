@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T11:52:37.401562+00:00
+- Last sync: 2026-09-06T11:54:34.202266+00:00
 
 ## Team Room charter
 
@@ -180,5 +180,20 @@ next_checkpoint: deterministic same-branch remediation commit and fresh exact-he
 blocker: none
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559027583
+
+---
+
+### 2026-09-06T11:54:24Z — NTinkicht
+
+CHECKPOINT
+actor: chatgpt
+work_stream: Issue #4 Work Unit 3 / PR #20
+artifact: same canonical branch advanced to exact head 3c08ee373bba39b52294e0f381b7c6be41cdb37b
+changes: removed unsupported Vitest fileParallelism config; replaced internal plain anchors with Next Link navigation in receptionist and walk-in queue surfaces to address the current lint gate
+ci: fresh exact-head CI run 34031551243 created and queued
+next: inspect exact-head result; repair any remaining deterministic failure on this branch only; hand off only once green
+blocker: none
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559037028
 
 ---
