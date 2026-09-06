@@ -1,13 +1,13 @@
 {
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
-  "round": 10,
-  "state": "work_unit_3_chatgpt_ci_remediation_with_team_visibility",
+  "round": 11,
+  "state": "work_unit_3_independent_review",
   "current_pr": 20,
   "current_issue": 4,
   "last_actor": "chatgpt",
-  "next_actor": "chatgpt",
-  "next_action": "remediate PR #20 formatting and vitest configuration failures on the same canonical branch, rerun exact-head CI, then hand the green ChatGPT-authored SHA to Claude as independent gating reviewer",
+  "next_actor": "claude",
+  "next_action": "independently review PR #20 exact head b27a072ec4f4099ec93265853759d7002ea3d3d4; merge only after exact-SHA PASS/MERGE_READY remains paired with green CI",
   "operating_model": "four-agent-capability-mesh-v5-role-failover-with-heartbeats-retrospectives",
   "binding_protocols": [
     "coordination/AUTONOMY_PROTOCOL.md",
@@ -37,7 +37,7 @@
         "review": "available",
         "merge_execution": "available"
       },
-      "current_activity": "active implementer and CI remediator for canonical PR #20 after no-idle failover; also orchestrating Team Room/retro infrastructure"
+      "current_activity": "orchestrating after completing Work Unit 3 implementation/CI failover; cannot self-gate the ChatGPT-authored exact head"
     },
     "codex_cloud": {
       "preferred_roles": [
@@ -54,14 +54,17 @@
       "constraint": "latest Issue #17 capacity probe still returned the account usage limit; keep affected leases failed over until CAPACITY_RECOVERED is observed"
     },
     "claude": {
-      "preferred_roles": ["independent_review", "adversarial_security_review"],
+      "preferred_roles": [
+        "independent_review",
+        "adversarial_security_review"
+      ],
       "capability_status": {
         "review": "available",
         "implementation": "available",
         "orchestration": "available",
         "merge_execution": "available"
       },
-      "current_activity": "available as preferred independent non-author gating reviewer once ChatGPT finishes PR #20 remediation",
+      "current_activity": "assigned as preferred independent non-author gating reviewer for PR #20 exact head b27a072ec4f4099ec93265853759d7002ea3d3d4",
       "invocation_policy": "persistent Claude session is the default Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
     "gemini": {
@@ -86,14 +89,14 @@
     },
     "implementer": {
       "actor": "chatgpt",
-      "status": "active_failover",
+      "status": "released_after_green_ci",
       "work_stream": "issue-4-work-unit-3-pr-20",
-      "reason": "Claude assignment did not produce acknowledgement/branch movement; Codex and Gemini are capacity-limited"
+      "reason": "canonical implementation head is green and ready for independent review"
     },
     "gating_reviewer": {
       "actor": "claude",
-      "status": "waiting_for_green_chatgpt_head",
-      "review_target_sha": null,
+      "status": "assigned",
+      "review_target_sha": "b27a072ec4f4099ec93265853759d7002ea3d3d4",
       "reason": "ChatGPT materially authored PR #20 and cannot self-gate its exact head"
     },
     "secondary_verifier": {
@@ -104,18 +107,24 @@
     "merge_executor": {
       "actor": "chatgpt",
       "preferred_actor_when_recovered": "codex_cloud",
-      "fallback_order": ["gemini", "claude"],
-      "status": "waiting_for_green_ci_and_independent_gate"
+      "fallback_order": [
+        "gemini",
+        "claude"
+      ],
+      "status": "waiting_for_independent_exact_sha_gate"
     }
   },
   "product_architect": "chatgpt",
   "deterministic_referee": "ci",
-  "open_blockers": 2,
+  "open_blockers": 0,
   "open_majors": 0,
   "open_minors": 0,
   "human_decision_required": false,
-  "pending_findings": ["PR20-CI-FORMAT", "PR20-CI-VITEST-CONFIG"],
-  "accepted_nonblocking_notes": ["CLAUDE-025-NOTE", "CLAUDE-026-NOTE"],
+  "pending_findings": [],
+  "accepted_nonblocking_notes": [
+    "CLAUDE-025-NOTE",
+    "CLAUDE-026-NOTE"
+  ],
   "runtime_constraints": [
     "codex.general=limited by account usage limit",
     "gemini.general=limited by Google free-tier daily quota"
@@ -157,19 +166,20 @@
     "work_unit": 3,
     "work_unit_title": "Walk-in/guest patient intake and waiting QueueEntry materialization",
     "approval_comment": 5558643274,
-    "implementation_status": "chatgpt_ci_remediation",
+    "implementation_status": "green_waiting_independent_review",
     "implementation_pr": 20,
     "canonical_branch": "claude/issue-4-work-unit-3-walkin-queue",
-    "current_head": "7826a177ebea7f30d5f49b0123e8687c5170cb3e",
-    "ci_run": 34028241002,
-    "ci_status": "failure",
-    "ci_passed": ["PostgreSQL integration"],
-    "ci_remaining": [
-      "Prettier formatting on four Work Unit 3 files",
-      "remove or replace unsupported vitest project config property fileParallelism so Next.js production typecheck succeeds"
+    "current_head": "b27a072ec4f4099ec93265853759d7002ea3d3d4",
+    "ci_run": 34032205360,
+    "ci_status": "success",
+    "ci_passed": [
+      "Quality and build",
+      "PostgreSQL integration",
+      "Browser smoke"
     ],
+    "ci_remaining": [],
     "scope": "receptionist walk-in/guest registration plus atomic waiting QueueEntry creation only; check-in/call/priority/ETA/notifications/remote guest credentials remain out of scope"
   },
   "next_work": null,
-  "notes": "Team Room Issue #21 and the collaboration/heartbeat/retro/consensus protocol are now part of project governance. PR #20 remains the sole canonical Work Unit 3 implementation stream. The two current CI failures are deterministic repo-side remediation tasks and require no owner action."
+  "notes": "PR #20 is the sole canonical Work Unit 3 implementation stream and is ready for review. The deterministic CI incident was resolved without owner action: unsupported Vitest config and lint/navigation issues were repaired, the browser failure was traced to strict same-origin comparison under Next host canonicalization, CSRF validation was fixed without removing origin protection and regression-covered, and final exact-head CI is fully green. The temporary pr20 one-time autofix workflow was already absent from main when reconciled. Independent non-author gating review is now required before merge."
 }
