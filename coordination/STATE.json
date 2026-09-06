@@ -1,13 +1,13 @@
 {
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
-  "round": 19,
-  "state": "work_unit_5_merged_awaiting_work_unit_6_scope",
-  "current_pr": null,
-  "current_issue": 4,
+  "round": 20,
+  "state": "work_unit_6_changes_required",
+  "current_pr": 51,
+  "current_issue": 49,
   "last_actor": "claude",
   "next_actor": "chatgpt",
-  "next_action": "scope Issue #4 Work Unit 6 and assign implementer; no active lease is held.",
+  "next_action": "resolve CLAUDE-034 (MAJOR) on PR #51 exact head 62bbecb7e9a49464c064067c013fe144d5badd92: remove the dead ID-derived publicDisplayLabel() helper and its call site in registerWalkIn; let the migration 0007 BEFORE INSERT trigger own label assignment entirely. ChatGPT authored this head and must not self-gate; hand the fixed head back to Claude for re-verification.",
   "operating_model": "five-actor-capability-mesh-v6-role-failover-with-heartbeats-retrospectives",
   "binding_protocols": [
     "coordination/AUTONOMY_PROTOCOL.md",
@@ -38,7 +38,7 @@
         "review": "available",
         "merge_execution": "available"
       },
-      "current_activity": "orchestrator/state reconciler; Work Unit 5 (PR #39) merged. Next: scope Work Unit 6."
+      "current_activity": "orchestrator/state reconciler; scoped Issue #49 (Work Unit 6, privacy-preserving waiting-room identifiers) after Codex capacity degradation, assigning itself as failover implementer."
     },
     "codex_cloud": {
       "preferred_roles": [
@@ -62,7 +62,7 @@
         "orchestration": "available",
         "merge_execution": "available"
       },
-      "current_activity": "PR #26, PR #35, PR #40, and PR #39 all merged and verified/reviewed. PR #39 (Work Unit 5, queue priority/reorder): after retracting an earlier PASS/MERGE_READY when a second Claude pathway found CLAUDE-033, independently re-reviewed Codex's remediation from scratch against real Postgres (including a fresh adversarial test for the priority-cohort compaction gap-safety pattern), issued PASS/MERGE_READY at final exact head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d, then confirmed the squash-merge commit 1b071d6 carried zero application-code drift from that head before reconciling STATE.json. No active lease. Standing by for Work Unit 6.",
+      "current_activity": "PR #26, PR #35, PR #40, and PR #39 all merged and verified/reviewed. Now independently reviewing PR #51 (Issue #49, Work Unit 6, privacy-preserving waiting-room identifiers) at exact head 62bbecb7e9a49464c064067c013fe144d5badd92 -- reviewed the actual current head rather than the stale SHA named in the HANDOFF_TO_CLAUDE comment (two more commits had landed by the time of review). Found and posted CLAUDE-034 (MAJOR): registerWalkIn still computes and inserts an ID-derived public label, neutralized only by migration 0007's BEFORE INSERT trigger override (proven empirically against real Postgres by hand-inserting the insecure value and confirming the trigger overwrote it). No live leak today, but a latent regression risk the current tests can't catch. Verdict: CHANGES_REQUIRED. No active lease.",
       "invocation_policy": "persistent Claude session is the default Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
     "gemini_agent": {
@@ -117,12 +117,16 @@
       "status": "active"
     },
     "implementer": {
-      "actor": null,
-      "status": "not_assigned"
+      "actor": "chatgpt",
+      "status": "active",
+      "note": "ChatGPT is failover implementer for Issue #49/Work Unit 6 pending Codex capacity recovery; must not self-gate its own exact head"
     },
     "gating_reviewer": {
-      "actor": null,
-      "status": "not_assigned"
+      "actor": "claude",
+      "status": "active",
+      "review_target": "PR #51 exact head 62bbecb7e9a49464c064067c013fe144d5badd92",
+      "verdict": "CHANGES_REQUIRED",
+      "reason": "CLAUDE-034 (MAJOR) posted; awaiting fix"
     },
     "secondary_verifier": {
       "actor": null,
@@ -136,10 +140,19 @@
   "product_architect": "chatgpt",
   "deterministic_referee": "ci",
   "open_blockers": 0,
-  "open_majors": 0,
+  "open_majors": 1,
   "open_minors": 0,
   "human_decision_required": false,
-  "pending_findings": [],
+  "pending_findings": [
+    {
+      "id": "CLAUDE-034",
+      "severity": "MAJOR",
+      "target_sha": "62bbecb7e9a49464c064067c013fe144d5badd92",
+      "summary": "registerWalkIn() in src/modules/queue/index.ts still computes a publicDisplayLabel(entryId) derived directly from the queue entry's own UUID and passes it into the queue_entries INSERT, violating Issue #49 req #2 ('do not derive labels directly from... database IDs'). db/migrations/0007's BEFORE INSERT trigger unconditionally overwrites it with a safe random value before the row is persisted -- empirically verified against real Postgres (hand-inserted the insecure value, trigger overwrote it) -- so there is no live PII/correlation leak today, but the dead insecure code path is a latent regression risk: a future removal of the trigger (plausible as a 'redundant cleanup') would silently reintroduce ID-derived public labels, and the current test suite only checks the final persisted value so would not catch that regression.",
+      "required_resolution": "Delete the publicDisplayLabel(entryId) helper and its call site in registerWalkIn; stop passing a computed value into the public_display_label column of that INSERT (omit the column or pass NULL/DEFAULT) and rely entirely on the migration 0007 trigger to assign it -- loadRegistration's existing re-select already reads back the correct value with no other change needed.",
+      "verification_method": "grep -n \"publicDisplayLabel(\" src/modules/queue/index.ts shows zero call sites after the fix (function removed); existing tests/integration/waiting-room-public.test.ts (3 tests) continues to pass unchanged since it only exercises the final persisted/returned label; independent re-verification against real Postgres before re-gating."
+    }
+  ],
   "resolved_findings": [
     {
       "id": "CLAUDE-033",
@@ -299,11 +312,26 @@
       "status": "merged"
     }
   ],
+  "current_work": {
+    "issue": 49,
+    "parent_issue": 4,
+    "work_unit": 6,
+    "work_unit_title": "Privacy-preserving waiting-room identifiers",
+    "implementation_status": "changes_required",
+    "implementation_pr": 51,
+    "canonical_branch": "chatgpt/issue-49-wu6-waiting-room-labels",
+    "current_head": "62bbecb7e9a49464c064067c013fe144d5badd92",
+    "review_verdict": "CHANGES_REQUIRED",
+    "ci_status": "success_and_independently_verified",
+    "pending_findings": ["CLAUDE-034"],
+    "mergeable_state": "not_ready"
+  },
   "next_work": {
     "issue": 4,
-    "work_unit": 6,
+    "work_unit": 7,
     "work_unit_title": "not yet defined",
-    "pre_approved": false
+    "pre_approved": false,
+    "blocked_by": "Work Unit 6 (PR #51) must reach PASS/MERGE_READY and merge first"
   },
-  "notes": "PR #26 (Work Unit 4), PR #35 (Slack company bridge), PR #40 (Slack onboard command trigger), and now PR #39 (Issue #4 Work Unit 5, queue priority/reorder) are all merged and verified/reviewed cleanly. PR #39 merged as squash commit 1b071d6a6c8d635d622358ece61590bd10a32192 on top of final exact reviewed head 1da2386b085e2620bf74cea77ac4d8533ac9ae2d, after a five-round review: an owner-diagnosed CI failure, CLAUDE-031 (MAJOR, reorder gap-collision), CLAUDE-032 (MINOR, that fix's own test bug), and CLAUDE-033 (MAJOR, architecture) -- the last one caught by a second Claude pathway after Claude's own three rounds missed it, then independently re-verified and concurred by Claude rather than defended against, and recorded plainly as Claude's own miss. Codex's remediation removed the competing service_order mechanism entirely and aligned implementation to the pre-existing priority_order contract in ARCHITECTURE.md:96-108 per ChatGPT's ARCHITECTURE_DECISION. Claude independently re-reviewed the full remediation from scratch (not just the named finding) against real Postgres: 3 consecutive full-suite runs (34/34), typecheck/lint/format/unit+API clean, plus a fresh adversarial test for the priority-cohort compaction gap-safety pattern (reused correctly from CLAUDE-031 in a new location). CI confirmed tied to the actual exact head, all green. Post-merge, Claude independently confirmed the squash commit is single-parent, matches the reviewed diff stats exactly, and carries zero application-code drift versus the reviewed head. One non-blocking NOTE carried forward (command()'s own compaction block lacks a try/catch reorder()'s has; verified not exploitable under the current session-lock model). Issue #4 Work Unit 6 is not yet scoped -- ChatGPT to define next. PR #32 was closed by the owner as SUPERSEDED / DO NOT MERGE -- resolved. On PR #40: a second Claude pathway and Codex's own review bot both independently caught a GitHub Actions case-insensitivity nuance in the trigger's string match that Claude's own review missed; recorded honestly as a non-blocking accepted note. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
+  "notes": "PR #26 (Work Unit 4), PR #35 (Slack company bridge), PR #40 (Slack onboard command trigger), and PR #39 (Issue #4 Work Unit 5, queue priority/reorder) are all merged and verified/reviewed cleanly. Issue #49 (Work Unit 6, privacy-preserving waiting-room identifiers) was scoped by ChatGPT after Codex capacity degradation and implemented by ChatGPT as failover implementer on PR #51. The HANDOFF_TO_CLAUDE named a stale exact head (ca3acac); Claude instead reviewed the actual current head 62bbecb7e9a49464c064067c013fe144d5badd92 (two more commits had landed since the handoff was posted), independently confirming CI green on that head first. Verdict: CHANGES_REQUIRED with CLAUDE-034 (MAJOR) -- registerWalkIn() still computes and inserts a public_display_label derived directly from the queue entry's own UUID, violating the WU6 requirement not to derive labels from database IDs; empirically verified (real Postgres, hand-inserted the insecure value) that migration 0007's BEFORE INSERT trigger unconditionally overwrites it before commit, so there is no live PII leak today, but the dead insecure code path is a latent landmine a future 'redundant cleanup' could reactivate, uncaught by the current tests which only check the final persisted value. Everything else on PR #51 verified sound: tenant/session isolation, no PII/internal-ID leakage in the public response, terminal-entry removal, ordering consistent with the established listOperational precedence, unauthenticated route correctly has no auth path and clean error handling, guest-credential independence (that subsystem doesn't exist yet). The @claude Action pathway errored out twice on this PR rather than producing a verdict -- no second opinion available this round. Awaiting ChatGPT's fix; expect fast re-verification once pushed since the required change is small and localized. PR #32 was closed by the owner as SUPERSEDED / DO NOT MERGE -- resolved. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
 }
