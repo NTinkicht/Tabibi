@@ -29,9 +29,19 @@ This means the GitHub-reported "PostgreSQL integration: success" is not reliable
 
 **Verification method for the fix:** re-run `npm run test:integration` at least 3 times back-to-back locally against real Postgres (not just once) after the config change, confirming 23/23 every time — a single green run is not sufficient evidence given the failure is timing-dependent.
 
+## Addendum: Codex's automated inline review, verified and concurred
+
+After I posted the verdict above, three inline findings from the Codex GitHub review bot landed (delivered to me out of order — queued before I finished, delivered after). Verified each against the actual code rather than accepting or dismissing on the reviewer's say-so:
+
+- **TAB-REVIEW-001 (MAJOR, confirmed — stronger than as reported).** Session cancellation's DB trigger (`enforce_session_queue_terminal_transition`) bulk-updates every `waiting`/`checked_in`/`called` queue entry to `cancelled`, but `SessionService.command`'s cancel path calls `appendAuditEvent` exactly once, for the session-level event only — traced the exact code path, confirmed no per-entry audit event is ever written for entries the trigger disposes of. This isn't just a good-practice suggestion: `ARCHITECTURE.md`'s own "Session cancellation" section explicitly commits to "atomically transitions every remaining waiting/checked_in/called entry to cancelled, ... **records audit events** ..." and `SECURITY.md`'s Auditability section explicitly lists "queue creation/removal" and session "cancel" as required audited actions. This is a violation of an already-committed contract, not a new ask — correctly MAJOR.
+- **TAB-REVIEW-002 (MINOR, confirmed).** `walk-in-queue.tsx`'s registration form sends `preferredLocale: locale`, where `locale` is the receptionist's own current UI-display state, not a distinct choice for the patient. A receptionist working in French who registers an Arabic-speaking walk-in silently records `fr` as that patient's preferred locale.
+- **TAB-REVIEW-003 (MINOR, confirmed).** `normalizeOptional(input.contactEmail)?.toLowerCase()` lowercases the entire address including the local part before `@`, which is technically case-sensitive per RFC 5321 (narrow real-world impact, but a real correctness nitpick as reported).
+
+All three fold into the same CHANGES_REQUIRED verdict below — TAB-REVIEW-001 in particular is blocking on its own, independent of CLAUDE-027.
+
 ## Disposition
 
-**CHANGES_REQUIRED**, not `PASS`/`MERGE_READY`. This is the only blocking finding — the application code itself (auth, concurrency, tenant isolation, privacy, CSRF) is genuinely solid and matches or exceeds the bar set by PR #15's fixes. Routing to whoever holds implementer capacity per the failover protocol for a small, well-scoped config fix, with the exact reproduction and fix already identified above so it shouldn't require rediscovery.
+**CHANGES_REQUIRED**, not `PASS`/`MERGE_READY`. Two independent blocking items: CLAUDE-027 (non-deterministic integration suite) and TAB-REVIEW-001 (missing per-entry audit events on cascade cancellation, a committed-contract violation). TAB-REVIEW-002/003 are real but non-blocking MINOR items worth fixing in the same pass. The application's core logic (auth ordering, concurrency, tenant isolation, privacy, CSRF) is otherwise genuinely solid and matches or exceeds the bar set by PR #15's fixes. Routing to whoever holds implementer capacity per the failover protocol, with exact reproductions/fixes already identified so nothing needs rediscovery.
 
 # Structural gap found: issue-only handoffs can fail over before I'm structurally able to see them
 
