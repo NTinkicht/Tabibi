@@ -117,17 +117,19 @@
       "status": "active"
     },
     "implementer": {
-      "actor": "codex",
-      "status": "active",
-      "work_stream": "Issue #4 Work Unit 4"
+      "actor": null,
+      "status": "released_reviewable_head",
+      "last_actor": "codex"
     },
     "gating_reviewer": {
       "actor": "claude",
-      "status": "assigned_pending_review"
+      "status": "active_pending_verdict",
+      "review_target": "PR #26 current head"
     },
     "secondary_verifier": {
       "actor": "gemini_chat",
-      "status": "assigned_pending_review"
+      "status": "assigned_pending_verification",
+      "review_target": "PR #26 current head"
     },
     "merge_executor": {
       "actor": null,
@@ -224,10 +226,13 @@
     "issue": 4,
     "work_unit": 4,
     "title": "Receptionist queue lifecycle controls",
-    "status": "implementation_active",
+    "status": "pending_independent_review",
     "canonical_branch": "codex/issue-4-work-unit-4-queue-lifecycle",
-    "implementer": "codex"
+    "canonical_pr": 26,
+    "implementer": "codex",
+    "gating_reviewer": "claude",
+    "secondary_verifier": "gemini_chat"
   },
   "next_work": null,
-  "notes": "Issue #4 Work Unit 4 approved. Codex holds the sole implementation/CI-remediation lease; Claude is the independent gate and Gemini Chat the supplementary UX/system verifier."
+  "notes": "Work Unit 4 implementation is reviewable on canonical PR #26. Codex released implementation lease; Claude owns the independent gate and Gemini Chat owns supplementary Algeria-first UX/system verification."
 }
