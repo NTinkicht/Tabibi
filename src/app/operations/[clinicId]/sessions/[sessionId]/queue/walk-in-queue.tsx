@@ -14,8 +14,6 @@ type WaitingEntry = {
   hasContact: boolean;
 };
 
-const RECEPTION_LOCALE_KEY = 'tabibi_reception_locale';
-
 function key() {
   return crypto.randomUUID();
 }
@@ -23,11 +21,13 @@ function key() {
 export function WalkInQueue({
   clinicId,
   sessionId,
+  initialLocale = 'ar',
 }: {
   clinicId: string;
   sessionId: string;
+  initialLocale?: 'ar' | 'fr';
 }) {
-  const [locale, setLocale] = useState<'ar' | 'fr'>('ar');
+  const [locale, setLocale] = useState<'ar' | 'fr'>(initialLocale);
   const t = receptionistCopy[locale];
   const [entries, setEntries] = useState<WaitingEntry[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -35,20 +35,7 @@ export function WalkInQueue({
   const [pending, setPending] = useState(false);
   const pendingKeysRef = useRef(new Map<string, string>());
 
-  useEffect(() => {
-    const stored = window.localStorage.getItem(RECEPTION_LOCALE_KEY);
-    if (stored === 'ar' || stored === 'fr') setLocale(stored);
-  }, []);
-
-  function toggleLocale() {
-    const next = locale === 'ar' ? 'fr' : 'ar';
-    window.localStorage.setItem(RECEPTION_LOCALE_KEY, next);
-    setLocale(next);
-  }
-
   const load = useCallback(async () => {
-    setState('loading');
-    setMessage('');
     try {
       const response = await fetch(
         `/api/clinics/${clinicId}/sessions/${sessionId}/queue`,
@@ -120,6 +107,12 @@ export function WalkInQueue({
     }
   }
 
+  function reload() {
+    setState('loading');
+    setMessage('');
+    void load();
+  }
+
   return (
     <main className="desk" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <header className="deskHeader">
@@ -128,16 +121,22 @@ export function WalkInQueue({
           <h1>{t.queueTitle}</h1>
           <p>{t.queueSubtitle}</p>
         </div>
-        <button className="locale" onClick={toggleLocale}>
+        <button
+          className="locale"
+          onClick={() => setLocale(locale === 'ar' ? 'fr' : 'ar')}
+        >
           {locale === 'ar' ? 'Français' : 'العربية'}
         </button>
       </header>
 
       <div className="queueToolbar">
-        <a className="secondaryLink" href={`/operations/${clinicId}`}>
+        <a
+          className="secondaryLink"
+          href={`/operations/${clinicId}?locale=${locale}`}
+        >
           {t.backSessions}
         </a>
-        <button className="locale" onClick={() => void load()}>
+        <button className="locale" onClick={reload}>
           {t.reload}
         </button>
       </div>
