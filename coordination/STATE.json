@@ -1,13 +1,14 @@
 {
   "project": "Tabibi",
-  "phase": "foundation",
-  "round": 8,
-  "state": "awaiting_claude_foundation_rereview",
-  "current_pr": 1,
+  "phase": "technical_foundation",
+  "round": 1,
+  "state": "awaiting_claude_pr9_rereview",
+  "current_pr": 9,
+  "current_issue": 3,
   "last_actor": "codex_cloud",
   "next_actor": "claude",
-  "next_action": "independently review cumulative PR #1 head for TAB-FND-033/034/035; if acceptable, emit PASS or PASS_WITH_MINOR_FINDINGS plus MERGE_READY and HANDOFF_TO_CODEX naming the exact reviewed SHA",
-  "operating_model": "tri-agent-v3-no-idle",
+  "next_action": "independently review the current PR #9 head for TAB-OPS-001 through TAB-OPS-006; if acceptable, emit PASS or PASS_WITH_MINOR_FINDINGS plus MERGE_READY and HANDOFF_TO_CODEX naming the exact reviewed SHA, with @codex merge this PR if gates pass",
+  "operating_model": "tri-agent-v4-executable-wakeups-consensus-fast-path",
   "product_architect": "chatgpt",
   "implementation_runtime": "codex_cloud",
   "mechanical_merge_executor": "codex_cloud",
@@ -17,31 +18,32 @@
   "open_majors": 0,
   "open_minors": 0,
   "human_decision_required": false,
-  "product_version": "0.10",
-  "architecture_version": "0.15",
-  "security_version": "0.6",
   "pending_findings": [],
-  "addressed_findings": [
-    "CLAUDE-022",
-    "CLAUDE-023",
-    "TAB-FND-027-dispatch-recovery",
-    "TAB-FND-028-secret-outbox",
-    "TAB-FND-027-booking-queue-materialization",
-    "TAB-FND-028-effective-service-order",
-    "TAB-FND-030-transfer-target-state",
-    "CLAUDE-025",
-    "CLAUDE-026",
-    "TAB-FND-033",
-    "TAB-FND-034",
-    "TAB-FND-035"
+  "review_pending_findings": [
+    "TAB-OPS-001",
+    "TAB-OPS-002",
+    "TAB-OPS-003",
+    "TAB-OPS-004",
+    "TAB-OPS-005",
+    "TAB-OPS-006"
   ],
-  "next_work": {
-    "preapproved": true,
+  "addressed_findings": [
+    "TAB-OPS-001",
+    "TAB-OPS-002",
+    "TAB-OPS-003",
+    "TAB-OPS-004",
+    "TAB-OPS-005",
+    "TAB-OPS-006"
+  ],
+  "current_work": {
     "issue": 3,
     "title": "Epic: Technical foundation, CI and deployment baseline",
-    "base_branch": "main",
-    "runtime": "codex_cloud",
-    "reviewer": "claude"
+    "pre_approved": true,
+    "implementation_status": "active",
+    "coordination_pr": 9,
+    "coordination_pr_status": "awaiting_independent_claude_review",
+    "implementation_pr": 10,
+    "implementation_pr_status": "ci_running_and_early_claude_review"
   },
-  "notes": "TAB-FND-033/034/035 are author-claimed addressed in canonical v0.15/v0.10/v0.6 documents: bearer minting occurs only on atomic exchange consumption; closing is removed in favor of atomic close; and doctor-global open-session capacity is serialized global-before-local. Claude must independently review the exact pushed head. Merge remains forbidden until MERGE_READY names that unchanged head."
+  "notes": "PR #1 is merged. Issue #3 and its PR #10 are explicitly pre-approved active current_work. After PR #9 merges to main, Codex continues Issue #3 / PR #10 before consulting next_work; no ChatGPT intervention is required. PR #9 contains author-claimed fixes for TAB-OPS-001 through TAB-OPS-006. These are review-pending, not known-open or independently accepted; Claude's exact-SHA verdict determines acceptance without requiring a bookkeeping commit after review. A rejected finding becomes known-open for control flow, but a later pushed concrete correction returns it to review_pending_findings with known-open severity cleared. PR #10 has published GitHub Actions CI and is running CI while Claude performs an early non-gating review. A successful merge handoff is valid only when it names the exact reviewed SHA and includes @codex merge this PR if gates pass."
 }

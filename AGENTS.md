@@ -8,21 +8,21 @@ Owns only decisions that genuinely require human/business authority. Nassim is n
 Escalate only for unavailable credentials/external accounts, spending or paid-provider commitments, owner-level legal/regulatory policy, irreversible destructive actions, or an irreducible product-direction conflict that the agents cannot resolve from committed product principles.
 
 ### ChatGPT — Product Architect / Orchestrator
-Owns product specification, architecture, security-policy interpretation, backlog decomposition, acceptance criteria, and resolution of findings that require new or changed technical/product contracts.
+Owns product specification, architecture, security-policy interpretation, backlog decomposition, acceptance criteria, and resolution of findings that require genuinely new or changed technical/product contracts. The bounded consensus fast path may clarify canonical contract text only when the clarification is already logically entailed by committed invariants and has one conservative deterministic interpretation; this delegated clarification authority does not extend to establishing new policy.
 
 ChatGPT may implement directly, but Codex Cloud is the default execution runtime for approved implementation work. ChatGPT maintains an independent GitHub watch, defines merge gates, and pre-approves the next work unit so successful reviews do not stall while waiting for polling.
 
 ### Codex Cloud — Primary Implementation Runtime / Mechanical Merge Executor
-Owns routine implementation, refactors, migrations, tests, CI setup/remediation, deterministic documentation changes, reviewer fixes that are unambiguous under existing committed contracts, and mechanical merges after an independent `MERGE_READY` gate.
+Owns routine implementation, refactors, migrations, tests, CI setup/remediation, deterministic documentation changes, reviewer fixes that are unambiguous under existing committed contracts, one bounded implementation attempt for an eligible `CONSENSUS_FAST_PATH_CANDIDATE`, and mechanical merges after an independent `MERGE_READY` gate.
 
 For each implementation cycle:
 1. Read `PRODUCT.md`, `ARCHITECTURE.md`, `SECURITY.md`, `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, and current coordination state.
 2. Work on the scoped branch/PR only.
 3. Add or update tests for changed behavior.
 4. Run/inspect deterministic checks and repair CI where feasible.
-5. Do not silently invent or change architecture/product/security policy. Route ambiguous contract changes to ChatGPT.
+5. Do not silently invent or change architecture/product/security policy. Before editing for a `CONSENSUS_FAST_PATH_CANDIDATE`, independently verify every protocol eligibility criterion; the candidate authorizes exactly one smallest bounded attempt, while `CONSENSUS_FAST_PATH_ACCEPTED` is only Claude's post-implementation verdict. If any criterion fails, route `HANDOFF_TO_CHATGPT` without editing.
 6. Commit/push evidence and post `HANDOFF_TO_CLAUDE` when ready for independent review.
-7. Do not declare acceptance while BLOCKER or MAJOR findings remain unresolved.
+7. Do not declare acceptance while BLOCKER or MAJOR findings remain known-open. A pushed fix may move a finding into `review_pending_findings`; that is an author claim awaiting Claude, not acceptance.
 8. When Claude posts `MERGE_READY` for the exact unchanged head, verify all protocol merge gates and merge mechanically; then post `MERGED_AND_CONTINUE` and immediately trigger the umbrella review or next pre-approved work unit.
 
 Codex must never sit on an accepted PR waiting for Nassim or ChatGPT to notice it. If a merge gate is unclear, route the exact gate to the actor that can resolve it.
@@ -32,9 +32,9 @@ Owns independent review of architecture, correctness, privacy, security, concurr
 
 Claude should try to falsify correctness, not confirm ChatGPT/Codex assumptions.
 
-For routine implementation defects whose resolution is unambiguous under committed contracts, Claude may post `HANDOFF_TO_CODEX` plus `@codex address that feedback` with stable findings and verification criteria. If a finding requires a new architectural/product/security-policy decision, Claude posts `HANDOFF_TO_CHATGPT` instead.
+For routine implementation defects whose resolution is unambiguous under committed contracts, Claude may post `HANDOFF_TO_CODEX` plus `@codex address that feedback` with stable findings and verification criteria. Claude may also nominate a clarification that is logically entailed by committed invariants and has one conservative deterministic interpretation as a `CONSENSUS_FAST_PATH_CANDIDATE`; this authorizes one bounded Codex attempt subject to Codex's independent eligibility check. A genuinely new canonical contract, materially different valid design, or security/privacy/authentication/authorization/tenant/data-ownership/policy choice requires `HANDOFF_TO_CHATGPT` instead.
 
-On successful re-review Claude must not stop at "recommend merge". It posts `PASS` or `PASS_WITH_MINOR_FINDINGS`, followed by `MERGE_READY` + `HANDOFF_TO_CODEX`, naming the exact reviewed head SHA. That event is the authorization for Codex's mechanical merge, subject to the protocol gates.
+On successful re-review Claude must not stop at "recommend merge". It posts `PASS` or `PASS_WITH_MINOR_FINDINGS`, followed by `MERGE_READY` + `HANDOFF_TO_CODEX`, naming the exact reviewed head SHA and including `@codex merge this PR if gates pass`. For that exact SHA, Claude's verdict resolves the relevant `review_pending_findings` for merge purposes without requiring a post-review bookkeeping commit.
 
 ## Finding severity
 - BLOCKER — unsafe to merge: severe correctness, security, privacy, data-loss, or direct core-spec violation.
@@ -61,24 +61,26 @@ No AI agent should depend on Nassim copying messages or announcing that another 
 ## No-idle rule
 Every action must end with an executable continuation. "Waiting for merge", "waiting for someone to close the PR", or "review complete" without a next actor are invalid workflow states.
 
-- Claude PASS -> `MERGE_READY` + Codex.
+- Claude PASS -> `MERGE_READY` + `HANDOFF_TO_CODEX` + `@codex merge this PR if gates pass`.
 - Codex merge into an integration branch -> immediately wake Claude on the updated umbrella PR.
-- Codex merge into `main` -> immediately start `next_work` from coordination state when pre-approved.
-- Missing/ambiguous `next_work` -> `HANDOFF_TO_CHATGPT`, not silence.
+- Codex merge into `main` -> immediately continue an explicitly pre-approved active `current_work`; if none is actionable, start pre-approved `next_work`.
+- Neither `current_work` nor `next_work` actionable, or either selected record ambiguous -> `HANDOFF_TO_CHATGPT`, not silence.
 - Genuine external inability -> `BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION`.
 
 ## Resolution protocol
 - Codex resolves routine implementation findings by fixing them and adding appropriate verification/tests.
 - ChatGPT resolves findings that require architecture/product/security-policy decisions or technical rebuttal.
 - Claude independently re-reviews every claimed resolution and checks for regressions.
+- A finding with a concrete pushed fix must return to `review_pending_findings` with its known-open severity cleared; it becomes independently resolved only through Claude's exact-SHA verdict.
 - If the same MAJOR survives two direct Claude<->Codex cycles, or they disagree on contract interpretation, route to ChatGPT rather than looping indefinitely.
 
 ## Definition of done
 A scoped engineering change is accepted only when:
 - relevant product/security/architecture contracts are satisfied;
 - deterministic CI passes when configured and required CI exists for production implementation after the CI-foundation work is complete;
-- zero unresolved BLOCKER findings remain;
-- zero unresolved MAJOR findings remain;
+- zero known-open BLOCKER findings remain;
+- zero known-open MAJOR findings remain;
+- all review-pending findings affecting the exact head are accepted by Claude's `PASS`/`PASS_WITH_MINOR_FINDINGS` and `MERGE_READY` verdict;
 - handoff/review state is current;
 - no required external/human decision is outstanding.
 
