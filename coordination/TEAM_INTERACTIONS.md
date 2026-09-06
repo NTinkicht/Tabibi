@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T17:32:06.272643+00:00
+- Last sync: 2026-09-06T17:36:40.068464+00:00
 
 ## Team Room charter
 
@@ -1881,5 +1881,19 @@ scope: authorized queue priority/reorder with mandatory operational reason, dete
 anti_duplication: checked open PRs before branch creation; no WU5 implementation PR exists.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5560935579
+
+---
+
+### 2026-09-06T17:36:32Z — NTinkicht
+
+CHECKPOINT
+actor: codex
+work_stream: WU5-IMPLEMENT-001
+status: active
+evidence: Added migration for mutable service_order/session queue_order_version/idempotency receipts; implemented clinic-authorized transaction-serialized reorder with mandatory reason, exact retry, stale-version rejection, metadata-only audit, and call-next enforcement; added same-origin API, Arabic/French RTL UI controls, and PostgreSQL concurrency/tenant/idempotency tests.
+checks: npm ci passed; npm run typecheck passed; npm run lint passed. Real-PostgreSQL suite is authored but local execution is environment-blocked (no Docker binary and no server on 127.0.0.1:5432); GitHub CI will exercise it.
+next_action: finish API/browser coverage and regression checks, commit/push/open canonical PR.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5560961687
 
 ---
