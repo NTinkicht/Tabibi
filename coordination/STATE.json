@@ -1,14 +1,14 @@
 {
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
-  "round": 11,
+  "round": 12,
   "state": "work_unit_3_independent_review",
   "current_pr": 20,
   "current_issue": 4,
   "last_actor": "chatgpt",
   "next_actor": "claude",
   "next_action": "independently review PR #20 exact head b27a072ec4f4099ec93265853759d7002ea3d3d4; merge only after exact-SHA PASS/MERGE_READY remains paired with green CI",
-  "operating_model": "four-agent-capability-mesh-v5-role-failover-with-heartbeats-retrospectives",
+  "operating_model": "five-actor-capability-mesh-v6-role-failover-with-heartbeats-retrospectives",
   "binding_protocols": [
     "coordination/AUTONOMY_PROTOCOL.md",
     "coordination/ROLE_FAILOVER_PROTOCOL.md",
@@ -21,7 +21,14 @@
     "learning_register": "coordination/TEAM_LEARNING.md",
     "retrospectives": "coordination/RETROSPECTIVES.md",
     "heartbeat_target_minutes": 15,
-    "stale_active_lease_minutes": 30
+    "stale_active_lease_minutes": 30,
+    "actors": [
+      "chatgpt",
+      "codex",
+      "claude",
+      "gemini_agent",
+      "gemini_chat"
+    ]
   },
   "agents": {
     "chatgpt": {
@@ -67,7 +74,7 @@
       "current_activity": "assigned as preferred independent non-author gating reviewer for PR #20 exact head b27a072ec4f4099ec93265853759d7002ea3d3d4",
       "invocation_policy": "persistent Claude session is the default Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
-    "gemini": {
+    "gemini_agent": {
       "preferred_roles": [
         "qa_ux_system_verification",
         "secondary_independent_review"
@@ -79,7 +86,32 @@
         "orchestration": "limited",
         "merge_execution": "limited"
       },
-      "constraint": "authentication is valid, but run 34027291689 exhausted the Google free-tier daily quota on gemini-3.5-flash; do not repeatedly retrigger until capacity recovers"
+      "constraint": "authentication is valid, but run 34027291689 exhausted the Google free-tier daily quota on the Gemini Agent project; do not repeatedly retrigger until capacity recovers",
+      "identity": "distinct from gemini_chat"
+    },
+    "gemini_chat": {
+      "preferred_roles": [
+        "adaptive_generalist",
+        "architecture_peer",
+        "implementation_failover",
+        "independent_review",
+        "ci_remediation",
+        "retrospective_consensus"
+      ],
+      "capability_status": {
+        "orchestration": "pending_runtime_validation",
+        "architecture": "pending_runtime_validation",
+        "implementation": "pending_runtime_validation",
+        "review": "pending_runtime_validation",
+        "qa_ux_system_verification": "pending_runtime_validation",
+        "ci_remediation": "pending_runtime_validation",
+        "merge_execution": "pending_runtime_validation"
+      },
+      "credential": "dedicated GEMINI_CHAT_API_KEY GitHub Actions secret reported configured by repository owner; raw value is never exposed",
+      "runtime": ".github/workflows/gemini-chat-collaborator.yml",
+      "instructions": "GEMINI_CHAT.md",
+      "current_activity": "onboarding/runtime validation only; no engineering role lease assigned",
+      "identity": "distinct from gemini_agent"
     }
   },
   "role_leases": {
@@ -100,15 +132,19 @@
       "reason": "ChatGPT materially authored PR #20 and cannot self-gate its exact head"
     },
     "secondary_verifier": {
-      "actor": "gemini",
+      "actor": "gemini_agent",
       "status": "capacity_limited",
-      "review_target_sha": null
+      "review_target_sha": null,
+      "fallback_candidates": [
+        "gemini_chat"
+      ]
     },
     "merge_executor": {
       "actor": "chatgpt",
       "preferred_actor_when_recovered": "codex_cloud",
       "fallback_order": [
-        "gemini",
+        "gemini_chat",
+        "gemini_agent",
         "claude"
       ],
       "status": "waiting_for_independent_exact_sha_gate"
@@ -127,7 +163,8 @@
   ],
   "runtime_constraints": [
     "codex.general=limited by account usage limit",
-    "gemini.general=limited by Google free-tier daily quota"
+    "gemini_agent.general=limited by Gemini Agent project daily quota",
+    "gemini_chat.runtime=pending first authenticated onboarding validation"
   ],
   "completed_work": [
     {
@@ -181,5 +218,5 @@
     "scope": "receptionist walk-in/guest registration plus atomic waiting QueueEntry creation only; check-in/call/priority/ETA/notifications/remote guest credentials remain out of scope"
   },
   "next_work": null,
-  "notes": "PR #20 is the sole canonical Work Unit 3 implementation stream and is ready for review. The deterministic CI incident was resolved without owner action: unsupported Vitest config and lint/navigation issues were repaired, the browser failure was traced to strict same-origin comparison under Next host canonicalization, CSRF validation was fixed without removing origin protection and regression-covered, and final exact-head CI is fully green. The temporary pr20 one-time autofix workflow was already absent from main when reconciled. Independent non-author gating review is now required before merge."
+  "notes": "PR #20 is the sole canonical Work Unit 3 implementation stream and is ready for Claude independent review. Gemini Chat has been registered as a separate fifth actor with a dedicated GitHub Actions runtime/secret but has no engineering role lease during onboarding. The existing Gemini Agent remains independently tracked and currently quota-limited."
 }
