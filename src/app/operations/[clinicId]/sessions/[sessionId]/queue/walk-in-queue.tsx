@@ -58,7 +58,8 @@ export function WalkInQueue({
   }, [clinicId, sessionId, t.error]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   async function register(event: React.FormEvent<HTMLFormElement>) {
