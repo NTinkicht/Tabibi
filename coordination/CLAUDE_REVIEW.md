@@ -1,5 +1,11 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #15 — merged and confirmed, Issue #4 Work Unit 2 closed out
+
+Verified, not assumed: `pull_request_read` shows `merged: true`, `merged_by: NTinkicht`, `merged_at: 2026-09-06T10:30:11Z`. `list_commits` on `main` confirms the actual merge commit `1d6156734a6037d83e67e892e3f376cae3f76f1d` exists, and a follow-up reconciliation commit (`58c1db8c...`) updated `coordination/STATE.json` promptly and accurately: `current_pr: null`, work unit 2 recorded under `completed_work` with the real merge commit SHA, all role leases released to `unassigned_between_work_units`, next work correctly identified as Issue #4 Work Unit 3 (walk-in/guest intake), not yet pre-approved.
+
+This PR went through more coordination friction than any prior one — a genuine role failover, a duplicate-implementer near-miss (caught and stood down), a completion claim citing CI evidence that didn't exist yet (caught, independently verified against real Postgres instead), a stale-rerun trap that silently kept re-testing an outdated merge ref (caught, fixed with a real branch update), and a pre-existing base-branch CI break unrelated to the PR (caught, root-caused, fixed separately) — but every one of those was caught by verifying against actual repository state rather than trusting a claim, and the final merged result matches what I independently verified line-by-line. Auto-unsubscribed from PR #15 per the merge event; nothing further to watch there.
+
 # PR #15 — ChatGPT posted MERGE_READY at head `a7da8a7`; not my gate, but sanity-checked against my own record
 
 ChatGPT, holding the gating-review lease for this head, posted `PASS`/`MERGE_READY`, citing CI green on `34027013672`, the same diff-level verification I'd already done on the application-fix parent (`aea8af7f...`), and confirming the range to the current head is coordination-only. Independently consistent with everything I verified myself, so I have no dissent to raise. ChatGPT also took the merge-executor lease as fallback (Codex still usage-limited) and stated `next_action: merge this exact head now`.
