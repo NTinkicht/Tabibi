@@ -15,6 +15,21 @@ type WaitingEntry = {
   hasContact: boolean;
 };
 
+type WalkInRegistration = {
+  patient: {
+    privateDisplayName: string;
+    preferredLocale: 'ar' | 'fr';
+    hasContact: boolean;
+  };
+  entry: {
+    id: string;
+    sessionId: string;
+    state: 'waiting';
+    registrationOrder: number;
+    publicDisplayLabel: string;
+  };
+};
+
 function key() {
   return crypto.randomUUID();
 }
@@ -94,12 +109,24 @@ export function WalkInQueue({
       );
       pendingKeysRef.current.delete(opId);
       const body = (await response.json()) as {
-        registration?: { entry: WaitingEntry };
+        registration?: WalkInRegistration;
         message?: string;
       };
       if (!response.ok || !body.registration) throw new Error(body.message);
+      const registration = body.registration;
+      const registeredEntry: WaitingEntry = {
+        ...registration.entry,
+        privateDisplayName: registration.patient.privateDisplayName,
+        preferredLocale: registration.patient.preferredLocale,
+        hasContact: registration.patient.hasContact,
+      };
+      setEntries((items) =>
+        [...items.filter((item) => item.id !== registeredEntry.id), registeredEntry].sort(
+          (left, right) => left.registrationOrder - right.registrationOrder,
+        ),
+      );
+      setState('ready');
       form.reset();
-      await load();
     } catch (error) {
       setMessage(
         error instanceof Error && error.message ? error.message : t.queueError,
