@@ -1,6 +1,8 @@
-# Tabibi Collaboration, Heartbeat and Learning Protocol v1
+# Tabibi Collaboration, Heartbeat and Learning Protocol v2
 
-This protocol is binding for ChatGPT, Codex Cloud, Claude, and Gemini. It supplements `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, and `coordination/STATE.json`. Product, architecture, security, reviewer-independence, role-lease, and owner-authority rules remain unchanged.
+This protocol is binding for **ChatGPT, Codex Cloud, Claude, Gemini Agent, and Gemini Chat**. It supplements `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, and `coordination/STATE.json`. Product, architecture, security, reviewer-independence, role-lease, and owner-authority rules remain unchanged.
+
+Gemini Agent (`gemini_agent`) and Gemini Chat (`gemini_chat`) are distinct actors. They may share a model family, but they do not share identity, role leases, heartbeats, authored changes, findings, review authority, or accountability. Historical `actor: gemini` Team Room entries are interpreted as Gemini Agent.
 
 ## 1. Permanent Team Room
 
@@ -36,7 +38,7 @@ Template:
 
 ```text
 HEARTBEAT
-actor: <chatgpt|codex|claude|gemini>
+actor: <chatgpt|codex|claude|gemini_agent|gemini_chat>
 role: <leased role>
 work_stream: <issue/pr/work unit>
 status: <active|blocked|waiting_external|complete>
@@ -52,9 +54,9 @@ A heartbeat is not a substitute for code, tests, review, or merge activity. It i
 
 The collaboration watchdog treats an active lease with no fresh heartbeat/checkpoint for 30 minutes as **stale** unless a known long-running deterministic job is still visibly progressing.
 
-A stale marker is not automatic proof the agent failed. The orchestrator must reconcile GitHub state, CI, branch movement, and comments first. If the actor is truly idle/deadlocked, apply `ROLE_FAILOVER_PROTOCOL.md` rather than waiting for Nassim.
+A stale marker is not automatic proof the actor failed. The orchestrator must reconcile GitHub state, CI, branch movement, and comments first. If the actor is truly idle/deadlocked, apply `ROLE_FAILOVER_PROTOCOL.md` rather than waiting for Nassim.
 
-No agent should keep a lease while silently inactive.
+No actor should keep a lease while silently inactive.
 
 ## 4. Checkpoints
 
@@ -74,7 +76,7 @@ Open a retrospective:
 - after a material coordination failure, duplicate stream, repeated stale handoff, quota-driven failover, or significant CI incident;
 - when the orchestrator believes a repeated pattern should be corrected before the next work unit.
 
-Use `RETRO_OPEN` in Team Room. Relevant agents then post `RETRO_ENTRY`:
+Use `RETRO_OPEN` in Team Room. Relevant available actors then post `RETRO_ENTRY`:
 
 ```text
 RETRO_ENTRY
@@ -86,11 +88,13 @@ change: <specific improvement>
 lesson: <reusable lesson>
 ```
 
-Retrospectives are expected to be candid but technical and respectful. Critique process, decisions, assumptions, and artifacts rather than personalities.
+Retrospectives are candid but technical and respectful. Critique process, decisions, assumptions, and artifacts rather than personalities.
+
+Gemini Chat is expected to participate as a peer when available, not merely observe other agents' retrospectives.
 
 ## 6. Discussion and consensus
 
-Any agent may post `PROCESS_PROPOSAL` with:
+Any actor may post `PROCESS_PROPOSAL` with:
 - stable proposal ID, e.g. `PROC-001`;
 - problem/evidence;
 - proposed change;
@@ -99,16 +103,18 @@ Any agent may post `PROCESS_PROPOSAL` with:
 - how success will be measured;
 - whether it is reversible/experimental.
 
-Other agents respond with one of:
+Other actors respond with one of:
 - `CONSENSUS_ACK <ID>` — agree, with reason;
 - `CONSENSUS_AMEND <ID>` — agree only with a concrete amendment;
 - `CONSENSUS_CHALLENGE <ID>` — disagree, with evidence or risk.
 
 For routine reversible collaboration/process changes, consensus is reached when:
-- the proposer plus at least two other independent agents agree; and
-- no unresolved evidence-backed challenge remains from an available active agent after a reasonable bounded discussion window.
+- the proposer plus at least two other independent available actors agree; and
+- no unresolved evidence-backed challenge remains after a reasonable bounded discussion window.
 
-If only two AI runtimes are currently available because of provider limits, a reversible process experiment may proceed with both agreeing plus ChatGPT recording it as provisional. It must be revisited when another agent becomes available.
+Do not count Gemini Agent and Gemini Chat as automatically corroborating one another merely because they come from the same model family; each must reason independently. For consequential technical questions, model-family diversity is preferred when available.
+
+If only two AI runtimes are available because of provider limits, a reversible process experiment may proceed with both agreeing plus ChatGPT recording it as provisional. It must be revisited when another actor becomes available.
 
 For consequential architecture/security/product/data-policy changes, this protocol does **not** replace existing authority. Follow `AGENTS.md`, `ARCHITECTURE.md`, `SECURITY.md`, and the technical-quorum/owner rules.
 
@@ -132,15 +138,20 @@ The raw conversation remains visible in `coordination/TEAM_INTERACTIONS.md`; sum
 
 ## 8. Teach each other
 
-Agents are expected to transfer useful knowledge, not merely hand off tasks.
+Actors are expected to transfer useful knowledge, not merely hand off tasks.
 
-When discovering a reusable technique, failure mode, test strategy, provider limitation, UX insight, or architecture pattern, post `LESSON_LEARNED` in Team Room. Another agent should acknowledge, challenge, or extend it when relevant.
+When discovering a reusable technique, failure mode, test strategy, provider limitation, UX insight, or architecture pattern, post `LESSON_LEARNED` in Team Room. Another actor should acknowledge, challenge, or extend it when relevant.
 
 Before beginning a similar future task, check `TEAM_LEARNING.md` and recent retrospectives so the team does not repeatedly rediscover the same lesson.
 
 ## 9. Capacity transparency
 
 Provider/runtime limits must be visible in Team Room and `STATE.json` using existing capability-specific markers. A provider limit does not justify silent waiting.
+
+Capacity is tracked per **actor and capability**. In particular:
+- Gemini Agent capacity does not automatically determine Gemini Chat capacity;
+- Gemini Chat capacity does not automatically determine Gemini Agent capacity;
+- if evidence later shows a genuinely shared provider/project-level quota, record that explicitly rather than assuming it.
 
 Heartbeats from a limited actor should say exactly which capability is affected and whether the role lease was released or failed over.
 
@@ -156,7 +167,8 @@ Heartbeats from a limited actor should say exactly which capability is affected 
 
 - **Codex:** `AGENTS.md` is authoritative; every Codex task must honor this protocol and post heartbeats/checkpoints while active.
 - **Claude:** `CLAUDE.md` plus this protocol are authoritative for Claude-specific behavior; Claude participates in Team Room retrospectives and consensus even when its current role is reviewer rather than implementer.
-- **Gemini:** `GEMINI.md` plus this protocol are authoritative; Gemini contributes UX/system lessons and retrospective feedback, not only pass/fail reviews.
+- **Gemini Agent:** `GEMINI.md` plus this protocol are authoritative; Gemini Agent contributes UX/system lessons and retrospective feedback, not only pass/fail reviews.
+- **Gemini Chat:** `GEMINI_CHAT.md` plus this protocol are authoritative. Gemini Chat identifies itself as `gemini_chat`, may hold any transferable role lease, and never impersonates Gemini Agent.
 - **ChatGPT:** ChatGPT must treat Team Room, `STATE.json`, CI, and branch/PR evidence as live orchestration state and post its own heartbeats/checkpoints when actively operating the project.
 
-No actor is exempt because it is the orchestrator, reviewer, or fallback runtime.
+No actor is exempt because it is the orchestrator, reviewer, conversational collaborator, or fallback runtime.
