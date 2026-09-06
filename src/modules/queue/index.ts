@@ -62,7 +62,6 @@ export type QueueCommand =
 export interface StaffQueueEntry extends StaffWaitingEntry {
   eligibilityOrder: number | null;
   priorityOrder: number | null;
-  serviceOrder: number | null;
 }
 
 export interface QueueReorderInput {
@@ -435,7 +434,6 @@ export class QueueService {
         registration_order: string;
         eligibility_order: string | null;
         priority_order: string | null;
-        service_order: string | null;
         public_display_label: string;
         private_display_name: string;
         preferred_locale: 'ar' | 'fr';
@@ -444,7 +442,7 @@ export class QueueService {
       }>(
         `SELECT entry.id, entry.session_id, entry.state,
                 entry.registration_order, entry.eligibility_order,
-                entry.priority_order, entry.service_order, entry.public_display_label,
+                entry.priority_order, entry.public_display_label,
                 patient.private_display_name, patient.preferred_locale,
                 patient.contact_phone, patient.contact_email
            FROM queue_entries entry
@@ -454,7 +452,10 @@ export class QueueService {
           ORDER BY CASE entry.state
                      WHEN 'called' THEN 0 WHEN 'in_consultation' THEN 0
                      WHEN 'checked_in' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END,
-                   entry.service_order NULLS LAST, entry.registration_order`,
+                   CASE WHEN entry.priority_order IS NULL THEN 1 ELSE 0 END,
+                   entry.priority_order NULLS LAST,
+                   entry.eligibility_order NULLS LAST,
+                   entry.registration_order`,
         [scope.clinicId, sessionId],
       );
       return {
@@ -470,8 +471,6 @@ export class QueueService {
               : Number(row.eligibility_order),
           priorityOrder:
             row.priority_order === null ? null : Number(row.priority_order),
-          serviceOrder:
-            row.service_order === null ? null : Number(row.service_order),
           publicDisplayLabel: row.public_display_label,
           privateDisplayName: row.private_display_name,
           preferredLocale: row.preferred_locale,
@@ -553,8 +552,9 @@ export class QueueService {
 
       const current = await client.query<{
         state: QueueEntryState;
+        priority_order: string | null;
       }>(
-        `SELECT state FROM queue_entries
+        `SELECT state,priority_order FROM queue_entries
           WHERE id=$1 AND session_id=$2 AND clinic_id=$3 FOR UPDATE`,
         [entryId, sessionId, scope.clinicId],
       );
@@ -579,7 +579,8 @@ export class QueueService {
         const next = await client.query<{ id: string }>(
           `SELECT id FROM queue_entries
             WHERE session_id=$1 AND clinic_id=$2 AND state='checked_in'
-            ORDER BY service_order NULLS LAST, eligibility_order, registration_order
+            ORDER BY CASE WHEN priority_order IS NULL THEN 1 ELSE 0 END,
+                     priority_order NULLS LAST, eligibility_order, registration_order
             LIMIT 1`,
           [sessionId, scope.clinicId],
         );
@@ -605,15 +606,6 @@ export class QueueService {
         );
         eligibilityOrder = Number(next.rows[0]!.value);
       }
-      let serviceOrder: number | null = null;
-      if (rawInput.command === 'check_in') {
-        const next = await client.query<{ value: string }>(
-          `SELECT COALESCE(MAX(service_order), 0) + 1 AS value
-             FROM queue_entries WHERE session_id=$1 AND state='checked_in'`,
-          [sessionId],
-        );
-        serviceOrder = Number(next.rows[0]!.value);
-      }
       let updated;
       try {
         updated = await client.query<{
@@ -623,7 +615,6 @@ export class QueueService {
           registration_order: string;
           eligibility_order: string | null;
           priority_order: string | null;
-          service_order: string | null;
           public_display_label: string;
           private_display_name: string;
           preferred_locale: 'ar' | 'fr';
@@ -632,13 +623,15 @@ export class QueueService {
         }>(
           `UPDATE queue_entries entry SET state=$4::queue_entry_status,
              eligibility_order=CASE WHEN $4::queue_entry_status='checked_in' THEN $5 ELSE eligibility_order END,
-             service_order=CASE WHEN $4::queue_entry_status='checked_in' THEN $6::bigint ELSE NULL END,
+             priority_order=CASE
+               WHEN $4::queue_entry_status IN ('waiting','checked_in') THEN priority_order
+               ELSE NULL END,
              updated_at=now()
            FROM patient_operational_records patient
            WHERE entry.id=$1 AND entry.session_id=$2 AND entry.clinic_id=$3
              AND patient.id=entry.patient_id AND patient.clinic_id=entry.clinic_id
            RETURNING entry.id, entry.session_id, entry.state,
-             entry.registration_order, entry.eligibility_order, entry.priority_order, entry.service_order,
+             entry.registration_order, entry.eligibility_order, entry.priority_order,
              entry.public_display_label, patient.private_display_name,
              patient.preferred_locale, patient.contact_phone, patient.contact_email`,
           [
@@ -647,7 +640,6 @@ export class QueueService {
             scope.clinicId,
             target[rawInput.command],
             eligibilityOrder,
-            serviceOrder,
           ],
         );
       } catch (error) {
@@ -664,6 +656,43 @@ export class QueueService {
           );
         throw error;
       }
+      const changesEffectiveOrder =
+        rawInput.command === 'check_in' ||
+        prior === 'checked_in' ||
+        (current.rows[0]!.priority_order !== null && prior === 'waiting');
+      if (
+        current.rows[0]!.priority_order !== null &&
+        (prior === 'waiting' || prior === 'checked_in') &&
+        !['waiting', 'checked_in'].includes(target[rawInput.command])
+      ) {
+        const priorityCohort = await client.query<{ id: string }>(
+          `SELECT id FROM queue_entries
+            WHERE session_id=$1 AND clinic_id=$2
+              AND state IN ('waiting','checked_in') AND priority_order IS NOT NULL
+            ORDER BY priority_order,registration_order FOR UPDATE`,
+          [sessionId, scope.clinicId],
+        );
+        const cohortIds = priorityCohort.rows.map((item) => item.id);
+        if (cohortIds.length > 0) {
+          await client.query(
+            `UPDATE queue_entries SET priority_order=NULL
+              WHERE id=ANY($1::uuid[])`,
+            [cohortIds],
+          );
+          for (let index = 0; index < cohortIds.length; index++)
+            await client.query(
+              'UPDATE queue_entries SET priority_order=$2,updated_at=now() WHERE id=$1',
+              [cohortIds[index], index + 1],
+            );
+        }
+      }
+      if (changesEffectiveOrder)
+        await client.query(
+          `UPDATE consultation_sessions
+              SET queue_order_version=queue_order_version+1,updated_at=now()
+            WHERE id=$1`,
+          [sessionId],
+        );
       const row = updated.rows[0]!;
       const response: StaffQueueEntry = {
         id: row.id,
@@ -674,8 +703,6 @@ export class QueueService {
           row.eligibility_order === null ? null : Number(row.eligibility_order),
         priorityOrder:
           row.priority_order === null ? null : Number(row.priority_order),
-        serviceOrder:
-          row.service_order === null ? null : Number(row.service_order),
         publicDisplayLabel: row.public_display_label,
         privateDisplayName: row.private_display_name,
         preferredLocale: row.preferred_locale,
@@ -804,45 +831,65 @@ export class QueueService {
       const ordered = await client.query<{
         id: string;
         registration_order: string;
-        eligibility_order: string;
-        service_order: string | null;
+        eligibility_order: string | null;
+        priority_order: string | null;
       }>(
-        `SELECT id,registration_order,eligibility_order,service_order
+        `SELECT id,registration_order,eligibility_order,priority_order
            FROM queue_entries
-          WHERE session_id=$1 AND clinic_id=$2 AND state='checked_in'
-          ORDER BY service_order NULLS LAST, eligibility_order, registration_order
+          WHERE session_id=$1 AND clinic_id=$2
+            AND state IN ('waiting','checked_in') AND priority_order IS NOT NULL
+          ORDER BY priority_order,registration_order
           FOR UPDATE`,
         [sessionId, scope.clinicId],
       );
       const sourceIndex = ordered.rows.findIndex((row) => row.id === entryId);
-      if (sourceIndex < 0)
+      const candidate = await client.query<{
+        id: string;
+        state: QueueEntryState;
+        registration_order: string;
+        eligibility_order: string | null;
+        priority_order: string | null;
+      }>(
+        `SELECT id,state,registration_order,eligibility_order,priority_order
+           FROM queue_entries
+          WHERE id=$1 AND session_id=$2 AND clinic_id=$3 FOR UPDATE`,
+        [entryId, sessionId, scope.clinicId],
+      );
+      if (
+        !candidate.rows[0] ||
+        !['waiting', 'checked_in'].includes(candidate.rows[0].state)
+      )
         throw new QueueConflictError(
-          'Only checked-in entries are eligible for reorder',
+          'Only waiting or checked-in entries are eligible for priority',
         );
-      if (rawInput.targetPosition > ordered.rows.length)
+      const maximumPosition =
+        sourceIndex < 0 ? ordered.rows.length + 1 : ordered.rows.length;
+      if (rawInput.targetPosition > maximumPosition)
         throw new QueueConflictError(
-          `Target position exceeds the ${ordered.rows.length} eligible entries`,
+          `Target position exceeds the allowed maximum of ${maximumPosition}`,
         );
 
-      const previousOrder = ordered.rows.map((row, index) => ({
+      const previousOrder = ordered.rows.map((row) => ({
         entryId: row.id,
-        serviceOrder:
-          row.service_order === null ? index + 1 : Number(row.service_order),
+        priorityOrder: Number(row.priority_order),
       }));
       const reordered = [...ordered.rows];
-      const [moved] = reordered.splice(sourceIndex, 1);
+      const [moved] =
+        sourceIndex < 0
+          ? [candidate.rows[0]]
+          : reordered.splice(sourceIndex, 1);
       reordered.splice(rawInput.targetPosition - 1, 0, moved!);
       try {
-        // Clear the locked cohort out of the partial unique index before assigning
-        // contiguous positions. Existing service orders may contain lifecycle gaps.
+        // Clear the locked cohort out of the unique partial index before assigning
+        // the canonical contiguous priority slots.
         await client.query(
-          `UPDATE queue_entries SET service_order=NULL
+          `UPDATE queue_entries SET priority_order=NULL
             WHERE id = ANY($1::uuid[])`,
           [reordered.map((item) => item.id)],
         );
         for (let index = 0; index < reordered.length; index++)
           await client.query(
-            'UPDATE queue_entries SET service_order=$2,updated_at=now() WHERE id=$1',
+            'UPDATE queue_entries SET priority_order=$2,updated_at=now() WHERE id=$1',
             [reordered[index]!.id, index + 1],
           );
       } catch (error) {
@@ -870,7 +917,6 @@ export class QueueService {
         registration_order: string;
         eligibility_order: string | null;
         priority_order: string | null;
-        service_order: string | null;
         public_display_label: string;
         private_display_name: string;
         preferred_locale: 'ar' | 'fr';
@@ -878,7 +924,7 @@ export class QueueService {
         contact_email: string | null;
       }>(
         `SELECT entry.id,entry.session_id,entry.state,entry.registration_order,
-                entry.eligibility_order,entry.priority_order,entry.service_order,
+                entry.eligibility_order,entry.priority_order,
                 entry.public_display_label,patient.private_display_name,patient.preferred_locale,
                 patient.contact_phone,patient.contact_email
            FROM queue_entries entry JOIN patient_operational_records patient
@@ -900,10 +946,6 @@ export class QueueService {
           movedRow.priority_order === null
             ? null
             : Number(movedRow.priority_order),
-        serviceOrder:
-          movedRow.service_order === null
-            ? null
-            : Number(movedRow.service_order),
         publicDisplayLabel: movedRow.public_display_label,
         privateDisplayName: movedRow.private_display_name,
         preferredLocale: movedRow.preferred_locale,
@@ -912,7 +954,7 @@ export class QueueService {
       };
       const resultingOrder = reordered.map((item, index) => ({
         entryId: item.id,
-        serviceOrder: index + 1,
+        priorityOrder: index + 1,
       }));
       const response = {
         entry,

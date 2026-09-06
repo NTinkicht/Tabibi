@@ -10,12 +10,12 @@ lock the session and entry in PostgreSQL, use durable actor-scoped idempotency
 receipts, and emit metadata-only audit events. Partial unique indexes prevent more
 than one called or in-consultation entry in a session.
 
-Checked-in entries receive a mutable `service_order` that is separate from the
-immutable `registration_order` and arrival `eligibility_order`. Authorized
-reorders lock the session in PostgreSQL, require a metadata-only operational
-reason, validate an optimistic queue version, persist an exact-retry receipt,
-and audit both the prior and resulting order. Normal call selection accepts only
-the first checked-in entry in that committed order.
+Authorized priority overrides use the canonical optional `priority_order`, kept
+separate from immutable `registration_order` and arrival `eligibility_order`.
+Priority changes lock the session in PostgreSQL, require a metadata-only
+operational reason, validate an optimistic queue version, persist an exact-retry
+receipt, and audit both the prior and resulting priority cohort. Call selection
+uses eligible priority entries first and normal eligibility order second.
 
 ETA, notifications, appointment-specific no-show rules, restore, and transfer
 remain outside this bounded work unit.

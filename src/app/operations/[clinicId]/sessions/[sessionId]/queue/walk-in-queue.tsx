@@ -23,7 +23,6 @@ type WaitingEntry = {
   hasContact: boolean;
   eligibilityOrder?: number | null;
   priorityOrder?: number | null;
-  serviceOrder?: number | null;
 };
 
 type WalkInRegistration = {
@@ -213,9 +212,7 @@ export function WalkInQueue({
       };
       if (!response.ok || !body.entry) throw new Error(body.message);
       pendingKeysRef.current.delete(operation);
-      setEntries((items) =>
-        items.map((item) => (item.id === entry.id ? body.entry! : item)),
-      );
+      await load();
     } catch (error) {
       setMessage(
         error instanceof Error && error.message ? error.message : t.queueError,
@@ -268,25 +265,7 @@ export function WalkInQueue({
       )
         throw new Error(body.message);
       pendingKeysRef.current.delete(operation);
-      setQueueOrderVersion(body.queueOrderVersion);
-      setEntries((items) => {
-        const rank = new Map(
-          body.orderedEntryIds!.map((id, index) => [id, index + 1]),
-        );
-        return [...items]
-          .map((item) => ({
-            ...item,
-            serviceOrder: rank.get(item.id) ?? item.serviceOrder,
-          }))
-          .sort((left, right) => {
-            if (left.state === 'checked_in' && right.state === 'checked_in')
-              return (
-                (left.serviceOrder ?? Number.MAX_SAFE_INTEGER) -
-                (right.serviceOrder ?? Number.MAX_SAFE_INTEGER)
-              );
-            return left.registrationOrder - right.registrationOrder;
-          });
-      });
+      await load();
     } catch (error) {
       setMessage(
         error instanceof Error && error.message ? error.message : t.queueError,
@@ -410,8 +389,8 @@ export function WalkInQueue({
                 <strong>{entry.publicDisplayLabel}</strong>
               </div>
               <span className="registrationOrder">
-                {entry.state === 'checked_in' && entry.serviceOrder
-                  ? `${t.serviceOrder} #${entry.serviceOrder}`
+                {entry.priorityOrder
+                  ? `${t.priorityOrder} #${entry.priorityOrder}`
                   : `${t.registrationOrder} #${entry.registrationOrder}`}
               </span>
               <span className={`queueState queueState-${entry.state}`}>
@@ -448,7 +427,7 @@ export function WalkInQueue({
                     {t.cancelEntry}
                   </button>
                 )}
-                {entry.state === 'checked_in' && (
+                {['waiting', 'checked_in'].includes(entry.state) && (
                   <button
                     className="priorityAction"
                     disabled={pendingEntry !== null}
