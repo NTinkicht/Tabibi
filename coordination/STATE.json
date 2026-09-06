@@ -2,12 +2,12 @@
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
   "round": 18,
-  "state": "work_unit_5_independent_review_pending",
+  "state": "work_unit_5_changes_required",
   "current_pr": 39,
   "current_issue": 4,
-  "last_actor": "codex",
-  "next_actor": "claude",
-  "next_action": "Independently review the exact PR #39 head after required CI is green; post findings or PASS/MERGE_READY without relying on author summary.",
+  "last_actor": "claude",
+  "next_actor": "codex",
+  "next_action": "fix CLAUDE-032 (the CLAUDE-031 regression test itself is missing a required 'reason' field on its no_show call, a one-line fix) on the existing PR #39 branch, get CI to actually run and go green on the new exact head, and post HANDOFF_TO_CLAUDE for final re-gate. Also note the base has moved (mergeable_state: dirty) and will need a merge before this can land.",
   "operating_model": "five-actor-capability-mesh-v6-role-failover-with-heartbeats-retrospectives",
   "binding_protocols": [
     "coordination/AUTONOMY_PROTOCOL.md",
@@ -52,7 +52,7 @@
         "merge_execution": "available",
         "review": "available"
       },
-      "current_activity": "WU5 implementation complete; implementation lease released after PR #39 exact-head handoff. Available for reviewer fixes."
+      "current_activity": "authored PR #39 (Work Unit 5, queue priority/reorder); fixed the owner-diagnosed CI failure (bigint cast) and then CLAUDE-031 (gap-safe reorder, independently verified correct by Claude against real Postgres). Current head 73fdb4936e983e08bbf52600b6a490afca7d7142 has one remaining MINOR (CLAUDE-032): its own new regression test is missing a required field. Implementer lease active pending that one-line fix."
     },
     "claude": {
       "preferred_roles": ["independent_review", "adversarial_security_review"],
@@ -62,7 +62,7 @@
         "orchestration": "available",
         "merge_execution": "available"
       },
-      "current_activity": "Active independent gating reviewer lease for WU5 PR #39; verify exact head and green CI.",
+      "current_activity": "PR #26 and PR #35 both merged and verified. PR #39 (Work Unit 5, queue priority/reorder): CLAUDE-031 (MAJOR) production fix independently re-verified correct against real Postgres in a fresh worktree (CI had not run for that head yet). Found CLAUDE-032 (MINOR): the fix's own new regression test is missing a required field. Active gating-reviewer lease pending that one-line test fix and a green CI run.",
       "invocation_policy": "persistent Claude session is the default Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
     "gemini_agent": {
@@ -117,12 +117,19 @@
       "status": "active"
     },
     "implementer": {
-      "actor": null,
-      "status": "not_assigned"
+      "actor": "codex",
+      "status": "changes_requested",
+      "work_stream": "issue-4-work-unit-5-pr-39",
+      "current_head": "73fdb4936e983e08bbf52600b6a490afca7d7142"
     },
     "gating_reviewer": {
-      "actor": null,
-      "status": "not_assigned"
+      "actor": "claude",
+      "status": "changes_requested",
+      "current_head": "73fdb4936e983e08bbf52600b6a490afca7d7142",
+      "work_stream": "pr-39-work-unit-5-queue-priority",
+      "verdict": "CHANGES_REQUIRED",
+      "pr_comment": "https://github.com/NTinkicht/Tabibi/pull/39#issuecomment-5561144972",
+      "note": "CLAUDE-031 production fix independently verified correct against real Postgres (CI had not run for this head at review time). Remaining CHANGES_REQUIRED is CLAUDE-032 (MINOR): the new regression test itself is missing a required field, a one-line fix."
     },
     "secondary_verifier": {
       "actor": null,
@@ -137,10 +144,27 @@
   "deterministic_referee": "ci",
   "open_blockers": 0,
   "open_majors": 0,
-  "open_minors": 0,
+  "open_minors": 1,
   "human_decision_required": false,
-  "pending_findings": [],
+  "pending_findings": [
+    {
+      "id": "CLAUDE-032",
+      "severity": "MINOR",
+      "target_sha": "73fdb4936e983e08bbf52600b6a490afca7d7142",
+      "target_pr": 39,
+      "summary": "The new regression test added to fix CLAUDE-031 ('renumbers safely after a lifecycle gap...' in queue-priority.test.ts) calls the no_show command without the required reason field, so it throws QueueValidationError before ever reaching the gap scenario it was written to cover. Production code is unaffected; confirmed correct independently.",
+      "evidence": "https://github.com/NTinkicht/Tabibi/pull/39#issuecomment-5561144972 -- independently ran the suite against real Postgres (GitHub CI had not yet run for this exact head): 4/5 queue-priority.test.ts tests pass, this one fails with exactly 'No-show reason is required'.",
+      "required_resolution": "Add a reason field (e.g. 'left before being called') to the no_show command() call in that test.",
+      "verification_method": "queue-priority.test.ts 5/5 passing against real Postgres."
+    }
+  ],
   "resolved_findings": [
+    {
+      "id": "CLAUDE-031",
+      "severity": "MAJOR",
+      "resolved_at_sha": "73fdb4936e983e08bbf52600b6a490afca7d7142",
+      "resolution": "reorder() now bulk-sets service_order=NULL for the whole locked checked-in cohort (UPDATE ... WHERE id=ANY($1::uuid[])) before assigning final contiguous 1..length values, structurally removing every touched row from the partial unique index before any new value is written -- eliminating the gap-collision case entirely rather than relying on a safe offset. Also wraps the update in a try/catch translating 23505 to QueueConflictError as defense in depth. Independently re-verified: re-ran the original real-Postgres repro (check in 3, no_show the middle one, check in a 4th, reorder the first entry to the back) against this exact head in a fresh worktree -- it now succeeds with deterministic service_order [1,2,3], where it previously threw a raw 23505. Full existing suite (lifecycle/clinic-scheduling/walk-in/database/unit/API, typecheck, lint) also re-run clean. Note: GitHub CI had not actually run for this exact head at review time (author-confirmed empty check rollup); this resolution rests on independent local verification, not a CI badge."
+    },
     {
       "id": "CLAUDE-028",
       "severity": "MAJOR",
@@ -257,21 +281,21 @@
     "issue": 4,
     "work_unit": 5,
     "work_unit_title": "Authorized queue priority/reorder with mandatory reason, deterministic ordering, idempotency and audit",
-    "implementation_status": "review_pending",
+    "implementation_status": "changes_required",
+    "implementation_pr": 39,
     "canonical_branch": "codex/issue-4-work-unit-5-queue-priority",
-    "canonical_pr": 39,
-    "implementer": null,
-    "gating_reviewer": "claude",
-    "secondary_verifier": "gemini_chat",
-    "merge_executor": "codex",
-    "task_id": "WU5-IMPLEMENT-001",
-    "base_sha": "8b2798b4e8a4ce46f2d14c50dd1aab379926e660"
+    "current_head": "73fdb4936e983e08bbf52600b6a490afca7d7142",
+    "review_verdict": "CHANGES_REQUIRED",
+    "ci_status": "not_yet_run_for_this_head_verified_locally_instead",
+    "resolved_findings": ["CLAUDE-031"],
+    "pending_findings": ["CLAUDE-032"],
+    "mergeable_state": "dirty"
   },
   "next_work": {
     "issue": 4,
-    "work_unit": 5,
-    "work_unit_title": "Authorized queue priority/reorder with mandatory reason, deterministic ordering, idempotency and audit",
-    "pre_approved": true
+    "work_unit": 6,
+    "work_unit_title": "not yet defined",
+    "pre_approved": false
   },
-  "notes": "PR #26 (Issue #4 Work Unit 4, queue lifecycle) merged at 848968d6c2c45c3e3a9ebadfa6e0d191cf7b2338, verified with zero drift from the independently gated exact head. All role leases for that work stream are released; ChatGPT scopes Issue #4 Work Unit 5 next. PR #35 (five-actor Slack company bridge) is also merged, at 1977e2ffd4a3c95c2f871866c8f32fac6c3426da: Claude's first pass found CLAUDE-028/029 (MAJOR, identity asserted rather than verified across the GitHub/Slack trust boundary), the author fixed both, Claude independently re-verified by code inspection (not the handoff summary) and confirmed CI green before PASS/MERGE_READY at cca3389547c90612762d4d40b599136ff9d52c95, and the merge commit was confirmed to carry zero drift from that exact head. One accepted non-blocking note (CLAUDE-030-NOTE): the fix assumes all agents' Team Room writes transit the NTinkicht GitHub identity, but Codex's connector-authored comments demonstrably do not (chatgpt-codex-connector[bot]) -- fails safe (under-mirrors) rather than reopening the spoofing hole, worth an empirical check once bot secrets are live. PR #32 (coordination-only, 'reconcile after Work Unit 4 merge') remains an unresolved concurrent duplicate of the STATE.json reconciliation already merged here; still flagged on the PR for the author to rebase, unchanged since. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
+  "notes": "PR #26 (Work Unit 4) and PR #35 (Slack company bridge) are merged and verified with zero drift, both closed out cleanly. PR #39 (Issue #4 Work Unit 5, queue priority/reorder): Codex fixed CLAUDE-031 (the reorder gap-collision MAJOR) at exact head 73fdb4936e983e08bbf52600b6a490afca7d7142 with a bulk NULL-first renumbering plus a 23505-to-QueueConflictError translation. GitHub CI had not actually run for this head at review time (author-confirmed empty check rollup), so Claude independently re-verified the fix in a fresh worktree against real Postgres: re-ran the original repro (now succeeds, deterministic [1,2,3]) plus the full existing suite (all clean). Found CLAUDE-032 (MINOR): the fix's own new regression test omits a required reason field on its no_show call, so it fails before exercising the scenario it was written to cover -- a one-line fix, not a design issue; production code is sound. Also noted mergeable_state is dirty (base has moved) -- flagged for the implementer, not touched by Claude. PR #32 (coordination-only, 'reconcile after Work Unit 4 merge') was closed by the owner as SUPERSEDED / DO NOT MERGE -- resolved, no further action. PR #40 (Slack onboarding command trigger) requested independent review from Gemini Chat, not Claude -- Claude is monitoring but deliberately not duplicating that lane. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
 }
