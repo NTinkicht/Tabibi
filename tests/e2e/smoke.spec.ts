@@ -84,6 +84,7 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
     page.getByRole('heading', { name: 'File des patients sans rendez-vous' }),
   ).toBeVisible();
   await page.getByLabel('Nom à l’accueil').fill('Patient test');
+  await expect(page.getByLabel('Langue préférée du patient')).toHaveValue('ar');
   const registrationResponsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&
@@ -93,6 +94,9 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
   const registrationResponse = await registrationResponsePromise;
   const registrationBody = await registrationResponse.text();
   expect(registrationResponse.status(), registrationBody).toBe(201);
+  expect(JSON.parse(registrationBody)).toMatchObject({
+    registration: { patient: { preferredLocale: 'ar' } },
+  });
   await expect(
     page.getByText('Patient test', { exact: true }).first(),
   ).toBeVisible();

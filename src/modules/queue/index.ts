@@ -70,6 +70,14 @@ function normalizeOptional(value?: string | null): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
+function normalizeEmail(value?: string | null): string | null {
+  const email = normalizeOptional(value);
+  if (!email) return null;
+  const separator = email.lastIndexOf('@');
+  if (separator < 0) return email;
+  return `${email.slice(0, separator)}@${email.slice(separator + 1).toLowerCase()}`;
+}
+
 function normalizeInput(input: WalkInRegistrationInput) {
   const privateDisplayName = input.privateDisplayName.trim();
   if (privateDisplayName.length < 1 || privateDisplayName.length > 120)
@@ -81,8 +89,8 @@ function normalizeInput(input: WalkInRegistrationInput) {
       'Idempotency key is required and must be at most 128 characters',
     );
   const contactPhone = normalizeOptional(input.contactPhone);
-  const contactEmail =
-    normalizeOptional(input.contactEmail)?.toLowerCase() ?? null;
+  // SMTP local parts can be case-sensitive; only the DNS domain is canonical.
+  const contactEmail = normalizeEmail(input.contactEmail);
   if (contactPhone && (contactPhone.length < 3 || contactPhone.length > 32))
     throw new QueueValidationError(
       'Contact phone must be between 3 and 32 characters',

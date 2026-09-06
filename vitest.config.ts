@@ -4,6 +4,11 @@ import { resolve } from 'node:path';
 const common = { resolve: { alias: { '@': resolve(__dirname, 'src') } } };
 export default defineConfig({
   test: {
+    // Integration files share one real PostgreSQL schema and perform
+    // destructive cleanup. Vitest 3 only supports this setting globally (not
+    // per ProjectConfig), so serialize files to keep the integration project
+    // deterministic while purpose-built concurrency remains inside tests.
+    fileParallelism: false,
     projects: [
       defineProject({
         ...common,

@@ -133,7 +133,7 @@ describe('walk-in registration foundation', () => {
     const registration = await queue.registerWalkIn(scopeA, ids.session, {
       ...input('Karim A.', 'contact-1'),
       contactPhone: '+213555000001',
-      contactEmail: 'KARIM@example.dz',
+      contactEmail: 'PatientID@EXAMPLE.dz',
       preferredLocale: 'fr',
     });
     expect(registration.patient.hasContact).toBe(true);
@@ -146,7 +146,7 @@ describe('walk-in registration foundation', () => {
     );
     expect(stored.rows[0]).toEqual({
       contact_phone: '+213555000001',
-      contact_email: 'karim@example.dz',
+      contact_email: 'PatientID@example.dz',
     });
     const credentialTables = await pool.query<{
       bearer: string | null;
@@ -156,6 +156,21 @@ describe('walk-in registration foundation', () => {
               to_regclass('guest_exchange_ids')::text exchange`,
     );
     expect(credentialTables.rows[0]).toEqual({ bearer: null, exchange: null });
+  });
+
+  it('stores the patient locale selected independently from the staff interface', async () => {
+    const queue = new QueueService(pool);
+    const registration = await queue.registerWalkIn(scopeA, ids.session, {
+      ...input('Patient arabophone', 'cross-locale'),
+      preferredLocale: 'ar',
+    });
+
+    expect(registration.patient.preferredLocale).toBe('ar');
+    const stored = await pool.query<{ preferred_locale: string }>(
+      'SELECT preferred_locale FROM patient_operational_records WHERE id = $1',
+      [registration.patient.id],
+    );
+    expect(stored.rows[0]?.preferred_locale).toBe('ar');
   });
 
   it('returns the same records on exact retry, rejects key reuse with different content, and reauthorizes retries', async () => {
@@ -312,5 +327,82 @@ describe('walk-in registration foundation', () => {
       [ids.session],
     );
     expect(state.rows[0]).toEqual({ status: 'cancelled', active: '0' });
+  });
+
+  it('atomically audits every entry cancelled with a session', async () => {
+    const queue = new QueueService(pool);
+    const sessions = new SessionService(pool);
+    const registrations = await Promise.all(
+      ['waiting', 'checked-in', 'called'].map((label, index) =>
+        queue.registerWalkIn(
+          scopeA,
+          ids.session,
+          input(label, `cancel-audit-${index}`),
+        ),
+      ),
+    );
+    await pool.query(
+      `UPDATE queue_entries
+          SET state = CASE id
+            WHEN $1 THEN 'checked_in'::queue_entry_status
+            WHEN $2 THEN 'called'::queue_entry_status
+            ELSE state
+          END,
+          eligibility_order = CASE id WHEN $1 THEN 1 ELSE NULL END
+        WHERE session_id = $3`,
+      [registrations[1]!.entry.id, registrations[2]!.entry.id, ids.session],
+    );
+    await pool.query(
+      `UPDATE consultation_sessions SET status = 'open' WHERE id = $1`,
+      [ids.session],
+    );
+
+    await sessions.command(scopeA, ids.session, {
+      command: 'cancel',
+      reason: 'Doctor unavailable',
+      idempotencyKey: 'multi-entry-cancel',
+      correlationId: 'multi-entry-cancel-correlation',
+    });
+
+    const audits = await pool.query<{
+      actor_user_id: string;
+      entity_type: string;
+      entity_id: string;
+      action: string;
+      metadata: Record<string, unknown>;
+    }>(
+      `SELECT actor_user_id, entity_type, entity_id, action, metadata
+         FROM audit_events
+        WHERE action IN ('consultation_session.cancel', 'queue_entry.cancelled_by_session')
+        ORDER BY entity_type, entity_id`,
+    );
+    expect(audits.rows).toHaveLength(4);
+    const entryAudits = audits.rows.filter(
+      (audit) => audit.action === 'queue_entry.cancelled_by_session',
+    );
+    expect(entryAudits.map((audit) => audit.entity_id).sort()).toEqual(
+      registrations.map((registration) => registration.entry.id).sort(),
+    );
+    expect(entryAudits.map((audit) => audit.metadata.from).sort()).toEqual([
+      'called',
+      'checked_in',
+      'waiting',
+    ]);
+    for (const audit of audits.rows) {
+      expect(audit.actor_user_id).toBe(ids.receptionistA);
+      expect(audit.metadata).toMatchObject({
+        reason: 'Doctor unavailable',
+        correlationId: 'multi-entry-cancel-correlation',
+        idempotencyKey: 'multi-entry-cancel',
+      });
+    }
+    const entries = await pool.query<{ state: string }>(
+      'SELECT state FROM queue_entries WHERE session_id = $1',
+      [ids.session],
+    );
+    expect(entries.rows).toHaveLength(3);
+    expect(entries.rows.every((entry) => entry.state === 'cancelled')).toBe(
+      true,
+    );
   });
 });

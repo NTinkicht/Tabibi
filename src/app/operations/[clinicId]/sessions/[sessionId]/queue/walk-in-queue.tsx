@@ -85,7 +85,9 @@ export function WalkInQueue({
       privateDisplayName: String(data.get('privateDisplayName') ?? '').trim(),
       contactPhone: String(data.get('contactPhone') ?? '').trim() || null,
       contactEmail: String(data.get('contactEmail') ?? '').trim() || null,
-      preferredLocale: locale,
+      preferredLocale: String(data.get('preferredLocale') ?? 'ar') as
+        | 'ar'
+        | 'fr',
     };
     const opId = JSON.stringify(payload);
     let idempotencyKey = pendingKeysRef.current.get(opId);
@@ -194,6 +196,13 @@ export function WalkInQueue({
           <label>
             {t.emailOptional}
             <input maxLength={254} name="contactEmail" type="email" />
+          </label>
+          <label>
+            {t.patientLanguage}
+            <select defaultValue="ar" name="preferredLocale">
+              <option value="ar">{t.patientLanguageArabic}</option>
+              <option value="fr">{t.patientLanguageFrench}</option>
+            </select>
           </label>
           <button disabled={pending}>
             {pending ? t.pending : t.addWalkIn}

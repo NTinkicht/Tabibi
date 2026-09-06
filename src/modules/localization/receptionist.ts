@@ -30,6 +30,9 @@ export const receptionistCopy = {
     guestName: 'Nom à l’accueil',
     phoneOptional: 'Téléphone (facultatif)',
     emailOptional: 'E-mail (facultatif)',
+    patientLanguage: 'Langue préférée du patient',
+    patientLanguageArabic: 'Arabe',
+    patientLanguageFrench: 'Français',
     contactOptionalHint:
       'Les coordonnées sont facultatives. Un patient sans téléphone reste entièrement pris en charge à la clinique.',
     queueLoading: 'Chargement de la file…',
@@ -77,6 +80,9 @@ export const receptionistCopy = {
     guestName: 'الاسم لدى الاستقبال',
     phoneOptional: 'الهاتف (اختياري)',
     emailOptional: 'البريد الإلكتروني (اختياري)',
+    patientLanguage: 'لغة المريض المفضلة',
+    patientLanguageArabic: 'العربية',
+    patientLanguageFrench: 'الفرنسية',
     contactOptionalHint:
       'معلومات الاتصال اختيارية. يبقى المريض بدون هاتف قابلاً للخدمة بالكامل داخل العيادة.',
     queueLoading: 'جارٍ تحميل قائمة الانتظار…',
