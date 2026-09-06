@@ -72,6 +72,57 @@ CREATE TABLE queue_registration_receipts (
     REFERENCES queue_entries(id, clinic_id) ON DELETE RESTRICT
 );
 
+-- Once queue rows exist, terminal session transitions must compose with them.
+-- Registration and lifecycle mutation serialize through the locked session row;
+-- this trigger is the database-level final guard for direct/update code paths too.
+CREATE FUNCTION enforce_session_queue_terminal_transition()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.status = OLD.status THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.status = 'closed' THEN
+    IF EXISTS (
+      SELECT 1
+        FROM queue_entries
+       WHERE session_id = NEW.id
+         AND state IN ('waiting', 'checked_in', 'called', 'in_consultation')
+    ) THEN
+      RAISE EXCEPTION 'Cannot close a session while active queue entries remain'
+        USING ERRCODE = '23514';
+    END IF;
+  ELSIF NEW.status = 'cancelled' THEN
+    IF EXISTS (
+      SELECT 1
+        FROM queue_entries
+       WHERE session_id = NEW.id
+         AND state = 'in_consultation'
+    ) THEN
+      RAISE EXCEPTION 'Cannot cancel a session while a consultation is active'
+        USING ERRCODE = '23514';
+    END IF;
+
+    UPDATE queue_entries
+       SET state = 'cancelled',
+           eligibility_order = NULL,
+           priority_order = NULL,
+           updated_at = now()
+     WHERE session_id = NEW.id
+       AND state IN ('waiting', 'checked_in', 'called');
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER consultation_sessions_queue_terminal_guard
+BEFORE UPDATE OF status ON consultation_sessions
+FOR EACH ROW
+EXECUTE FUNCTION enforce_session_queue_terminal_transition();
+
 ALTER TABLE audit_events
   DROP CONSTRAINT audit_events_entity_type_check,
   ADD CONSTRAINT audit_events_entity_type_check
