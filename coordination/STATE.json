@@ -99,18 +99,19 @@
         "retrospective_consensus"
       ],
       "capability_status": {
-        "orchestration": "pending_runtime_validation",
-        "architecture": "pending_runtime_validation",
-        "implementation": "pending_runtime_validation",
-        "review": "pending_runtime_validation",
-        "qa_ux_system_verification": "pending_runtime_validation",
-        "ci_remediation": "pending_runtime_validation",
-        "merge_execution": "pending_runtime_validation"
+        "orchestration": "limited_authentication",
+        "architecture": "limited_authentication",
+        "implementation": "limited_authentication",
+        "review": "limited_authentication",
+        "qa_ux_system_verification": "limited_authentication",
+        "ci_remediation": "limited_authentication",
+        "merge_execution": "limited_authentication"
       },
-      "credential": "dedicated GEMINI_CHAT_API_KEY GitHub Actions secret reported configured by repository owner; raw value is never exposed",
+      "credential": "GEMINI_CHAT_API_KEY secret is present in GitHub Actions, but Google Generative Language API rejected its value as API_KEY_INVALID in onboarding run 34032927675; raw value remains undisclosed",
+      "runtime_status": "credential_invalid",
       "runtime": ".github/workflows/gemini-chat-collaborator.yml",
       "instructions": "GEMINI_CHAT.md",
-      "current_activity": "onboarding/runtime validation only; no engineering role lease assigned",
+      "current_activity": "onboarding paused until repository owner replaces GEMINI_CHAT_API_KEY with a valid Gemini API key; no engineering role lease assigned",
       "identity": "distinct from gemini_agent"
     }
   },
@@ -137,7 +138,8 @@
       "review_target_sha": null,
       "fallback_candidates": [
         "gemini_chat"
-      ]
+      ],
+      "fallback_status": "gemini_chat currently authentication-limited"
     },
     "merge_executor": {
       "actor": "chatgpt",
@@ -164,7 +166,7 @@
   "runtime_constraints": [
     "codex.general=limited by account usage limit",
     "gemini_agent.general=limited by Gemini Agent project daily quota",
-    "gemini_chat.runtime=pending first authenticated onboarding validation"
+    "gemini_chat.authentication=limited: GEMINI_CHAT_API_KEY rejected as API_KEY_INVALID in run 34032927675; scheduled retries suppressed until owner replaces secret"
   ],
   "completed_work": [
     {
@@ -218,5 +220,5 @@
     "scope": "receptionist walk-in/guest registration plus atomic waiting QueueEntry creation only; check-in/call/priority/ETA/notifications/remote guest credentials remain out of scope"
   },
   "next_work": null,
-  "notes": "PR #20 is the sole canonical Work Unit 3 implementation stream and is ready for Claude independent review. Gemini Chat has been registered as a separate fifth actor with a dedicated GitHub Actions runtime/secret but has no engineering role lease during onboarding. The existing Gemini Agent remains independently tracked and currently quota-limited."
+  "notes": "PR #20 remains the sole canonical Work Unit 3 stream and is waiting for Claude independent review. Gemini Chat integration infrastructure is installed, but first onboarding proved the GitHub secret is wired and non-empty while the supplied key itself is rejected by Google as invalid. No engineering work depends on Gemini Chat, so the project continues while owner replaces that secret value."
 }
