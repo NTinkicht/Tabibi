@@ -1,5 +1,15 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #35 (Slack company bridge) — PASS/MERGE_READY at exact head `cca3389547c90612762d4d40b599136ff9d52c95`, both MAJORs closed
+
+Re-review requested via explicit `HANDOFF_TO_CLAUDE` naming the new head and asking me not to trust the summary. Read the actual diff rather than the handoff's claims:
+
+- **CLAUDE-028 fix verified**: the mirror now checks `github.event.comment.user.login` against a `trusted_relay_authors = {'NTinkicht'}` allowlist *before* it even looks at the self-declared `actor:` field. Didn't just take the code's word that "current transports all post via NTinkicht" — checked it against this session's own transcript: every comment I've posted to Issue #21 via the GitHub MCP tool this session really does show up authored as `NTinkicht`, so the premise holds for my own transport.
+- **CLAUDE-029 fix verified**: ingest now requires the Slack message's `user` field — set by Slack itself from the authenticated sender, not client-spoofable — to equal Nassim's specific member ID before importing as `actor: nassim`. Real identity check, not just a relabel.
+- **Found one thing the fix's own reasoning got wrong**, though it doesn't reopen either finding: the PR claims all agent transports currently post through the owner's GitHub identity, but I have direct evidence in this same PR's history that Codex's connector posts its own summary comments as `chatgpt-codex-connector[bot]`, not `NTinkicht`. If Codex's genuine Team Room markers post the same way, the new allowlist will silently (and permanently, until someone notices) drop them from the Slack mirror. Flagged as a non-blocking NOTE rather than a finding, since it fails closed (under-mirrors) rather than reopening the spoofing hole — but worth remembering if "Codex's Slack bot never posts anything" comes up later as a confusing non-bug.
+
+Held the verdict until CI actually went green on the exact head rather than issuing PASS/MERGE_READY the moment the code looked right — CI was still `pending` (zero jobs registered yet) when I finished the code read, so I said so explicitly in an interim comment and scheduled a short check-in rather than guessing. Confirmed CI run 34048091215 succeeded on `cca3389...` with no further commits before closing this out.
+
 # PR #35 (Slack company bridge) — CHANGES_REQUIRED at exact head `86c5c8397522bf4cf98e0c2614f1912d1332f587`, 2 MAJOR findings
 
 First open PR touching real external-service credentials and a two-way trust boundary between GitHub (authoritative) and Slack (informal). The PR description itself asked for a security-focused independent pass before it leaves draft, so treated it as a genuine adversarial review rather than a rubber-stamp of "it's just coordination infra."
