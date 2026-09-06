@@ -22,13 +22,6 @@ export async function GET(
       clinicId,
       sessionId,
     );
-    return {
-      status: 200,
-      body: snapshot,
-      headers: {
-        'Cache-Control': 'no-store',
-        'Referrer-Policy': 'no-referrer',
-      },
-    };
+    return { status: 200, body: snapshot };
   });
 }
