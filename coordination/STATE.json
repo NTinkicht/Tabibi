@@ -52,7 +52,7 @@
         "merge_execution": "available",
         "review": "available"
       },
-      "current_activity": "authored PR #39 (Work Unit 5, queue priority/reorder) exact head 909abd5381bd8e0d437125f0efc671f9eb0f447c; already fixed one owner-diagnosed CI failure (service_order bigint cast). Claude found a further MAJOR (CLAUDE-031) not covered by CI; implementer lease active pending fix and re-handoff."
+      "current_activity": "authored PR #39 (Work Unit 5, queue priority/reorder), current exact head 2a9520460340417a6f6a1c1d12d44d933fd1348c (application code unchanged since 909abd5381bd8e0d437125f0efc671f9eb0f447c, which is what Claude reviewed); already fixed one owner-diagnosed CI failure (service_order bigint cast). Claude found a further MAJOR (CLAUDE-031) not covered by CI; implementer lease active pending fix and re-handoff."
     },
     "claude": {
       "preferred_roles": ["independent_review", "adversarial_security_review"],
@@ -62,7 +62,7 @@
         "orchestration": "available",
         "merge_execution": "available"
       },
-      "current_activity": "PR #26 and PR #35 both merged and verified. Active gating-reviewer lease on PR #39 (Work Unit 5, queue priority/reorder): CHANGES_REQUIRED at exact head 909abd5381bd8e0d437125f0efc671f9eb0f447c, one MAJOR (CLAUDE-031) empirically reproduced against real Postgres in a worktree, not just traced.",
+      "current_activity": "PR #26 and PR #35 both merged and verified. Active gating-reviewer lease on PR #39 (Work Unit 5, queue priority/reorder): CHANGES_REQUIRED, one MAJOR (CLAUDE-031) empirically reproduced against real Postgres in a worktree, not just traced. Verdict confirmed to still apply at the PR's current head 2a9520460340417a6f6a1c1d12d44d933fd1348c (a coordination-only commit landed on top of the reviewed 909abd5381bd8e0d437125f0efc671f9eb0f447c; zero application-code diff confirmed, CI green on the actual current head).",
       "invocation_policy": "persistent Claude session is the default Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
     "gemini_agent": {
@@ -120,15 +120,18 @@
       "actor": "codex",
       "status": "changes_requested",
       "work_stream": "issue-4-work-unit-5-pr-39",
-      "authored_sha": "909abd5381bd8e0d437125f0efc671f9eb0f447c"
+      "authored_sha": "909abd5381bd8e0d437125f0efc671f9eb0f447c",
+      "current_head": "2a9520460340417a6f6a1c1d12d44d933fd1348c"
     },
     "gating_reviewer": {
       "actor": "claude",
       "status": "changes_requested",
       "review_target_sha": "909abd5381bd8e0d437125f0efc671f9eb0f447c",
+      "current_head": "2a9520460340417a6f6a1c1d12d44d933fd1348c",
       "work_stream": "pr-39-work-unit-5-queue-priority",
       "verdict": "CHANGES_REQUIRED",
-      "pr_comment": "https://github.com/NTinkicht/Tabibi/pull/39#issuecomment-5561043107"
+      "pr_comment": "https://github.com/NTinkicht/Tabibi/pull/39#issuecomment-5561043107",
+      "note": "current_head is a coordination-only commit on top of review_target_sha; verified zero application-code diff and CI green on current_head before confirming the verdict still applies (pr comment https://github.com/NTinkicht/Tabibi/pull/39#issuecomment-5561067867)"
     },
     "secondary_verifier": {
       "actor": null,
@@ -150,6 +153,7 @@
       "id": "CLAUDE-031",
       "severity": "MAJOR",
       "target_sha": "909abd5381bd8e0d437125f0efc671f9eb0f447c",
+      "current_head": "2a9520460340417a6f6a1c1d12d44d933fd1348c",
       "target_pr": 39,
       "summary": "QueueService.reorder()'s two-phase service_order renumbering (temp value = length+index+1, then final = index+1) assumes the checked-in set's service_order values are contiguous 1..length. They are not guaranteed to be: no_show/cancel can remove any checked-in entry (only call requires 'next in order'), leaving a gap that check_in's MAX(service_order)+1 does not backfill. When a gap exists, a row's original value can land inside the temp range and collide with a not-yet-processed row mid-loop, raising a raw unhandled 23505 unique-violation on queue_entries_session_service_order_uq instead of succeeding or failing with a clean domain error.",
       "evidence": "https://github.com/NTinkicht/Tabibi/pull/39#issuecomment-5561043107 -- includes an independently written and run reproduction against real Postgres in a worktree (check in 3, no_show the middle one, check in a 4th, reorder the first entry to the back) that reproduces the exact duplicate-key error at src/modules/queue/index.ts:838.",
@@ -277,7 +281,8 @@
     "implementation_status": "changes_required",
     "implementation_pr": 39,
     "canonical_branch": "codex/issue-4-work-unit-5-queue-priority",
-    "current_head": "909abd5381bd8e0d437125f0efc671f9eb0f447c",
+    "current_head": "2a9520460340417a6f6a1c1d12d44d933fd1348c",
+    "reviewed_head": "909abd5381bd8e0d437125f0efc671f9eb0f447c",
     "review_verdict": "CHANGES_REQUIRED",
     "ci_status": "green_but_does_not_cover_the_finding",
     "pending_findings": ["CLAUDE-031"]
@@ -288,5 +293,5 @@
     "work_unit_title": "not yet defined",
     "pre_approved": false
   },
-  "notes": "PR #26 (Work Unit 4) and PR #35 (Slack company bridge) are merged and verified with zero drift, both closed out cleanly. PR #39 (Issue #4 Work Unit 5, queue priority/reorder) is CHANGES_REQUIRED at exact head 909abd5381bd8e0d437125f0efc671f9eb0f447c: Codex already fixed one owner-diagnosed CI failure (a service_order bigint/text CASE ambiguity), which Claude verified is correctly applied. Claude's own independent review then found CLAUDE-031 (MAJOR): reorder()'s two-phase service_order renumbering assumes no gaps in the checked-in set's ordering, but no_show/cancel can create gaps (only call requires 'next in order'), and a gap can cause a raw unhandled unique-violation instead of success or a clean domain error. Claude reproduced this empirically against real Postgres in a worktree rather than relying on code-reading alone; CI is green but doesn't cover the gap scenario, so it isn't evidence against the finding. PR #32 (coordination-only, 'reconcile after Work Unit 4 merge') remains an unresolved concurrent duplicate of an already-merged STATE.json reconciliation; still flagged on the PR for the author to rebase, unchanged since. PR #40 (Slack onboarding command trigger) requested independent review from Gemini Chat, not Claude -- Claude is monitoring but deliberately not duplicating that lane. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
+  "notes": "PR #26 (Work Unit 4) and PR #35 (Slack company bridge) are merged and verified with zero drift, both closed out cleanly. PR #39 (Issue #4 Work Unit 5, queue priority/reorder) is CHANGES_REQUIRED, currently at exact head 2a9520460340417a6f6a1c1d12d44d933fd1348c: Codex already fixed one owner-diagnosed CI failure (a service_order bigint/text CASE ambiguity) at 909abd5381bd8e0d437125f0efc671f9eb0f447c, which Claude verified is correctly applied. Claude's own independent review of that head found CLAUDE-031 (MAJOR): reorder()'s two-phase service_order renumbering assumes no gaps in the checked-in set's ordering, but no_show/cancel can create gaps (only call requires 'next in order'), and a gap can cause a raw unhandled unique-violation instead of success or a clean domain error. Claude reproduced this empirically against real Postgres in a worktree rather than relying on code-reading alone. A coordination-only commit then moved the PR's head to 2a9520460340417a6f6a1c1d12d44d933fd1348c; Claude independently confirmed zero application-code diff and CI green on that actual current head before confirming the verdict still applies (did not just re-stamp or assume). PR #32 (coordination-only, 'reconcile after Work Unit 4 merge') was closed by the owner as SUPERSEDED / DO NOT MERGE -- both its pieces (STATE.json facts, WORK_QUEUE.md transition) were overtaken by later canonical reconciliation on main; resolved, no further action. PR #40 (Slack onboarding command trigger) requested independent review from Gemini Chat, not Claude -- Claude is monitoring but deliberately not duplicating that lane. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
 }
