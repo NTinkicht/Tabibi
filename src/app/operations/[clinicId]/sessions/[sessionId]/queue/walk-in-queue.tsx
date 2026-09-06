@@ -50,7 +50,9 @@ export function WalkInQueue({
       setState('ready');
     } catch (error) {
       setState('error');
-      setMessage(error instanceof Error && error.message ? error.message : t.error);
+      setMessage(
+        error instanceof Error && error.message ? error.message : t.error,
+      );
     }
   }, [clinicId, sessionId, t.error]);
 

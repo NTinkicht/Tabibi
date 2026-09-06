@@ -122,7 +122,10 @@ describe('walk-in registration foundation', () => {
       contact_phone: string | null;
       contact_email: string | null;
     }>('SELECT contact_phone, contact_email FROM patient_operational_records');
-    expect(stored.rows[0]).toEqual({ contact_phone: null, contact_email: null });
+    expect(stored.rows[0]).toEqual({
+      contact_phone: null,
+      contact_email: null,
+    });
   });
 
   it('stores optional contact privately but creates no guest remote credential', async () => {
@@ -145,7 +148,10 @@ describe('walk-in registration foundation', () => {
       contact_phone: '+213555000001',
       contact_email: 'karim@example.dz',
     });
-    const credentialTables = await pool.query<{ bearer: string | null; exchange: string | null }>(
+    const credentialTables = await pool.query<{
+      bearer: string | null;
+      exchange: string | null;
+    }>(
       `SELECT to_regclass('guest_credentials')::text bearer,
               to_regclass('guest_exchange_ids')::text exchange`,
     );
@@ -180,7 +186,11 @@ describe('walk-in registration foundation', () => {
         (SELECT count(*) FROM queue_entries)::text entries,
         (SELECT count(*) FROM audit_events WHERE action = 'walk_in_registered')::text audits`,
     );
-    expect(counts.rows[0]).toEqual({ patients: '1', entries: '1', audits: '1' });
+    expect(counts.rows[0]).toEqual({
+      patients: '1',
+      entries: '1',
+      audits: '1',
+    });
 
     const audit = await pool.query<{ metadata: string }>(
       `SELECT metadata::text FROM audit_events WHERE action = 'walk_in_registered'`,
@@ -208,9 +218,13 @@ describe('walk-in registration foundation', () => {
       ),
     );
     expect(
-      registrations.map((item) => item.entry.registrationOrder).sort((a, b) => a - b),
+      registrations
+        .map((item) => item.entry.registrationOrder)
+        .sort((a, b) => a - b),
     ).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
-    expect(new Set(registrations.map((item) => item.entry.publicDisplayLabel)).size).toBe(8);
+    expect(
+      new Set(registrations.map((item) => item.entry.publicDisplayLabel)).size,
+    ).toBe(8);
   });
 
   it('rejects unauthorized, cross-clinic, and terminal-session registration', async () => {
@@ -224,7 +238,11 @@ describe('walk-in registration foundation', () => {
     ).rejects.toBeInstanceOf(AuthorizationError);
 
     await expect(
-      queue.registerWalkIn(scopeB, ids.session, input('Cross clinic', 'cross-clinic')),
+      queue.registerWalkIn(
+        scopeB,
+        ids.session,
+        input('Cross clinic', 'cross-clinic'),
+      ),
     ).rejects.toBeInstanceOf(QueueConflictError);
 
     await pool.query(
@@ -237,13 +255,18 @@ describe('walk-in registration foundation', () => {
   });
 
   it('never commits an active waiting row into a closed session during a registration race', async () => {
-    await pool.query(`UPDATE consultation_sessions SET status = 'open' WHERE id = $1`, [
-      ids.session,
-    ]);
+    await pool.query(
+      `UPDATE consultation_sessions SET status = 'open' WHERE id = $1`,
+      [ids.session],
+    );
     const queue = new QueueService(pool);
     const sessions = new SessionService(pool);
     await Promise.allSettled([
-      queue.registerWalkIn(scopeA, ids.session, input('Race patient', 'race-close-register')),
+      queue.registerWalkIn(
+        scopeA,
+        ids.session,
+        input('Race patient', 'race-close-register'),
+      ),
       sessions.command(scopeA, ids.session, {
         command: 'close',
         idempotencyKey: 'race-close-command',
@@ -262,13 +285,18 @@ describe('walk-in registration foundation', () => {
   });
 
   it('cancels a concurrently registered waiting entry or rejects registration after session cancellation', async () => {
-    await pool.query(`UPDATE consultation_sessions SET status = 'open' WHERE id = $1`, [
-      ids.session,
-    ]);
+    await pool.query(
+      `UPDATE consultation_sessions SET status = 'open' WHERE id = $1`,
+      [ids.session],
+    );
     const queue = new QueueService(pool);
     const sessions = new SessionService(pool);
     await Promise.allSettled([
-      queue.registerWalkIn(scopeA, ids.session, input('Cancel race', 'race-cancel-register')),
+      queue.registerWalkIn(
+        scopeA,
+        ids.session,
+        input('Cancel race', 'race-cancel-register'),
+      ),
       sessions.command(scopeA, ids.session, {
         command: 'cancel',
         reason: 'Clinic cancelled the session',

@@ -1,10 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
-import {
-  type ClinicScope,
-  requireClinicRole,
-} from '@/modules/identity';
+import { type ClinicScope, requireClinicRole } from '@/modules/identity';
 import { inTransaction } from '@/platform/database/transaction';
 
 export type QueueEntryState =
@@ -76,15 +73,24 @@ function normalizeOptional(value?: string | null): string | null {
 function normalizeInput(input: WalkInRegistrationInput) {
   const privateDisplayName = input.privateDisplayName.trim();
   if (privateDisplayName.length < 1 || privateDisplayName.length > 120)
-    throw new QueueValidationError('Walk-in name must be between 1 and 120 characters');
+    throw new QueueValidationError(
+      'Walk-in name must be between 1 and 120 characters',
+    );
   if (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 128)
-    throw new QueueValidationError('Idempotency key is required and must be at most 128 characters');
+    throw new QueueValidationError(
+      'Idempotency key is required and must be at most 128 characters',
+    );
   const contactPhone = normalizeOptional(input.contactPhone);
-  const contactEmail = normalizeOptional(input.contactEmail)?.toLowerCase() ?? null;
+  const contactEmail =
+    normalizeOptional(input.contactEmail)?.toLowerCase() ?? null;
   if (contactPhone && (contactPhone.length < 3 || contactPhone.length > 32))
-    throw new QueueValidationError('Contact phone must be between 3 and 32 characters');
+    throw new QueueValidationError(
+      'Contact phone must be between 3 and 32 characters',
+    );
   if (contactEmail && (contactEmail.length < 3 || contactEmail.length > 254))
-    throw new QueueValidationError('Contact email must be between 3 and 254 characters');
+    throw new QueueValidationError(
+      'Contact email must be between 3 and 254 characters',
+    );
   return {
     privateDisplayName,
     contactPhone,
@@ -95,7 +101,10 @@ function normalizeInput(input: WalkInRegistrationInput) {
   };
 }
 
-function fingerprint(sessionId: string, input: ReturnType<typeof normalizeInput>): string {
+function fingerprint(
+  sessionId: string,
+  input: ReturnType<typeof normalizeInput>,
+): string {
   return createHash('sha256')
     .update(
       JSON.stringify([
@@ -152,7 +161,8 @@ async function loadRegistration(
     [clinicId, patientId, entryId],
   );
   const row = result.rows[0];
-  if (!row) throw new QueueConflictError('Walk-in registration no longer exists');
+  if (!row)
+    throw new QueueConflictError('Walk-in registration no longer exists');
   return {
     patient: {
       id: row.patient_id,
@@ -167,7 +177,8 @@ async function loadRegistration(
       registrationOrder: Number(row.registration_order),
       eligibilityOrder:
         row.eligibility_order === null ? null : Number(row.eligibility_order),
-      priorityOrder: row.priority_order === null ? null : Number(row.priority_order),
+      priorityOrder:
+        row.priority_order === null ? null : Number(row.priority_order),
       publicDisplayLabel: row.public_display_label,
     },
   };
@@ -187,7 +198,9 @@ export class QueueService {
       await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
       await client.query(
         `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
-        [`queue-registration:${scope.clinicId}:${scope.actorUserId}:${input.idempotencyKey}`],
+        [
+          `queue-registration:${scope.clinicId}:${scope.actorUserId}:${input.idempotencyKey}`,
+        ],
       );
       const receipt = await client.query<{
         request_fingerprint: string;
@@ -202,7 +215,9 @@ export class QueueService {
       const existing = receipt.rows[0];
       if (existing) {
         if (existing.request_fingerprint !== requestFingerprint)
-          throw new QueueConflictError('Idempotency key was already used for a different walk-in registration');
+          throw new QueueConflictError(
+            'Idempotency key was already used for a different walk-in registration',
+          );
         return loadRegistration(
           client,
           scope.clinicId,
@@ -219,9 +234,14 @@ export class QueueService {
         [sessionId, scope.clinicId],
       );
       const status = session.rows[0]?.status;
-      if (!status) throw new QueueConflictError('Consultation session was not found in this clinic');
+      if (!status)
+        throw new QueueConflictError(
+          'Consultation session was not found in this clinic',
+        );
       if (!['planned', 'open', 'paused'].includes(status))
-        throw new QueueConflictError('Walk-in registration is not allowed for a terminal session');
+        throw new QueueConflictError(
+          'Walk-in registration is not allowed for a terminal session',
+        );
 
       const orderResult = await client.query<{ next_order: string }>(
         `SELECT COALESCE(MAX(registration_order), 0) + 1 AS next_order
@@ -252,7 +272,14 @@ export class QueueService {
            (id, clinic_id, session_id, patient_id, state, source, registration_order,
             eligibility_order, priority_order, public_display_label)
          VALUES ($1, $2, $3, $4, 'waiting', 'walk_in', $5, NULL, NULL, $6)`,
-        [entryId, scope.clinicId, sessionId, patientId, registrationOrder, label],
+        [
+          entryId,
+          scope.clinicId,
+          sessionId,
+          patientId,
+          registrationOrder,
+          label,
+        ],
       );
       await appendAuditEvent(client, {
         clinicId: scope.clinicId,
@@ -264,7 +291,8 @@ export class QueueService {
           source: 'walk_in',
           state: 'waiting',
           registrationOrder,
-          hasContact: input.contactPhone !== null || input.contactEmail !== null,
+          hasContact:
+            input.contactPhone !== null || input.contactEmail !== null,
           preferredLocale: input.preferredLocale,
           correlationId: input.correlationId,
           idempotencyKey: input.idempotencyKey,
@@ -298,7 +326,9 @@ export class QueueService {
         [sessionId, scope.clinicId],
       );
       if (session.rowCount !== 1)
-        throw new QueueConflictError('Consultation session was not found in this clinic');
+        throw new QueueConflictError(
+          'Consultation session was not found in this clinic',
+        );
       const result = await client.query<{
         id: string;
         session_id: string;

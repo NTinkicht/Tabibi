@@ -30,7 +30,10 @@ export async function GET(
   return operationalJson(request, async () => {
     const { clinicId, sessionId } = paramsSchema.parse(await context.params);
     const scope = await authenticatedClinicScope(request, clinicId);
-    const entries = await new QueueService(getPool()).listWaiting(scope, sessionId);
+    const entries = await new QueueService(getPool()).listWaiting(
+      scope,
+      sessionId,
+    );
     return { status: 200, body: { entries } };
   });
 }
