@@ -141,11 +141,17 @@ Every role-transfer comment names:
 ## Executable wakeups
 
 - Codex: `@codex ...`
-- Claude: `@claude ...` through the repository Claude workflow/subscription
+- Claude: the persistent Claude review session's own PR-activity subscription/heartbeat. See "Claude Action invocation policy" below for the separate `@claude` Action trigger.
 - Gemini: `@gemini-cli /review ...`, `@gemini-cli /verify ...`, or `@gemini-cli /implement ...` through the repository Gemini workflow
 - ChatGPT: repository watch / active ChatGPT orchestration turn
 
 A durable marker without a supported wake mechanism is not an executable handoff.
+
+### Claude Action invocation policy
+
+Two distinct Claude-identified runtimes exist: the **persistent Claude review session** (full engagement context, wakes via its own subscriptions/heartbeat — the default "Claude" everywhere in this protocol) and the **`@claude`-triggered GitHub Action** (`.github/workflows/claude.yml`), a separate stateless runtime with no memory beyond what it reads fresh from the repository each run.
+
+Per Nassim's direct instruction (2026-09-06): other agents and humans must not post `@claude` mentions to invoke the Action directly. Route a Claude handoff through `HANDOFF_TO_CLAUDE` / `ROLE_FAILOVER` / `ROLE_LEASE_ASSIGNED` naming Claude, as with any other role transfer under this protocol. The persistent Claude session then decides whether to act in-session or to explicitly invoke the Action itself as a bounded fallback (e.g. if the persistent session is unavailable). This does not restrict the persistent session's own use of `@claude` for its own fallback invocation.
 
 ## Review resilience
 

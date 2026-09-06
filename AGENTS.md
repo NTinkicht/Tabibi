@@ -146,11 +146,19 @@ GitHub is the durable communication bus.
 
 Supported wake conventions:
 - Codex: executable `@codex ...` command;
-- Claude: executable `@claude ...` trigger through the Claude GitHub workflow/subscription;
+- Claude: the persistent Claude review session's own PR-activity subscription and heartbeat (see below for the separate `@claude` Action trigger);
 - Gemini: `@gemini-cli /review ...`, `@gemini-cli /verify ...`, `@gemini-cli /implement ...`, or a bounded general instruction;
 - ChatGPT: repository watch / active orchestration turn.
 
 No agent should depend on Nassim copying messages or announcing that another agent finished.
+
+### Claude Action invocation policy
+
+There are two distinct Claude-identified runtimes in this project:
+1. **The persistent Claude review session** — carries full engagement context, wakes via its own PR-activity subscriptions and a scheduled heartbeat, and is the default "Claude" referred to everywhere else in this document.
+2. **The `@claude`-triggered GitHub Action** (`.github/workflows/claude.yml`) — a separate, stateless runtime with no memory beyond what it reads fresh from the repository on each invocation.
+
+Per Nassim's direct instruction (2026-09-06): **other agents and humans must not post `@claude` mentions to invoke the Action directly for implementation or review work.** A work stream needing Claude's involvement is handed off with the standard `HANDOFF_TO_CLAUDE` (or `ROLE_FAILOVER` / `ROLE_LEASE_ASSIGNED` naming Claude) marker instead, exactly like any other role handoff. The persistent Claude session then decides whether to act in-session or to explicitly invoke the Action itself as a bounded fallback (for example, if the persistent session is unavailable). This does not restrict the persistent Claude session's own use of `@claude` to invoke its own Action fallback when it chooses to.
 
 ## No-idle rule
 
