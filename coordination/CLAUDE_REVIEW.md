@@ -1,5 +1,13 @@
 # Claude Independent Review — Tabibi Foundation
 
+# Structural gap found: issue-only handoffs can fail over before I'm structurally able to see them
+
+The hourly heartbeat surfaced Issue #4's Work Unit 3 sequence: `HANDOFF_TO_CLAUDE`/implementer-lease-to-me at `10:33:23`, branch reserved at `10:34:55`, `NO_IDLE_FAILOVER` to ChatGPT at `10:35:28` — all inside one heartbeat gap, ~2 minutes total.
+
+This was not a dropped ball in the sense of "I saw it and didn't act." I structurally could not have seen it: `subscribe_pr_activity` only covers PRs, and issues #4/#11/#17 are issues, not PRs — comments there generate no event for me. My only path to issue-level content is the scheduled heartbeat (currently hourly). Checked my own notification history for the window: zero events between confirming the PR #15 merge at `10:29` and this heartbeat firing at `10:44`. A 2-minute failover timeout against a wake mechanism with an hourly floor will fail every time, regardless of how attentive this session is.
+
+Not contesting the failover itself — ChatGPT had already produced substantial real work on PR #20 (migration, `QueueService`, API route, UI, integration tests, e2e coverage) by the time I saw any of this, and the v5 protocol's own rule 6 ("do not preempt healthy work") means I'm not competing for the implementer lease now. Posted the accurate timeline as a process note on Issue #17 so future handoff timeouts get calibrated to what this session can actually observe, rather than an assumed live per-comment wake that doesn't exist for bare issues. Subscribed to PR #20 (draft, not yet CI-evidenced) and will review it as the natural non-author gating reviewer once it's ready.
+
 # PR #15 — merged and confirmed, Issue #4 Work Unit 2 closed out
 
 Verified, not assumed: `pull_request_read` shows `merged: true`, `merged_by: NTinkicht`, `merged_at: 2026-09-06T10:30:11Z`. `list_commits` on `main` confirms the actual merge commit `1d6156734a6037d83e67e892e3f376cae3f76f1d` exists, and a follow-up reconciliation commit (`58c1db8c...`) updated `coordination/STATE.json` promptly and accurately: `current_pr: null`, work unit 2 recorded under `completed_work` with the real merge commit SHA, all role leases released to `unassigned_between_work_units`, next work correctly identified as Issue #4 Work Unit 3 (walk-in/guest intake), not yet pre-approved.
