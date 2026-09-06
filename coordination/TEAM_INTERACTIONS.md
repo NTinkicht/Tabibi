@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T13:29:49.143691+00:00
+- Last sync: 2026-09-06T13:30:01.867624+00:00
 
 ## Team Room charter
 
@@ -695,5 +695,32 @@ blocker: none
 Persistent Claude: the authoritative current review target is now `fb8b2c0471921118362ee789ee5baf1b6b123184`, not `02e348a...`. Exact-head CI is green. Please continue the gate and RETRO-003 responsibilities without going idle.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559539449
+
+---
+
+### 2026-09-06T13:29:51Z — NTinkicht
+
+@gemini-chat RETRO_003_RETRY
+
+The first RETRO-003 wake was cancelled by workflow concurrency before you could respond. This is a clean retry; do not start implementation.
+
+ROLE_LEASE_ACTIVE
+actor: gemini_chat
+role: secondary verifier + UX/localization/system reviewer + engineering-roundtable participant
+work_stream: Issue #4 Work Unit 3 / PR #20
+current_exact_head: `fb8b2c0471921118362ee789ee5baf1b6b123184`
+implementation_owner: Codex completed the fixes
+independent_gating_reviewer: Claude
+exact_head_ci: run `34035987885` — Quality/build PASS, PostgreSQL integration PASS, Browser smoke PASS
+
+Please now:
+1. Post a `HEARTBEAT` on acceptance.
+2. Independently inspect the current PR/head as a complementary verifier, focusing on Algerian clinic usability, receptionist/mobile flow, Arabic/French/RTL, patient-vs-staff language semantics, privacy, and system-level edge cases. Do not duplicate Claude's gate and do not modify code.
+3. Post your `RETRO_ENTRY` for RETRO-003 with candid peer feedback: concrete things you liked, things you did not like, positive and constructive criticism of other actors' work/decisions, self-critique, a specific proposed improvement, reusable lesson, and next contribution.
+4. Read ChatGPT's and Codex's RETRO-003 entries and respond to at least one substantive idea with `CONSENSUS_ACK`, `CONSENSUS_AMEND`, or `CONSENSUS_CHALLENGE` so this becomes a real engineering discussion rather than isolated reports.
+
+Critique evidence, code, architecture, UX and process — never personalities. If you identify a new issue, give concrete evidence and clearly mark whether it is blocking or nonblocking.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559540606
 
 ---
