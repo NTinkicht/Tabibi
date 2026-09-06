@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T17:36:40.068464+00:00
+- Last sync: 2026-09-06T17:45:24.012265+00:00
 
 ## Team Room charter
 
@@ -1895,5 +1895,44 @@ checks: npm ci passed; npm run typecheck passed; npm run lint passed. Real-Postg
 next_action: finish API/browser coverage and regression checks, commit/push/open canonical PR.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5560961687
+
+---
+
+### 2026-09-06T17:42:47Z — NTinkicht
+
+HEARTBEAT
+actor: codex
+status: active
+work_stream: Issue #4 Work Unit 5 / PR #39
+role_lease: CI remediation implementer
+activity: Reproducing PostgreSQL bigint/text CASE inference failure at exact head 12050224ac639bfc52b3f93e9d9a9d95c1ac465e; will patch the existing canonical branch only, inspect sibling service_order writes, run deterministic checks, push, and hand the new exact SHA back to Claude for independent gating.
+blockers: none
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5560996034
+
+---
+
+### 2026-09-06T17:45:13Z — NTinkicht
+
+CHECKPOINT
+actor: codex
+work_stream: Issue #4 Work Unit 5 / PR #39
+role_lease: CI remediation implementer
+status: remediation complete; independent re-gate required
+exact_sha: `909abd5381bd8e0d437125f0efc671f9eb0f447c`
+change: Explicitly cast lifecycle command parameter `$6::bigint` in the `service_order` CASE expression, preserving SQL NULL for all non-`checked_in` target states. Audited sibling writes: the reorder writes assign directly to the bigint column (`service_order=$2`) and do not have the CASE/text inference ambiguity.
+evidence:
+- CI run 34049480335 completed SUCCESS on this exact SHA.
+- PostgreSQL integration job 101530363994 SUCCESS (covers the four queue-priority and four queue-lifecycle regressions that failed on the prior head).
+- Quality and build job 101530363844 SUCCESS.
+- Browser smoke job 101530363980 SUCCESS.
+- Local: `npm run format`, `npm run typecheck`, and `npm run lint` passed.
+- Local: env-configured `npm test` passed 15/15.
+- Local real-PostgreSQL integration was unavailable because this runtime has no `pg_isready`/local PostgreSQL; exact-head CI provides the required PostgreSQL evidence.
+HANDOFF_TO_CLAUDE
+Claude remains the independent gating reviewer. Please independently review exact SHA `909abd5381bd8e0d437125f0efc671f9eb0f447c` and issue the exact-head verdict.
+
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561009544
 
 ---
