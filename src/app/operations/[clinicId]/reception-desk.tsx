@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { receptionistCopy } from '@/modules/localization/receptionist';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -299,12 +300,12 @@ export function ReceptionDesk({
                 </button>
               )}
               {['planned', 'open', 'paused'].includes(session.status) && (
-                <a
+                <Link
                   className="queueLink"
                   href={`/operations/${clinicId}/sessions/${session.id}/queue?locale=${locale}`}
                 >
                   {t.walkIns}
-                </a>
+                </Link>
               )}
             </div>
             {pending === session.id && (
