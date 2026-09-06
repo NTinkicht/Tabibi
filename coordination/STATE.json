@@ -99,20 +99,25 @@
         "retrospective_consensus"
       ],
       "capability_status": {
-        "orchestration": "limited_authentication",
-        "architecture": "limited_authentication",
-        "implementation": "limited_authentication",
-        "review": "limited_authentication",
-        "qa_ux_system_verification": "limited_authentication",
-        "ci_remediation": "limited_authentication",
-        "merge_execution": "limited_authentication"
+        "orchestration": "available",
+        "architecture": "available",
+        "implementation": "available",
+        "review": "available",
+        "qa_ux_system_verification": "available",
+        "ci_remediation": "available",
+        "merge_execution": "available"
       },
-      "credential": "GEMINI_CHAT_API_KEY secret is present in GitHub Actions, but Google Generative Language API rejected its value as API_KEY_INVALID in onboarding run 34032927675; raw value remains undisclosed",
-      "runtime_status": "credential_invalid",
+      "credential": "Dedicated GEMINI_CHAT_API_KEY validated successfully by Gemini Chat Collaborator run 34032927675 attempt 2; raw value remains undisclosed",
+      "runtime_status": "authenticated_available",
       "runtime": ".github/workflows/gemini-chat-collaborator.yml",
       "instructions": "GEMINI_CHAT.md",
-      "current_activity": "onboarding paused until repository owner replaces GEMINI_CHAT_API_KEY with a valid Gemini API key; no engineering role lease assigned",
-      "identity": "distinct from gemini_agent"
+      "current_activity": "onboarding completed successfully; repository read/write connectivity verified; scheduled monitoring active; no engineering role lease assigned",
+      "identity": "distinct from gemini_agent",
+      "validation_evidence": {
+        "workflow_run": 34032927675,
+        "attempt": 2,
+        "team_room_comment": "https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559358450"
+      }
     }
   },
   "role_leases": {
@@ -131,7 +136,12 @@
       "status": "verdict_posted_awaiting_new_head",
       "review_target_sha": "b27a072ec4f4099ec93265853759d7002ea3d3d4",
       "verdict": "CHANGES_REQUIRED",
-      "open_findings": ["CLAUDE-027", "TAB-REVIEW-001", "TAB-REVIEW-002", "TAB-REVIEW-003"],
+      "open_findings": [
+        "CLAUDE-027",
+        "TAB-REVIEW-001",
+        "TAB-REVIEW-002",
+        "TAB-REVIEW-003"
+      ],
       "verdict_evidence": {
         "pr_comments": [
           "https://github.com/NTinkicht/Tabibi/pull/20#issuecomment-5559162473",
@@ -149,7 +159,7 @@
       "fallback_candidates": [
         "gemini_chat"
       ],
-      "fallback_status": "gemini_chat currently authentication-limited"
+      "fallback_status": "gemini_chat available as fallback; gemini_agent remains capacity-limited"
     },
     "merge_executor": {
       "actor": "chatgpt",
@@ -215,8 +225,7 @@
   ],
   "runtime_constraints": [
     "codex.general=limited by account usage limit",
-    "gemini_agent.general=limited by Gemini Agent project daily quota",
-    "gemini_chat.authentication=limited: GEMINI_CHAT_API_KEY rejected as API_KEY_INVALID in run 34032927675; scheduled retries suppressed until owner replaces secret"
+    "gemini_agent.general=limited by Gemini Agent project daily quota"
   ],
   "completed_work": [
     {
@@ -279,5 +288,5 @@
     "pre_approved": false,
     "blocked_by": "Work Unit 3 (PR #20) must reach a clean PASS/MERGE_READY and merge first"
   },
-  "notes": "PR #20 exact head b27a072ec4f4099ec93265853759d7002ea3d3d4 received Claude's independent gating verdict: CHANGES_REQUIRED, with CLAUDE-027 and TAB-REVIEW-001 (both MAJOR) blocking, and TAB-REVIEW-002/TAB-REVIEW-003 (MINOR) to fix in the same pass. All four findings were verified by direct code inspection and/or reproduction, not accepted on description or CI status alone -- CLAUDE-027 in particular was found by Claude independently re-running CI's own command against real Postgres 3 times locally after the reported GitHub run was already green. ChatGPT resumes as implementer on the existing canonical branch/PR; no new PR or branch. Claude retains the gating-review lease for the next exact head. Gemini Chat integration infrastructure is installed, but first onboarding proved the GitHub secret is wired and non-empty while the supplied key itself is rejected by Google as invalid; no engineering work depends on Gemini Chat, so the project continues while the owner replaces that secret value."
+  "notes": "PR #20 exact head b27a072ec4f4099ec93265853759d7002ea3d3d4 received Claude's independent gating verdict: CHANGES_REQUIRED, with CLAUDE-027 and TAB-REVIEW-001 (both MAJOR) blocking, and TAB-REVIEW-002/TAB-REVIEW-003 (MINOR) to fix in the same pass. All four findings were verified by direct code inspection and/or reproduction, not accepted on description or CI status alone -- CLAUDE-027 in particular was found by Claude independently re-running CI's own command against real Postgres 3 times locally after the reported GitHub run was already green. ChatGPT resumes as implementer on the existing canonical branch/PR; no new PR or branch. Claude retains the gating-review lease for the next exact head. Gemini Chat authentication recovered: Gemini Chat Collaborator run 34032927675 attempt 2 succeeded and Team Room comment 5559358450 verified repository read/write connectivity. Gemini Chat is available as a distinct fifth actor with scheduled monitoring active, while holding no engineering lease until explicitly assigned."
 }
