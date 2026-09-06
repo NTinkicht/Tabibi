@@ -115,8 +115,12 @@ jobs:
                   match = pattern.search(body)
                   parsed[field] = match.group(1).strip() if match else ''
               actor = parsed.get('actor', '').lower()
-              if actor not in {'chatgpt', 'codex', 'claude', 'gemini'}:
+              # Historical Gemini Agent heartbeats used `actor: gemini`.
+              if actor == 'gemini':
+                  actor = 'gemini_agent'
+              if actor not in {'chatgpt', 'codex', 'claude', 'gemini_agent', 'gemini_chat'}:
                   continue
+              parsed['actor'] = actor
               parsed['created_at'] = comment.get('created_at') or ''
               parsed['url'] = comment.get('html_url') or ''
               latest[actor] = parsed
@@ -129,6 +133,7 @@ jobs:
               '',
               f'- Last sync: {now.isoformat()}',
               '- Stale threshold: 30 minutes for a lease that claims `active`, unless a visible deterministic job is still progressing.',
+              '- `gemini_agent` and `gemini_chat` are distinct actors and are tracked separately.',
               '',
               '| Actor | Last heartbeat | Freshness | Role | Work stream | Status | Current action | Last artifact | Next checkpoint | Blocker |',
               '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
@@ -137,7 +142,7 @@ jobs:
           def cell(value):
               return (value or '—').replace('|', '\\|').replace('\n', ' ')
 
-          for actor in ['chatgpt', 'codex', 'claude', 'gemini']:
+          for actor in ['chatgpt', 'codex', 'claude', 'gemini_agent', 'gemini_chat']:
               item = latest.get(actor)
               if not item:
                   status_lines.append(f'| {actor} | — | no heartbeat | — | — | — | — | — | — | — |')
