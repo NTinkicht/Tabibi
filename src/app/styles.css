@@ -138,9 +138,17 @@ h1 {
   gap: 0.5rem;
   margin-top: 1rem;
 }
-.actions button {
+.actions button,
+.actions .queueLink {
   padding: 0.55rem 0.8rem;
   font-size: 0.8rem;
+}
+.actions .queueLink {
+  border-radius: 999px;
+  background: #d9ebe7;
+  color: #164d45;
+  font-weight: 800;
+  text-decoration: none;
 }
 .actions .danger {
   background: #a93b45;
@@ -210,6 +218,54 @@ h1 {
   font-size: 0.8rem;
   font-weight: 750;
 }
+.createPanel p {
+  color: #52716d;
+}
+.queueToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin: 2rem 0 0;
+}
+.secondaryLink {
+  color: #164d45;
+  font-weight: 800;
+  text-decoration: none;
+}
+.queueList {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+.queueRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.1rem;
+  background: white;
+  border: 1px solid #dce9e7;
+  border-radius: 1rem;
+}
+.queueRow small,
+.queueIdentity span {
+  display: block;
+  color: #52716d;
+  font-size: 0.76rem;
+  margin-top: 0.2rem;
+}
+.queueIdentity {
+  text-align: center;
+}
+.registrationOrder {
+  min-width: 3rem;
+  text-align: center;
+  border-radius: 999px;
+  padding: 0.45rem 0.65rem;
+  background: #edf5f3;
+  font-weight: 800;
+}
 .srOnly {
   position: absolute;
   width: 1px;
@@ -223,7 +279,8 @@ h1 {
   }
 }
 @media (max-width: 700px) {
-  .createPanel form {
+  .createPanel form,
+  .createPanel .walkInForm {
     grid-template-columns: 1fr;
   }
   .deskHeader {
@@ -231,5 +288,11 @@ h1 {
   }
   .sessionGrid {
     grid-template-columns: 1fr;
+  }
+  .queueRow {
+    grid-template-columns: 1fr auto;
+  }
+  .queueIdentity {
+    text-align: start;
   }
 }
