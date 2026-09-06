@@ -48,8 +48,9 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
   );
   const today = new Date().toISOString().slice(0, 10);
   await pool.query(
-    `INSERT INTO consultation_sessions(id,clinic_id,doctor_id,service_date,starts_at,ends_at)
-    VALUES($1,$2,$3,$4,$4::date+time '09:00',$4::date+time '12:00') ON CONFLICT DO NOTHING`,
+    `INSERT INTO consultation_sessions(id,clinic_id,doctor_id,service_date,starts_at,ends_at,status)
+    VALUES($1,$2,$3,$4,$4::date+time '09:00',$4::date+time '12:00','open')
+    ON CONFLICT (id) DO UPDATE SET status='open',queue_order_version=0`,
     [sessionId, clinicId, doctorId, today],
   );
   const secret =
@@ -104,5 +105,20 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
     page.getByText('Sans coordonnées', { exact: true }).first(),
   ).toBeVisible();
   await expect(page.getByText(/^W-[A-F0-9]{10}$/).first()).toBeVisible();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  await page.getByRole('button', { name: 'تسجيل الوصول' }).click();
+  await expect(page.getByText('ترتيب الخدمة #1')).toBeVisible();
+  const dialogAnswers = ['1', 'تنظيم تشغيلي للاستقبال'];
+  page.on('dialog', (dialog) => void dialog.accept(dialogAnswers.shift()));
+  const reorderResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/reorder'),
+  );
+  await page
+    .getByRole('button', { name: 'تقديم / إعادة ترتيب (مدقّق)' })
+    .click();
+  expect((await reorderResponsePromise).status()).toBe(200);
+  await expect(page.getByText('ترتيب الخدمة #1')).toBeVisible();
   await pool.end();
 });

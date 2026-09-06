@@ -21,6 +21,9 @@ type WaitingEntry = {
   privateDisplayName: string;
   preferredLocale: 'ar' | 'fr';
   hasContact: boolean;
+  eligibilityOrder?: number | null;
+  priorityOrder?: number | null;
+  serviceOrder?: number | null;
 };
 
 type WalkInRegistration = {
@@ -58,6 +61,7 @@ export function WalkInQueue({
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
   const [pendingEntry, setPendingEntry] = useState<string | null>(null);
+  const [queueOrderVersion, setQueueOrderVersion] = useState(0);
   const pendingKeysRef = useRef(new Map<string, string>());
 
   const load = useCallback(async () => {
@@ -68,10 +72,12 @@ export function WalkInQueue({
       );
       const body = (await response.json()) as {
         entries?: WaitingEntry[];
+        queueOrderVersion?: number;
         message?: string;
       };
       if (!response.ok || !body.entries) throw new Error(body.message);
       setEntries(body.entries);
+      setQueueOrderVersion(body.queueOrderVersion ?? 0);
       setState('ready');
     } catch (error) {
       setState('error');
@@ -219,6 +225,78 @@ export function WalkInQueue({
     }
   }
 
+  async function reorder(entry: WaitingEntry) {
+    const rawPosition = window.prompt(t.reorderPosition);
+    if (rawPosition === null) return;
+    const targetPosition = Number(rawPosition);
+    if (!Number.isInteger(targetPosition) || targetPosition < 1) {
+      setMessage(t.reorderInvalid);
+      return;
+    }
+    const reason = window.prompt(t.reorderReason)?.trim();
+    if (!reason) return;
+    const operation = `${entry.id}:reorder:${targetPosition}:${queueOrderVersion}:${reason}`;
+    const idempotencyKey = pendingKeysRef.current.get(operation) ?? key();
+    pendingKeysRef.current.set(operation, idempotencyKey);
+    setPendingEntry(entry.id);
+    setMessage('');
+    try {
+      const response = await fetch(
+        `/api/clinics/${clinicId}/sessions/${sessionId}/queue/${entry.id}/reorder`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'idempotency-key': idempotencyKey,
+          },
+          body: JSON.stringify({
+            targetPosition,
+            expectedVersion: queueOrderVersion,
+            reason,
+          }),
+        },
+      );
+      const body = (await response.json()) as {
+        queueOrderVersion?: number;
+        orderedEntryIds?: string[];
+        message?: string;
+      };
+      if (
+        !response.ok ||
+        !body.orderedEntryIds ||
+        body.queueOrderVersion === undefined
+      )
+        throw new Error(body.message);
+      pendingKeysRef.current.delete(operation);
+      setQueueOrderVersion(body.queueOrderVersion);
+      setEntries((items) => {
+        const rank = new Map(
+          body.orderedEntryIds!.map((id, index) => [id, index + 1]),
+        );
+        return [...items]
+          .map((item) => ({
+            ...item,
+            serviceOrder: rank.get(item.id) ?? item.serviceOrder,
+          }))
+          .sort((left, right) => {
+            if (left.state === 'checked_in' && right.state === 'checked_in')
+              return (
+                (left.serviceOrder ?? Number.MAX_SAFE_INTEGER) -
+                (right.serviceOrder ?? Number.MAX_SAFE_INTEGER)
+              );
+            return left.registrationOrder - right.registrationOrder;
+          });
+      });
+    } catch (error) {
+      setMessage(
+        error instanceof Error && error.message ? error.message : t.queueError,
+      );
+      await load();
+    } finally {
+      setPendingEntry(null);
+    }
+  }
+
   const actionFor: Record<
     EntryState,
     {
@@ -332,7 +410,9 @@ export function WalkInQueue({
                 <strong>{entry.publicDisplayLabel}</strong>
               </div>
               <span className="registrationOrder">
-                #{entry.registrationOrder}
+                {entry.state === 'checked_in' && entry.serviceOrder
+                  ? `${t.serviceOrder} #${entry.serviceOrder}`
+                  : `${t.registrationOrder} #${entry.registrationOrder}`}
               </span>
               <span className={`queueState queueState-${entry.state}`}>
                 {t.queueStatuses[entry.state]}
@@ -366,6 +446,15 @@ export function WalkInQueue({
                     onClick={() => void command(entry, 'cancel')}
                   >
                     {t.cancelEntry}
+                  </button>
+                )}
+                {entry.state === 'checked_in' && (
+                  <button
+                    className="priorityAction"
+                    disabled={pendingEntry !== null}
+                    onClick={() => void reorder(entry)}
+                  >
+                    {t.reorderAudited}
                   </button>
                 )}
               </div>

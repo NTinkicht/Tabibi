@@ -48,6 +48,12 @@ export const receptionistCopy = {
     startConsultation: 'Démarrer la consultation',
     completeConsultation: 'Terminer la consultation',
     queueReason: 'Motif opérationnel (obligatoire)',
+    registrationOrder: 'Inscription',
+    serviceOrder: 'Ordre de service',
+    reorderAudited: 'Prioriser / réordonner (audité)',
+    reorderPosition: 'Nouvelle position de service',
+    reorderReason: 'Motif opérationnel obligatoire (cette action est auditée)',
+    reorderInvalid: 'La position doit être un nombre entier positif.',
     patientCancellation:
       'Confirmer : annulation demandée par le patient ? Annuler = décision de la clinique.',
     queueStatuses: {
@@ -116,6 +122,12 @@ export const receptionistCopy = {
     startConsultation: 'بدء الاستشارة',
     completeConsultation: 'إنهاء الاستشارة',
     queueReason: 'السبب التشغيلي (مطلوب)',
+    registrationOrder: 'ترتيب التسجيل',
+    serviceOrder: 'ترتيب الخدمة',
+    reorderAudited: 'تقديم / إعادة ترتيب (مدقّق)',
+    reorderPosition: 'موضع الخدمة الجديد',
+    reorderReason: 'سبب تشغيلي إلزامي (يتم تدقيق هذا الإجراء)',
+    reorderInvalid: 'يجب أن يكون الموضع عددًا صحيحًا موجبًا.',
     patientCancellation:
       'تأكيد: هل طلب المريض الإلغاء؟ اختر إلغاء إذا كان القرار من العيادة.',
     queueStatuses: {
