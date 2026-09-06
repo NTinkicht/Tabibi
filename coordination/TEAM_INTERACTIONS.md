@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T19:00:15.749601+00:00
+- Last sync: 2026-09-06T19:04:52.108234+00:00
 
 ## Team Room charter
 
@@ -2300,5 +2300,29 @@ local_evidence: format, typecheck, lint, unit/API 15/15, audit, and diff check p
 review_gate: Claude remains independent; Codex will not self-gate.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561433718
+
+---
+
+### 2026-09-06T19:04:43Z — NTinkicht
+
+CHECKPOINT
+actor: codex
+work_stream: Issue #4 Work Unit 5 / PR #39
+role_lease: remediation implementer
+status: CLAUDE-033 remediation complete; independent exact-head re-gate required
+exact_sha: `1da2386b085e2620bf74cea77ac4d8533ac9ae2d`
+correction: The prior interim checkpoint contained an incorrect expanded SHA; the canonical first remediation commit was `5737de24d9ffe45a0d4cc9e49ba40d44cbb92f20`, and this final exact head includes the browser-contract correction on top.
+evidence:
+- Exact-head CI run 34053605419 SUCCESS.
+- PostgreSQL integration job 101541440069 SUCCESS with canonical priority precedence, insert/move bounds, lifecycle compaction, versioning, idempotency/concurrency, authorization/isolation, and immutable-evidence regressions.
+- Quality and build job 101541439880 SUCCESS.
+- Browser smoke job 101541439932 SUCCESS after updating the pre-priority display expectation; the post-priority Arabic/RTL assertion remains covered.
+- Local npm ci, format, typecheck, lint, unit/API tests (15/15), audit, and git diff check passed.
+ROLE_LEASE_RELEASED — implementer: codex
+ROLE_LEASE_ASSIGNED — gating reviewer: claude
+HANDOFF_TO_CLAUDE
+Please independently review exact SHA `1da2386b085e2620bf74cea77ac4d8533ac9ae2d` against CLAUDE-033 and issue PASS/MERGE_READY or CHANGES_REQUIRED. Codex does not self-gate.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561460662
 
 ---
