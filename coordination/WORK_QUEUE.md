@@ -4,20 +4,36 @@ This is the human-readable work marketplace for available engineering capacity. 
 
 Status values: `ACTIVE`, `READY`, `BLOCKED`, `DONE`, `CANCELLED`.
 
-## Current company round — Issue #4 / Work Unit 4 preparation
+## Current company round — Issue #4 / Work Unit 5
 
-Work Unit 3 is merged. Before opening the next implementation PR, the team will use available models in parallel to shape a stronger Work Unit 4 without creating duplicate code streams.
+Work Units 1–4 are merged. Work Unit 5 is the next bounded clinic-operations slice:
+
+**Authorized queue priority/reorder with mandatory reason, deterministic ordering, idempotency and audit.**
+
+This slice deliberately does **not** add ETA, notifications, appointment booking, public waiting-room screens, restore/transfer, or new clinical data. One canonical implementation stream only.
 
 | Task ID | Status | Preferred actor | Scope | Expected artifact | Code allowed? |
 | --- | --- | --- | --- | --- | --- |
-| WU4-SCOPE-001 | ACTIVE | chatgpt | Synthesize Issue #4's next bounded slice from current product/architecture/security contracts and peer inputs | Final Work Unit 4 scope + acceptance criteria + role plan | No application code |
-| WU4-REF-001 | READY | codex | Audit current `main` for implementation-readiness/refactoring/test debt relevant to the next queue-operations slice; identify concrete low-risk refactors and missing regression hooks | `REFACTOR_IDEA`/`TEST_IDEA` report with file-level evidence and priority | No code unless later separately leased |
-| WU4-RISK-001 | READY | claude | Pre-mortem the likely next queue-operations slice for security, privacy, tenant isolation, state-machine, concurrency, idempotency, audit and failure-recovery risks | Risk map + recommended invariants/tests + challenge to proposed scope | No code |
-| WU4-UX-001 | READY | gemini_chat | Build an Algeria-realistic receptionist/doctor workflow map for the likely next queue progression slice; cover Arabic/French/RTL/mobile/accessibility and low-connectivity/guest realities | UX scenario matrix + acceptance recommendations + refactor/system observations | No code |
-| WU4-QA-001 | READY | gemini_agent | Perform one bounded capacity check; if recovered, produce a complementary system-QA/edge-case matrix for the next queue progression slice without duplicating Gemini Chat | Capacity report or QA matrix | No code |
-| WU4-IMPLEMENT-001 | BLOCKED | codex | Implement the final bounded Work Unit 4 on one canonical branch/PR | Code + migrations/tests + exact-SHA handoff | Yes, only after WU4 scope is approved |
-| WU4-GATE-001 | BLOCKED | claude | Independent exact-SHA gate for WU4 if Claude remains non-author | Findings or `MERGE_READY` | Review only |
-| WU4-SECONDARY-001 | BLOCKED | gemini_chat / gemini_agent | Complementary UX/system verification of WU4 exact head | Scenario evidence/findings | Review only |
+| WU5-IMPLEMENT-001 | ACTIVE | codex | Implement authorized priority/reorder on current `main`: clinic-scoped permission checks; eligible queue states only; mandatory non-empty reason; deterministic persisted service order/priority; PostgreSQL serialization; idempotent retry receipt; metadata-only audit; API + receptionist UI; regression/concurrency tests | One canonical branch/PR + exact-SHA handoff | Yes — sole implementation lease |
+| WU5-RISK-001 | ACTIVE | claude | Adversarial pre-mortem and later independent exact-SHA gate: authorization, tenant isolation, fairness/state-machine abuse, concurrency, idempotency, audit completeness, stale commands, priority starvation and deterministic ordering | `RISK_CALL`/test recommendations now; findings or `MERGE_READY` on final exact head | Review only; no application edits while gating |
+| WU5-UX-001 | ACTIVE | gemini_chat | Algeria-realistic UX/system lane: receptionist mental model, urgent/priority reason capture, Arabic/French/RTL/mobile, accessibility, low-connectivity retries, clear indication that reorder is exceptional and audited | `UX_NOTE` + scenario/test matrix; later complementary exact-head verification | No implementation unless explicitly failed over |
+| WU5-QA-001 | READY | gemini_agent | One bounded capacity check. If recovered, independently design system/concurrency QA for reorder races, duplicate retries, stale views and cross-clinic attempts without duplicating Gemini Chat | `CAPACITY_RECOVERED` + QA matrix, or one precise capacity-degraded report | No implementation unless explicitly failed over |
+| WU5-REF-001 | READY | chatgpt/codex after implementation checkpoint | Identify only low-risk refactors revealed by WU5 that reduce duplication in queue command validation/audit/retry handling without broadening the PR | `REFACTOR_IDEA` with file-level evidence and whether defer/fold-in | Only if implementer decides it is required for WU5 |
+| WU5-GATE-001 | BLOCKED | claude | Independent exact-SHA merge gate after Codex implementation and green CI | Stable findings or `PASS/MERGE_READY` | Review only |
+| WU5-SECONDARY-001 | BLOCKED | gemini_chat / gemini_agent | Complementary UX/system verification of WU5 exact head | Scenario evidence/findings | Review only |
+| WU5-MERGE-001 | BLOCKED | codex → chatgpt fallback | Mechanical merge only after unchanged exact head has green CI and valid independent `MERGE_READY` | Merge commit + state reconciliation | Merge only |
+
+### WU5 acceptance requirements
+
+- Only authorized clinic staff may reorder/priority-adjust queue entries; cross-clinic IDs never widen access.
+- Reorder/priority is allowed only for committed eligible queue states; called/in-consultation/terminal entries cannot be silently reshuffled.
+- Every successful priority/reorder mutation requires a non-empty operational reason and creates metadata-only audit evidence containing actor, clinic/session/entry identifiers, prior ordering data, resulting ordering data and reason — no diagnosis/clinical justification fields.
+- Concurrent reorder/retry operations are serialized in PostgreSQL and yield a deterministic committed order; duplicate retries do not create duplicate side effects/audit rows.
+- Existing immutable registration order remains preserved as historical evidence; service/priority order is a separate mutable operational concept.
+- Ordinary call-next/service selection remains deterministic after priority changes and must not strand or duplicate queue entries.
+- Arabic/French/RTL/mobile receptionist UI clearly exposes priority/reorder as an exceptional audited action, requires reason before submission, and reports conflict/stale-state outcomes safely.
+- Real-PostgreSQL tests cover authorization, tenant isolation, eligible/ineligible states, repeated idempotent request, simultaneous reorder races, stale-version conflict and deterministic resulting order. Browser coverage includes at least one mobile/RTL priority adjustment flow.
+- Full lint/typecheck/unit/integration/build/security-audit/CI remain green.
 
 ## Claim protocol
 
