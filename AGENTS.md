@@ -15,6 +15,8 @@ All agents MUST read:
 - `coordination/AUTONOMY_PROTOCOL.md`
 - `coordination/ROLE_FAILOVER_PROTOCOL.md`
 - `coordination/COLLABORATION_PROTOCOL.md`
+- `coordination/COMPANY_OPERATING_SYSTEM.md`
+- `coordination/WORK_QUEUE.md`
 - `coordination/STATE.json`
 - recent `coordination/TEAM_LEARNING.md` / `coordination/RETROSPECTIVES.md` entries relevant to the task
 
@@ -147,7 +149,7 @@ Capacity must be recorded per actor and capability, not as a vague provider-wide
 
 ## Team visibility, retrospectives and learning
 
-GitHub Issue #21 is the permanent **Team Room**. `coordination/COLLABORATION_PROTOCOL.md` is binding.
+GitHub Issue #21 is the permanent **Team Room**. `coordination/COLLABORATION_PROTOCOL.md` and `coordination/COMPANY_OPERATING_SYSTEM.md` are binding. `coordination/WORK_QUEUE.md` is the human-readable marketplace for safe complementary work.
 
 Every actor holding an active role lease, including ChatGPT and reviewers, must:
 - post a `HEARTBEAT` when starting/accepting work;
@@ -162,7 +164,7 @@ A heartbeat is visibility, not proof of progress. Observable artifacts (commits,
 
 Retrospectives are required after every merged bounded work unit and after material coordination incidents. Relevant agents participate in Team Room using `RETRO_ENTRY`, then discuss improvements via `PROCESS_PROPOSAL`, `CONSENSUS_ACK`, `CONSENSUS_AMEND`, and `CONSENSUS_CHALLENGE`.
 
-Accepted process lessons are tracked in `coordination/TEAM_LEARNING.md`; retrospective summaries are tracked in `coordination/RETROSPECTIVES.md`; the raw Team Room conversation is mirrored to `coordination/TEAM_INTERACTIONS.md`; latest heartbeats are summarized in `coordination/TEAM_STATUS.md`.
+Accepted process lessons are tracked in `coordination/TEAM_LEARNING.md`; retrospective summaries are tracked in `coordination/RETROSPECTIVES.md`; the raw Team Room conversation is mirrored to `coordination/TEAM_INTERACTIONS.md`; latest heartbeats are summarized in `coordination/TEAM_STATUS.md`; standups are generated into `coordination/STANDUPS.md`; and the readable group-chat view is generated into `coordination/ENGINEERING_CHAT.md`.
 
 No actor may opt out because it is “only reviewing” or “only orchestrating.” Team learning is part of the engineering work.
 
@@ -210,6 +212,8 @@ There are two distinct Claude-identified runtimes in this project:
 Per Nassim's direct instruction (2026-09-06): **other agents and humans must not post `@claude` mentions to invoke the Action directly for implementation or review work.** A work stream needing Claude's involvement is handed off with the standard `HANDOFF_TO_CLAUDE` (or `ROLE_FAILOVER` / `ROLE_LEASE_ASSIGNED` naming Claude) marker instead. The persistent Claude session then decides whether to act in-session or to explicitly invoke the Action itself as a bounded fallback.
 
 ## No-idle rule
+
+Every available actor should create value without duplicating the canonical implementation stream. If an actor has no active delivery lease, it checks `coordination/WORK_QUEUE.md` for safe `READY` work, claims it with `TASK_CLAIM`, or proposes a bounded useful task with `TASK_PROPOSAL`. Capacity recovery should become a useful assignment in the same orchestration cycle whenever safe work exists. Reviewer independence and anti-duplication outrank utilization.
 
 Every completed action ends with one of:
 - another actor has a valid role lease and executable next action;

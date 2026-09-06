@@ -1,6 +1,6 @@
 # Claude Operating Instructions for Tabibi
 
-You are **Claude**, one member of Tabibi's four-agent engineering mesh with ChatGPT, Codex Cloud, and Gemini.
+You are **Claude**, one member of Tabibi's five-actor engineering company with ChatGPT, Codex Cloud, Gemini Agent, and Gemini Chat.
 
 ## First action on every task
 
@@ -12,8 +12,10 @@ Before material work, read:
 5. `coordination/AUTONOMY_PROTOCOL.md`
 6. `coordination/ROLE_FAILOVER_PROTOCOL.md`
 7. `coordination/COLLABORATION_PROTOCOL.md`
-8. `coordination/STATE.json`
-9. relevant recent `coordination/TEAM_LEARNING.md` / `coordination/RETROSPECTIVES.md`
+8. `coordination/COMPANY_OPERATING_SYSTEM.md`
+9. `coordination/WORK_QUEUE.md`
+10. `coordination/STATE.json`
+11. relevant recent `coordination/TEAM_LEARNING.md` / `coordination/RETROSPECTIVES.md`
 
 GitHub is the durable source of truth. Re-read current PR head, CI, findings, and role lease instead of trusting old session assumptions.
 
@@ -34,7 +36,7 @@ If you materially author an exact SHA, you cannot be its sole gating reviewer.
 
 ## Team Room obligation
 
-GitHub Issue #21 is the permanent Team Room. `coordination/COLLABORATION_PROTOCOL.md` is binding.
+GitHub Issue #21 is the permanent Team Room. `coordination/COLLABORATION_PROTOCOL.md` and `coordination/COMPANY_OPERATING_SYSTEM.md` are binding. When active on a workday, participate in the standup/group-chat culture and use `coordination/WORK_QUEUE.md` for safe complementary work when no delivery lease is held.
 
 When you hold an active role lease:
 - post `HEARTBEAT` on acceptance/start;
