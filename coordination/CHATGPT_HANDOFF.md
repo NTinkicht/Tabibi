@@ -1,35 +1,38 @@
 # ChatGPT Handoff
 
-## Current status
+## Current operating model
 
-`HANDOFF_TO_CLAUDE` — PR #9 requires independent re-review after author-claimed fixes for TAB-OPS-001 through TAB-OPS-006 are committed and pushed.
+Tabibi uses the capability-resilient four-agent mesh defined by `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, and `coordination/COLLABORATION_PROTOCOL.md`.
 
-PR #1 is merged. Issue #3, **Epic: Technical foundation, CI and deployment baseline**, is active. PR #10 is the implementation PR; required GitHub Actions CI has now been published through the authorized ChatGPT GitHub App and is running. Claude may perform an early non-gating review of PR #10 in parallel while PR #9 is reviewed.
+GitHub Issue #21 is the permanent Team Room. ChatGPT must post its own `HEARTBEAT` / `CHECKPOINT` messages when actively orchestrating or implementing, participate in retrospectives, record process consensus, and reconcile stale leases rather than silently waiting.
 
-The current operating model is `tri-agent-v4-executable-wakeups-consensus-fast-path`.
+## Current engineering stream
 
-## PR #9 review scope
+Issue #4 Work Unit 2 / PR #15 is merged.
 
-Claude must independently verify the pushed PR #9 head:
+Issue #4 Work Unit 3 — walk-in/guest patient intake and atomic `waiting` QueueEntry materialization — is active in the single canonical draft PR #20 on branch `claude/issue-4-work-unit-3-walkin-queue`.
 
-1. **TAB-OPS-001:** `CONSENSUS_FAST_PATH_CANDIDATE` authorizes exactly one bounded implementation attempt only after Codex independently checks every eligibility criterion. `CONSENSUS_FAST_PATH_ACCEPTED` is exclusively a post-implementation Claude verdict.
-2. **TAB-OPS-002:** canonical contract text may be clarified only when the result is logically entailed by committed invariants and has one conservative deterministic interpretation. A new contract, materially different valid design, or security/privacy/authentication/authorization/tenant/data-ownership/policy choice routes to ChatGPT.
-3. **TAB-OPS-003:** durable state reflects v4, merged PR #1, active Issue #3, and current PRs; no stale Round-8/PR-1 next action remains.
-4. **TAB-OPS-004:** finding state no longer creates an exact-SHA circular merge gate. Concrete pushed fixes are recorded in `review_pending_findings`, while `open_blockers`/`open_majors` count only findings currently known to remain unresolved. Claude's `PASS`/`PASS_WITH_MINOR_FINDINGS` + `MERGE_READY` for the exact reviewed SHA resolves relevant review-pending findings for merge purposes without a post-review bookkeeping commit.
-5. **TAB-OPS-005:** after a top-level merge, an explicitly pre-approved active `current_work` has deterministic priority over `next_work`. Simulating PR #9 merging therefore continues active Issue #3 / PR #10 without ChatGPT intervention.
-6. **TAB-OPS-006:** Claude rejection makes a finding known-open for control flow, but a later pushed commit containing a concrete author-claimed correction returns it to `review_pending_findings` with known-open severity cleared. Review-pending is never independent acceptance; Claude's exact-SHA verdict remains required.
-7. The hard no-idle invariant remains intact: every `HANDOFF_TO_CODEX` carries a supported executable `@codex ...` command, and a merge authorization carries `@codex merge this PR if gates pass`.
+ChatGPT currently owns the implementation/CI-remediation lease after no-idle failover from Claude. Because ChatGPT materially authors this stream, an eligible non-author reviewer must provide the eventual exact-SHA gating verdict.
 
-`review_pending_findings` is explicitly not acceptance. If Claude rejects a claimed resolution, no `MERGE_READY` exists and the finding is known-open for control flow. Once a later pushed commit contains a concrete author-claimed correction, that fixing commit returns the finding to `review_pending_findings` and clears its known-open severity; Claude must then review that exact SHA.
+Current known deterministic CI state from run `34028241002` at head `7826a177ebea7f30d5f49b0123e8687c5170cb3e`:
+- PostgreSQL integration: PASS;
+- Quality/build: failed only at Prettier check on four Work Unit 3 files;
+- Browser job reached production build and failed TypeScript because `vitest.config.ts` uses unsupported `fileParallelism` in project config.
 
-## Executable continuation
+These are active remediation items, not external blockers. ChatGPT should fix them on the same canonical branch, rerun CI, and continue without asking Nassim.
 
-If the reviewed head is acceptable, Claude posts `PASS` or `PASS_WITH_MINOR_FINDINGS`, `MERGE_READY`, and `HANDOFF_TO_CODEX`, names the exact reviewed SHA, and includes:
+## Team-learning duties
 
-`@codex merge this PR if gates pass`
+Before material action, inspect:
+- `coordination/STATE.json`;
+- Team Room Issue #21 and generated `TEAM_STATUS.md`;
+- recent `TEAM_LEARNING.md` and `RETROSPECTIVES.md`;
+- current PR/CI evidence.
 
-If a BLOCKER or MAJOR remains, Claude posts the stable finding and the appropriate handoff. A routine correction uses `HANDOFF_TO_CODEX` together with `@codex address that feedback`; a consequential or ambiguous contract decision uses `HANDOFF_TO_CHATGPT`.
+After each meaningful checkpoint, post to Team Room. If an active actor's heartbeat/artifacts are stale beyond the collaboration threshold, reconcile and fail over according to protocol.
 
-## Parallel implementation review
+After every merged bounded work unit or material coordination incident, ensure a retrospective opens and produces explicit proposals/consensus or a recorded disagreement.
 
-PR #10 may be reviewed early while CI runs. Early review is non-gating: Claude may surface architecture/security/testability defects now, but final `MERGE_READY` for PR #10 waits for required CI to pass on the exact implementation head.
+## Owner boundary
+
+Nassim is Product Owner, not a routine scheduler, relay, reviewer coordinator, or merge operator. Escalate only genuine owner-only matters defined in `AGENTS.md`.

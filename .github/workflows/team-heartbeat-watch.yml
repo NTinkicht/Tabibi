@@ -1,0 +1,156 @@
+name: Team Heartbeat Watch
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: team-heartbeat-watch
+  cancel-in-progress: true
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Detect stale active leases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from datetime import datetime, timezone, timedelta
+          from pathlib import Path
+
+          repo = os.environ['REPOSITORY']
+          token = os.environ['GH_TOKEN']
+          api = f'https://api.github.com/repos/{repo}'
+          team_issue = 21
+          state = json.loads(Path('coordination/STATE.json').read_text(encoding='utf-8'))
+          threshold = int(state.get('team_room', {}).get('stale_active_lease_minutes', 30))
+
+          def request_json(method, url, payload=None):
+              data = None
+              if payload is not None:
+                  data = json.dumps(payload).encode('utf-8')
+              req = urllib.request.Request(
+                  url,
+                  data=data,
+                  method=method,
+                  headers={
+                      'Authorization': f'Bearer {token}',
+                      'Accept': 'application/vnd.github+json',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                      'User-Agent': 'tabibi-heartbeat-watch',
+                      'Content-Type': 'application/json',
+                  },
+              )
+              with urllib.request.urlopen(req) as response:
+                  return json.load(response)
+
+          def get_all_comments(number):
+              comments = []
+              page = 1
+              while True:
+                  batch = request_json('GET', f'{api}/issues/{number}/comments?per_page=100&page={page}')
+                  comments.extend(batch)
+                  if len(batch) < 100:
+                      return comments
+                  page += 1
+
+          comments = get_all_comments(team_issue)
+          latest = {}
+          actor_re = re.compile(r'(?mi)^actor:\s*(chatgpt|codex|claude|gemini)\s*$')
+          heartbeat_re = re.compile(r'(?mi)^HEARTBEAT\s*$')
+          for comment in comments:
+              body = comment.get('body') or ''
+              if not heartbeat_re.search(body):
+                  continue
+              m = actor_re.search(body)
+              if not m:
+                  continue
+              latest[m.group(1).lower()] = comment
+
+          active = {}
+          for role, lease in (state.get('role_leases') or {}).items():
+              actor = lease.get('actor')
+              status = str(lease.get('status', '')).lower()
+              if actor and ('active' in status or status.startswith('waiting_for_green') or status.startswith('waiting_for_')):
+                  # Waiting reviewer/merge roles are not active execution leases unless explicitly marked active.
+                  if 'active' not in status:
+                      continue
+                  active.setdefault(actor, []).append(role)
+
+          now = datetime.now(timezone.utc)
+          recent_cutoff = now - timedelta(minutes=60)
+          current_pr = state.get('current_pr')
+          current_issue = state.get('current_issue')
+          target = current_pr or current_issue or team_issue
+
+          for actor, roles in active.items():
+              comment = latest.get(actor)
+              stale = False
+              age_minutes = None
+              if comment is None:
+                  stale = True
+              else:
+                  try:
+                      stamp = datetime.fromisoformat(comment['created_at'].replace('Z', '+00:00'))
+                      age_minutes = int((now - stamp).total_seconds() // 60)
+                      stale = age_minutes >= threshold
+                  except Exception:
+                      stale = True
+
+              if not stale:
+                  continue
+
+              marker = f'WATCHDOG_STALE actor={actor} work_stream={state.get("state", "unknown")}'
+              already_recent = False
+              for prior in comments:
+                  body = prior.get('body') or ''
+                  if marker not in body:
+                      continue
+                  try:
+                      created = datetime.fromisoformat(prior['created_at'].replace('Z', '+00:00'))
+                      if created >= recent_cutoff:
+                          already_recent = True
+                          break
+                  except Exception:
+                      pass
+              if already_recent:
+                  continue
+
+              age_text = 'no heartbeat found' if age_minutes is None else f'latest heartbeat is {age_minutes} minutes old'
+              team_body = (
+                  f'HEARTBEAT_STALE\n\n{marker}\n'
+                  f'actor: {actor}\nroles: {", ".join(roles)}\n'
+                  f'observation: {age_text}; threshold is {threshold} minutes.\n'
+                  'action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.\n'
+                  'This marker is a watchdog signal, not automatic proof that the actor failed.'
+              )
+              request_json('POST', f'{api}/issues/{team_issue}/comments', {'body': team_body})
+
+              if target != team_issue:
+                  target_body = (
+                      'ROLE_FAILOVER_REQUIRED — stale activity heartbeat requires reconciliation\n\n'
+                      f'{marker}\n'
+                      f'Current active roles: {", ".join(roles)}. {age_text}.\n'
+                      'Check exact branch/PR/CI movement first. If no deterministic operation is actively progressing, revoke/fail over the stale lease under `coordination/ROLE_FAILOVER_PROTOCOL.md`. Do not ask Nassim to relay or restart routine work.'
+                  )
+                  request_json('POST', f'{api}/issues/{target}/comments', {'body': target_body})
+          PY

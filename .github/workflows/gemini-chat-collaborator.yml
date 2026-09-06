@@ -1,0 +1,379 @@
+name: Gemini Chat Collaborator
+
+on:
+  issue_comment:
+    types: [created]
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: gemini-chat-${{ github.event_name }}-${{ github.event.issue.number || 'monitor' }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  comment-collaboration:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.sender.type == 'User' &&
+      startsWith(github.event.comment.body, '@gemini-chat') &&
+      !startsWith(github.event.comment.body, '@gemini-chat /implement') &&
+      !startsWith(github.event.comment.body, '@gemini-chat /fix') &&
+      !startsWith(github.event.comment.body, '@gemini-chat /merge') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Checkout repository instructions
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 30
+
+      - name: Run Gemini Chat collaborator
+        uses: google-github-actions/run-gemini-cli@v0
+        env:
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_CHAT_API_KEY: ${{ secrets.GEMINI_CHAT_API_KEY }}
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_CHAT_API_KEY }}
+          gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION }}
+          gemini_model: ${{ vars.GEMINI_MODEL }}
+          gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || false) }}
+          github_pr_number: ${{ github.event.issue.pull_request && github.event.issue.number || '' }}
+          github_issue_number: ${{ github.event.issue.number }}
+          settings: |-
+            {
+              "model": { "maxSessionTurns": 60 },
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": ["run","-i","--rm","-e","GITHUB_PERSONAL_ACCESS_TOKEN","ghcr.io/github/github-mcp-server:v0.27.0"],
+                  "includeTools": [
+                    "add_issue_comment","issue_read","list_issues","search_issues",
+                    "pull_request_read","list_pull_requests","search_pull_requests",
+                    "pull_request_review_write","add_comment_to_pending_review",
+                    "get_commit","get_file_contents","list_commits","search_code"
+                  ],
+                  "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
+                }
+              }
+            }
+          prompt: |-
+            You are Gemini Chat (`gemini_chat`), a distinct Tabibi team actor from Gemini Agent (`gemini_agent`).
+            Read GEMINI_CHAT.md, AGENTS.md, coordination/COLLABORATION_PROTOCOL.md,
+            coordination/ROLE_FAILOVER_PROTOCOL.md, coordination/AUTONOMY_PROTOCOL.md,
+            coordination/STATE.json, coordination/TEAM_STATUS.md, relevant TEAM_LEARNING.md
+            and RETROSPECTIVES.md, plus PRODUCT.md, ARCHITECTURE.md and SECURITY.md before acting.
+
+            Trusted collaborator request:
+            ${{ github.event.comment.body }}
+
+            This read/collaboration job cannot modify repository contents. Follow current role leases.
+            Do not create a duplicate implementation stream and do not claim Gemini Agent actions as yours.
+            If this is onboarding/synchronization only, acknowledge without triggering engineering work.
+            When posting to Team Room, identify yourself explicitly with `actor: gemini_chat`.
+            Participate independently in discussion, QA, review, retrospective and consensus when requested.
+            If asked for authoritative gating review, verify that you are the non-author lease holder for the exact SHA.
+            End with an executable continuation only when the current protocol actually requires one.
+
+  comment-implement-fix:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.sender.type == 'User' &&
+      (startsWith(github.event.comment.body, '@gemini-chat /implement') ||
+       startsWith(github.event.comment.body, '@gemini-chat /fix')) &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      id-token: write
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Checkout repository instructions
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 50
+
+      - name: Run Gemini Chat developer
+        uses: google-github-actions/run-gemini-cli@v0
+        env:
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_CHAT_API_KEY: ${{ secrets.GEMINI_CHAT_API_KEY }}
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_CHAT_API_KEY }}
+          gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION }}
+          gemini_model: ${{ vars.GEMINI_MODEL }}
+          gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || false) }}
+          github_pr_number: ${{ github.event.issue.pull_request && github.event.issue.number || '' }}
+          github_issue_number: ${{ github.event.issue.number }}
+          settings: |-
+            {
+              "model": { "maxSessionTurns": 80 },
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": ["run","-i","--rm","-e","GITHUB_PERSONAL_ACCESS_TOKEN","ghcr.io/github/github-mcp-server:v0.27.0"],
+                  "includeTools": [
+                    "add_issue_comment","issue_read","list_issues","search_issues",
+                    "create_pull_request","pull_request_read","list_pull_requests","search_pull_requests",
+                    "create_branch","create_or_update_file","delete_file","get_commit",
+                    "get_file_contents","list_commits","push_files","search_code"
+                  ],
+                  "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
+                }
+              }
+            }
+          prompt: |-
+            You are Gemini Chat (`gemini_chat`) acting under an explicit Tabibi implementation/CI-remediation role lease.
+            Read GEMINI_CHAT.md and all binding project/coordination/security documents before editing.
+
+            Trusted role/task request:
+            ${{ github.event.comment.body }}
+
+            Confirm the role lease and canonical work stream first. Continue the existing branch/PR whenever possible.
+            Never create a duplicate stream. Preserve scope, findings, tests, tenant/privacy/security/concurrency/idempotency contracts.
+            Post HEARTBEAT/CHECKPOINT visibility in Team Room while active. Use `[gemini-chat]` in commit messages where practical.
+            Push only the bounded result, then hand the exact SHA to an independent non-author reviewer. Never self-gate.
+
+  comment-merge:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.sender.type == 'User' &&
+      startsWith(github.event.comment.body, '@gemini-chat /merge') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Checkout repository instructions
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 30
+
+      - name: Run Gemini Chat merge executor
+        uses: google-github-actions/run-gemini-cli@v0
+        env:
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_CHAT_API_KEY: ${{ secrets.GEMINI_CHAT_API_KEY }}
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_CHAT_API_KEY }}
+          gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION }}
+          gemini_model: ${{ vars.GEMINI_MODEL }}
+          github_pr_number: ${{ github.event.issue.pull_request && github.event.issue.number || '' }}
+          github_issue_number: ${{ github.event.issue.number }}
+          settings: |-
+            {
+              "model": { "maxSessionTurns": 30 },
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": ["run","-i","--rm","-e","GITHUB_PERSONAL_ACCESS_TOKEN","ghcr.io/github/github-mcp-server:v0.27.0"],
+                  "includeTools": ["add_issue_comment","issue_read","pull_request_read","merge_pull_request","get_commit","get_file_contents"],
+                  "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
+                }
+              }
+            }
+          prompt: |-
+            You are Gemini Chat (`gemini_chat`) acting only as Tabibi's currently leased mechanical merge executor.
+            Read GEMINI_CHAT.md and binding coordination state first.
+            Trusted merge request: ${{ github.event.comment.body }}
+            Merge only if the exact unchanged head has green required CI, zero open BLOCKER/MAJOR findings,
+            and a valid independent exact-SHA MERGE_READY from the gating reviewer lease holder.
+            Do not alter or re-review the head. Post the merge evidence and continuation.
+
+  monitor-gate:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      mode: ${{ steps.gate.outputs.mode }}
+    steps:
+      - name: Checkout main coordination state
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Decide whether Gemini Chat should wake
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json, os, re, urllib.request
+
+          state = json.load(open('coordination/STATE.json', encoding='utf-8'))
+          gemini_chat = (state.get('agents') or {}).get('gemini_chat') or {}
+          if gemini_chat.get('runtime_status') == 'credential_invalid':
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+                  f.write('mode=idle\n')
+              print('Gemini Chat monitor suppressed: credential_invalid recorded in STATE.json')
+              raise SystemExit(0)
+
+          active = False
+          for lease in (state.get('role_leases') or {}).values():
+              if not isinstance(lease, dict):
+                  continue
+              if lease.get('actor') != 'gemini_chat':
+                  continue
+              status = str(lease.get('status', '')).lower()
+              if not any(x in status for x in ['released', 'complete', 'limited', 'unassigned']):
+                  active = True
+
+          token = os.environ['GH_TOKEN']
+          repo = os.environ['REPOSITORY']
+          req = urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/issues/21/comments?per_page=100',
+              headers={'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'User-Agent': 'tabibi-gemini-chat-monitor'},
+          )
+          with urllib.request.urlopen(req) as r:
+              comments = json.load(r)
+
+          target_re = re.compile(r'(?is)(HANDOFF_TO_GEMINI_CHAT|@gemini-chat|RETRO_OPEN|PROCESS_PROPOSAL|ROLE_LEASE_ASSIGNED.{0,800}gemini_chat)')
+          response_re = re.compile(r'(?mi)^actor:\s*gemini_chat\s*$')
+          latest_target = ''
+          latest_response = ''
+          for c in comments:
+              body = c.get('body') or ''
+              stamp = c.get('created_at') or ''
+              if target_re.search(body) and stamp > latest_target:
+                  latest_target = stamp
+              if response_re.search(body) and stamp > latest_response:
+                  latest_response = stamp
+
+          discussion = bool(latest_target and latest_target > latest_response)
+          mode = 'active_lease' if active else ('discussion' if discussion else 'idle')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write(f'mode={mode}\n')
+          print(f'Gemini Chat monitor mode: {mode}')
+          PY
+
+  monitor-discussion:
+    needs: monitor-gate
+    if: needs.monitor-gate.outputs.mode == 'discussion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+      pull-requests: read
+      actions: read
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 20
+
+      - name: Run Gemini Chat Team Room monitor
+        uses: google-github-actions/run-gemini-cli@v0
+        env:
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_CHAT_API_KEY: ${{ secrets.GEMINI_CHAT_API_KEY }}
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_CHAT_API_KEY }}
+          gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION }}
+          gemini_model: ${{ vars.GEMINI_MODEL }}
+          github_issue_number: '21'
+          settings: |-
+            {
+              "model": { "maxSessionTurns": 40 },
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": ["run","-i","--rm","-e","GITHUB_PERSONAL_ACCESS_TOKEN","ghcr.io/github/github-mcp-server:v0.27.0"],
+                  "includeTools": ["add_issue_comment","issue_read","pull_request_read","get_commit","get_file_contents","search_code"],
+                  "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
+                }
+              }
+            }
+          prompt: |-
+            You are Gemini Chat (`gemini_chat`) performing low-cost Team Room monitoring, not autonomous work creation.
+            Read GEMINI_CHAT.md and all collaboration/state/learning documents. Inspect Issue #21.
+            A newer Team Room item appears to need your participation. Respond independently if it is a retrospective,
+            process proposal, direct question, or handoff discussion. Identify yourself with `actor: gemini_chat`.
+            If no active role lease actually belongs to you, do not modify code, create a PR, or invent a task.
+
+  monitor-active-lease:
+    needs: monitor-gate
+    if: needs.monitor-gate.outputs.mode == 'active_lease'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      id-token: write
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Checkout main instructions
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 50
+
+      - name: Resume Gemini Chat leased work
+        uses: google-github-actions/run-gemini-cli@v0
+        env:
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_CHAT_API_KEY: ${{ secrets.GEMINI_CHAT_API_KEY }}
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_CHAT_API_KEY }}
+          gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION }}
+          gemini_model: ${{ vars.GEMINI_MODEL }}
+          github_issue_number: '21'
+          settings: |-
+            {
+              "model": { "maxSessionTurns": 80 },
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": ["run","-i","--rm","-e","GITHUB_PERSONAL_ACCESS_TOKEN","ghcr.io/github/github-mcp-server:v0.27.0"],
+                  "includeTools": [
+                    "add_issue_comment","issue_read","list_issues","search_issues","create_pull_request",
+                    "pull_request_read","list_pull_requests","search_pull_requests","pull_request_review_write",
+                    "create_branch","create_or_update_file","delete_file","get_commit","get_file_contents",
+                    "list_commits","push_files","search_code","merge_pull_request"
+                  ],
+                  "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
+                }
+              }
+            }
+          prompt: |-
+            You are Gemini Chat (`gemini_chat`). The durable Tabibi state currently assigns you an active role lease.
+            Read GEMINI_CHAT.md, AGENTS.md, all binding coordination protocols, STATE.json, Team Room/status/learning,
+            and product/architecture/security documents. Inspect the current canonical issue/PR and exact lease.
+            Post a HEARTBEAT with `actor: gemini_chat`, then perform only the bounded leased action.
+            Continue existing branch/PR; never duplicate work; preserve reviewer independence; use CI as referee.
+            Post CHECKPOINT/final heartbeat and an executable handoff when done. If capacity fails, release/fail over the lease.
