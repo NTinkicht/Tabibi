@@ -1,13 +1,13 @@
 {
   "project": "Tabibi",
-  "phase": "technical_foundation",
-  "round": 1,
-  "state": "awaiting_claude_pr9_rereview",
-  "current_pr": 9,
-  "current_issue": 3,
-  "last_actor": "codex_cloud",
-  "next_actor": "claude",
-  "next_action": "independently review the current PR #9 head for TAB-OPS-001 through TAB-OPS-006; if acceptable, emit PASS or PASS_WITH_MINOR_FINDINGS plus MERGE_READY and HANDOFF_TO_CODEX naming the exact reviewed SHA, with @codex merge this PR if gates pass",
+  "phase": "clinic_operations_foundation",
+  "round": 2,
+  "state": "codex_active_issue_4_work_unit_1",
+  "current_pr": null,
+  "current_issue": 4,
+  "last_actor": "chatgpt",
+  "next_actor": "codex_cloud",
+  "next_action": "implement Issue #4 bounded work unit 1 from current main: clinic/doctor/staff/scheduling persistence foundation, deterministic session generation, tenant-scoped authorization contracts, and PostgreSQL-enforced doctor-global open-session concurrency; open one PR, run CI, then HANDOFF_TO_CLAUDE with exact SHA and mirror dispatch to Issue #11",
   "operating_model": "tri-agent-v4-executable-wakeups-consensus-fast-path",
   "product_architect": "chatgpt",
   "implementation_runtime": "codex_cloud",
@@ -19,14 +19,7 @@
   "open_minors": 0,
   "human_decision_required": false,
   "pending_findings": [],
-  "review_pending_findings": [
-    "TAB-OPS-001",
-    "TAB-OPS-002",
-    "TAB-OPS-003",
-    "TAB-OPS-004",
-    "TAB-OPS-005",
-    "TAB-OPS-006"
-  ],
+  "review_pending_findings": [],
   "addressed_findings": [
     "TAB-OPS-001",
     "TAB-OPS-002",
@@ -35,15 +28,38 @@
     "TAB-OPS-005",
     "TAB-OPS-006"
   ],
+  "accepted_minor_findings": [
+    "PR9-WATCHDOG-ROLE-UNDERSPECIFIED",
+    "PR10-DB-LOGGER-IMPORT-PLACEMENT"
+  ],
+  "completed_work": [
+    {
+      "issue": 3,
+      "implementation_pr": 10,
+      "merge_commit": "411c80467fc094aef2b9028c7c0de1b9f6a43bbf",
+      "status": "merged"
+    },
+    {
+      "coordination_pr": 9,
+      "merge_commit": "69746d2c6c0ec3fa26e5644dcc7a669bd3a0322b",
+      "status": "merged"
+    }
+  ],
   "current_work": {
-    "issue": 3,
-    "title": "Epic: Technical foundation, CI and deployment baseline",
+    "issue": 4,
+    "title": "Epic: Clinic, doctor and receptionist operations",
+    "work_unit": 1,
+    "work_unit_title": "Clinic/doctor/staff/scheduling persistence foundation",
     "pre_approved": true,
-    "implementation_status": "active",
-    "coordination_pr": 9,
-    "coordination_pr_status": "awaiting_independent_claude_review",
-    "implementation_pr": 10,
-    "implementation_pr_status": "ci_running_and_early_claude_review"
+    "implementation_status": "actively_triggered",
+    "implementation_pr": null
   },
-  "notes": "PR #1 is merged. Issue #3 and its PR #10 are explicitly pre-approved active current_work. After PR #9 merges to main, Codex continues Issue #3 / PR #10 before consulting next_work; no ChatGPT intervention is required. PR #9 contains author-claimed fixes for TAB-OPS-001 through TAB-OPS-006. These are review-pending, not known-open or independently accepted; Claude's exact-SHA verdict determines acceptance without requiring a bookkeeping commit after review. A rejected finding becomes known-open for control flow, but a later pushed concrete correction returns it to review_pending_findings with known-open severity cleared. PR #10 has published GitHub Actions CI and is running CI while Claude performs an early non-gating review. A successful merge handoff is valid only when it names the exact reviewed SHA and includes @codex merge this PR if gates pass."
+  "next_work": {
+    "issue": 4,
+    "title": "Epic: Clinic, doctor and receptionist operations",
+    "work_unit": 2,
+    "work_unit_title": "Receptionist operational session controls after work unit 1 acceptance",
+    "pre_approved": false
+  },
+  "notes": "PR #9 and PR #10 were independently accepted and merged. Issue #3 platform baseline is complete. ChatGPT selected Issue #4 as the next dependency-first product stream because clinic/doctor/staff/scheduling/session persistence is prerequisite to patient discovery/booking and deterministic queue execution. Work unit 1 is actively triggered on Issue #4 with an executable @codex command. Patient/queue/appointment behavior remains out of scope for this first slice. Claude's PR #9 watchdog-definition observation and PR #10 import-placement observation are accepted non-blocking minors and do not block new work."
 }
