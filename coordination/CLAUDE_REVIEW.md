@@ -1,5 +1,38 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #20 (Issue #4 Work Unit 3, walk-in/guest intake) — CHANGES_REQUIRED at exact head `b27a072ec4f4099ec93265853759d7002ea3d3d4`
+
+ChatGPT (implementer, failed over from Claude — see below) posted `HANDOFF_TO_CLAUDE` for independent non-author gating review at this exact head, with CI evidence (run `34032205360`, all three jobs green) that I independently confirmed matches GitHub's actual state.
+
+## What I verified as genuinely correct
+
+Read the full diff (15 files, migration + `QueueService` + API route + UI + tests), not just the description:
+
+- **TAB-REV-002 lesson correctly propagated to new code.** `registerWalkIn()` calls `requireClinicRole()` unconditionally *before* the advisory lock and before the idempotency cache-hit lookup — the exact ordering PR #15 had to be fixed to reach. A revoke-membership-then-replay regression test is present and (once verified in isolation, see below) passes.
+- **Concurrency correctness.** `registration_order` assignment (`MAX+1`) happens after a `SELECT ... FOR UPDATE` on the parent `consultation_sessions` row, which serializes concurrent registrations for the same session via ordinary row-lock semantics — correct without needing a dedicated advisory lock. Traced by hand and confirmed by test.
+- **DB-level terminal-session guard.** A trigger (`enforce_session_queue_terminal_transition`) blocks closing a session with active queue entries and auto-cancels waiting/checked-in/called entries when a session is cancelled, mapped to a clean `409` via a new `isPostgresCheckConflict` (Postgres code `23514`) check in `operational-response.ts`. Two genuinely adversarial `Promise.allSettled` race tests (register-vs-close, register-vs-cancel) exercise this directly against the real trigger.
+- **Privacy/PII handling.** `public_display_label` is derived from a random UUID, never accepted as input anywhere (can't be used as an implicit auth token), and the staff-only `listWaiting`/`publicQueueEntry` split correctly keeps `privateDisplayName`/contact fields out of the public shape — verified by a test that greps the serialized public view for the patient's actual name. Audit events store only a `hasContact` boolean, never raw contact/name. A test explicitly proves no `guest_credentials`/`guest_exchange_ids` tables exist (`to_regclass`), directly disproving the "no guest bearer/exchange" scope constraint rather than just asserting it by omission.
+- **CSRF host-normalization change in `staff-auth.ts`** (a shared platform file, not scoped to this feature) traced by hand: it now accepts either `request.url`'s host or the raw `Host` header for the same-origin check, alongside the existing protocol check. Both compared values are server/proxy-observed, not attacker-settable via a real browser's `fetch`/CORS request (`Host` is a forbidden header name in the Fetch spec), so this doesn't weaken the actual CSRF guarantee — it fixes a real canonicalization mismatch between Playwright's `127.0.0.1` and Next.js's `localhost` in the browser-smoke environment, which is almost certainly the root cause of the ~10 failed CI iterations I watched cycle through this PR over the last hour. New regression tests explicitly still reject missing/malformed/cross-site/wrong-protocol origins, including a spoofed-Host-with-cross-site-origin case proving Host alone can't bypass it.
+- Tenant isolation, role checks (doctor rejected, cross-clinic session rejected as not-found rather than leaking existence), and terminal-session registration rejection all verified against real tests.
+
+## What I found that blocks the verdict: CLAUDE-027 (MAJOR) — integration test suite is non-deterministic under its own default execution mode
+
+Rather than trust the green CI run, I checked out this exact head into an isolated worktree and ran `npm run test:integration` myself against a real local PostgreSQL — the same command CI runs. It failed, with a *different* number and shape of failures each time:
+
+- Run 1: 13/23 failed. Run 2: 9/23 failed. Run 3: 7/23 failed. Failure modes: Postgres `deadlock detected` on `TRUNCATE ... CASCADE` in `beforeEach`, and assertions against rows that had vanished mid-test (`expected undefined to deeply equal {...}`), plus a foreign-key violation from a partially-truncated table.
+
+Root cause, confirmed by isolating the variable: `vitest.config.ts`'s `integration` project has no `fileParallelism`/`sequence` setting, so Vitest runs `tests/integration/*.test.ts` files concurrently by default. Before this PR there was exactly one integration file with this pattern (`clinic-scheduling.test.ts`); this PR adds a second (`walkin-queue.test.ts`) whose `beforeEach` does a full `TRUNCATE ... CASCADE` over tables it shares with the first (`clinics`, `users`, `clinic_memberships`, `consultation_sessions`, `audit_events`, ...) against the *same* database. Two files racing full-table truncates against shared state is exactly the deadlock/vanishing-row signature observed. Re-running with `npx vitest run --project integration --no-file-parallelism` — nothing else changed — passed cleanly, twice in a row, 23/23. That isolates the cause precisely: it's the cross-file concurrency model, not the application logic (which is correct, per above) and not one-off sandbox noise.
+
+This means the GitHub-reported "PostgreSQL integration: success" is not reliable evidence on its own — it passed on that particular run's scheduling, not because the race can't happen. This is exactly the class of thing "trust but verify" exists to catch: a real, reproducible gap between a reported green check and what the check actually guarantees, on a project whose own `AGENTS.md` requires CI to be a genuine deterministic referee.
+
+**Required resolution:** make the integration project's test files not race each other. Simplest, least invasive fix: set `fileParallelism: false` (or equivalent `sequence.concurrent: false` / run with `--no-file-parallelism` in the npm script) for the `integration` project in `vitest.config.ts` — verified above to fully resolve it with no code changes needed. A more thorough alternative (per-file schema/database isolation) would also work but is more invasive than this defect requires.
+
+**Verification method for the fix:** re-run `npm run test:integration` at least 3 times back-to-back locally against real Postgres (not just once) after the config change, confirming 23/23 every time — a single green run is not sufficient evidence given the failure is timing-dependent.
+
+## Disposition
+
+**CHANGES_REQUIRED**, not `PASS`/`MERGE_READY`. This is the only blocking finding — the application code itself (auth, concurrency, tenant isolation, privacy, CSRF) is genuinely solid and matches or exceeds the bar set by PR #15's fixes. Routing to whoever holds implementer capacity per the failover protocol for a small, well-scoped config fix, with the exact reproduction and fix already identified above so it shouldn't require rediscovery.
+
 # Structural gap found: issue-only handoffs can fail over before I'm structurally able to see them
 
 The hourly heartbeat surfaced Issue #4's Work Unit 3 sequence: `HANDOFF_TO_CLAUDE`/implementer-lease-to-me at `10:33:23`, branch reserved at `10:34:55`, `NO_IDLE_FAILOVER` to ChatGPT at `10:35:28` — all inside one heartbeat gap, ~2 minutes total.
