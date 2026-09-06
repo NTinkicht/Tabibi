@@ -22,11 +22,17 @@ export async function GET(
     const { clinicId } = await context.params;
     const scope = await authenticatedClinicScope(request, clinicId);
     const date = new URL(request.url).searchParams.get('date') ?? '';
+    const sessions = await new SessionService(getPool()).listSessions(
+      scope,
+      date,
+    );
+    const clinic = await getPool().query<{ timezone: string }>(
+      'SELECT timezone FROM clinics WHERE id = $1',
+      [scope.clinicId],
+    );
     return {
       status: 200,
-      body: {
-        sessions: await new SessionService(getPool()).listSessions(scope, date),
-      },
+      body: { sessions, timezone: clinic.rows[0]?.timezone ?? 'UTC' },
     };
   });
 }

@@ -336,6 +336,61 @@ describe('reception session operations', () => {
     );
   });
 
+  it('re-authorizes on every idempotent retry and rejects replay after membership revocation', async () => {
+    const id = await seedSession(ids.clinicA, '2026-09-15');
+    const sessions = new SessionService(pool);
+    const receptionScope = {
+      clinicId: ids.clinicA,
+      actorUserId: ids.receptionistA,
+    };
+    const input = {
+      command: 'open' as const,
+      idempotencyKey: 'revoke-retry-1',
+      correlationId: 'revoke-retry-1',
+    };
+    const opened = await sessions.command(receptionScope, id, input);
+    expect(opened.status).toBe('open');
+    const retry = await sessions.command(receptionScope, id, input);
+    expect(retry.status).toBe('open');
+    await pool.query(
+      `DELETE FROM clinic_memberships WHERE clinic_id = $1 AND user_id = $2`,
+      [ids.clinicA, ids.receptionistA],
+    );
+    await expect(
+      sessions.command(receptionScope, id, input),
+    ).rejects.toBeInstanceOf(AuthorizationError);
+    const audit = await pool.query(
+      `SELECT 1 FROM audit_events WHERE entity_id = $1`,
+      [id],
+    );
+    expect(audit.rowCount).toBe(1);
+  });
+
+  it('rejects a manual session whose serviceDate does not match the clinic-local date of startsAt', async () => {
+    const sessions = new SessionService(pool);
+    await expect(
+      sessions.createManual(
+        { clinicId: ids.clinicA, actorUserId: ids.receptionistA },
+        {
+          doctorId: ids.doctor,
+          serviceDate: '2026-09-09',
+          startsAt: new Date('2026-09-10T08:00:00Z'),
+          endsAt: new Date('2026-09-10T11:00:00Z'),
+          idempotencyKey: 'mismatched-service-date',
+          correlationId: 'mismatched-service-date',
+        },
+      ),
+    ).rejects.toThrow('serviceDate must match the clinic-local date');
+    expect(
+      (
+        await pool.query(
+          `SELECT 1 FROM consultation_sessions WHERE service_date IN ('2026-09-09','2026-09-10') AND clinic_id = $1`,
+          [ids.clinicA],
+        )
+      ).rowCount,
+    ).toBe(0);
+  });
+
   it('validates, versions, updates, clears, and idempotently retries delay declarations', async () => {
     const id = await seedSession(ids.clinicA, '2026-09-12');
     const sessions = new SessionService(pool);

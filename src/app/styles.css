@@ -82,6 +82,10 @@ h1 {
   grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
   gap: 1rem;
 }
+.sessionGrid[aria-busy='true'] {
+  opacity: 0.5;
+  pointer-events: none;
+}
 .sessionCard {
   position: relative;
   background: white;

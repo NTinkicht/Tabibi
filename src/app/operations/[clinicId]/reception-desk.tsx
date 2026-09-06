@@ -1,6 +1,6 @@
 'use client';
 import { receptionistCopy } from '@/modules/localization/receptionist';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type Status = 'planned' | 'open' | 'paused' | 'closed' | 'cancelled';
 type Session = {
@@ -19,25 +19,46 @@ type Session = {
 function key() {
   return crypto.randomUUID();
 }
+function localDateString(instant: Date): string {
+  const offsetMs = instant.getTimezoneOffset() * 60_000;
+  return new Date(instant.getTime() - offsetMs).toISOString().slice(0, 10);
+}
 export function ReceptionDesk({ clinicId }: { clinicId: string }) {
   const [locale, setLocale] = useState<'ar' | 'fr'>('ar');
   const t = receptionistCopy[locale];
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => localDateString(new Date()));
+  const [timezone, setTimezone] = useState('UTC');
   const [sessions, setSessions] = useState<Session[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [pending, setPending] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const pendingKeysRef = useRef(new Map<string, string>());
+  function keyFor(opId: string): string {
+    const existing = pendingKeysRef.current.get(opId);
+    if (existing) return existing;
+    const generated = key();
+    pendingKeysRef.current.set(opId, generated);
+    return generated;
+  }
+  function releaseKey(opId: string): void {
+    pendingKeysRef.current.delete(opId);
+  }
   const load = useCallback(async () => {
     setState('loading');
     setMessage('');
+    setSessions([]);
     try {
       const response = await fetch(
         `/api/clinics/${clinicId}/sessions?date=${date}`,
         { cache: 'no-store' },
       );
       if (!response.ok) throw new Error();
-      const body = (await response.json()) as { sessions: Session[] };
+      const body = (await response.json()) as {
+        sessions: Session[];
+        timezone: string;
+      };
       setSessions(body.sessions);
+      setTimezone(body.timezone);
       setState('ready');
     } catch {
       setState('error');
@@ -46,9 +67,15 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
-  async function mutate(sessionId: string, path: string, body: object) {
+  async function mutate(
+    sessionId: string,
+    opId: string,
+    path: string,
+    body: object,
+  ) {
     setPending(sessionId);
     setMessage('');
+    const idempotencyKey = keyFor(opId);
     try {
       const response = await fetch(
         `/api/clinics/${clinicId}/sessions/${sessionId}/${path}`,
@@ -56,11 +83,12 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
           method: 'POST',
           headers: {
             'content-type': 'application/json',
-            'idempotency-key': key(),
+            'idempotency-key': idempotencyKey,
           },
           body: JSON.stringify(body),
         },
       );
+      releaseKey(opId);
       const data = (await response.json()) as {
         session?: Session;
         message?: string;
@@ -83,23 +111,25 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
       reason = window.prompt(t.promptCancel)?.trim();
       if (!reason) return;
     }
-    await mutate(session.id, 'commands', { command, reason });
+    await mutate(session.id, `${session.id}:command:${command}`, 'commands', {
+      command,
+      reason,
+    });
   }
   async function delay(session: Session) {
     const raw = window.prompt(t.promptDelay);
     if (raw === null) return;
     const minutes = Number(raw);
-    await mutate(session.id, 'delay', {
-      command:
-        session.declaredDelayMinutes === null
-          ? 'declare_delay'
-          : 'update_delay',
+    const delayCommand =
+      session.declaredDelayMinutes === null ? 'declare_delay' : 'update_delay';
+    await mutate(session.id, `${session.id}:delay:${delayCommand}`, 'delay', {
+      command: delayCommand,
       minutes,
       expectedVersion: session.delayVersion,
     });
   }
   async function clearDelay(session: Session) {
-    await mutate(session.id, 'delay', {
+    await mutate(session.id, `${session.id}:delay:clear_delay`, 'delay', {
       command: 'clear_delay',
       expectedVersion: session.delayVersion,
     });
@@ -108,6 +138,7 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     setPending('create');
+    const idempotencyKey = keyFor('create');
     try {
       const start = String(data.get('start'));
       const end = String(data.get('end'));
@@ -115,7 +146,7 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'idempotency-key': key(),
+          'idempotency-key': idempotencyKey,
         },
         body: JSON.stringify({
           doctorId: data.get('doctorId'),
@@ -124,6 +155,7 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
           endsAt: new Date(`${date}T${end}`).toISOString(),
         }),
       });
+      releaseKey('create');
       const body = (await response.json()) as {
         session?: Session;
         message?: string;
@@ -186,7 +218,10 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
           <p>{t.empty}</p>
         </div>
       )}
-      <section className="sessionGrid" aria-busy={pending !== null}>
+      <section
+        className="sessionGrid"
+        aria-busy={pending !== null || state === 'loading'}
+      >
         {sessions.map((session) => (
           <article
             className={`sessionCard status-${session.status}`}
@@ -198,12 +233,12 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
                 <p className="time">
                   {new Intl.DateTimeFormat(
                     locale === 'ar' ? 'ar-DZ' : 'fr-DZ',
-                    { hour: '2-digit', minute: '2-digit' },
+                    { hour: '2-digit', minute: '2-digit', timeZone: timezone },
                   ).format(new Date(session.startsAt))}{' '}
                   —{' '}
                   {new Intl.DateTimeFormat(
                     locale === 'ar' ? 'ar-DZ' : 'fr-DZ',
-                    { hour: '2-digit', minute: '2-digit' },
+                    { hour: '2-digit', minute: '2-digit', timeZone: timezone },
                   ).format(new Date(session.endsAt))}
                 </p>
               </div>

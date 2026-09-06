@@ -129,6 +129,7 @@ async function idempotent(
   scope: ClinicScope,
   key: string,
   request: object,
+  authorize: () => Promise<void>,
   operation: () => Promise<ConsultationSession>,
 ): Promise<ConsultationSession> {
   if (!key || key.length > 128)
@@ -137,6 +138,7 @@ async function idempotent(
   await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
     `${scope.clinicId}:${scope.actorUserId}:${key}`,
   ]);
+  await authorize();
   const existing = await client.query<{
     request_fingerprint: string;
     response: ConsultationSession;
@@ -180,6 +182,15 @@ function validateDate(value: string): void {
     throw new SessionValidationError(
       'serviceDate must be a valid YYYY-MM-DD date',
     );
+}
+
+function clinicLocalDate(instant: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(instant);
 }
 
 export class SessionService {
@@ -251,6 +262,20 @@ export class SessionService {
             'receptionist',
             'clinic_admin',
           ]);
+        },
+        async () => {
+          const clinicRow = await client.query<{ timezone: string }>(
+            'SELECT timezone FROM clinics WHERE id = $1',
+            [scope.clinicId],
+          );
+          const timezone = clinicRow.rows[0]?.timezone;
+          if (
+            !timezone ||
+            clinicLocalDate(input.startsAt, timezone) !== input.serviceDate
+          )
+            throw new SessionValidationError(
+              'serviceDate must match the clinic-local date of startsAt',
+            );
           const association = await client.query(
             `SELECT 1 FROM doctor_clinics WHERE clinic_id = $1 AND doctor_id = $2`,
             [scope.clinicId, input.doctorId],
@@ -299,8 +324,9 @@ export class SessionService {
   ): Promise<ConsultationSession> {
     if (input.command === 'cancel' && !input.reason?.trim())
       throw new SessionValidationError('Cancellation reason is required');
-    return inTransaction(this.pool, (client) =>
-      idempotent(
+    return inTransaction(this.pool, (client) => {
+      let doctorId = '';
+      return idempotent(
         client,
         scope,
         input.idempotencyKey,
@@ -310,14 +336,17 @@ export class SessionService {
           reason: input.reason?.trim() ?? null,
         },
         async () => {
-          const identified = await client.query<SessionRow>(
-            `SELECT ${selection} FROM consultation_sessions session JOIN doctor_profiles doctor ON doctor.id=session.doctor_id WHERE session.id=$1 AND session.clinic_id=$2`,
+          const identified = await client.query<{ doctor_id: string }>(
+            `SELECT doctor_id FROM consultation_sessions WHERE id=$1 AND clinic_id=$2`,
             [sessionId, scope.clinicId],
           );
           const identity = identified.rows[0];
           if (!identity)
             throw new SessionConflictError('Session not found in clinic');
-          await requireSessionAccess(client, scope, identity.doctor_id);
+          doctorId = identity.doctor_id;
+          await requireSessionAccess(client, scope, doctorId);
+        },
+        async () => {
           const target: SessionStatus = {
             open: 'open',
             pause: 'paused',
@@ -327,7 +356,7 @@ export class SessionService {
           }[input.command] as SessionStatus;
           if (target === 'open')
             await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-              identity.doctor_id,
+              doctorId,
             ]);
           const selected = await client.query<SessionRow>(
             `SELECT ${selection} FROM consultation_sessions session JOIN doctor_profiles doctor ON doctor.id=session.doctor_id WHERE session.id=$1 AND session.clinic_id=$2 FOR UPDATE OF session`,
@@ -376,8 +405,8 @@ export class SessionService {
             throw error;
           }
         },
-      ),
-    );
+      );
+    });
   }
 
   async delay(
@@ -413,6 +442,16 @@ export class SessionService {
           expectedVersion: input.expectedVersion,
         },
         async () => {
+          const identified = await client.query<{ doctor_id: string }>(
+            `SELECT doctor_id FROM consultation_sessions WHERE id=$1 AND clinic_id=$2`,
+            [sessionId, scope.clinicId],
+          );
+          const identity = identified.rows[0];
+          if (!identity)
+            throw new SessionConflictError('Session not found in clinic');
+          await requireSessionAccess(client, scope, identity.doctor_id);
+        },
+        async () => {
           const selected = await client.query<SessionRow>(
             `SELECT ${selection} FROM consultation_sessions session JOIN doctor_profiles doctor ON doctor.id=session.doctor_id WHERE session.id=$1 AND session.clinic_id=$2 FOR UPDATE OF session`,
             [sessionId, scope.clinicId],
@@ -420,7 +459,6 @@ export class SessionService {
           const current = selected.rows[0];
           if (!current)
             throw new SessionConflictError('Session not found in clinic');
-          await requireSessionAccess(client, scope, current.doctor_id);
           if (!['planned', 'open', 'paused'].includes(current.status))
             throw new SessionConflictError(
               'Delay cannot change on a terminal session',
