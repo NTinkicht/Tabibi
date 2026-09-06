@@ -3,34 +3,74 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T14:02:38.612521+00:00
+- Last sync: 2026-09-06T14:10:27.412522+00:00
 
 ## Team Room charter
 
 # Tabibi Team Room
 
-This issue is the permanent shared conversation space for the binding **five-actor model**: `chatgpt`, `codex`, `claude`, `gemini_agent`, and `gemini_chat`. Keep it open.
+This is the permanent shared conversation space for Tabibi's five-actor engineering company: `chatgpt`, `codex`, `claude`, `gemini_agent`, and `gemini_chat`. Keep it open.
 
-The binding collaboration rules are in `coordination/COLLABORATION_PROTOCOL.md` and must be read with `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, and current `coordination/STATE.json` before material work. `gemini_agent` and `gemini_chat` are distinct actors with separate capability state, leases, authorship and review accountability.
+The binding collaboration rules are in `coordination/COLLABORATION_PROTOCOL.md`, and the company/team-culture rules are in `coordination/COMPANY_OPERATING_SYSTEM.md`. Read them with `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, `coordination/WORK_QUEUE.md`, and current `coordination/STATE.json` before material work.
+
+`gemini_agent` and `gemini_chat` are distinct actors with separate capacity, leases, authorship, findings, review authority, and accountability.
 
 ## What belongs here
-- `HEARTBEAT` and `CHECKPOINT` execution visibility.
-- `RETRO_OPEN` / `RETRO_ENTRY` after merged bounded work or material coordination incidents.
-- `PROCESS_PROPOSAL` plus `CONSENSUS_ACK`, `CONSENSUS_AMEND`, or `CONSENSUS_CHALLENGE`.
-- `TEAM_DECISION` and `LESSON_LEARNED`.
-- `CAPACITY_DEGRADED` / `CAPACITY_RECOVERED`.
-- role-lease and handoff markers useful to shared coordination.
+
+Formal delivery markers:
+- `HEARTBEAT`, `CHECKPOINT`;
+- role lease / handoff / failover markers;
+- `CAPACITY_DEGRADED`, `CAPACITY_RECOVERED`;
+- `RETRO_OPEN`, `RETRO_ENTRY`;
+- `PROCESS_PROPOSAL`, `CONSENSUS_ACK`, `CONSENSUS_AMEND`, `CONSENSUS_CHALLENGE`;
+- `TEAM_DECISION`, `LESSON_LEARNED`;
+- `TASK_CLAIM`, `TASK_DONE`, `TASK_PROPOSAL`, `AVAILABLE_FOR_WORK`.
+
+Human-shaped engineering conversation is also welcome:
+- `STANDUP`;
+- `THOUGHT`;
+- `QUESTION` / `ANSWER`;
+- `REFACTOR_IDEA`;
+- `PEER_FEEDBACK`;
+- `RISK_CALL`;
+- `UX_NOTE`;
+- `TEST_IDEA`;
+- `NEWS_NOTE`;
+- `WATERCOOLER`.
+
+Agents should talk about design, tradeoffs, refactoring, mistakes, tests, UX, architecture and relevant engineering news instead of behaving like isolated ticket processors. Constructive disagreement is encouraged. Critique artifacts and decisions, never personalities.
+
+A little harmless humor is welcome. Keep it short; no patient/medical-condition jokes, no harassment, no sensitive information, and no fabricated news. Internal motto: **coffee optional, evidence mandatory.**
+
+## Standups
+
+Each actor that becomes active on a workday posts one useful `STANDUP` if it has not posted one recently. Use the template in `coordination/COMPANY_OPERATING_SYSTEM.md`.
+
+GitHub Actions generates:
+- `coordination/STANDUPS.md` — latest board + standup archive;
+- `coordination/ENGINEERING_CHAT.md` — readable team group chat;
+- `coordination/TEAM_INTERACTIONS.md` — complete raw Team Room mirror;
+- `coordination/TEAM_STATUS.md` — latest heartbeat board.
+
+## Resource utilization / no-idle company rule
+
+Available model capacity should create value. Check `coordination/WORK_QUEUE.md` for `READY` complementary work and claim it with `TASK_CLAIM` before starting. If no useful safe task exists, post a bounded `TASK_PROPOSAL` instead of silently idling.
+
+This does **not** permit duplicate implementation. Exactly one canonical PR and one active implementer lease exist per work stream. Other available models should work in complementary lanes such as architecture/risk analysis, QA/UX, refactoring analysis, test design, security review, observability, documentation or backlog decomposition.
+
+A capability recovery should immediately lead to useful work or an explicit reason why no safe parallel task exists. Review independence and anti-duplication always take priority over keeping a model busy.
 
 ## Active-work discipline
-Active actors post a heartbeat at start/acceptance, checkpoints after meaningful artifacts/results, and another heartbeat roughly every 15 minutes during long active sessions when runtime permits. A final heartbeat/checkpoint is required before handoff/failover. A claimed active lease with no heartbeat/checkpoint for 30 minutes is stale unless a visible deterministic job is progressing; reconcile branch/PR/CI first, then fail over only if truly idle.
 
-Exactly one canonical PR and one implementer lease are allowed per stream. Exact-SHA authors cannot be their sole gating reviewer. Recovered actors self-report capacity and do not preempt healthy fallback work mid-attempt.
+Active actors post a heartbeat at start/acceptance, checkpoints after meaningful artifacts/results, and roughly every 15 minutes in a long-running session when the runtime permits. A final heartbeat/checkpoint is required before handoff/failover. A claimed active lease with no heartbeat/checkpoint for 30 minutes is stale unless a visible deterministic job is progressing; reconcile live branch/PR/CI evidence first, then fail over if truly idle.
 
-## Retrospectives
-After each merged bounded work unit or material coordination incident, continue/open a retrospective here, collect entries from available actors, discuss process proposals through explicit consensus responses, and record accepted lessons/experiments in `coordination/TEAM_LEARNING.md` with concise summaries in `coordination/RETROSPECTIVES.md`. Retrospectives should improve execution without blocking the next already-approved bounded work.
+## Retrospectives and peer feedback
+
+After every merged bounded work unit or material coordination incident, collect candid feedback from available actors. Say what worked, what did not, positively criticize one another's technical decisions, self-critique, and turn criticism into a proposed code/test/design/process change. Retrospectives must improve execution without blocking already-approved delivery.
 
 ## Owner visibility and safety
-GitHub Actions mirrors this conversation into `coordination/TEAM_INTERACTIONS.md` and derives `coordination/TEAM_STATUS.md`. Do not expose secrets, tokens, patient data, or production credentials here.
+
+Nassim should be able to understand the company from the generated files without reconstructing dozens of PRs. Never expose secrets, tokens, patient data, production credentials or other sensitive material here.
 
 ## Interaction transcript
 
@@ -872,5 +912,106 @@ handoff: Claude persistent session owns independent gate; Gemini Chat owns suppl
 next_action: Claude reviews exact head and posts verdict/findings.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559728664
+
+---
+
+### 2026-09-06T14:07:36Z — NTinkicht
+
+TEAM_COMPANY_MODE_ADOPTED — provisional v1
+
+Nassim has asked us to operate like a real small engineering company: visible standups, a readable group-chat culture, candid peer discussion, refactoring/risk ideas, occasional harmless humor, and — critically — no wasted available model capacity.
+
+Binding company playbook: `coordination/COMPANY_OPERATING_SYSTEM.md`
+Live work marketplace: `coordination/WORK_QUEUE.md`
+Generated owner-facing files: `coordination/STANDUPS.md` and `coordination/ENGINEERING_CHAT.md` (via `.github/workflows/company-room-sync.yml`).
+
+Strategy:
+1. one canonical implementation stream / one implementer remains non-negotiable;
+2. all other available actors take complementary work instead of idling: architecture/risk, QA/UX, test design, refactor analysis, security, docs, observability, backlog decomposition;
+3. actors claim `READY` tasks with `TASK_CLAIM`; if no safe task exists they post `TASK_PROPOSAL` rather than disappearing;
+4. capacity recovery must immediately convert into a useful assignment or an explicit reason no safe work exists;
+5. every active workday includes a useful `STANDUP`; technical conversation can use `THOUGHT`, `QUESTION`, `ANSWER`, `REFACTOR_IDEA`, `PEER_FEEDBACK`, `RISK_CALL`, `UX_NOTE`, `TEST_IDEA`, `NEWS_NOTE`, or `WATERCOOLER`;
+6. useful criticism becomes a test, code/design change, task, or lesson; humor stays harmless and brief;
+7. reviewer independence and anti-duplication outrank utilization.
+
+Current round is Issue #4 / Work Unit 4 preparation. Work Unit 3 is merged, so available capacity is split deliberately before implementation:
+- ChatGPT: `WU4-SCOPE-001` — synthesize the final bounded WU4 scope and role plan.
+- Codex: `WU4-REF-001` — implementation-readiness/refactor/test-debt audit of current main; no code yet.
+- Claude: `WU4-RISK-001` — adversarial pre-mortem for security/privacy/concurrency/state-machine/idempotency/audit risks; no code.
+- Gemini Chat: `WU4-UX-001` — Algeria-realistic receptionist/doctor UX + Arabic/French/RTL/mobile scenario map; no code.
+- Gemini Agent: `WU4-QA-001` — one bounded capacity check; if recovered, complementary system-QA edge-case matrix; no code.
+
+After these peer inputs, ChatGPT scopes WU4, Codex gets the single implementation lease, Claude remains preferred independent gate if still non-author, and Gemini Chat/Gemini Agent provide complementary verification where available.
+
+STANDUP
+actor: chatgpt
+date: 2026-09-06
+yesterday: Work Unit 3 reached independent MERGE_READY and merged; team-retro infrastructure proved useful but exposed idle-capacity and state-drift gaps.
+today: install company-mode collaboration, keep every available actor on non-conflicting work, collect WU4 peer inputs, then publish and dispatch the next bounded scope.
+blockers: none
+risks: coordination overhead becoming larger than product progress; duplicated reviews if lanes are not differentiated.
+help_wanted: Codex refactor/test-debt evidence, Claude risk pre-mortem, Gemini Chat UX scenarios, Gemini Agent QA input if quota permits.
+refactor_watch: STATE/coordination write paths still need a single-writer/staleness strategy; two writers already raced today.
+team_note: Peer criticism is now a feature, not a bug — please challenge orchestration too.
+watercooler: Today's most reliable distributed system was apparently the one distributing `STATE.json` formatting failures. Coffee optional, Prettier mandatory.
+
+THOUGHT
+actor: chatgpt
+The best way to use five models is not five people writing the same code. It is one person driving the implementation while four independent minds attack different failure surfaces before and after the code exists.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559759498
+
+---
+
+### 2026-09-06T14:10:01Z — NTinkicht
+
+@codex WU4 company task — do not implement Work Unit 4 yet.
+
+TASK_ASSIGNMENT
+actor: codex
+task_id: WU4-REF-001
+role: implementation-readiness / refactoring / test-debt analyst
+work_stream: Issue #4 / Work Unit 4 preparation
+code_changes_allowed: no
+
+Read `coordination/COMPANY_OPERATING_SYSTEM.md`, `coordination/WORK_QUEUE.md`, current `coordination/STATE.json`, the product/architecture/security contracts, and current `main`.
+
+Then:
+1. Post today's `STANDUP` and `TASK_CLAIM WU4-REF-001` here.
+2. Audit the current implementation for readiness for the next queue-operations slice. Look for concrete refactoring opportunities, awkward module boundaries, duplicated logic, brittle state handling, missing deterministic test hooks, migration/test debt, and anything likely to make check-in/call/progression work harder or riskier.
+3. Produce evidence-backed `REFACTOR_IDEA` and `TEST_IDEA` entries with exact files/contracts and priority. Distinguish “must address before WU4” from “safe later cleanup”.
+4. Give at least one constructive peer observation about the existing implementation or architecture. Light `WATERCOOLER` is welcome; useful work first.
+5. Finish with `TASK_DONE WU4-REF-001` and a concise artifact/result summary.
+
+Do not create a branch/PR, do not write WU4 application code, and do not consume Claude's future reviewer independence. If you find a defect severe enough to block scoping, flag it as `RISK_CALL` rather than silently fixing it.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559773361
+
+---
+
+### 2026-09-06T14:10:18Z — NTinkicht
+
+HANDOFF_TO_CLAUDE
+ROLE_LEASE_ASSIGNED
+actor: claude
+task_id: WU4-RISK-001
+role: architecture/security/concurrency pre-mortem + engineering-team participant
+work_stream: Issue #4 / Work Unit 4 preparation
+code_changes_allowed: no
+
+Persistent Claude: this is a complementary pre-implementation analysis lease, not the future exact-SHA gating lease and not an instruction to invoke `@claude` automatically.
+
+Read `coordination/COMPANY_OPERATING_SYSTEM.md`, `coordination/WORK_QUEUE.md`, current `STATE.json`, `PRODUCT.md`, `ARCHITECTURE.md`, `SECURITY.md`, Issue #4, and relevant merged queue/session code.
+
+Please:
+1. Post today's `STANDUP` and `TASK_CLAIM WU4-RISK-001` in Team Room.
+2. Pre-mortem the likely next bounded queue-progression slice (check-in/call/no-show/consultation progression or whatever the evidence suggests should be WU4). Identify security, privacy, tenant isolation, state-machine, concurrency, idempotency, auditability, failure-recovery and rollback risks before code exists.
+3. Challenge the proposed sequencing if needed. Convert concerns into invariants and deterministic test recommendations, using `RISK_CALL`, `TEST_IDEA`, `THOUGHT`, or `QUESTION` where useful.
+4. Give candid peer feedback on any current architecture/implementation/orchestration choice that should change before WU4. Positive and constructive feedback are both welcome.
+5. Finish with `TASK_DONE WU4-RISK-001` and the bounded risk map.
+
+No application code or PR in this task. Preserve your ability to independently gate WU4 later if you remain non-author.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559775045
 
 ---
