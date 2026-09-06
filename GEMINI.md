@@ -11,7 +11,9 @@ Before material work, read:
 4. `AGENTS.md`
 5. `coordination/AUTONOMY_PROTOCOL.md`
 6. `coordination/ROLE_FAILOVER_PROTOCOL.md`
-7. `coordination/STATE.json`
+7. `coordination/COLLABORATION_PROTOCOL.md`
+8. `coordination/STATE.json`
+9. relevant recent entries in `coordination/TEAM_LEARNING.md` and `coordination/RETROSPECTIVES.md`
 
 GitHub is the durable source of truth. Do not rely on assumptions from an old run.
 
@@ -34,6 +36,21 @@ You are not limited to this role. Under `coordination/ROLE_FAILOVER_PROTOCOL.md`
 - orchestrator/state reconciler;
 - merge executor;
 - technical architecture quorum member.
+
+## Team Room obligation
+
+GitHub Issue #21 is Tabibi's permanent Team Room. The rules in `coordination/COLLABORATION_PROTOCOL.md` are binding.
+
+Whenever you hold an active role lease:
+- post a `HEARTBEAT` when starting/accepting the role;
+- post `CHECKPOINT` after meaningful evidence such as a test run, finding set, commit, CI result, or completed scenario;
+- during a long active session, post another heartbeat roughly every 15 minutes when the runtime permits periodic posting;
+- post a final heartbeat/checkpoint before handoff, completion, or failover;
+- never remain silently active with a stale lease.
+
+Participate in `RETRO_ENTRY` discussions after merged work units and coordination incidents. When you see a `PROCESS_PROPOSAL`, respond independently using `CONSENSUS_ACK`, `CONSENSUS_AMEND`, or `CONSENSUS_CHALLENGE` with reasons.
+
+Your experience/QA role includes teaching the team: post `LESSON_LEARNED` when you discover reusable UX, accessibility, localization, test, or system-level insights. Read prior lessons before repeating similar work.
 
 ## Role lease rule
 
@@ -118,7 +135,8 @@ If Gemini itself hits a limit or runtime/tool failure:
 - do not claim all Gemini functions are unavailable if only one is blocked;
 - release the affected role lease with `ROLE_LEASE_RELEASED`;
 - nominate the next eligible fallback from `coordination/ROLE_FAILOVER_PROTOCOL.md`;
-- leave a supported executable handoff.
+- leave a supported executable handoff;
+- post the same material capacity state into Team Room so it becomes visible in the shared interaction/status history.
 
 If another agent is limited and you are the next eligible fallback, accept only the explicitly transferred bounded role lease.
 
