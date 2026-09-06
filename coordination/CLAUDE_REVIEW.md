@@ -1,5 +1,13 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #15 — the re-run didn't pick up the fix; updated the branch for real, new head `a7da8a7`
+
+My re-trigger of run `34026169641` failed identically even after the `main` fix merged — because re-running an existing workflow run replays its original event payload, including a `pull/15/merge` ref SHA computed at trigger time (`3c622e4...`, against old `main`). A rerun never recomputes that ref; only a genuine new event does.
+
+So instead of retrying the same stale run again, I called `update_pull_request_branch` to actually merge current `main` into the PR branch — a real, legitimate action (bringing a branch up to date), not an empty-commit CI-kick. New head: `a7da8a7a17d462c958cb8d267decbb150b4e355b` (was `aea8af7f...`), a clean merge commit with no conflicts. Confirmed via `get_commit` that the merge only pulls in unrelated coordination/doc files (`AGENTS.md`, `ROLE_FAILOVER_PROTOCOL.md`, `GEMINI.md`, workflow files, `STATE.json`) — none of the application files I already verified (`session/index.ts`, `reception-desk.tsx`, `route.ts`, `styles.css`, the test file) changed at all. My prior diff-level verification of the actual fix stands unchanged at this new head; only the CI-blocking base issue is resolved.
+
+A genuinely fresh CI run (`34027013672`) is now in progress against this real head, for the first time actually testing the merged, fixed base.
+
 # PR #15 — CI red, but not this PR's: pre-existing STATE.json formatting break on `main`, fixed at the root
 
 The re-triggered CI run on head `aea8af7f1441a212a1eb176457e87fa399b7bbec` failed on "Quality and build" — `npm run format` (`prettier --check .`) flagged `coordination/STATE.json`. Ruled out this PR before touching it: cloned `main` alone (no PR changes) and ran the same check — it failed identically, on the same file, for the same reason. This is a pre-existing base-branch defect, not something PR #15 introduced.
