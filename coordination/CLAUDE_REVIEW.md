@@ -1,5 +1,18 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #35 (Slack company bridge) — CHANGES_REQUIRED at exact head `86c5c8397522bf4cf98e0c2614f1912d1332f587`, 2 MAJOR findings
+
+First open PR touching real external-service credentials and a two-way trust boundary between GitHub (authoritative) and Slack (informal). The PR description itself asked for a security-focused independent pass before it leaves draft, so treated it as a genuine adversarial review rather than a rubber-stamp of "it's just coordination infra."
+
+Traced both bridge directions by hand for loop safety first, since a Slack<->GitHub echo loop would be an obvious and embarrassing failure mode: `slack-owner-ingest.yml` skips `bot_id`/`subtype` messages so bot-authored Slack posts never get re-ingested, and `slack-team-room-mirror.yml` early-exits on any comment body prefixed `SLACK_TO_TEAM_ROOM` so Slack-imported comments never get echoed back to Slack. No cycle. Secret handling is clean — tokens only ever move through `secrets.*` -> env -> `Authorization: Bearer` headers, nothing gets printed.
+
+Found two real MAJOR gaps, both about identity being *asserted* rather than *verified* across the trust boundary:
+
+- **CLAUDE-028**: the GitHub->Slack mirror picks which agent's bot token to post with by regex-parsing a self-declared `actor:` field out of the comment body, with no check that the actual GitHub comment author is that actor. Anyone who can comment on Issue #21 can write `actor: claude` and get their text posted to `#all-tabibi` under Claude's real Slack identity — the exact thing the whole per-actor-identity design was supposed to prevent. The code even gets this right in one place (the owner-fallback branch checks `COMMENT_AUTHOR == 'NTinkicht'`) but doesn't apply the same check to the five named actors.
+- **CLAUDE-029**: the Slack->GitHub ingest attributes *every* non-bot Slack message to `actor: nassim, role: product_owner` with no check against an actual Nassim Slack user ID — just "not a bot." Given this project's own established norm of treating "owner-directed correction" as adopted immediately (RETRO-002 onward), that's a real privilege-escalation path for anyone who ends up with access to that Slack channel, not merely a cosmetic mislabel.
+
+Posted both with evidence, required resolution, and verification method directly on the PR (first reviewer/comment on this head — no second Claude pathway had weighed in). Two minor non-blocking notes recorded too (unused `channels:history` scope on four of five bots; a narrow dedup edge case in the ingest workflow's pagination). Verdict: CHANGES_REQUIRED — draft PR, so nothing is actually merge-blocked yet, but flagged clearly before it should leave draft.
+
 # PR #26 conflict/re-gate episode — verdict held through two base-integration merges, re-confirmed rather than assumed
 
 After posting PASS/MERGE_READY at `68c39fb8`, a routine re-check found `mergeable_state: "dirty"` — `main` had moved forward (my own `STATE.json` reconciliation, plus a large unrelated "Company Operating System" coordination restructuring: new `COMPANY_OPERATING_SYSTEM.md`, `ENGINEERING_CHAT.md`, `STANDUPS.md`, `WORK_QUEUE.md`, a new sync workflow, and edits to `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`/`GEMINI_CHAT.md`/`COLLABORATION_PROTOCOL.md`). Read those before touching anything — confirmed `STATE.json` keeps its role as "authoritative machine-oriented delivery state" per the new doc itself; the restructuring is additive (standups/group-chat/work-queue layers), not a schema change, so resolving the conflict on my own prior understanding was safe.
