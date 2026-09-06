@@ -11,7 +11,9 @@ All agents MUST read:
 - `AGENTS.md`
 - `coordination/AUTONOMY_PROTOCOL.md`
 - `coordination/ROLE_FAILOVER_PROTOCOL.md`
+- `coordination/COLLABORATION_PROTOCOL.md`
 - `coordination/STATE.json`
+- recent `coordination/TEAM_LEARNING.md` / `coordination/RETROSPECTIVES.md` entries relevant to the task
 
 before material implementation, review, architecture arbitration, or failover work.
 
@@ -120,6 +122,25 @@ Existing coordination markers remain valid. Additional binding markers are:
 
 Capacity must be recorded per capability, not as a vague provider-wide failure.
 
+## Team visibility, retrospectives and learning
+
+GitHub Issue #21 is the permanent **Team Room**. `coordination/COLLABORATION_PROTOCOL.md` is binding.
+
+Every actor holding an active role lease, including ChatGPT and reviewers, must:
+- post a `HEARTBEAT` when starting/accepting work;
+- post a `CHECKPOINT` after meaningful artifacts/results;
+- during a long-running active session, post another heartbeat roughly every 15 minutes when its runtime permits periodic posting;
+- post a final heartbeat/checkpoint before handoff, completion, or failover;
+- record exact blockers rather than remaining silently idle.
+
+A heartbeat is visibility, not proof of progress. Observable artifacts (commits, PR movement, CI, findings, merges) remain the evidence of execution.
+
+Retrospectives are required after every merged bounded work unit and after material coordination incidents. Relevant agents participate in Team Room using `RETRO_ENTRY`, then discuss improvements via `PROCESS_PROPOSAL`, `CONSENSUS_ACK`, `CONSENSUS_AMEND`, and `CONSENSUS_CHALLENGE`.
+
+Accepted process lessons are tracked in `coordination/TEAM_LEARNING.md`; retrospective summaries are tracked in `coordination/RETROSPECTIVES.md`; the raw Team Room conversation is mirrored to `coordination/TEAM_INTERACTIONS.md`; latest heartbeats are summarized in `coordination/TEAM_STATUS.md`.
+
+No agent may opt out because it is “only reviewing” or “only orchestrating.” Team learning is part of the engineering work.
+
 ## Finding severity
 
 - BLOCKER — unsafe to merge: severe correctness, security, privacy, data-loss, or direct core-spec violation.
@@ -173,7 +194,8 @@ Invalid terminal states include:
 - "review complete" without next actor;
 - an unconsumed handoff with no supported wake trigger;
 - a provider quota message without a role failover attempt;
-- duplicate implementation because a second agent started before the first lease was revoked.
+- duplicate implementation because a second agent started before the first lease was revoked;
+- an active lease with no fresh heartbeat/checkpoint and no visible deterministic job or artifact movement for the collaboration protocol's stale threshold.
 
 ## Resolution protocol
 
@@ -194,6 +216,7 @@ A scoped engineering change is accepted only when:
 - the exact head has a valid independent gating verdict;
 - the author is not self-gating;
 - role/handoff state is current;
+- required heartbeat/checkpoint/retro state for the work unit is current;
 - no required external/human decision is outstanding.
 
 ## Engineering rules
