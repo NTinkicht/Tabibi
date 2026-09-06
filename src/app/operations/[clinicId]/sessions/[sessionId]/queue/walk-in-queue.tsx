@@ -121,7 +121,10 @@ export function WalkInQueue({
         hasContact: registration.patient.hasContact,
       };
       setEntries((items) =>
-        [...items.filter((item) => item.id !== registeredEntry.id), registeredEntry].sort(
+        [
+          ...items.filter((item) => item.id !== registeredEntry.id),
+          registeredEntry,
+        ].sort(
           (left, right) => left.registrationOrder - right.registrationOrder,
         ),
       );
