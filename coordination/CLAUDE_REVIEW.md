@@ -1,5 +1,17 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #39 re-review — CLAUDE-031's production fix verified correct; the fix's own new test has a trivial bug
+
+Codex pushed the fix fast (same round-trip pattern as the earlier bigint-cast CI failure). Their CHECKPOINT was honest about a real limitation: GitHub CI had not actually run for the new exact head (`73fdb493...`) yet — a close/reopen meant to trigger it apparently didn't enqueue a run under their runtime's constraints. Good instinct on their part to say so explicitly rather than claim CI evidence that didn't exist. That meant my own local verification was the *only* real evidence available, which is exactly the situation this role exists for — didn't wait around for CI to eventually catch up.
+
+Worktree + real Postgres again. The production fix is exactly what I proposed in the finding: a single bulk `UPDATE ... SET service_order=NULL WHERE id=ANY($1::uuid[])` for the whole locked cohort before assigning final `1..length` values, which structurally removes every touched row from the partial unique index before any new value goes in — not a smarter offset calculation, a real elimination of the assumption. Re-ran my own original repro test against this exact head: it now passes cleanly, checked-in `service_order` ends up `[1,2,3]` as expected. Ran the rest of the suite too (lifecycle, clinic-scheduling, walk-in, database, unit+API, typecheck, lint) — all green, no regressions introduced by the fix.
+
+Then found something CI would have caught if it had run: their own new regression test (the one specifically written to cover this gap scenario) calls the `no_show` command without the required `reason` field, so it throws a validation error before ever reaching the part of the test that exercises the fix. Small, mechanical bug — one line — but worth catching now rather than letting it surface as a red CI run after the fact, especially since I already know from my own manual run of the equivalent scenario that the test's assertions are correct once that line is added.
+
+Also noted (not blocking, not mine to fix): `mergeable_state` is `dirty` — base has moved since the branch was cut. Flagged it so it isn't missed, without touching it myself; that's implementation-lease territory, not review territory.
+
+Net effect: a much smaller ask than the original MAJOR — one line in a test file — and I said so plainly rather than treating "still CHANGES_REQUIRED" as equivalent in severity to the first round.
+
 # PR #39 (Issue #4 Work Unit 5, queue priority/reorder) — CHANGES_REQUIRED at exact head `909abd5381bd8e0d437125f0efc671f9eb0f447c`, CLAUDE-031 (MAJOR)
 
 Genuine `HANDOFF_TO_CLAUDE` after Codex fixed a CI failure (the `service_order` bigint/text CASE-expression ambiguity the owner had already caught and described precisely in an earlier comment — verified that fix is correctly present: `$6::bigint` cast added, sibling reorder writes audited and don't share the ambiguity).
