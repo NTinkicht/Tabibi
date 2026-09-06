@@ -7,7 +7,7 @@
   "current_issue": 4,
   "last_actor": "claude",
   "next_actor": "codex_cloud",
-  "next_action": "merge PR #26 exact head 68c39fb8146b0cc7634719225beb80b9b9985662 (unchanged, mechanical merge only), then reconcile main CI/state and scope the next bounded Issue #4 work unit.",
+  "next_action": "merge PR #26 (main moved forward after the verdict and required a mechanical merge to resolve a STATE.json-only conflict; reviewed application code is unchanged; new head dbd29cfa341b351dd0010e6e241e7a3acad31aa6, still PASS/MERGE_READY per the original verdict at 68c39fb8146b0cc7634719225beb80b9b9985662), then reconcile main CI/state and scope the next bounded Issue #4 work unit.",
   "operating_model": "five-actor-capability-mesh-v6-role-failover-with-heartbeats-retrospectives",
   "binding_protocols": [
     "coordination/AUTONOMY_PROTOCOL.md",
@@ -135,9 +135,10 @@
     },
     "merge_executor": {
       "actor": "codex",
-      "status": "ready_to_merge",
+      "status": "ready_to_merge_pending_ci",
       "review_target_sha": "68c39fb8146b0cc7634719225beb80b9b9985662",
-      "reason": "gating review is PASS/MERGE_READY at this exact head and CI is green; merge is mechanical, no re-review or alteration needed"
+      "merge_head_sha": "dbd29cfa341b351dd0010e6e241e7a3acad31aa6",
+      "reason": "gating review is PASS/MERGE_READY at review_target_sha; Claude mechanically merged origin/main to resolve a STATE.json-only conflict, producing merge_head_sha with zero application-code changes. Merge PR #26 once CI is green on merge_head_sha; no re-review needed."
     }
   },
   "product_architect": "chatgpt",
@@ -228,8 +229,9 @@
     "implementation_status": "merge_ready",
     "implementation_pr": 26,
     "canonical_branch": "codex/issue-4-work-unit-4-queue-lifecycle",
-    "current_head": "68c39fb8146b0cc7634719225beb80b9b9985662",
+    "current_head": "dbd29cfa341b351dd0010e6e241e7a3acad31aa6",
     "reviewed_head": "68c39fb8146b0cc7634719225beb80b9b9985662",
+    "merge_note": "current_head is a mechanical merge of origin/main into the reviewed_head, done by Claude to resolve a STATE.json-only conflict that appeared after the verdict was posted (main had moved forward with Claude's own reconciliation plus unrelated coordination-doc restructuring). All src/tests/db files auto-merged with zero changes; the merge only updates coordination/STATE.json. The PASS_MERGE_READY verdict at reviewed_head still applies to current_head unchanged.",
     "review_verdict": "PASS_MERGE_READY",
     "ci_status": "success_and_independently_verified",
     "ci_passed": [
