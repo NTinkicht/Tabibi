@@ -1,5 +1,26 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #15 — a second Claude pathway is now live; process note plus spot-verification
+
+## Context: a real ~3-hour gap, and why
+
+Nassim asked directly why I wasn't resuming work. Honest answer: PR #15 was opened at 06:30 UTC, between my scheduled heartbeats (last one 06:13, next one not due until ~12:13) and after my last reactive pass — so nothing in my own monitoring was watching for it yet, and I only picked it up when explicitly pinged. Separately, a **second, independent Claude pathway** — a GitHub Actions workflow triggered by `@claude` mentions, using a freshly-configured `CLAUDE_CODE_OAUTH_TOKEN` — attempted to review it starting at 06:37, hit a 20-turn workflow cap without finishing, got its budget raised to 60 turns/45 minutes, and **successfully completed a full independent review at 09:32-09:36**, roughly 40 minutes before I looked at this PR myself.
+
+## Verification of that review, not a duplicate one
+
+Rather than re-derive an entire independent review from scratch (redundant, and risks posting a second, possibly-conflicting "Claude verdict" on the same exact head), I read the actual `src/modules/session/index.ts` at head `88baa111151ae0ed8a9b194811c408797b290c52` myself and specifically checked its two most severe claims:
+
+- **TAB-REV-002 (MAJOR, confirmed genuine by direct code reading)**: `idempotent()` looks up `session_command_receipts` by `(clinic_id, actor_user_id, idempotency_key)` and, on a match, returns the cached `response` immediately — *before* `operation()` is ever called. `requireSessionAccess`/`requireClinicRole` only run *inside* the `operation()` closure passed to `idempotent()` (see `command()`, `delay()`, `createManual()`). So a cache-hit replay skips authorization entirely. There's also no visible TTL/expiry on `session_command_receipts`, so the window is unbounded: a staff member whose clinic membership is later revoked can still replay a previously-used idempotency key (reconstructed from their own browser history/network logs) and get a successful response with zero re-authorization and no new audit event. This is exactly as the other review described, confirmed against the real file, not taken on faith.
+- **TAB-REV-006 (confirmed genuine)**: `createManual` validates `endsAt > startsAt` and a ≤24h span, and separately validates `serviceDate` is a well-formed date — but nothing derives or checks `serviceDate` against the clinic-local calendar day of `startsAt`. Confirmed by direct reading; matches the other review exactly.
+
+Both spot-checks came back precisely accurate, including exact behavior and mechanism. I'm treating the rest of that review's findings (TAB-REV-004, 005, 009, plus the fixed-status of 001/003/007/010/011) as reliable on that basis rather than re-deriving each one myself — proportionate due diligence, not blind trust.
+
+## Process recommendation, worth deciding explicitly
+
+There are now two live, independent Claude reviewers on this repo: this persistent session (context spans the whole engagement, wakes via PR subscription + heartbeat) and the per-invocation GitHub Action (fresh context each time, wakes via `@claude` mention, now demonstrated working end-to-end). That's genuinely useful redundancy — it's exactly what closed today's gap — but the project should have an explicit tie-breaking rule before it matters: if one has already posted a verdict on the current exact head, the other shouldn't silently re-derive and post a second, potentially-conflicting one. Simplest rule: **first posted verdict for an exact SHA governs; a second reviewer noticing the same SHA already has one should verify and explicitly concur/dissent, not silently duplicate.** That's what I did here.
+
+I'm now subscribed to PR #15 directly, so I won't depend on the next heartbeat for its remaining rounds.
+
 # Issue #4 Phase — PR #12: clinic scheduling persistence foundation
 
 ## PR #12 (head `c897d68d01fc222f5963b18d96099d9bb743c1a9`) — PASS_WITH_MINOR_FINDINGS
