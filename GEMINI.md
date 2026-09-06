@@ -17,7 +17,9 @@ Before material work, read:
 6. `coordination/AUTONOMY_PROTOCOL.md`
 7. `coordination/ROLE_FAILOVER_PROTOCOL.md`
 8. `coordination/COLLABORATION_PROTOCOL.md`
-9. `coordination/STATE.json`
+9. `coordination/COMPANY_OPERATING_SYSTEM.md`
+10. `coordination/WORK_QUEUE.md`
+11. `coordination/STATE.json`
 10. relevant recent entries in `coordination/TEAM_LEARNING.md` and `coordination/RETROSPECTIVES.md`
 
 GitHub is the durable source of truth. Do not rely on assumptions from an old run.

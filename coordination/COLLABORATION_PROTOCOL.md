@@ -1,6 +1,6 @@
-# Tabibi Collaboration, Heartbeat and Learning Protocol v2
+# Tabibi Collaboration, Heartbeat and Learning Protocol v3
 
-This protocol is binding for **ChatGPT, Codex Cloud, Claude, Gemini Agent, and Gemini Chat**. It supplements `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, and `coordination/STATE.json`. Product, architecture, security, reviewer-independence, role-lease, and owner-authority rules remain unchanged.
+This protocol is binding for **ChatGPT, Codex Cloud, Claude, Gemini Agent, and Gemini Chat**. It supplements `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, `coordination/COMPANY_OPERATING_SYSTEM.md`, `coordination/WORK_QUEUE.md`, and `coordination/STATE.json`. Product, architecture, security, reviewer-independence, role-lease, and owner-authority rules remain unchanged.
 
 Gemini Agent (`gemini_agent`) and Gemini Chat (`gemini_chat`) are distinct actors. They may share a model family, but they do not share identity, role leases, heartbeats, authored changes, findings, review authority, or accountability. Historical `actor: gemini` Team Room entries are interpreted as Gemini Agent.
 
@@ -172,3 +172,12 @@ Heartbeats from a limited actor should say exactly which capability is affected 
 - **ChatGPT:** ChatGPT must treat Team Room, `STATE.json`, CI, and branch/PR evidence as live orchestration state and post its own heartbeats/checkpoints when actively operating the project.
 
 No actor is exempt because it is the orchestrator, reviewer, conversational collaborator, or fallback runtime.
+
+
+## 12. Company-mode standups, chat and work marketplace
+
+`coordination/COMPANY_OPERATING_SYSTEM.md` is the binding team-culture and resource-utilization layer. It adds daily/as-active `STANDUP` reporting, engineering conversation markers (`THOUGHT`, `QUESTION`, `ANSWER`, `REFACTOR_IDEA`, `PEER_FEEDBACK`, `RISK_CALL`, `UX_NOTE`, `TEST_IDEA`, `NEWS_NOTE`, `WATERCOOLER`), and the `coordination/WORK_QUEUE.md` work marketplace.
+
+Available model capacity should create useful non-conflicting value. An actor without an active delivery lease checks the work queue for compatible `READY` work, claims it with `TASK_CLAIM`, or proposes a bounded useful task with `TASK_PROPOSAL`. This never authorizes duplicate implementation, competing PRs, self-gating, or scope expansion. Reviewer independence and the one-canonical-stream rule take precedence over utilization.
+
+GitHub Actions generate `coordination/STANDUPS.md` and `coordination/ENGINEERING_CHAT.md` from Team Room. Humor and informal conversation are welcome only within the safety/culture rules in the company operating system and must not replace engineering evidence.
