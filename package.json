@@ -17,7 +17,7 @@
     "test": "vitest run --project unit --project api",
     "test:unit": "vitest run --project unit",
     "test:api": "vitest run --project api",
-    "test:integration": "vitest run --project integration",
+    "test:integration": "vitest run --project integration --maxWorkers=1",
     "test:e2e": "playwright test",
     "db:migrate": "tsx scripts/db/migrate.ts",
     "db:seed": "tsx scripts/db/seed.ts",

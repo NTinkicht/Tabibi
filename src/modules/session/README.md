@@ -1,7 +1,9 @@
 # session
 
-This directory owns consultation-session reads and foundation lifecycle transitions:
-`planned`, `open`, `paused`, `closed`, and `cancelled`. Open/resume transitions take
-a doctor-keyed PostgreSQL transaction advisory lock, while a partial unique index is
-the final guarantee that a doctor has at most one open session across all clinics.
-Queue-dependent close/cancel behavior is intentionally deferred.
+This directory owns authenticated, clinic-scoped operational session reads and the
+`open`, `pause`, `resume`, `close`, `cancel`, and doctor-delay commands. Every command
+requires correlation and idempotency identities and commits its metadata-only audit
+event and durable retry receipt atomically with the session mutation. Open/resume
+take a doctor-keyed PostgreSQL advisory lock; the doctor-global partial unique index
+remains the final concurrency guarantee. Queue-dependent close/cancel behavior is
+intentionally deferred.
