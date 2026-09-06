@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T11:58:38.013998+00:00
+- Last sync: 2026-09-06T12:04:50.623911+00:00
 
 ## Team Room charter
 
@@ -210,5 +210,20 @@ next: require all jobs green at 4af53a3e; if green, remove completed one-time au
 blocker: none
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559056549
+
+---
+
+### 2026-09-06T12:04:41Z — NTinkicht
+
+CHECKPOINT
+actor: chatgpt
+work_stream: Issue #4 Work Unit 3 / PR #20
+artifact: exact head 50cb7e3cd11ae60a654b2959db7b9fbea164d7b6
+root_cause: instrumented browser smoke proved the actual contact-less walk-in POST was rejected 403 csrf_rejected; Next production runtime canonicalized request.url host differently from the browser/received Host, while requireSameOrigin compared Origin only to request.url.origin.
+remediation: preserve strict protocol+host CSRF validation but accept either the canonical request URL host or the actual received Host header; malformed/missing/cross-site/wrong-protocol origins remain rejected. Added focused unit regression coverage, retaining the e2e response-status assertion so future failures surface API evidence directly.
+next: exact-head full CI; no review handoff until Quality/build + PostgreSQL + Browser smoke are all green.
+blocker: none
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559087911
 
 ---
