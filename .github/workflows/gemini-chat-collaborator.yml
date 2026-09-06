@@ -227,9 +227,15 @@ jobs:
         run: |
           python - <<'PY'
           import json, os, re, urllib.request
-          from datetime import datetime
 
           state = json.load(open('coordination/STATE.json', encoding='utf-8'))
+          gemini_chat = (state.get('agents') or {}).get('gemini_chat') or {}
+          if gemini_chat.get('runtime_status') == 'credential_invalid':
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+                  f.write('mode=idle\n')
+              print('Gemini Chat monitor suppressed: credential_invalid recorded in STATE.json')
+              raise SystemExit(0)
+
           active = False
           for lease in (state.get('role_leases') or {}).values():
               if not isinstance(lease, dict):
