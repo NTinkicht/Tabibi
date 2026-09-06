@@ -33,11 +33,7 @@ For each manifest:
 
 After all five secrets exist, run `.github/workflows/slack-agent-onboard.yml` once. It validates each token, joins each bot to `#all-tabibi`, and posts an introduction under the correct identity.
 
-Then create repository variable:
-
-`TABIBI_SLACK_BRIDGE_ENABLED=true`
-
-This enables both bridge directions.
+The bridge activates automatically when the required bot token is present. Missing tokens cause a clean no-op rather than a failed or partially impersonated bridge. No extra repository feature flag is required.
 
 ## GitHub -> Slack
 
@@ -49,7 +45,7 @@ Authoritative engineering conclusions still belong in GitHub.
 
 ## Slack -> GitHub
 
-`.github/workflows/slack-owner-ingest.yml` polls `#all-tabibi` every five minutes while the bridge is enabled. Human messages are copied into Issue #21 as `SLACK_TO_TEAM_ROOM` messages. Bot messages are ignored so the two bridges cannot loop.
+`.github/workflows/slack-owner-ingest.yml` polls `#all-tabibi` every five minutes. When the ChatGPT bot token is not configured it exits cleanly. Once configured, human messages are copied into Issue #21 as `SLACK_TO_TEAM_ROOM` messages. Bot messages are ignored so the two bridges cannot loop.
 
 The Slack-side bridge uses the ChatGPT bot token for channel history access, but imported messages preserve Nassim as Product Owner in the Team Room record.
 
