@@ -1,0 +1,83 @@
+name: Slack Team Room Mirror
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  mirror:
+    if: github.event.issue.number == 21
+    runs-on: ubuntu-latest
+    env:
+      SLACK_CHANNEL_ID: C0C0RV36QP2
+      SLACK_CHATGPT_BOT_TOKEN: ${{ secrets.SLACK_CHATGPT_BOT_TOKEN }}
+      SLACK_CODEX_BOT_TOKEN: ${{ secrets.SLACK_CODEX_BOT_TOKEN }}
+      SLACK_CLAUDE_BOT_TOKEN: ${{ secrets.SLACK_CLAUDE_BOT_TOKEN }}
+      SLACK_GEMINI_AGENT_BOT_TOKEN: ${{ secrets.SLACK_GEMINI_AGENT_BOT_TOKEN }}
+      SLACK_GEMINI_CHAT_BOT_TOKEN: ${{ secrets.SLACK_GEMINI_CHAT_BOT_TOKEN }}
+    steps:
+      - name: Mirror comment using actor identity
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_URL: ${{ github.event.comment.html_url }}
+        run: |
+          python - <<'PY'
+          import json, os, re, urllib.request
+
+          body = os.environ['COMMENT_BODY']
+          author = os.environ.get('COMMENT_AUTHOR', '')
+          if body.startswith('SLACK_TO_TEAM_ROOM'):
+              raise SystemExit(0)
+
+          # Current Tabibi agent transports (ChatGPT connector, Codex/Claude/Gemini handoffs)
+          # all publish durable Team Room comments through the repository owner's authenticated
+          # GitHub identity. Never let another GitHub commenter select an agent Slack bot simply
+          # by forging `actor:` in free text. If/when an actor gets a distinct GitHub App identity,
+          # extend this allowlist explicitly rather than trusting the body.
+          trusted_relay_authors = {'NTinkicht'}
+          if author not in trusted_relay_authors:
+              print(f'Untrusted Team Room commenter {author!r}; Slack mirror skipped.')
+              raise SystemExit(0)
+
+          actor_match = re.search(r'(?mi)^actor:\s*([a-zA-Z0-9_-]+)', body)
+          actor = (actor_match.group(1).lower() if actor_match else '')
+          aliases = {'codex_cloud': 'codex', 'gemini': 'gemini_agent'}
+          actor = aliases.get(actor, actor)
+          token_env = {
+              'chatgpt': 'SLACK_CHATGPT_BOT_TOKEN',
+              'codex': 'SLACK_CODEX_BOT_TOKEN',
+              'claude': 'SLACK_CLAUDE_BOT_TOKEN',
+              'gemini_agent': 'SLACK_GEMINI_AGENT_BOT_TOKEN',
+              'gemini_chat': 'SLACK_GEMINI_CHAT_BOT_TOKEN',
+          }
+          prefix = ''
+          env_name = token_env.get(actor)
+          if not env_name:
+              env_name = 'SLACK_CHATGPT_BOT_TOKEN'
+              prefix = '*Nassim — Product Owner / trusted Team Room relay*\n'
+
+          token = os.environ.get(env_name, '')
+          if not token:
+              print(f'{env_name} is not configured; mirror skipped.')
+              raise SystemExit(0)
+
+          text = prefix + body
+          if len(text) > 36000:
+              text = text[:35500] + '\n…[truncated; full record in Team Room]'
+          text += f"\n\n<{os.environ['COMMENT_URL']}|GitHub source>"
+          payload = json.dumps({'channel': os.environ['SLACK_CHANNEL_ID'], 'text': text, 'unfurl_links': False}).encode()
+          req = urllib.request.Request(
+              'https://slack.com/api/chat.postMessage', data=payload,
+              headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json; charset=utf-8'}
+          )
+          with urllib.request.urlopen(req) as r:
+              result = json.load(r)
+          if not result.get('ok'):
+              raise SystemExit(f"Slack post failed: {result.get('error')}")
+          print(f"Mirrored trusted relay as {actor or 'owner'} -> {result.get('ts')}")
+          PY

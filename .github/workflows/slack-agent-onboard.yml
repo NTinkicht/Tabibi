@@ -1,0 +1,59 @@
+name: Slack Agent Bot Onboard
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  onboard:
+    runs-on: ubuntu-latest
+    env:
+      SLACK_CHANNEL_ID: C0C0RV36QP2
+      SLACK_CHATGPT_BOT_TOKEN: ${{ secrets.SLACK_CHATGPT_BOT_TOKEN }}
+      SLACK_CODEX_BOT_TOKEN: ${{ secrets.SLACK_CODEX_BOT_TOKEN }}
+      SLACK_CLAUDE_BOT_TOKEN: ${{ secrets.SLACK_CLAUDE_BOT_TOKEN }}
+      SLACK_GEMINI_AGENT_BOT_TOKEN: ${{ secrets.SLACK_GEMINI_AGENT_BOT_TOKEN }}
+      SLACK_GEMINI_CHAT_BOT_TOKEN: ${{ secrets.SLACK_GEMINI_CHAT_BOT_TOKEN }}
+    steps:
+      - name: Validate identities, join #all-tabibi and introduce the team
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+
+          bots = [
+              ('ChatGPT', 'SLACK_CHATGPT_BOT_TOKEN', 'Product Architect / Orchestrator'),
+              ('Codex', 'SLACK_CODEX_BOT_TOKEN', 'Implementation / CI Engineer'),
+              ('Claude', 'SLACK_CLAUDE_BOT_TOKEN', 'Independent Adversarial Reviewer'),
+              ('Gemini Agent', 'SLACK_GEMINI_AGENT_BOT_TOKEN', 'QA / UX / System Verification'),
+              ('Gemini Chat', 'SLACK_GEMINI_CHAT_BOT_TOKEN', 'Adaptive Generalist Collaborator'),
+          ]
+          channel = os.environ['SLACK_CHANNEL_ID']
+
+          def call(method, token, payload=None):
+              data = None if payload is None else json.dumps(payload).encode()
+              req = urllib.request.Request(f'https://slack.com/api/{method}', data=data)
+              req.add_header('Authorization', f'Bearer {token}')
+              if data is not None:
+                  req.add_header('Content-Type', 'application/json; charset=utf-8')
+              with urllib.request.urlopen(req) as r:
+                  result = json.load(r)
+              if not result.get('ok'):
+                  raise RuntimeError(f'{method}: {result.get("error")}')
+              return result
+
+          missing = [env for _, env, _ in bots if not os.environ.get(env)]
+          if missing:
+              raise SystemExit('Missing GitHub Actions secrets: ' + ', '.join(missing))
+
+          for name, env_name, role in bots:
+              token = os.environ[env_name]
+              identity = call('auth.test', token)
+              call('conversations.join', token, {'channel': channel})
+              call('chat.postMessage', token, {
+                  'channel': channel,
+                  'text': f"👋 *{name} reporting in.*\nRole: {role}\nCompany rule: talk in Slack, decide in GitHub, build in branches, prove in CI.\nCoffee optional, evidence mandatory."
+              })
+              print(f"{name}: connected as {identity.get('user')} ({identity.get('user_id')})")
+          PY
