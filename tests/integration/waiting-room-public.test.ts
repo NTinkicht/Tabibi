@@ -129,6 +129,13 @@ describe('privacy-preserving waiting-room projection', () => {
     );
     expect(wrongClinic.entries).toEqual([]);
 
+    await pool.query(
+      `UPDATE consultation_sessions
+          SET status = 'open', opened_at = COALESCE(opened_at, now()), updated_at = now()
+        WHERE id = $1 AND clinic_id = $2`,
+      [ids.session, ids.clinic],
+    );
+
     await queue.command(scope, ids.session, registration.entry.id, {
       command: 'cancel',
       reason: 'Patient left clinic',
