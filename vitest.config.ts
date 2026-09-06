@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 const common = { resolve: { alias: { '@': resolve(__dirname, 'src') } } };
 export default defineConfig({
   test: {
+    // Keep database-sensitive test files deterministic across projects.
     fileParallelism: false,
     projects: [
       defineProject({
