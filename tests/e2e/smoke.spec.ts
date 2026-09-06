@@ -106,7 +106,7 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
   ).toBeVisible();
   await expect(page.getByText(/^W-[A-F0-9]{10}$/).first()).toBeVisible();
   await page.getByRole('button', { name: 'العربية' }).click();
-  await page.getByRole('button', { name: 'تسجيل الوصول' }).click();
+  await page.getByRole('button', { name: 'تسجيل الوصول' }).last().click();
   await expect(page.getByText('ترتيب الخدمة #1')).toBeVisible();
   const dialogAnswers = ['1', 'تنظيم تشغيلي للاستقبال'];
   page.on('dialog', (dialog) => void dialog.accept(dialogAnswers.shift()));

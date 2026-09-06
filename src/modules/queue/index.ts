@@ -632,7 +632,7 @@ export class QueueService {
         }>(
           `UPDATE queue_entries entry SET state=$4::queue_entry_status,
              eligibility_order=CASE WHEN $4::queue_entry_status='checked_in' THEN $5 ELSE eligibility_order END,
-             service_order=CASE WHEN $4::queue_entry_status='checked_in' THEN $6 ELSE NULL END,
+             service_order=CASE WHEN $4::queue_entry_status='checked_in' THEN $6::bigint ELSE NULL END,
              updated_at=now()
            FROM patient_operational_records patient
            WHERE entry.id=$1 AND entry.session_id=$2 AND entry.clinic_id=$3
