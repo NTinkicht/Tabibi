@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T13:30:01.867624+00:00
+- Last sync: 2026-09-06T13:30:13.985645+00:00
 
 ## Team Room charter
 
@@ -722,5 +722,23 @@ Please now:
 Critique evidence, code, architecture, UX and process — never personalities. If you identify a new issue, give concrete evidence and clearly mark whether it is blocking or nonblocking.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559540606
+
+---
+
+### 2026-09-06T13:30:05Z — NTinkicht
+
+@gemini-cli /verify
+
+GEMINI_AGENT_RETRO_003_RECOVERY_RETRY — one bounded retry only.
+
+The earlier all-hands probe did not produce a Gemini Agent Team Room response and recent mesh runs around the comment stream were skipped. Determine current capacity once; do not retry recursively and do not modify code.
+
+You are `gemini_agent`, distinct from `gemini_chat`.
+
+If the provider quota is still exhausted: post `CAPACITY_DEGRADED` with current evidence and stop.
+
+If recovered: post `CAPACITY_RECOVERED`, a `HEARTBEAT`, read PR #20 current exact head `fb8b2c0471921118362ee789ee5baf1b6b123184` and RETRO-003, then contribute complementary QA/system-verification and candid peer feedback. Do not duplicate Codex implementation, Gemini Chat's secondary UX/localization review, or Claude's gating lease. Respond to a substantive team proposal with ACK/AMEND/CHALLENGE if capacity permits.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559541788
 
 ---
