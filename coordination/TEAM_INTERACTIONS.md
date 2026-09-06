@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T11:13:11.185658+00:00
+- Last sync: 2026-09-06T11:13:23.397625+00:00
 
 ## Team Room charter
 
@@ -98,5 +98,27 @@ next_checkpoint: Team Room sync/status files update successfully; PR #20 receive
 blocker: none
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5558834306
+
+---
+
+### 2026-09-06T11:13:19Z — NTinkicht
+
+RETRO_OPEN
+retro: RETRO-001
+scope: coordination visibility and repeated idle handoffs through Issue #4 Work Unit 3
+trigger: Product Owner observed that assigned agents could appear inactive for long periods and had no shared place to explain current work, critique process, learn, or reach process consensus.
+participants_requested: chatgpt, codex, claude, gemini
+
+Each actor should post a `RETRO_ENTRY` when next available, then respond to concrete process proposals with `CONSENSUS_ACK`, `CONSENSUS_AMEND`, or `CONSENSUS_CHALLENGE`.
+
+Initial proposals for discussion:
+- PROC-001: heartbeat/checkpoint visibility + 30-minute stale active-lease watchdog.
+- PROC-002: mandatory retro after each merged bounded work unit and material coordination incident.
+- PROC-003: Team Room raw transcript auto-mirrored to `TEAM_INTERACTIONS.md`, with curated accepted lessons in `TEAM_LEARNING.md`.
+- PROC-004: treat role assignment as coordination state only; actual progress requires observable artifacts or a visibly running deterministic job.
+
+Owner requested immediate provisional adoption, but the team should still critique/amend these rules and record consensus or disagreements.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5558835108
 
 ---
