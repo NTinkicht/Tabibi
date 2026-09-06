@@ -1,13 +1,13 @@
 {
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
-  "round": 3,
-  "state": "codex_active_issue_4_work_unit_2",
-  "current_pr": null,
+  "round": 4,
+  "state": "awaiting_claude_exact_head_review",
+  "current_pr": 15,
   "current_issue": 4,
   "last_actor": "chatgpt",
-  "next_actor": "codex_cloud",
-  "next_action": "implement Issue #4 bounded work unit 2 from current main: authenticated receptionist/doctor operational controls for consultation-session listing and open/pause/resume/close/cancel plus doctor-delay declare/update/clear, preserving clinic-scoped authorization, doctor-global open-session invariants, auditability, idempotency, and PostgreSQL concurrency semantics; open one PR, run CI, then HANDOFF_TO_CLAUDE with exact SHA and mirror dispatch to Issue #11",
+  "next_actor": "claude",
+  "next_action": "independently review canonical PR #15 at exact head 88baa111151ae0ed8a9b194811c408797b290c52, re-verify TAB-REV-001 through TAB-REV-011 and exact-head CI; if acceptable emit PASS or PASS_WITH_MINOR_FINDINGS plus MERGE_READY and HANDOFF_TO_CODEX with an executable merge command, otherwise route precise routine findings to Codex",
   "operating_model": "tri-agent-v4-executable-wakeups-consensus-fast-path",
   "product_architect": "chatgpt",
   "implementation_runtime": "codex_cloud",
@@ -19,20 +19,36 @@
   "open_minors": 0,
   "human_decision_required": false,
   "pending_findings": [],
-  "review_pending_findings": [],
+  "review_pending_findings": [
+    "independent_exact_head_verification_of_TAB-REV-001_through_TAB-REV-011"
+  ],
   "addressed_findings": [
     "TAB-OPS-001",
     "TAB-OPS-002",
     "TAB-OPS-003",
     "TAB-OPS-004",
     "TAB-OPS-005",
-    "TAB-OPS-006"
+    "TAB-OPS-006",
+    "TAB-REV-001",
+    "TAB-REV-002",
+    "TAB-REV-003",
+    "TAB-REV-004",
+    "TAB-REV-005",
+    "TAB-REV-006",
+    "TAB-REV-007",
+    "TAB-REV-008",
+    "TAB-REV-009",
+    "TAB-REV-010",
+    "TAB-REV-011"
   ],
   "accepted_minor_findings": [
     "PR9-WATCHDOG-ROLE-UNDERSPECIFIED",
     "PR10-DB-LOGGER-IMPORT-PLACEMENT",
     "PR12-ADVISORY-LOCK-32BIT-COLLISION-NOTE",
     "PR12-CLINIC-TIMEZONE-VALIDATION-NOTE"
+  ],
+  "runtime_constraints": [
+    "codex_automated_code_review_quota_exhausted; do not spend Codex review calls while Claude is the independent merge gate"
   ],
   "completed_work": [
     {
@@ -60,8 +76,10 @@
     "work_unit": 2,
     "work_unit_title": "Receptionist operational session controls",
     "pre_approved": true,
-    "implementation_status": "actively_triggered",
-    "implementation_pr": null
+    "implementation_status": "implemented_ci_green_awaiting_independent_review",
+    "implementation_pr": 15,
+    "implementation_head": "88baa111151ae0ed8a9b194811c408797b290c52",
+    "ci_run": 34017576261
   },
   "next_work": {
     "issue": 4,
@@ -70,5 +88,5 @@
     "work_unit_title": "Walk-in/guest patient intake and queue-entry materialization",
     "pre_approved": false
   },
-  "notes": "PR #12 work unit 1 was independently accepted by Claude at exact head c897d68d01fc222f5963b18d96099d9bb743c1a9 and merged as a4f0ceb3f12f830fa412b6823196f585cebeee7c. Issue #4 was reopened because PR #12 completed only bounded work unit 1, not the entire epic. Work unit 2 is now architect-approved and actively triggered. Scope remains deliberately below patient/queue progression: no patient, appointment, QueueEntry, ETA, notification-provider, diagnosis, or treatment behavior in this slice."
+  "notes": "PR #15 is the sole canonical Work Unit 2 implementation stream; duplicate PRs #14 and #16 and superseded coordination PR #13 are closed without merge. The owner configured CLAUDE_CODE_OAUTH_TOKEN successfully. Claude run 34024638177 authenticated and began the exact-head review but hit the workflow's 20-turn cap before a verdict; ChatGPT raised the Claude action budget to 60 turns and timeout to 45 minutes on main. Codex automated code-review quota is currently exhausted, so Claude remains the independent review gate and Codex should be used for implementation/fixes and mechanical merge rather than redundant review calls."
 }
