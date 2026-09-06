@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { receptionistCopy } from '@/modules/localization/receptionist';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -130,12 +131,12 @@ export function WalkInQueue({
       </header>
 
       <div className="queueToolbar">
-        <a
+        <Link
           className="secondaryLink"
           href={`/operations/${clinicId}?locale=${locale}`}
         >
           {t.backSessions}
-        </a>
+        </Link>
         <button className="locale" onClick={reload}>
           {t.reload}
         </button>
