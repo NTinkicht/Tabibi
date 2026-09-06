@@ -21,6 +21,9 @@ describe('PostgreSQL platform baseline', () => {
     expect(result.rows.map((row) => row.name)).toContain(
       '0001_platform_baseline.sql',
     );
+    expect(result.rows.map((row) => row.name)).toContain(
+      '0002_clinic_scheduling_foundation.sql',
+    );
   });
   it('passes readiness against the real database', async () => {
     expect(await databaseIsReady()).toBe(true);

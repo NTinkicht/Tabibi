@@ -1,3 +1,5 @@
 # audit
 
-This directory owns the **audit** module boundary. Its future domain, application, and adapter code must expose intentional public APIs rather than importing another module's internals. No patient or queue behavior is implemented in the platform baseline.
+This directory owns metadata-only audit events for clinic, membership, doctor,
+schedule, and session mutations. Events always identify the explicit clinic and
+actor; this foundation contains no diagnosis, treatment, patient, or queue data.

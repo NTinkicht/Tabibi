@@ -1,6 +1,6 @@
 # Tabibi
 
-Tabibi is an Algeria-first doctor appointment and intelligent queue-management platform. This repository currently contains the production platform baseline; patient discovery, booking, and queue workflows are intentionally not implemented yet.
+Tabibi is an Algeria-first doctor appointment and intelligent queue-management platform. This repository contains the production platform baseline plus the clinic/staff/doctor scheduling and consultation-session persistence foundation. Patient discovery, booking, and queue workflows are intentionally not implemented yet.
 
 ## Prerequisites
 
@@ -36,6 +36,10 @@ DATABASE_URL=postgresql://tabibi:tabibi_dev_only@localhost:5432/tabibi npm run t
 ```
 
 Integration tests deliberately use a real PostgreSQL server. CI provisions an isolated PostgreSQL 16 service and runs quality, build, integration, and browser smoke jobs from `npm ci`.
+
+The clinic scheduling integration suite migrates a clean database and verifies
+tenant authorization, role boundaries, concurrent idempotent occurrence generation,
+and the doctor-global open-session invariant with synchronized cross-clinic races.
 
 ## Architecture boundaries
 
