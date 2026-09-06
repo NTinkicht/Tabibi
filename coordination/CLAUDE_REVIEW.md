@@ -1,5 +1,28 @@
 # Claude Independent Review — Tabibi Foundation
 
+# Issue #4 Phase — PR #12: clinic scheduling persistence foundation
+
+## PR #12 (head `c897d68d01fc222f5963b18d96099d9bb743c1a9`) — PASS_WITH_MINOR_FINDINGS
+
+Verified CI directly via `get_check_runs` rather than trusting the comment claims: all three jobs (Quality and build, PostgreSQL integration, Browser smoke) completed with `conclusion: success` on this exact SHA. Read the full diff.
+
+This is the real implementation of the single hardest, most concurrency-sensitive invariant in the entire 8-round foundation spec — the doctor-global "at most one open session" rule — and it's done correctly, with genuine barrier-synchronized PostgreSQL concurrency tests, not mocks.
+
+**What I verified specifically:**
+- **The invariant itself is enforced two ways, correctly composed:** a partial unique index `consultation_sessions_one_open_per_doctor_uq ON (doctor_id) WHERE status = 'open'` (doctor-scoped, not clinic-scoped — correctly global) as the actual source of truth, plus a `pg_advisory_xact_lock` keyed on `doctor_id` taken before the write as a serialization point. Tracing the two-contender test by hand: both transactions row-lock their own session, validate the transition, then contend for the same advisory lock; the loser blocks until the winner commits, then its `UPDATE` collides with the now-committed unique index and raises `23505`, which the code catches and translates into a domain `SessionConflictError`. Correct even without an explicit pre-write re-check `SELECT`, because the unique index is the actual enforcement mechanism, not the advisory lock (the lock is a serialization optimization on top of it — genuine defense-in-depth, matching what I originally asked for as CLAUDE-014).
+- **Tenant isolation**: session lookups are scoped by `clinic_id` in the same `WHERE` clause as the row lock, so a session ID from clinic B queried under clinic A's scope returns "not found," not a leak — verified against an actual cross-clinic test, not just asserted.
+- **A privilege-escalation edge I specifically checked for**: `requireDoctorIdentity` verifies the acting doctor's own profile matches the `doctorId` being acted on, not just that they hold a `doctor` role at the clinic — so Doctor A can't manage Doctor B's schedule/sessions at the same clinic. Correctly wired into every doctor-role write path.
+- **Platform-admin non-access**: verified by an actual test that a `platform_admin` identity with no clinic membership row gets `AuthorizationError`, matching `SECURITY.md`'s explicit "no implicit unrestricted access" invariant.
+- **Idempotent generation**: `INSERT ... ON CONFLICT DO NOTHING` targets the natural-key partial unique index (clinic/doctor/date/template/occurrence), which is what actually makes concurrent duplicate generation safe — verified via a real concurrent-call test, not a sequential one.
+- **State machine**: `canTransitionSession`'s table matches the accepted canonical state×operation table from the foundation exactly, including all terminal-state rejections.
+- **Timezone handling**: `(day::date + t.local_start_time) AT TIME ZONE c.timezone` is the correct Postgres idiom for converting a clinic-local wall-clock time to an absolute UTC instant — correctly per-clinic rather than hardcoded.
+
+**Two non-blocking notes:**
+- NOTE: the advisory lock key is `hashtext(doctor_id)`, a 32-bit hash — a theoretical collision between two unrelated doctors would only cause unnecessary extra serialization between them (the unique index remains the real correctness guarantee), never an actual invariant violation. Not worth fixing now; worth a 64-bit key if this ever needs to scale to a very large doctor count.
+- NOTE: `Clinic.timezone` isn't validated against real IANA zone names at write time (`updateClinic`) — an invalid value would only surface later, as a runtime error during session generation. Low priority given the Algeria-only MVP scope (in practice there's one real value), but worth tightening (e.g. against `pg_timezone_names`) before multi-region ever becomes relevant.
+
+**Verdict: `PASS_WITH_MINOR_FINDINGS`.**
+
 # Technical Foundation Phase — PR #9 (coordination v4) and PR #10 (Issue #3 platform baseline)
 
 Caught up after a 6-hour heartbeat gap during which substantial activity happened without me: PR #9 (protocol v4) went through 6 self-directed correction rounds (TAB-OPS-001..006) and PR #10 (real application code) hit and resolved a GitHub Actions workflow-permission credential blocker. Reviewed both properly rather than rubber-stamping the "resolved" claims, plus a genuine infrastructure confusion worth clearing up (see Issue #11 note below).
