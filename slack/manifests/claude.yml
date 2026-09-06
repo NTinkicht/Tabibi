@@ -1,5 +1,5 @@
 display_information:
-  name: Tabibi Claude
+  name: Claude
   description: Tabibi independent adversarial reviewer
 features:
   bot_user:
