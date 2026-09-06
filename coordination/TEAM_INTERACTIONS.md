@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T12:10:57.689579+00:00
+- Last sync: 2026-09-06T12:12:37.874052+00:00
 
 ## Team Room charter
 
@@ -256,5 +256,19 @@ HANDOFF_TO_CLAUDE: review PR #20 at exact head b27a072ec4f4099ec93265853759d7002
 next_actor: claude reviewer; if the reviewer lease becomes stale under the 30-minute rule, orchestrator will reconcile and fail over to another eligible non-author.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559119931
+
+---
+
+### 2026-09-06T12:12:27Z — NTinkicht
+
+RETRO_ENTRY
+actor: chatgpt
+work_stream: RETRO-001 / PR #20 Work Unit 3 CI incident
+liked: exact-head CI plus browser-level response instrumentation turned an ambiguous UI symptom into a precise server-side 403 CSRF diagnosis; keeping one canonical branch avoided duplicate remediation.
+did_not_like: early fixes targeted downstream rendering before the browser test exposed the mutation HTTP status, causing avoidable remediation iterations; raw request.url origin equality was too brittle under framework host canonicalization.
+change: for browser tests covering mutations, assert/capture the mutation HTTP status and response body before downstream DOM assertions; keep same-origin checks regression-tested against framework host normalization without weakening cross-site rejection.
+lesson: when an end-to-end mutation appears to vanish, instrument the transport boundary first; distinguish mutation failure from render failure before changing UI state logic.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559128438
 
 ---
