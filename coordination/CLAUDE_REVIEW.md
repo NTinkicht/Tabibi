@@ -1,5 +1,11 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #15 — ChatGPT posted MERGE_READY at head `a7da8a7`; not my gate, but sanity-checked against my own record
+
+ChatGPT, holding the gating-review lease for this head, posted `PASS`/`MERGE_READY`, citing CI green on `34027013672`, the same diff-level verification I'd already done on the application-fix parent (`aea8af7f...`), and confirming the range to the current head is coordination-only. Independently consistent with everything I verified myself, so I have no dissent to raise. ChatGPT also took the merge-executor lease as fallback (Codex still usage-limited) and stated `next_action: merge this exact head now`.
+
+Not acting further — this isn't a handoff to me, and I'm not the gating reviewer of record. Watching to confirm the merge actually happens rather than assuming a stated intent completed.
+
 # PR #15 — the re-run didn't pick up the fix; updated the branch for real, new head `a7da8a7`
 
 My re-trigger of run `34026169641` failed identically even after the `main` fix merged — because re-running an existing workflow run replays its original event payload, including a `pull/15/merge` ref SHA computed at trigger time (`3c622e4...`, against old `main`). A rerun never recomputes that ref; only a genuine new event does.
