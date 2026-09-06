@@ -16,3 +16,216 @@ h1 {
   font-size: 3rem;
   margin-bottom: 0.5rem;
 }
+
+* {
+  box-sizing: border-box;
+}
+.desk {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: clamp(1rem, 4vw, 3rem);
+  min-height: 100vh;
+}
+.deskHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  align-items: flex-start;
+}
+.deskHeader h1 {
+  font-size: clamp(2.2rem, 6vw, 4.5rem);
+  letter-spacing: -0.05em;
+  margin: 0.4rem 0;
+}
+.deskHeader p {
+  color: #52716d;
+  margin: 0;
+}
+.eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  color: #087f6d;
+  font-weight: 800;
+}
+.locale,
+.toolbar button,
+.actions button,
+.createPanel button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.75rem 1.1rem;
+  background: #0a6f61;
+  color: white;
+  font-weight: 750;
+  cursor: pointer;
+}
+.locale {
+  background: white;
+  color: #164d45;
+  border: 1px solid #c9dcda;
+}
+.toolbar {
+  display: flex;
+  gap: 0.7rem;
+  margin: 2rem 0;
+}
+.toolbar input,
+.createPanel input {
+  border: 1px solid #c9dcda;
+  border-radius: 0.8rem;
+  padding: 0.72rem;
+  background: white;
+  color: #153b36;
+}
+.sessionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 1rem;
+}
+.sessionCard {
+  position: relative;
+  background: white;
+  border: 1px solid #dce9e7;
+  border-top: 4px solid #8ca8a4;
+  border-radius: 1.1rem;
+  padding: 1.25rem;
+  box-shadow: 0 12px 35px #174c4410;
+}
+.status-open {
+  border-top-color: #0ba884;
+}
+.status-paused {
+  border-top-color: #e1a329;
+}
+.status-closed,
+.status-cancelled {
+  opacity: 0.72;
+}
+.sessionTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.sessionTop h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.time {
+  font-variant-numeric: tabular-nums;
+  color: #52716d;
+}
+.status,
+.delayBadge {
+  border-radius: 999px;
+  background: #edf5f3;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  height: max-content;
+}
+.delayBadge {
+  display: inline-block;
+  background: #fff0c8;
+  color: #805500;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.actions button {
+  padding: 0.55rem 0.8rem;
+  font-size: 0.8rem;
+}
+.actions .danger {
+  background: #a93b45;
+}
+.actions .quiet {
+  background: #e8f1ef;
+  color: #285e56;
+}
+.pending {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 1rem;
+  background: #ffffffdd;
+  font-weight: 800;
+}
+.state {
+  min-height: 15rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #52716d;
+  text-align: center;
+}
+.state.error {
+  color: #8d3039;
+}
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid #c8dcda;
+  border-top-color: #0a6f61;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 1rem;
+}
+.emptyIcon {
+  font-size: 3rem;
+}
+.alert {
+  background: #fff0f1;
+  color: #8d3039;
+  padding: 1rem;
+  border-radius: 0.8rem;
+  margin: 1rem 0;
+}
+.createPanel {
+  margin-top: 2rem;
+  background: #dcece8;
+  border-radius: 1.2rem;
+  padding: 1.3rem;
+}
+.createPanel h2 {
+  margin-top: 0;
+}
+.createPanel form {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 0.8rem;
+  align-items: end;
+}
+.createPanel label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 700px) {
+  .createPanel form {
+    grid-template-columns: 1fr;
+  }
+  .deskHeader {
+    align-items: center;
+  }
+  .sessionGrid {
+    grid-template-columns: 1fr;
+  }
+}

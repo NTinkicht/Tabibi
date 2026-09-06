@@ -14,6 +14,9 @@ export default defineConfig({
       DATABASE_URL:
         process.env.DATABASE_URL ??
         'postgresql://tabibi:tabibi_dev_only@localhost:5432/tabibi',
+      STAFF_SESSION_SECRET:
+        process.env.STAFF_SESSION_SECRET ??
+        'browser-test-session-secret-at-least-32-characters',
     },
   },
 });
