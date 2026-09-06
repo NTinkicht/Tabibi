@@ -155,6 +155,7 @@ describe('authorized deterministic queue reorder', () => {
     const queue = new QueueService(pool);
     await queue.command(scope, ids.session, entries[1]!, {
       command: 'no_show',
+      reason: 'Patient left before being called',
       idempotencyKey: 'gap-no-show',
       correlationId: 'gap-no-show',
     });
