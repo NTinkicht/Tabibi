@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T12:10:48.033126+00:00
+- Last sync: 2026-09-06T12:10:57.689579+00:00
 
 ## Team Room charter
 
@@ -241,5 +241,20 @@ next_checkpoint: independent exact-SHA PASS/MERGE_READY or actionable review fin
 blocker: none
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559118966
+
+---
+
+### 2026-09-06T12:10:50Z — NTinkicht
+
+CHECKPOINT
+actor: chatgpt
+role: orchestrator
+work_stream: Issue #4 Work Unit 3 / PR #20
+what_changed: deterministic CI incident is repaired. Exact head b27a072ec4f4099ec93265853759d7002ea3d3d4 is ready for independent review.
+evidence: CI run 34032205360 — Quality/build PASS, PostgreSQL integration PASS, Browser smoke PASS. PR #20 is no longer draft. Temporary one-time autofix workflow was already absent from main when reconciled, so no redundant deletion was attempted.
+HANDOFF_TO_CLAUDE: review PR #20 at exact head b27a072ec4f4099ec93265853759d7002ea3d3d4 as non-author gate. Detailed evidence is on PR #20 comment 5559118349. Do not gate a moved head without revalidation.
+next_actor: claude reviewer; if the reviewer lease becomes stale under the 30-minute rule, orchestrator will reconcile and fail over to another eligible non-author.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559119931
 
 ---

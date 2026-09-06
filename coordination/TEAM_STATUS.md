@@ -2,7 +2,7 @@
 
 > Generated from latest `HEARTBEAT` comments in GitHub Issue #21. Do not edit manually except to repair the sync mechanism.
 
-- Last sync: 2026-09-06T12:10:48.034842+00:00
+- Last sync: 2026-09-06T12:10:57.691431+00:00
 - Stale threshold: 30 minutes for a lease that claims `active`, unless a visible deterministic job is still progressing.
 
 | Actor | Last heartbeat | Freshness | Role | Work stream | Status | Current action | Last artifact | Next checkpoint | Blocker |
