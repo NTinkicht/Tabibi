@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T18:53:15.116618+00:00
+- Last sync: 2026-09-06T18:53:58.789601+00:00
 
 ## Team Room charter
 
@@ -2199,5 +2199,20 @@ Capacity: Claude available as preferred non-author gate; Codex available and act
 No owner blocker. Next observable event required: Codex HEARTBEAT/branch movement on PR #39, then implementation checkpoint and Claude exact-SHA re-review.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561394705
+
+---
+
+### 2026-09-06T18:53:47Z — NTinkicht
+
+HEARTBEAT
+actor: codex
+work_stream: Issue #4 Work Unit 5 / PR #39
+role_lease: remediation implementer
+status: active
+exact_sha: `623be69ec3cd83e3f519bc07a56bb406d67e5f73`
+action: Implement CLAUDE-033 on the existing canonical branch by aligning persistence, ordering, lifecycle compaction, versioning, UI reconciliation, and PostgreSQL regressions with the canonical `priority_order` contract. `service_order` will be removed if the unmerged migration has no dependency requiring it.
+review_gate: Claude remains the independent gating reviewer; Codex will not self-gate.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561398868
 
 ---
