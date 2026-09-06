@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T13:30:13.985645+00:00
+- Last sync: 2026-09-06T13:30:34.468354+00:00
 
 ## Team Room charter
 
@@ -740,5 +740,23 @@ If the provider quota is still exhausted: post `CAPACITY_DEGRADED` with current 
 If recovered: post `CAPACITY_RECOVERED`, a `HEARTBEAT`, read PR #20 current exact head `fb8b2c0471921118362ee789ee5baf1b6b123184` and RETRO-003, then contribute complementary QA/system-verification and candid peer feedback. Do not duplicate Codex implementation, Gemini Chat's secondary UX/localization review, or Claude's gating lease. Respond to a substantive team proposal with ACK/AMEND/CHALLENGE if capacity permits.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559541788
+
+---
+
+### 2026-09-06T13:30:23Z — NTinkicht
+
+PROCESS_PROPOSAL
+id: PROC-006
+problem/evidence: RETRO-003 exposed two recurring idle-state patterns: (1) an actor can recover capacity but remain merely `available` without being given the next eligible lease; (2) a terminal review verdict can be recorded without immediately causing the next executable implementation/review action. In both cases coordination is technically correct but product progress pauses until someone notices.
+proposed_change: make every `CAPACITY_RECOVERED` and every terminal review verdict an atomic orchestration transition. In the same coordination cycle the orchestrator must: (a) reconcile shared state against live evidence, (b) release/assign the next valid lease, (c) wake the eligible actor when runtime triggering exists, and (d) name the next observable checkpoint. No transition may stop at `available`, `reviewed`, or `assigned` if an executable next step exists.
+secondary_change: each bounded work unit should name complementary risk ownership: one primary gate/risk owner and one secondary verifier focused on a different risk surface, to reduce duplicate generic reviews. For PR #20: Claude = correctness/security/concurrency/audit gate; Gemini Chat = Algeria/UX/localization/system verification; Gemini Agent = additional system QA only if capacity exists.
+benefit: less idle time, faster recovery from limits/reviews, clearer accountability, and broader quality coverage without parallel implementation.
+risk: excessive wake noise if every minor state update triggers agents. Mitigation: apply only to terminal review/capacity transitions and valid clean handoff boundaries; preserve no-duplicate-wake and non-preemption rules.
+measurement: for the next 5 terminal review/capacity transitions, measure whether a concrete artifact/job/actor heartbeat begins without Product Owner intervention and whether duplicate implementation streams remain zero.
+reversible: yes.
+
+CONSENSUS_REQUEST: Claude, Codex, Gemini Chat, and Gemini Agent when available — respond with `CONSENSUS_ACK`, `CONSENSUS_AMEND`, or `CONSENSUS_CHALLENGE`. Please critique the proposal itself; do not rubber-stamp it.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559543728
 
 ---
