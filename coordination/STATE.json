@@ -62,7 +62,7 @@
         "orchestration": "available",
         "merge_execution": "available"
       },
-      "current_activity": "PR #26 (Work Unit 4) merged at 848968d6c2c45c3e3a9ebadfa6e0d191cf7b2338 -- verified the merge commit incorporates the independently-gated exact head 4292abf736fcc65ab59778b0f4814b9c42d9ec37 with zero drift. No active lease; available for Work Unit 5's independent review once scoped.",
+      "current_activity": "PR #26 (Work Unit 4) merged and verified with zero drift. Active gating-reviewer lease on PR #35 (Slack company bridge, exact head 86c5c8397522bf4cf98e0c2614f1912d1332f587): CHANGES_REQUIRED, 2 MAJOR findings (CLAUDE-028, CLAUDE-029) on identity-assertion-without-verification across the GitHub/Slack trust boundary. Also available for Work Unit 5's independent review once scoped.",
       "invocation_policy": "persistent Claude session is the default Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
     "gemini_agent": {
@@ -121,8 +121,12 @@
       "status": "not_assigned"
     },
     "gating_reviewer": {
-      "actor": null,
-      "status": "not_assigned"
+      "actor": "claude",
+      "status": "changes_requested",
+      "review_target_sha": "86c5c8397522bf4cf98e0c2614f1912d1332f587",
+      "work_stream": "pr-35-slack-company-bridge",
+      "verdict": "CHANGES_REQUIRED",
+      "pr_comment": "https://github.com/NTinkicht/Tabibi/pull/35#issuecomment-5560690500"
     },
     "secondary_verifier": {
       "actor": null,
@@ -136,10 +140,31 @@
   "product_architect": "chatgpt",
   "deterministic_referee": "ci",
   "open_blockers": 0,
-  "open_majors": 0,
+  "open_majors": 2,
   "open_minors": 0,
   "human_decision_required": false,
-  "pending_findings": [],
+  "pending_findings": [
+    {
+      "id": "CLAUDE-028",
+      "severity": "MAJOR",
+      "target_sha": "86c5c8397522bf4cf98e0c2614f1912d1332f587",
+      "target_pr": 35,
+      "summary": "slack-team-room-mirror.yml selects which agent's Slack bot token to post with by regex-parsing a self-declared actor: field from the comment body, with no check that the GitHub comment author actually corresponds to that actor -- any Issue #21 commenter can spoof any agent's Slack identity.",
+      "evidence": "https://github.com/NTinkicht/Tabibi/pull/35#issuecomment-5560690500",
+      "required_resolution": "verify COMMENT_AUTHOR against an allowlist for the claimed actor (as already done correctly in the owner-fallback branch) before selecting that actor's token; otherwise skip or use a neutral identity.",
+      "verification_method": "a comment on Issue #21 from an account that is not the real actor, containing actor: <name>, must not be mirrored under that actor's Slack identity."
+    },
+    {
+      "id": "CLAUDE-029",
+      "severity": "MAJOR",
+      "target_sha": "86c5c8397522bf4cf98e0c2614f1912d1332f587",
+      "target_pr": 35,
+      "summary": "slack-owner-ingest.yml attributes every non-bot Slack message in #all-tabibi to actor: nassim / role: product_owner with no check against an actual Nassim Slack user ID -- a real privilege-escalation path given the project's established norm of treating owner-directed input as immediately authoritative.",
+      "evidence": "https://github.com/NTinkicht/Tabibi/pull/35#issuecomment-5560690500",
+      "required_resolution": "filter on the sender's actual Slack user ID against a configured Nassim Slack user ID, not just \"not a bot\"; skip or label distinctly otherwise.",
+      "verification_method": "a message from a non-Nassim human Slack account must not be imported as actor: nassim."
+    }
+  ],
   "resolved_findings": [
     {
       "id": "CLAUDE-027",
@@ -233,5 +258,5 @@
     "work_unit_title": "not yet defined",
     "pre_approved": false
   },
-  "notes": "PR #26 (Issue #4 Work Unit 4, queue lifecycle) merged at 848968d6c2c45c3e3a9ebadfa6e0d191cf7b2338. The merge commit was independently verified (git diff --stat) to incorporate the gated exact head 4292abf736fcc65ab59778b0f4814b9c42d9ec37 with zero drift; that head in turn carried zero application-code changes versus the originally-reviewed 68c39fb8146b0cc7634719225beb80b9b9985662 across two rounds of base-integration merges (Claude's, then Codex's), each independently confirmed rather than assumed. Claude's original review verified: concurrency locking order traced by hand and confirmed by a real concurrent-call test, state machine consistency between service and API layers, tenant isolation, idempotency/reauthorization, plus running typecheck/lint/format/build and the integration suite 3 consecutive times against real Postgres (29/29 each run, confirming the PR #20 fileParallelism fix holds with a third integration file). One non-blocking UX note recorded (cancel-flow confirm-dialog button mapping). All role leases for this work stream are released. Next: ChatGPT scopes and bounds Issue #4 Work Unit 5. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
+  "notes": "PR #26 (Issue #4 Work Unit 4, queue lifecycle) merged at 848968d6c2c45c3e3a9ebadfa6e0d191cf7b2338, verified with zero drift from the independently gated exact head. All role leases for that work stream are released; ChatGPT scopes Issue #4 Work Unit 5 next. Separately, PR #35 (five-actor Slack company bridge, draft) requested independent security review; Claude posted CHANGES_REQUIRED with CLAUDE-028/029 (MAJOR) -- both about identity being asserted rather than verified across the GitHub/Slack trust boundary (Slack-mirror actor spoofing; unauthenticated product-owner attribution on ingest). PR #32 (coordination-only, 'reconcile after Work Unit 4 merge') is a concurrent duplicate of the STATE.json reconciliation already merged here; Claude flagged the conflict and recommended rebasing to keep only its still-useful WORK_QUEUE.md changes. Prior note still holds: coordination/STATE.json has two independent automated/manual writers (tabibi-coordination-bot and manual reconciliation) with no staleness check between them -- PROC-007 proposes a fix, open for team consensus in Team Room."
 }
