@@ -1,0 +1,36 @@
+name: Claude Review Fallback
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  actions: read
+
+jobs:
+  claude-review:
+    if: >-
+      github.event.issue.pull_request != null &&
+      github.event.comment.user.login == 'NTinkicht' &&
+      contains(github.event.comment.body, '[CLAUDE_FALLBACK_REVIEW]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 50
+
+      - name: Run Claude Code review fallback
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          trigger_phrase: '[CLAUDE_FALLBACK_REVIEW]'
+          additional_permissions: |
+            actions: read
+          claude_args: >-
+            --max-turns 60
