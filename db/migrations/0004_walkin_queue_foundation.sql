@@ -41,6 +41,7 @@ CREATE TABLE queue_entries (
     REFERENCES consultation_sessions(id, clinic_id) ON DELETE RESTRICT,
   FOREIGN KEY (patient_id, clinic_id)
     REFERENCES patient_operational_records(id, clinic_id) ON DELETE RESTRICT,
+  UNIQUE (id, clinic_id),
   UNIQUE (session_id, registration_order),
   UNIQUE (session_id, public_display_label)
 );
