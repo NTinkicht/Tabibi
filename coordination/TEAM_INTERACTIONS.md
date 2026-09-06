@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T17:47:00.749969+00:00
+- Last sync: 2026-09-06T18:01:20.270884+00:00
 
 ## Team Room charter
 
@@ -1954,5 +1954,40 @@ key_result: authorized reason-required deterministic service reorder with exact 
 follow_up: HANDOFF_TO_CLAUDE for independent exact-SHA gate; Codex implementation lease released and remains available for bounded reviewer fixes.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561018857
+
+---
+
+### 2026-09-06T18:01:11Z — NTinkicht
+
+@gemini-chat /verify
+
+WU5-UX-001 — EXECUTABLE REPO-CONNECTED HANDOFF. You are Tabibi's GitHub `gemini_chat` runtime, not an external standalone chat console. This workflow checks out the repository itself. Do not ask Nassim to paste code, diffs, files, role leases, or repository context manually.
+
+Role lease: complementary Algeria/UX/localization/system verifier. No application-code edits and no competing branch.
+
+Current target:
+- Issue #4 / Work Unit 5
+- PR #39 `Add audited deterministic queue priority and reorder`
+- live exact head at dispatch: `2a9520460340417a6f6a1c1d12d44d933fd1348c`
+- `coordination/WORK_QUEUE.md` task `WU5-UX-001`
+- Claude currently has `CHANGES_REQUIRED` on `CLAUDE-031`; Codex is remediating that implementation defect on the same PR. Your lane is complementary, not the correctness gate.
+
+Read from the repo yourself before responding: current `main`, `AGENTS.md`, `GEMINI_CHAT.md`, `coordination/COMPANY_OPERATING_SYSTEM.md`, `coordination/WORK_QUEUE.md`, current PR #39 diff/code/tests, Issue #4 and latest Team Room discussion.
+
+Objective: produce a concrete Algeria-realistic verification report for the priority/reorder feature, including:
+- receptionist mental model: make exceptional reorder visibly exceptional/audited, not normal queue manipulation;
+- Arabic + French, RTL/LTR, mobile and accessibility behavior;
+- reason capture and safe wording without clinical diagnosis data;
+- original registration order vs mutable service order clarity;
+- low-connectivity duplicate-submit/retry behavior, stale-version conflicts and refresh/recovery UX;
+- safeguards against accidental or habitual priority abuse;
+- deterministic browser/system test scenarios Codex/CI should cover;
+- direct constructive PEER_FEEDBACK on the current implementation where useful.
+
+Start with `STANDUP` + `TASK_CLAIM WU5-UX-001`. Then post `UX_NOTE`, `TEST_IDEA`, `RISK_CALL`, `QUESTION/ANSWER` or `PEER_FEEDBACK` as warranted. Finish with `TASK_DONE WU5-UX-001` and explicit acceptance recommendations. Talk to the other agents, not only upward.
+
+If this GitHub runtime genuinely cannot checkout/read the repo, do NOT request manual context from Nassim. Post `CAPACITY_DEGRADED` with the exact workflow/runtime error and stop so orchestration can fail over.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561097048
 
 ---
