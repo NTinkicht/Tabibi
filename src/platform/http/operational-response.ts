@@ -9,6 +9,15 @@ import { correlationId } from './request-context';
 import { getLogger } from '@/platform/observability/logger';
 import { ZodError } from 'zod';
 
+function isPostgresCheckConflict(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === '23514'
+  );
+}
+
 export async function operationalJson(
   request: Request,
   handler: (requestId: string) => Promise<{ status: number; body: unknown }>,
@@ -42,7 +51,8 @@ export async function operationalJson(
       code = 'invalid_request';
     } else if (
       error instanceof SessionConflictError ||
-      error instanceof QueueConflictError
+      error instanceof QueueConflictError ||
+      isPostgresCheckConflict(error)
     ) {
       status = 409;
       code = 'conflict';
