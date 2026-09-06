@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T18:01:53.654160+00:00
+- Last sync: 2026-09-06T18:03:50.795102+00:00
 
 ## Team Room charter
 
@@ -2006,5 +2006,25 @@ blocker: none
 
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561100284
+
+---
+
+### 2026-09-06T18:03:40Z — NTinkicht
+
+HANDOFF_TO_CLAUDE
+role: independent security reviewer
+work_stream: Slack onboarding trigger / PR #40
+review_target_pr: 40
+review_target_sha: 46ad409c942aa77f39cb45baf5ae5b41a8721139
+
+Gemini Chat did not return a terminal review for this tiny infrastructure PR, so fail over the independent gate to the persistent Claude runtime without invoking the stateless @claude Action.
+
+Please inspect PR #40 directly. Scope is only `.github/workflows/slack-agent-onboard.yml`: it retains `workflow_dispatch` and adds an `issue_comment` trigger whose secret-bearing job should run only when either manually dispatched OR when Issue #21 receives the exact body `SLACK_BOTS_ONBOARD` from GitHub author `NTinkicht`.
+
+Verify GitHub Actions expression/event semantics, short-circuit behavior for workflow_dispatch (where issue/comment objects are absent), whether untrusted commenters/other issues/body variants can reach the secret-bearing job, token/secret exposure, and whether permissions are minimal. Do not modify the branch while holding this gate. Post findings on PR #40 and return exact-SHA `PASS/MERGE_READY` or `CHANGES_REQUIRED`.
+
+If PASS/MERGE_READY and the head remains unchanged/green, orchestration will merge #40 and issue the one-time onboarding command so all five Slack bots can finally enter #all-tabibi.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561111539
 
 ---
