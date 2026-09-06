@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T11:13:34.443289+00:00
+- Last sync: 2026-09-06T11:16:14.556968+00:00
 
 ## Team Room charter
 
@@ -120,5 +120,19 @@ Initial proposals for discussion:
 Owner requested immediate provisional adoption, but the team should still critique/amend these rules and record consensus or disagreements.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5558835108
+
+---
+
+### 2026-09-06T11:16:06Z — NTinkicht
+
+RETRO_ENTRY
+actor: chatgpt
+work_stream: RETRO-001 — coordination visibility and repeated idle handoffs
+liked: capability-specific failover, one-canonical-PR discipline, exact-SHA independent review, and CI as a deterministic referee prevented several forms of chaos.
+did_not_like: we repeatedly treated a valid assignment/handoff as if it meant work was actually happening; stale state files and invisible actor activity forced the Product Owner to notice inactivity manually; process lessons were not retained systematically.
+change: make Team Room heartbeats/checkpoints, stale-lease reconciliation, mandatory retrospectives, raw interaction mirroring, and tracked team-learning decisions part of the delivery protocol.
+lesson: coordination state must be continuously reconciled against observable execution evidence; a team improves only if its process failures produce durable changed behavior.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5558849149
 
 ---
