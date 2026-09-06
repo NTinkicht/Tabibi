@@ -16,8 +16,6 @@ type Session = {
   delayVersion: number;
 };
 
-const RECEPTION_LOCALE_KEY = 'tabibi_reception_locale';
-
 function key() {
   return crypto.randomUUID();
 }
@@ -25,8 +23,14 @@ function localDateString(instant: Date): string {
   const offsetMs = instant.getTimezoneOffset() * 60_000;
   return new Date(instant.getTime() - offsetMs).toISOString().slice(0, 10);
 }
-export function ReceptionDesk({ clinicId }: { clinicId: string }) {
-  const [locale, setLocale] = useState<'ar' | 'fr'>('ar');
+export function ReceptionDesk({
+  clinicId,
+  initialLocale = 'ar',
+}: {
+  clinicId: string;
+  initialLocale?: 'ar' | 'fr';
+}) {
+  const [locale, setLocale] = useState<'ar' | 'fr'>(initialLocale);
   const t = receptionistCopy[locale];
   const [date, setDate] = useState(() => localDateString(new Date()));
   const [timezone, setTimezone] = useState('UTC');
@@ -35,17 +39,6 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
   const [pending, setPending] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const pendingKeysRef = useRef(new Map<string, string>());
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(RECEPTION_LOCALE_KEY);
-    if (stored === 'ar' || stored === 'fr') setLocale(stored);
-  }, []);
-
-  function toggleLocale() {
-    const next = locale === 'ar' ? 'fr' : 'ar';
-    window.localStorage.setItem(RECEPTION_LOCALE_KEY, next);
-    setLocale(next);
-  }
 
   function keyFor(opId: string): string {
     const existing = pendingKeysRef.current.get(opId);
@@ -191,7 +184,10 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
         </div>
-        <button className="locale" onClick={toggleLocale}>
+        <button
+          className="locale"
+          onClick={() => setLocale(locale === 'ar' ? 'fr' : 'ar')}
+        >
           {locale === 'ar' ? 'Français' : 'العربية'}
         </button>
       </header>
@@ -305,7 +301,7 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
               {['planned', 'open', 'paused'].includes(session.status) && (
                 <a
                   className="queueLink"
-                  href={`/operations/${clinicId}/sessions/${session.id}/queue`}
+                  href={`/operations/${clinicId}/sessions/${session.id}/queue?locale=${locale}`}
                 >
                   {t.walkIns}
                 </a>
