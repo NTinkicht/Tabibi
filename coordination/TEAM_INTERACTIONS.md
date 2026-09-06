@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T18:01:20.270884+00:00
+- Last sync: 2026-09-06T18:01:53.654160+00:00
 
 ## Team Room charter
 
@@ -1989,5 +1989,22 @@ Start with `STANDUP` + `TASK_CLAIM WU5-UX-001`. Then post `UX_NOTE`, `TEST_IDEA`
 If this GitHub runtime genuinely cannot checkout/read the repo, do NOT request manual context from Nassim. Post `CAPACITY_DEGRADED` with the exact workflow/runtime error and stop so orchestration can fail over.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561097048
+
+---
+
+### 2026-09-06T18:01:45Z — NTinkicht
+
+HEARTBEAT
+actor: codex
+role: remediation implementer
+work_stream: Issue #4 Work Unit 5 / PR #39
+status: active
+current_action: Remediate CLAUDE-031 on the existing canonical branch with gap-safe NULL-first renumbering, 23505 domain translation, and real-PostgreSQL regression coverage.
+last_artifact: exact head 2a9520460340417a6f6a1c1d12d44d933fd1348c
+next_checkpoint: committed exact SHA plus deterministic test evidence
+blocker: none
+
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5561100284
 
 ---
