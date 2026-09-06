@@ -1,0 +1,85 @@
+name: Slack Owner Chat Ingest
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  ingest:
+    if: vars.TABIBI_SLACK_BRIDGE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    env:
+      SLACK_CHANNEL_ID: C0C0RV36QP2
+      SLACK_CHATGPT_BOT_TOKEN: ${{ secrets.SLACK_CHATGPT_BOT_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Import new human Slack messages
+        run: |
+          python - <<'PY'
+          import json, os, re, time, urllib.parse, urllib.request
+
+          slack_token = os.environ.get('SLACK_CHATGPT_BOT_TOKEN', '')
+          if not slack_token:
+              print('SLACK_CHATGPT_BOT_TOKEN is not configured; ingest skipped.')
+              raise SystemExit(0)
+
+          def request_json(url, *, token, method='GET', payload=None):
+              data = None if payload is None else json.dumps(payload).encode()
+              req = urllib.request.Request(url, data=data, method=method)
+              req.add_header('Authorization', f'Bearer {token}')
+              req.add_header('Accept', 'application/vnd.github+json')
+              if data is not None:
+                  req.add_header('Content-Type', 'application/json; charset=utf-8')
+              with urllib.request.urlopen(req) as r:
+                  return json.load(r), r.headers
+
+          oldest = str(time.time() - 420)
+          q = urllib.parse.urlencode({'channel': os.environ['SLACK_CHANNEL_ID'], 'limit': 50, 'oldest': oldest})
+          messages, _ = request_json(f'https://slack.com/api/conversations.history?{q}', token=slack_token)
+          if not messages.get('ok'):
+              raise SystemExit(f"Slack history failed: {messages.get('error')}")
+
+          gh_token = os.environ['GH_TOKEN']
+          repo = os.environ['REPO']
+          comments_url = f'https://api.github.com/repos/{repo}/issues/21/comments?per_page=100'
+          comments, headers = request_json(comments_url, token=gh_token)
+          link = headers.get('Link', '')
+          last = re.search(r'<([^>]+)>; rel="last"', link)
+          if last:
+              comments, _ = request_json(last.group(1), token=gh_token)
+          seen = {m.group(1) for c in comments for m in [re.search(r'(?m)^slack_ts:\s*([^\s]+)', c.get('body',''))] if m}
+
+          human = []
+          for msg in messages.get('messages', []):
+              if msg.get('bot_id') or msg.get('subtype'):
+                  continue
+              ts = msg.get('ts')
+              text = (msg.get('text') or '').strip()
+              if not ts or not text or ts in seen:
+                  continue
+              human.append((float(ts), ts, text))
+
+          for _, ts, text in sorted(human):
+              body = (
+                  'SLACK_TO_TEAM_ROOM\n'
+                  'source: #all-tabibi\n'
+                  f'slack_ts: {ts}\n'
+                  'actor: nassim\n'
+                  'role: product_owner\n\n'
+                  f'{text}\n\n'
+                  'TEAM_CHAT_NOTE: This is a live message from Nassim in Slack. Treat it as company-room input. '
+                  'Discuss naturally, but promote any authoritative engineering decision/finding/lease into the normal GitHub protocol.'
+              )
+              payload = {'body': body}
+              result, _ = request_json(
+                  f'https://api.github.com/repos/{repo}/issues/21/comments',
+                  token=gh_token, method='POST', payload=payload
+              )
+              print(f"Imported Slack {ts} -> GitHub comment {result.get('id')}")
+          PY
