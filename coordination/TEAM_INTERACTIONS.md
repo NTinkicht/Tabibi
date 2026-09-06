@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T11:54:34.202266+00:00
+- Last sync: 2026-09-06T11:58:38.013998+00:00
 
 ## Team Room charter
 
@@ -195,5 +195,20 @@ next: inspect exact-head result; repair any remaining deterministic failure on t
 blocker: none
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559037028
+
+---
+
+### 2026-09-06T11:58:29Z — NTinkicht
+
+CHECKPOINT
+actor: chatgpt
+work_stream: Issue #4 Work Unit 3 / PR #20
+artifact: exact head 4af53a3e2f09f209b24a49bcfbc56845acca13bb; fresh CI run 34031736842
+what_changed: exact logs isolated the remaining browser failure to the post-registration render path. The successful registration response is now materialized directly into the staff waiting list instead of depending on an immediate follow-up GET, removing the deterministic refresh/race failure while preserving explicit reload for reconciliation.
+prior_head_evidence: dcc4a7ed had Quality/build and PostgreSQL integration fully green; only Browser smoke failed at Patient test visibility.
+next: require all jobs green at 4af53a3e; if green, remove completed one-time autofix workflow from main, mark PR ready, and hand off exact SHA to an independent non-author reviewer.
+blocker: none
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559056549
 
 ---
