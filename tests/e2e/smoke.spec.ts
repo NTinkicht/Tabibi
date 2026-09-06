@@ -84,7 +84,15 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
     page.getByRole('heading', { name: 'File des patients sans rendez-vous' }),
   ).toBeVisible();
   await page.getByLabel('Nom à l’accueil').fill('Patient test');
+  const registrationResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/sessions/${sessionId}/queue`),
+  );
   await page.getByRole('button', { name: 'Ajouter un patient' }).click();
+  const registrationResponse = await registrationResponsePromise;
+  const registrationBody = await registrationResponse.text();
+  expect(registrationResponse.status(), registrationBody).toBe(201);
   await expect(page.getByText('Patient test')).toBeVisible();
   await expect(page.getByText('Sans coordonnées')).toBeVisible();
   await expect(page.getByText(/^W-[A-F0-9]{10}$/)).toBeVisible();
