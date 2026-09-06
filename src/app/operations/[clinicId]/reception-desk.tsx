@@ -16,6 +16,8 @@ type Session = {
   delayVersion: number;
 };
 
+const RECEPTION_LOCALE_KEY = 'tabibi_reception_locale';
+
 function key() {
   return crypto.randomUUID();
 }
@@ -33,6 +35,18 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
   const [pending, setPending] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const pendingKeysRef = useRef(new Map<string, string>());
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(RECEPTION_LOCALE_KEY);
+    if (stored === 'ar' || stored === 'fr') setLocale(stored);
+  }, []);
+
+  function toggleLocale() {
+    const next = locale === 'ar' ? 'fr' : 'ar';
+    window.localStorage.setItem(RECEPTION_LOCALE_KEY, next);
+    setLocale(next);
+  }
+
   function keyFor(opId: string): string {
     const existing = pendingKeysRef.current.get(opId);
     if (existing) return existing;
@@ -177,10 +191,7 @@ export function ReceptionDesk({ clinicId }: { clinicId: string }) {
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
         </div>
-        <button
-          className="locale"
-          onClick={() => setLocale(locale === 'ar' ? 'fr' : 'ar')}
-        >
+        <button className="locale" onClick={toggleLocale}>
           {locale === 'ar' ? 'Français' : 'العربية'}
         </button>
       </header>
