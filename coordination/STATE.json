@@ -2,12 +2,12 @@
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
   "round": 18,
-  "state": "work_unit_5_implementation_active",
+  "state": "work_unit_5_independent_review_pending",
   "current_pr": 39,
   "current_issue": 4,
   "last_actor": "codex",
-  "next_actor": "codex",
-  "next_action": "Run required deterministic CI on PR #39, remediate failures, then hand the exact green SHA to Claude for independent gating review.",
+  "next_actor": "claude",
+  "next_action": "Independently review the exact PR #39 head after required CI is green; post findings or PASS/MERGE_READY without relying on author summary.",
   "operating_model": "five-actor-capability-mesh-v6-role-failover-with-heartbeats-retrospectives",
   "binding_protocols": [
     "coordination/AUTONOMY_PROTOCOL.md",
@@ -52,7 +52,7 @@
         "merge_execution": "available",
         "review": "available"
       },
-      "current_activity": "Active sole implementer lease for Issue #4 Work Unit 5 (authorized queue priority/reorder), task WU5-IMPLEMENT-001."
+      "current_activity": "WU5 implementation complete; implementation lease released after PR #39 exact-head handoff. Available for reviewer fixes."
     },
     "claude": {
       "preferred_roles": ["independent_review", "adversarial_security_review"],
@@ -62,7 +62,7 @@
         "orchestration": "available",
         "merge_execution": "available"
       },
-      "current_activity": "Independent gating reviewer lease for WU5; awaiting a reviewable exact Codex-authored head.",
+      "current_activity": "Active independent gating reviewer lease for WU5 PR #39; verify exact head and green CI.",
       "invocation_policy": "persistent Claude session is the default Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
     "gemini_agent": {
@@ -257,10 +257,10 @@
     "issue": 4,
     "work_unit": 5,
     "work_unit_title": "Authorized queue priority/reorder with mandatory reason, deterministic ordering, idempotency and audit",
-    "implementation_status": "active",
+    "implementation_status": "review_pending",
     "canonical_branch": "codex/issue-4-work-unit-5-queue-priority",
     "canonical_pr": 39,
-    "implementer": "codex",
+    "implementer": null,
     "gating_reviewer": "claude",
     "secondary_verifier": "gemini_chat",
     "merge_executor": "codex",
