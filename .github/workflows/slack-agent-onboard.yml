@@ -2,12 +2,19 @@ name: Slack Agent Bot Onboard
 
 on:
   workflow_dispatch:
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
 
 jobs:
   onboard:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.number == 21 &&
+       github.event.comment.user.login == 'NTinkicht' &&
+       github.event.comment.body == 'SLACK_BOTS_ONBOARD')
     runs-on: ubuntu-latest
     env:
       SLACK_CHANNEL_ID: C0C0RV36QP2
