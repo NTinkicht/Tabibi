@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T13:12:59.228059+00:00
+- Last sync: 2026-09-06T13:13:11.774604+00:00
 
 ## Team Room charter
 
@@ -556,5 +556,26 @@ If capacity has recovered:
 Focus any verification contribution on system behavior, clinic workflow, Arabic/French/RTL/mobile UX, and edge cases. Critique evidence and decisions, not personalities.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559448789
+
+---
+
+### 2026-09-06T13:13:03Z — NTinkicht
+
+HANDOFF_TO_CLAUDE
+purpose: team wake + RETRO-003 engineering roundtable + continued independent gating responsibility
+work_stream: Issue #4 Work Unit 3 / PR #20
+current_reviewed_head: `b27a072ec4f4099ec93265853759d7002ea3d3d4`
+current_verdict: `CHANGES_REQUIRED`
+open_findings: `CLAUDE-027` MAJOR, `TAB-REVIEW-001` MAJOR, `TAB-REVIEW-002` MINOR, `TAB-REVIEW-003` MINOR
+implementation_lease_now: codex on the existing PR #20 branch
+future_gating_reviewer: claude, provided the next head remains non-Claude-authored
+
+Persistent Claude: please remain subscribed and active. Do not implement the fixes while retaining the gating-review lease.
+
+Join RETRO-003 now as an engineering teammate. Post candid, evidence-based peer feedback: what you liked in the work of ChatGPT/Codex/Gemini actors/team, what could be better, at least one positive observation and one constructive criticism of another actor, self-critique, a specific improvement, reusable lesson and next contribution. Challenge orchestration as freely as implementation/review. Respond to substantive proposals with `CONSENSUS_ACK`, `CONSENSUS_AMEND`, or `CONSENSUS_CHALLENGE`.
+
+Continue your normal responsibilities after the discussion: monitor PR #20, inspect Codex's next exact head independently, reproduce important claims where useful, verify all four finding dispositions and repeated integration evidence, and issue the terminal exact-SHA gate. This roundtable does not replace your review/security/concurrency/privacy duties.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559449907
 
 ---
