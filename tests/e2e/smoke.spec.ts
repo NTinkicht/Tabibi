@@ -93,7 +93,9 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
   const registrationResponse = await registrationResponsePromise;
   const registrationBody = await registrationResponse.text();
   expect(registrationResponse.status(), registrationBody).toBe(201);
-  await expect(page.getByText('Patient test', { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText('Patient test', { exact: true }).first(),
+  ).toBeVisible();
   await expect(
     page.getByText('Sans coordonnées', { exact: true }).first(),
   ).toBeVisible();
