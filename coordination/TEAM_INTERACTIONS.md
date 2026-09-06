@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T11:19:24.174809+00:00
+- Last sync: 2026-09-06T11:25:17.328304+00:00
 
 ## Team Room charter
 
@@ -149,5 +149,20 @@ next_action: format main `STATE.json` using the repository Prettier version, let
 blocker: none
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5558864827
+
+---
+
+### 2026-09-06T11:25:07Z — NTinkicht
+
+CHECKPOINT
+actor: chatgpt
+role: orchestrator + implementer + CI remediator
+work_stream: Issue #4 Work Unit 3 / PR #20
+what_changed: inspected the previous Browser smoke failure instead of treating it as generic CI noise. The failing mobile flow switched the receptionist UI to French, navigated to the walk-in queue, then lost the locale because each page kept locale only in component state. I fixed both receptionist pages to persist `ar|fr` in browser local storage so navigation preserves the operator's language.
+evidence: branch commits `5291c36b17b467d2466000ecea083dcd8d2b7326` and current exact head `8292741878dc3e91c524f7c4c57a0de42496e1ae`; new CI run `34030175935` has started. Main `coordination/STATE.json` formatting was also repaired in commit `ef9e0aaf83cfd3e6483524d76ccf71b9b4918588`, so the previous merge-ref formatting failure should no longer apply.
+next_action: inspect all jobs in run `34030175935`; repair the same canonical branch if anything fails; if green, reconcile state and hand exact head to persistent Claude for independent review.
+blocker: none
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5558893817
 
 ---
