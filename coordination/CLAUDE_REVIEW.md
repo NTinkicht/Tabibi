@@ -1,5 +1,24 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #15 — role-failover to Claude-as-implementer requested; standing down to avoid a duplicate implementation stream
+
+Nassim posted a failover comment on PR #15 asking this session to take the **implementer** lease for TAB-REV-002/004/006/009/005/008 (Codex reporting `codex.general=limited by account usage limit`), then hand the new head to ChatGPT as gating reviewer, per a new binding `coordination/ROLE_FAILOVER_PROTOCOL.md` v5.
+
+**Verified before acting, not taken on faith:**
+- `coordination/ROLE_FAILOVER_PROTOCOL.md` exists on `main` at the claimed content (capability-based role leases, explicit anti-chaos rules, failover order table).
+- `coordination/STATE.json` on `main` independently confirms the same assignment: `implementer.actor = "claude"`, `gating_reviewer.actor = "chatgpt"`, `codex_cloud` capabilities all `"limited"`.
+- Both are consistent with each other and with the PR comment — this is a real, not fabricated, protocol/state change.
+
+**Why I'm not implementing right now:** re-reading the PR's comment timeline, the *other* live Claude pathway (the `@claude`-triggered GitHub Action) already posted "Claude Code is working…" (comment `5558428572`, job run `34025681124`) 13 seconds after the failover request landed — i.e. it already picked up and started this exact bounded task before I read the notification. The v5 protocol's own anti-chaos rules are explicit and directly on point:
+- Rule 1: "One active implementer per work stream."
+- Rule 7: "No duplicate wakeups after acknowledgement. Once an active run, reaction, branch movement, or explicit acknowledgement proves a lease was consumed, other agents do not start the same role."
+
+Two Claude instances independently editing and pushing to the same branch concurrently is a real hazard (conflicting commits, force-push races, wasted/duplicate work) — the opposite of what the failover protocol exists to prevent. So I am deliberately standing down from implementing in parallel. The PR head SHA is still `88baa111151ae0ed8a9b194811c408797b290c52` (unchanged) as of this note, i.e. the other run hasn't pushed yet.
+
+**What I'll do instead:** keep watching (I'm already subscribed to this PR's activity) for either a new commit on `codex/issue-4-receptionist-session-controls` or a completion/error comment from that run. If it completes, I will independently verify the actual diff and CI at the new exact head against the six named findings before anyone treats them as resolved — the same discipline as every prior "completed" claim in this project, regardless of which agent authored it. If that run instead errors out without any branch movement (as earlier Action invocations on this same PR did three separate times before finally succeeding on the review task), the implementer lease is still open and I will take it up myself at that point, since the acknowledgement will have failed to produce work per rule 7's own condition.
+
+Note on lease shape either way: per `STATE.json`, the **gating-review** lease for whatever new head results now belongs to ChatGPT, not this session (correct: neither Claude pathway can self-gate a head either of them may have authored). I'll still spot-verify independently as I did for the last exact-head review, but I won't post a competing authoritative `MERGE_READY`/blocking verdict — that's ChatGPT's lease to exercise now.
+
 # PR #15 — a second Claude pathway is now live; process note plus spot-verification
 
 ## Context: a real ~3-hour gap, and why
