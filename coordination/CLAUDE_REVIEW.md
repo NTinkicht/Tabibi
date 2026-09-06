@@ -1,5 +1,30 @@
 # Claude Independent Review — Tabibi Foundation
 
+# PR #26 (Issue #4 Work Unit 4, queue lifecycle) — PASS/MERGE_READY at exact head `68c39fb8146b0cc7634719225beb80b9b9985662`
+
+Codex authored this directly (no failover drama this time — clean handoff, genuine `HANDOFF_TO_CLAUDE`, CI already green when I picked it up). Read the full diff before touching the report: migration `0005_queue_lifecycle.sql`, `QueueService.command()`/`listOperational()` (284 new lines), the new `[entryId]/commands` API route, the UI wiring, and the new `queue-lifecycle.test.ts`.
+
+## What I verified by hand
+
+- **Auth-before-cache-hit lesson holds.** `command()` calls `requireClinicRole` right after the advisory lock, before the idempotency receipt lookup — same correct ordering as PR #20's fix, applied consistently to new code again.
+- **Concurrency correctness.** Every command acquires `SELECT ... FOR UPDATE` on the session row first, which serializes *all* queue commands within a session (coarser than per-entry locking, but correct and deliberately simple). The two new partial unique indexes (`one_called_per_session`, `one_consultation_per_session`) are the actual backstop; the code catches Postgres `23505` and translates it to a domain `QueueConflictError`. Traced the interleaving by hand: two concurrent `call` commands for different entries in the same session fully serialize on the session lock, so the second one's `UPDATE` deterministically hits the unique-index conflict once the first commits — no race window. Confirmed by the test that runs both concurrently and asserts exactly one `fulfilled` result and exactly one `called` row in the DB.
+- **State machine table** (`check_in`→`checked_in`→`call`→`called`→`start_consultation`→`in_consultation`→`complete_consultation`→`completed`, plus `no_show`/`cancel` branches with required reasons) matches the allowed-transition sets in both the service layer and the API's zod schema — checked both independently, no drift between them.
+- **Tenant/session isolation**: entry lookups scope by `id`+`session_id`+`clinic_id` together; a cross-clinic actor attempting a command against a real entry ID gets `QueueConflictError` (not found), not a leak. Verified by the test using a second clinic/receptionist.
+- **Idempotency**: exact retry returns the cached response; same key + different content is rejected; revoke-membership-then-retry re-authorizes and correctly fails — the by-now-standard regression pattern, present again without me having to ask.
+- **UI**: `actionFor` state→action mapping matches the backend transition table exactly; idempotency keys are content-scoped (`entryId:command:reason:cancellationSource`), avoiding the constant-opId issue flagged as CLAUDE-025 on PR #15's session-create form.
+
+## Independent verification, not trust
+
+Checked out the exact head myself: `typecheck`/`lint`/`format` clean, unit+api 15/15, **integration suite 3 consecutive runs, 29/29 every time** (the `fileParallelism: false` fix from PR #20 holds with a third integration file now sharing the schema), production build succeeds with the new route registered. GitHub's own CI (`Quality and build`, `PostgreSQL integration`, `Browser smoke`) was already green when I picked this up and I didn't just take that at face value either.
+
+## One NOTE, not blocking
+
+The cancel flow's `window.confirm(t.patientCancellation)` maps the browser's OK/Cancel buttons to "patient-initiated"/"clinic-initiated" cancellation source — functional, but a receptionist could plausibly misread which button means what under time pressure. Worth a proper two-button UI control in a future UX pass; not worth blocking this PR over.
+
+## Disposition
+
+**PASS — MERGE_READY.** Posting to the PR and reconciling `STATE.json` (carefully, through prettier, given today's demonstrated bot race).
+
 # Work Unit 3 (PR #20) genuinely merged — but shared state raced itself, and I found and fixed it
 
 PR #20 merged for real: commit `21f3ff363ce7a797c4a4de8d545dded28cd01c07`, exact head `fb8b2c0471921118362ee789ee5baf1b6b123184`, verified against GitHub's own merge record — matches my PASS/MERGE_READY verdict exactly, no discrepancy in the actual code.
