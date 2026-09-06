@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T13:14:05.806459+00:00
+- Last sync: 2026-09-06T13:22:01.177666+00:00
 
 ## Team Room charter
 
@@ -634,5 +634,48 @@ reason: transport-first diagnostics are supported by the PR's own CSRF incident.
 
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559455043
+
+---
+
+### 2026-09-06T13:21:52Z — NTinkicht
+
+CHECKPOINT
+actor: codex
+role: implementer + CI remediator
+work_stream: Issue #4 Work Unit 3 / PR #20
+artifact: exact head `02e348a381c62617fc153b8e4e9d37bc07fe4a68`
+
+All four findings are addressed on the existing canonical branch:
+- `CLAUDE-027`: Vitest file execution is serialized using the Vitest 3-supported global `fileParallelism: false` setting (the installed version excludes this option from individual `ProjectConfig`), while intentional concurrency remains within tests.
+- `TAB-REVIEW-001`: session cancellation locks/captures each affected waiting/checked_in/called entry before the trigger transition and appends an atomic per-entry audit containing actor, reason, prior state, session, correlation and idempotency metadata, in addition to the session event. A three-entry regression verifies all four audit events and final states.
+- `TAB-REVIEW-002`: the patient now has a distinct localized preferred-language selector with Arabic as the product/database default, independent from French/Arabic receptionist UI state; browser and integration regressions cover French UI -> Arabic patient.
+- `TAB-REVIEW-003`: email normalization preserves the local part and lowercases only the domain; mixed-case round-trip regression added.
+
+Deterministic local evidence against PostgreSQL 16 / database `tabibi_test`:
+- `npm run typecheck` PASS
+- `npm run lint` PASS
+- `npm test` PASS (15/15)
+- `npm run test:integration` PASS 25/25, three consecutive runs (no deadlocks, vanished rows, or cleanup races)
+- `npm run format` PASS
+- `npm run build` PASS
+- Browser execution was attempted; the local environment lacks the pinned Playwright browser and its CDN download is blocked with HTTP 403. The cross-locale browser assertion is committed for CI. A screenshot could not be captured for the same environment limitation.
+
+HANDOFF_TO_CLAUDE
+role: independent non-author gating reviewer
+exact_head: `02e348a381c62617fc153b8e4e9d37bc07fe4a68`
+required_action: independently revalidate all four finding dispositions and repeated integration determinism on this exact head; issue PASS/MERGE_READY or actionable exact-SHA findings. Codex authored this head and will not self-gate it.
+
+HEARTBEAT
+actor: codex
+role: implementer + CI remediator
+work_stream: Issue #4 Work Unit 3 / PR #20
+status: complete
+current_action: authored fixes are pushed; implementation lease is handed to Claude's independent exact-head gate
+last_artifact: 02e348a381c62617fc153b8e4e9d37bc07fe4a68
+next_checkpoint: Claude exact-SHA verdict and required CI completion; merge remains forbidden until MERGE_READY
+blocker: local Playwright browser download blocked by CDN HTTP 403; CI owns browser execution
+
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559497679
 
 ---
