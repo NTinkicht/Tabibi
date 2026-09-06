@@ -254,3 +254,272 @@ describe('doctor-global session lifecycle invariant', () => {
     );
   });
 });
+
+describe('reception session operations', () => {
+  it('creates manual sessions with exact-retry idempotency and audits metadata only', async () => {
+    const sessions = new SessionService(pool);
+    const input = {
+      doctorId: ids.doctor,
+      serviceDate: '2026-09-10',
+      startsAt: new Date('2026-09-10T08:00:00Z'),
+      endsAt: new Date('2026-09-10T11:00:00Z'),
+      idempotencyKey: 'manual-1',
+      correlationId: 'request-manual-1',
+    };
+    const created = await sessions.createManual(
+      { clinicId: ids.clinicA, actorUserId: ids.receptionistA },
+      input,
+    );
+    const retry = await sessions.createManual(
+      { clinicId: ids.clinicA, actorUserId: ids.receptionistA },
+      input,
+    );
+    expect(retry.id).toBe(created.id);
+    await expect(
+      sessions.createManual(
+        { clinicId: ids.clinicA, actorUserId: ids.receptionistA },
+        {
+          ...input,
+          endsAt: new Date('2026-09-10T12:00:00Z'),
+        },
+      ),
+    ).rejects.toThrow('different command');
+    expect(
+      (
+        await pool.query(`SELECT 1 FROM audit_events WHERE entity_id=$1`, [
+          created.id,
+        ])
+      ).rowCount,
+    ).toBe(1);
+  });
+
+  it('makes lifecycle retries stable and records command identities without clinical data', async () => {
+    const id = await seedSession(ids.clinicA, '2026-09-11');
+    const sessions = new SessionService(pool);
+    const input = {
+      command: 'open' as const,
+      idempotencyKey: 'open-1',
+      correlationId: 'request-open-1',
+    };
+    const opened = await sessions.command(scopeA, id, input);
+    const retry = await sessions.command(scopeA, id, input);
+    expect(retry.status).toBe('open');
+    expect(retry.openedAt).toEqual(opened.openedAt);
+    await sessions.command(scopeA, id, {
+      command: 'pause',
+      idempotencyKey: 'pause-1',
+      correlationId: 'request-pause-1',
+    });
+    await sessions.command(scopeA, id, {
+      command: 'resume',
+      idempotencyKey: 'resume-1',
+      correlationId: 'request-resume-1',
+    });
+    await sessions.command(scopeA, id, {
+      command: 'close',
+      idempotencyKey: 'close-1',
+      correlationId: 'request-close-1',
+    });
+    const audit = await pool.query<{ metadata: Record<string, unknown> }>(
+      `SELECT metadata FROM audit_events WHERE entity_id=$1 ORDER BY id`,
+      [id],
+    );
+    expect(audit.rows).toHaveLength(4);
+    expect(audit.rows[0]?.metadata).toMatchObject({
+      command: 'open',
+      outcome: 'applied',
+      correlationId: 'request-open-1',
+      idempotencyKey: 'open-1',
+    });
+    expect(JSON.stringify(audit.rows)).not.toMatch(
+      /patient|diagnosis|treatment/i,
+    );
+  });
+
+  it('re-authorizes on every idempotent retry and rejects replay after membership revocation', async () => {
+    const id = await seedSession(ids.clinicA, '2026-09-15');
+    const sessions = new SessionService(pool);
+    const receptionScope = {
+      clinicId: ids.clinicA,
+      actorUserId: ids.receptionistA,
+    };
+    const input = {
+      command: 'open' as const,
+      idempotencyKey: 'revoke-retry-1',
+      correlationId: 'revoke-retry-1',
+    };
+    const opened = await sessions.command(receptionScope, id, input);
+    expect(opened.status).toBe('open');
+    const retry = await sessions.command(receptionScope, id, input);
+    expect(retry.status).toBe('open');
+    await pool.query(
+      `DELETE FROM clinic_memberships WHERE clinic_id = $1 AND user_id = $2`,
+      [ids.clinicA, ids.receptionistA],
+    );
+    await expect(
+      sessions.command(receptionScope, id, input),
+    ).rejects.toBeInstanceOf(AuthorizationError);
+    const audit = await pool.query(
+      `SELECT 1 FROM audit_events WHERE entity_id = $1`,
+      [id],
+    );
+    expect(audit.rowCount).toBe(1);
+  });
+
+  it('rejects a manual session whose serviceDate does not match the clinic-local date of startsAt', async () => {
+    const sessions = new SessionService(pool);
+    await expect(
+      sessions.createManual(
+        { clinicId: ids.clinicA, actorUserId: ids.receptionistA },
+        {
+          doctorId: ids.doctor,
+          serviceDate: '2026-09-09',
+          startsAt: new Date('2026-09-10T08:00:00Z'),
+          endsAt: new Date('2026-09-10T11:00:00Z'),
+          idempotencyKey: 'mismatched-service-date',
+          correlationId: 'mismatched-service-date',
+        },
+      ),
+    ).rejects.toThrow('serviceDate must match the clinic-local date');
+    expect(
+      (
+        await pool.query(
+          `SELECT 1 FROM consultation_sessions WHERE service_date IN ('2026-09-09','2026-09-10') AND clinic_id = $1`,
+          [ids.clinicA],
+        )
+      ).rowCount,
+    ).toBe(0);
+  });
+
+  it('validates, versions, updates, clears, and idempotently retries delay declarations', async () => {
+    const id = await seedSession(ids.clinicA, '2026-09-12');
+    const sessions = new SessionService(pool);
+    for (const minutes of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1.5]) {
+      await expect(
+        sessions.delay(scopeA, id, {
+          command: 'declare_delay',
+          minutes,
+          expectedVersion: 0,
+          idempotencyKey: `bad-${String(minutes)}`,
+          correlationId: 'bad',
+        }),
+      ).rejects.toBeInstanceOf(Error);
+    }
+    const declared = await sessions.delay(scopeA, id, {
+      command: 'declare_delay',
+      minutes: 20,
+      expectedVersion: 0,
+      idempotencyKey: 'delay-1',
+      correlationId: 'delay-1',
+    });
+    expect(declared).toMatchObject({
+      declaredDelayMinutes: 20,
+      delayVersion: 1,
+    });
+    const retry = await sessions.delay(scopeA, id, {
+      command: 'declare_delay',
+      minutes: 20,
+      expectedVersion: 0,
+      idempotencyKey: 'delay-1',
+      correlationId: 'delay-1',
+    });
+    expect(retry).toMatchObject({ declaredDelayMinutes: 20, delayVersion: 1 });
+    await expect(
+      sessions.delay(scopeA, id, {
+        command: 'update_delay',
+        minutes: 30,
+        expectedVersion: 0,
+        idempotencyKey: 'stale',
+        correlationId: 'stale',
+      }),
+    ).rejects.toThrow('stale');
+    const updated = await sessions.delay(scopeA, id, {
+      command: 'update_delay',
+      minutes: 30,
+      expectedVersion: 1,
+      idempotencyKey: 'delay-2',
+      correlationId: 'delay-2',
+    });
+    const cleared = await sessions.delay(scopeA, id, {
+      command: 'clear_delay',
+      expectedVersion: updated.delayVersion,
+      idempotencyKey: 'delay-3',
+      correlationId: 'delay-3',
+    });
+    expect(cleared).toMatchObject({
+      declaredDelayMinutes: null,
+      delayVersion: 3,
+      delayUpdatedAt: null,
+    });
+  });
+
+  it('serializes competing lifecycle commands and commits one winner', async () => {
+    const id = await seedSession(ids.clinicA, '2026-09-14');
+    const sessions = new SessionService(pool);
+    await sessions.command(scopeA, id, {
+      command: 'open',
+      idempotencyKey: 'race-open',
+      correlationId: 'race-open',
+    });
+    const results = await race(
+      () =>
+        sessions.command(scopeA, id, {
+          command: 'cancel',
+          reason: 'competing cancellation',
+          idempotencyKey: 'race-cancel',
+          correlationId: 'race-cancel',
+        }),
+      () =>
+        sessions.command(scopeA, id, {
+          command: 'close',
+          idempotencyKey: 'race-close',
+          correlationId: 'race-close',
+        }),
+    );
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'rejected'),
+    ).toHaveLength(1);
+  });
+
+  it('limits doctors to their own session listing and platform admins to no operational access', async () => {
+    const otherUser = randomUUID(),
+      otherDoctor = randomUUID();
+    await pool.query(
+      `INSERT INTO users(id,auth_subject,display_name) VALUES($1,'other-doctor','Other Doctor')`,
+      [otherUser],
+    );
+    await pool.query(
+      `INSERT INTO clinic_memberships(clinic_id,user_id,role) VALUES($1,$2,'doctor')`,
+      [ids.clinicA, otherUser],
+    );
+    await pool.query(
+      `INSERT INTO doctor_profiles(id,user_id,display_name) VALUES($1,$2,'Other Doctor')`,
+      [otherDoctor, otherUser],
+    );
+    await pool.query(
+      `INSERT INTO doctor_clinics(clinic_id,doctor_id) VALUES($1,$2)`,
+      [ids.clinicA, otherDoctor],
+    );
+    await seedSession(ids.clinicA, '2026-09-13');
+    await pool.query(
+      `INSERT INTO consultation_sessions(id,clinic_id,doctor_id,service_date,starts_at,ends_at) VALUES($1,$2,$3,'2026-09-13','2026-09-13 13:00Z','2026-09-13 15:00Z')`,
+      [randomUUID(), ids.clinicA, otherDoctor],
+    );
+    const sessions = new SessionService(pool);
+    expect(
+      await sessions.listSessions(
+        { clinicId: ids.clinicA, actorUserId: ids.doctorUser },
+        '2026-09-13',
+      ),
+    ).toHaveLength(1);
+    await expect(
+      sessions.listSessions(
+        { clinicId: ids.clinicA, actorUserId: ids.platformAdmin },
+        '2026-09-13',
+      ),
+    ).rejects.toBeInstanceOf(AuthorizationError);
+  });
+});
