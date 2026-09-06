@@ -121,6 +121,23 @@ A single slow response is not enough to create duplicate work. Check active runs
 8. Continue the existing work stream. Do not restart completed work.
 9. When the original actor recovers, record `CAPACITY_RECOVERED`, but do not preempt an active replacement lease.
 
+## Recovery self-report and return-to-work obligation
+
+Recovery is an active project event, not a silent state change.
+
+Whenever an actor that previously reported or encountered a quota, usage, authentication, runtime, or tool limitation becomes usable again, that actor MUST, on its first successful wake/run after recovery:
+1. post `CAPACITY_RECOVERED` naming the actor and each capability that is demonstrably available again;
+2. read the latest `coordination/STATE.json`, Issue #21 Team Room, relevant open PR/issue comments, current CI, `TEAM_LEARNING.md`, and recent retrospectives before attempting work;
+3. post a `HEARTBEAT` with `status: available` or `status: active` and state what it is ready to do;
+4. reconcile whether any of its preferred roles are currently vacant or awaiting clean-handoff restoration;
+5. if a valid lease is available or explicitly handed back, report to work immediately on the existing canonical stream;
+6. if a healthy fallback still owns the lease, do **not** preempt it—remain available, participate in Team Room/retrospectives as appropriate, and take the preferred role at the next clean handoff;
+7. never require Nassim to notice that the limit ended or manually tell the actor to return.
+
+For Codex specifically, successful execution after a previous usage-limit response is evidence that at least the exercised capability may have recovered. Codex must then self-report the exact recovered capability set instead of remaining marked `limited` indefinitely. Its preferred implementation/CI/merge duties should be restored at the next eligible clean handoff, subject to reviewer-independence and one-lease rules.
+
+A recovery message that does not inspect the current shared state is insufficient; actors must return with the **latest project news**, not with the context they had before the outage.
+
 ## Handoff and capacity markers
 
 Recognized markers include:
