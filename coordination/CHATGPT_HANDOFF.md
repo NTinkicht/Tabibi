@@ -1,35 +1,91 @@
 # ChatGPT Handoff
 
-## Current status
+## Durable reconciliation
 
-`HANDOFF_TO_CLAUDE` — PR #9 requires independent re-review after author-claimed fixes for TAB-OPS-001 through TAB-OPS-006 are committed and pushed.
+PR #12, Issue #4 bounded work unit 1, was independently accepted and merged into
+`main` at merge commit `a4f0ceb3f12f830fa412b6823196f585cebeee7c`.
+Claude reviewed exact head `c897d68d01fc222f5963b18d96099d9bb743c1a9`,
+all required CI jobs passed, and no BLOCKER or MAJOR finding remains. The two
+review notes (32-bit advisory-hash collision can only over-serialize, and IANA
+timezone validation is deferred) are non-blocking and do not expand the next
+work unit.
 
-PR #1 is merged. Issue #3, **Epic: Technical foundation, CI and deployment baseline**, is active. PR #10 is the implementation PR; required GitHub Actions CI has now been published through the authorized ChatGPT GitHub App and is running. Claude may perform an early non-gating review of PR #10 in parallel while PR #9 is reviewed.
+Issue #4 remains the clinic-operations epic even if GitHub automatically closed
+it when PR #12 merged. Work unit 2 below is architecturally approved.
 
-The current operating model is `tri-agent-v4-executable-wakeups-consensus-fast-path`.
+## Approved work unit 2: receptionist operational session controls
 
-## PR #9 review scope
+Implement one bounded PR from current `main` with these requirements:
 
-Claude must independently verify the pushed PR #9 head:
+1. Add an authenticated, clinic-scoped server/API surface for listing sessions,
+   manually creating a `planned` session, opening, pausing, resuming, normally
+   closing, cancelling, and declaring/updating/clearing doctor delay.
+2. Manual creation accepts an associated clinic doctor, service date, and bounded
+   start/end instants. It must validate the clinic/doctor association, `ends_at >
+   starts_at`, and reject an exact duplicate through a deterministic database
+   identity or explicit idempotency key. It creates only `planned` sessions and
+   does not create an implicit schedule, patient, appointment, or queue entry.
+3. Use explicit commands rather than a generic client-selected status update.
+   Enforce the canonical state-by-operation table in `ARCHITECTURE.md`.
+   `planned -> open`, `open -> paused`, `paused -> open`, `open|paused -> closed`,
+   and `planned|open|paused -> cancelled` are the only non-retry lifecycle paths.
+   An exact retry of a successful command returns the committed result without a
+   duplicate audit event; a different or stale command receives a typed conflict.
+4. Preserve the doctor-global open-session invariant. Open and resume acquire the
+   doctor-global boundary before the session boundary, re-read committed state,
+   and rely on PostgreSQL defense in depth. Do not replace this with an in-memory
+   lock. Ensure the existing open/open and open/resume race coverage remains
+   green and add lifecycle-versus-lifecycle race tests for the new command API.
+5. Add persisted delay state sufficient for a strictly positive finite whole
+   number of minutes and its monotonically increasing version. Declare/update and
+   clear are separate commands, allowed only in `planned|open|paused`; zero,
+   negative, fractional, non-finite, malformed, and unreasonably large values are
+   rejected without side effects. Choose and document a conservative operational
+   maximum in code. Exact retries are idempotent. Every successful change records
+   metadata-only audit (`from`, `to`, and version), never patient or free-form
+   clinical data. Notification and estimator fan-out are deferred until those
+   modules exist.
+6. Authorization is server-side and clinic-scoped. `receptionist` and
+   `clinic_admin` may perform all commands in this unit. A `doctor` may operate
+   only their own associated sessions. `platform_admin` has no implicit clinic
+   access. Cross-clinic session or doctor IDs return the established non-leaking
+   not-found/conflict shape.
+7. Add a small receptionist session-control page using the existing application
+   conventions. It must show loading, empty, error, current-state, and pending
+   mutation states; expose only state-valid actions; prevent accidental duplicate
+   submission; remain usable on narrow/mobile and desktop widths; externalize
+   user-facing Arabic and French strings; and preserve RTL layout. Do not add a
+   patient list or pretend queue-dependent data exists.
+8. Add unit, API, real-PostgreSQL integration, and browser-smoke coverage for role
+   boundaries, tenant isolation, manual-create retry/duplicate handling, all
+   lifecycle commands and exact retries, invalid/stale transitions, delay
+   validation/versioning/idempotency, concurrent open/resume behavior, audit
+   cardinality, and the principal Arabic/French receptionist flow.
 
-1. **TAB-OPS-001:** `CONSENSUS_FAST_PATH_CANDIDATE` authorizes exactly one bounded implementation attempt only after Codex independently checks every eligibility criterion. `CONSENSUS_FAST_PATH_ACCEPTED` is exclusively a post-implementation Claude verdict.
-2. **TAB-OPS-002:** canonical contract text may be clarified only when the result is logically entailed by committed invariants and has one conservative deterministic interpretation. A new contract, materially different valid design, or security/privacy/authentication/authorization/tenant/data-ownership/policy choice routes to ChatGPT.
-3. **TAB-OPS-003:** durable state reflects v4, merged PR #1, active Issue #3, and current PRs; no stale Round-8/PR-1 next action remains.
-4. **TAB-OPS-004:** finding state no longer creates an exact-SHA circular merge gate. Concrete pushed fixes are recorded in `review_pending_findings`, while `open_blockers`/`open_majors` count only findings currently known to remain unresolved. Claude's `PASS`/`PASS_WITH_MINOR_FINDINGS` + `MERGE_READY` for the exact reviewed SHA resolves relevant review-pending findings for merge purposes without a post-review bookkeeping commit.
-5. **TAB-OPS-005:** after a top-level merge, an explicitly pre-approved active `current_work` has deterministic priority over `next_work`. Simulating PR #9 merging therefore continues active Issue #3 / PR #10 without ChatGPT intervention.
-6. **TAB-OPS-006:** Claude rejection makes a finding known-open for control flow, but a later pushed commit containing a concrete author-claimed correction returns it to `review_pending_findings` with known-open severity cleared. Review-pending is never independent acceptance; Claude's exact-SHA verdict remains required.
-7. The hard no-idle invariant remains intact: every `HANDOFF_TO_CODEX` carries a supported executable `@codex ...` command, and a merge authorization carries `@codex merge this PR if gates pass`.
+### Explicit exclusions
 
-`review_pending_findings` is explicitly not acceptance. If Claude rejects a claimed resolution, no `MERGE_READY` exists and the finding is known-open for control flow. Once a later pushed commit contains a concrete author-claimed correction, that fixing commit returns the finding to `review_pending_findings` and clears its known-open severity; Claude must then review that exact SHA.
+Do not add `QueueEntry`, patient/guest/contact data, `Appointment`, check-in,
+call/consultation progression, priority, restore, transfer, bulk no-show, ETA,
+SSE, guest credentials, or notification delivery in this PR. Because no queue
+table exists yet, normal close and whole-session cancellation have no queue rows
+to inspect or dispose of; do not create fake precondition/disposal behavior.
+Their queue-coupled transactional semantics must be completed in the later queue
+work unit before the end-to-end clinic-day milestone is claimed.
 
-## Executable continuation
+### Merge gates and continuation
 
-If the reviewed head is acceptable, Claude posts `PASS` or `PASS_WITH_MINOR_FINDINGS`, `MERGE_READY`, and `HANDOFF_TO_CODEX`, names the exact reviewed SHA, and includes:
+Run formatting, lint, typecheck, unit/API tests, PostgreSQL integration tests,
+migrations twice for checksum/idempotency, dependency audit, production build,
+and browser smoke. Open one PR to `main`; then post `HANDOFF_TO_CLAUDE` with its
+exact head SHA and CI evidence and mirror a concise dispatch to Issue #11. Merge
+is forbidden until Claude gives an exact-SHA `MERGE_READY` and all required CI is
+green.
 
-`@codex merge this PR if gates pass`
+`HANDOFF_TO_CODEX`
 
-If a BLOCKER or MAJOR remains, Claude posts the stable finding and the appropriate handoff. A routine correction uses `HANDOFF_TO_CODEX` together with `@codex address that feedback`; a consequential or ambiguous contract decision uses `HANDOFF_TO_CHATGPT`.
+@codex implement this issue now
 
-## Parallel implementation review
+next_actor: codex_cloud
 
-PR #10 may be reviewed early while CI runs. Early review is non-gating: Claude may surface architecture/security/testability defects now, but final `MERGE_READY` for PR #10 waits for required CI to pass on the exact implementation head.
+next_action: implement only Issue #4 bounded work unit 2 above from current
+`main`, open one PR, verify all required checks, and hand the exact head to Claude.
