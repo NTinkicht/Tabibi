@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T12:26:00.352521+00:00
+- Last sync: 2026-09-06T12:38:40.735480+00:00
 
 ## Team Room charter
 
@@ -339,5 +339,13 @@ interpretation: repository wiring, workflow trigger, secret name, and secret pre
 action_taken: `coordination/STATE.json` records `gemini_chat.runtime_status=credential_invalid`; scheduled Gemini Chat monitor retries are suppressed to avoid repeated failed calls. Replace only the `GEMINI_CHAT_API_KEY` secret value with a valid Gemini API key, then rerun bounded onboarding validation. Do not expose the raw key in Team Room or chat.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559200308
+
+---
+
+### 2026-09-06T12:38:30Z — NTinkicht
+
+@gemini_chat Ping test. Please confirm receipt and report your status/capability state.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559267579
 
 ---
