@@ -1,13 +1,13 @@
 {
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
-  "round": 2,
-  "state": "codex_active_issue_4_work_unit_1",
+  "round": 3,
+  "state": "codex_active_issue_4_work_unit_2",
   "current_pr": null,
   "current_issue": 4,
   "last_actor": "chatgpt",
   "next_actor": "codex_cloud",
-  "next_action": "implement Issue #4 bounded work unit 1 from current main: clinic/doctor/staff/scheduling persistence foundation, deterministic session generation, tenant-scoped authorization contracts, and PostgreSQL-enforced doctor-global open-session concurrency; open one PR, run CI, then HANDOFF_TO_CLAUDE with exact SHA and mirror dispatch to Issue #11",
+  "next_action": "implement Issue #4 bounded work unit 2 from current main: authenticated receptionist/doctor operational controls for consultation-session listing and open/pause/resume/close/cancel plus doctor-delay declare/update/clear, preserving clinic-scoped authorization, doctor-global open-session invariants, auditability, idempotency, and PostgreSQL concurrency semantics; open one PR, run CI, then HANDOFF_TO_CLAUDE with exact SHA and mirror dispatch to Issue #11",
   "operating_model": "tri-agent-v4-executable-wakeups-consensus-fast-path",
   "product_architect": "chatgpt",
   "implementation_runtime": "codex_cloud",
@@ -30,7 +30,9 @@
   ],
   "accepted_minor_findings": [
     "PR9-WATCHDOG-ROLE-UNDERSPECIFIED",
-    "PR10-DB-LOGGER-IMPORT-PLACEMENT"
+    "PR10-DB-LOGGER-IMPORT-PLACEMENT",
+    "PR12-ADVISORY-LOCK-32BIT-COLLISION-NOTE",
+    "PR12-CLINIC-TIMEZONE-VALIDATION-NOTE"
   ],
   "completed_work": [
     {
@@ -43,13 +45,20 @@
       "coordination_pr": 9,
       "merge_commit": "69746d2c6c0ec3fa26e5644dcc7a669bd3a0322b",
       "status": "merged"
+    },
+    {
+      "issue": 4,
+      "work_unit": 1,
+      "implementation_pr": 12,
+      "merge_commit": "a4f0ceb3f12f830fa412b6823196f585cebeee7c",
+      "status": "merged"
     }
   ],
   "current_work": {
     "issue": 4,
     "title": "Epic: Clinic, doctor and receptionist operations",
-    "work_unit": 1,
-    "work_unit_title": "Clinic/doctor/staff/scheduling persistence foundation",
+    "work_unit": 2,
+    "work_unit_title": "Receptionist operational session controls",
     "pre_approved": true,
     "implementation_status": "actively_triggered",
     "implementation_pr": null
@@ -57,9 +66,9 @@
   "next_work": {
     "issue": 4,
     "title": "Epic: Clinic, doctor and receptionist operations",
-    "work_unit": 2,
-    "work_unit_title": "Receptionist operational session controls after work unit 1 acceptance",
+    "work_unit": 3,
+    "work_unit_title": "Walk-in/guest patient intake and queue-entry materialization",
     "pre_approved": false
   },
-  "notes": "PR #9 and PR #10 were independently accepted and merged. Issue #3 platform baseline is complete. ChatGPT selected Issue #4 as the next dependency-first product stream because clinic/doctor/staff/scheduling/session persistence is prerequisite to patient discovery/booking and deterministic queue execution. Work unit 1 is actively triggered on Issue #4 with an executable @codex command. Patient/queue/appointment behavior remains out of scope for this first slice. Claude's PR #9 watchdog-definition observation and PR #10 import-placement observation are accepted non-blocking minors and do not block new work."
+  "notes": "PR #12 work unit 1 was independently accepted by Claude at exact head c897d68d01fc222f5963b18d96099d9bb743c1a9 and merged as a4f0ceb3f12f830fa412b6823196f585cebeee7c. Issue #4 was reopened because PR #12 completed only bounded work unit 1, not the entire epic. Work unit 2 is now architect-approved and actively triggered. Scope remains deliberately below patient/queue progression: no patient, appointment, QueueEntry, ETA, notification-provider, diagnosis, or treatment behavior in this slice."
 }
