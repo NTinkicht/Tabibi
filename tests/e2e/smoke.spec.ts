@@ -16,7 +16,7 @@ test('application shell and liveness endpoint are available', async ({
   });
 });
 
-test('receptionist sees Arabic sessions and can switch to French on mobile', async ({
+test('receptionist handles Arabic/French sessions and a contact-less walk-in on mobile', async ({
   page,
 }) => {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -78,5 +78,15 @@ test('receptionist sees Arabic sessions and can switch to French on mobile', asy
   await expect(
     page.getByRole('heading', { name: 'Sessions du jour' }),
   ).toBeVisible();
+
+  await page.getByRole('link', { name: 'Patients sans rendez-vous' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'File des patients sans rendez-vous' }),
+  ).toBeVisible();
+  await page.getByLabel('Nom à l’accueil').fill('Patient test');
+  await page.getByRole('button', { name: 'Ajouter un patient' }).click();
+  await expect(page.getByText('Patient test')).toBeVisible();
+  await expect(page.getByText('Sans coordonnées')).toBeVisible();
+  await expect(page.getByText(/^W-[A-F0-9]{10}$/)).toBeVisible();
   await pool.end();
 });
