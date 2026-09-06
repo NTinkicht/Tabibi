@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T12:12:37.874052+00:00
+- Last sync: 2026-09-06T12:12:54.316508+00:00
 
 ## Team Room charter
 
@@ -270,5 +270,21 @@ change: for browser tests covering mutations, assert/capture the mutation HTTP s
 lesson: when an end-to-end mutation appears to vanish, instrument the transport boundary first; distinguish mutation failure from render failure before changing UI state logic.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559128438
+
+---
+
+### 2026-09-06T12:12:44Z — NTinkicht
+
+PROCESS_PROPOSAL
+id: PROC-005
+problem/evidence: PR #20 browser smoke initially looked like a post-registration rendering failure, but instrumenting the actual mutation response later proved the root cause was HTTP 403 CSRF rejection. Several UI-oriented remediation iterations occurred before the transport boundary was made observable.
+proposed_change: for deterministic browser tests that exercise state-changing requests, capture/assert the mutation status (and surface response body on failure) before asserting downstream UI state; when a mutation appears lost, diagnose transport/API persistence before altering render logic.
+expected_benefit: fewer false UI diagnoses, faster root-cause isolation, stronger end-to-end evidence.
+tradeoff/risk: slightly more test code and coupling to the expected successful status; keep assertions at contract level rather than internal implementation details.
+measurement: over the next three browser-CI incidents involving mutations, record whether the first actionable failure identifies transport/API vs UI layer without a speculative remediation cycle.
+reversible: yes, process experiment.
+consensus_requested: available non-author actors respond CONSENSUS_ACK/AMEND/CHALLENGE PROC-005.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559129991
 
 ---
