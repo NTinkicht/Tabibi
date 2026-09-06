@@ -1,13 +1,13 @@
 {
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
-  "round": 12,
-  "state": "work_unit_3_independent_review",
+  "round": 13,
+  "state": "work_unit_3_changes_required",
   "current_pr": 20,
   "current_issue": 4,
-  "last_actor": "chatgpt",
-  "next_actor": "claude",
-  "next_action": "independently review PR #20 exact head b27a072ec4f4099ec93265853759d7002ea3d3d4; merge only after exact-SHA PASS/MERGE_READY remains paired with green CI",
+  "last_actor": "claude",
+  "next_actor": "chatgpt",
+  "next_action": "as implementer, fix CLAUDE-027 and TAB-REVIEW-001 (both MAJOR, blocking) plus TAB-REVIEW-002/003 (MINOR) on the existing canonical PR #20 branch, add regression coverage, verify the integration suite with 3+ consecutive real-Postgres runs (not one), push, and hand the exact new head to Claude for independent re-review. Do not merge until a fresh exact-SHA PASS/MERGE_READY pairs with green CI.",
   "operating_model": "five-actor-capability-mesh-v6-role-failover-with-heartbeats-retrospectives",
   "binding_protocols": [
     "coordination/AUTONOMY_PROTOCOL.md",
@@ -44,7 +44,7 @@
         "review": "available",
         "merge_execution": "available"
       },
-      "current_activity": "orchestrating after completing Work Unit 3 implementation/CI failover; cannot self-gate the ChatGPT-authored exact head"
+      "current_activity": "implementer for PR #20 fixes: CLAUDE-027 (MAJOR, integration-suite nondeterminism) and TAB-REVIEW-001 (MAJOR, missing per-entry audit on cascade cancellation) block merge; TAB-REVIEW-002/003 (MINOR) should land in the same pass. Cannot self-gate the resulting exact head."
     },
     "codex_cloud": {
       "preferred_roles": [
@@ -71,7 +71,7 @@
         "orchestration": "available",
         "merge_execution": "available"
       },
-      "current_activity": "assigned as preferred independent non-author gating reviewer for PR #20 exact head b27a072ec4f4099ec93265853759d7002ea3d3d4",
+      "current_activity": "completed independent gating review of PR #20 exact head b27a072ec4f4099ec93265853759d7002ea3d3d4: CHANGES_REQUIRED (CLAUDE-027, TAB-REVIEW-001 MAJOR; TAB-REVIEW-002, TAB-REVIEW-003 MINOR). Findings verified by reproduction, not read-only. Gating-review lease remains held for the next exact head from this same PR/branch; watching for the implementer's fix and CI.",
       "invocation_policy": "persistent Claude session is the default Claude runtime; other agents/humans do not directly invoke the stateless @claude Action"
     },
     "gemini_agent": {
@@ -122,15 +122,25 @@
     },
     "implementer": {
       "actor": "chatgpt",
-      "status": "released_after_green_ci",
+      "status": "active",
       "work_stream": "issue-4-work-unit-3-pr-20",
-      "reason": "canonical implementation head is green and ready for independent review"
+      "reason": "resuming as implementer on the existing canonical branch to fix CLAUDE-027 (MAJOR) and TAB-REVIEW-001 (MAJOR), plus TAB-REVIEW-002/003 (MINOR), found by Claude's independent gating review of b27a072ec4f4099ec93265853759d7002ea3d3d4. Continue this PR; do not open a new one."
     },
     "gating_reviewer": {
       "actor": "claude",
-      "status": "assigned",
+      "status": "verdict_posted_awaiting_new_head",
       "review_target_sha": "b27a072ec4f4099ec93265853759d7002ea3d3d4",
-      "reason": "ChatGPT materially authored PR #20 and cannot self-gate its exact head"
+      "verdict": "CHANGES_REQUIRED",
+      "open_findings": ["CLAUDE-027", "TAB-REVIEW-001", "TAB-REVIEW-002", "TAB-REVIEW-003"],
+      "verdict_evidence": {
+        "pr_comments": [
+          "https://github.com/NTinkicht/Tabibi/pull/20#issuecomment-5559162473",
+          "https://github.com/NTinkicht/Tabibi/pull/20#issuecomment-5559173743"
+        ],
+        "team_room_checkpoint": "https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559163752",
+        "claude_review_journal": "coordination/CLAUDE_REVIEW.md on branch claude/algeria-medical-queue-onboard-6rdzyj (non-canonical, continuity-only; see CLAUDE.md \"Persistent review branch\")"
+      },
+      "reason": "ChatGPT materially authored PR #20 and cannot self-gate its exact head. Claude did not author the code and remains the eligible gating reviewer for the next exact head from the same branch once fixes are pushed."
     },
     "secondary_verifier": {
       "actor": "gemini_agent",
@@ -149,16 +159,56 @@
         "gemini_agent",
         "claude"
       ],
-      "status": "waiting_for_independent_exact_sha_gate"
+      "status": "blocked_on_open_findings",
+      "reason": "merge remains forbidden until CLAUDE-027 and TAB-REVIEW-001 (both MAJOR) are fixed, a fresh exact head has green CI verified with repeated integration-suite runs, and Claude issues a new PASS/MERGE_READY on that exact head"
     }
   },
   "product_architect": "chatgpt",
   "deterministic_referee": "ci",
   "open_blockers": 0,
-  "open_majors": 0,
-  "open_minors": 0,
+  "open_majors": 2,
+  "open_minors": 2,
   "human_decision_required": false,
-  "pending_findings": [],
+  "pending_findings": [
+    {
+      "id": "CLAUDE-027",
+      "severity": "MAJOR",
+      "category": "test-infrastructure-determinism",
+      "target_sha": "b27a072ec4f4099ec93265853759d7002ea3d3d4",
+      "summary": "npm run test:integration is non-deterministic: Vitest runs integration test files concurrently by default, and this PR's new tests/integration/walkin-queue.test.ts races tests/integration/clinic-scheduling.test.ts's full-table TRUNCATE CASCADE against the same shared Postgres tables.",
+      "evidence": "Reproduced 3 consecutive local runs against real Postgres on the exact reviewed head: 13/23, 9/23, then 7/23 tests failed with varying Postgres 'deadlock detected' and vanished-row errors. Re-ran with `npx vitest run --project integration --no-file-parallelism` (no other change): 23/23 passed, twice in a row.",
+      "required_resolution": "Make the integration project's test files not race each other -- simplest verified fix is `fileParallelism: false` (or equivalent sequence/pool setting) for the integration project in vitest.config.ts. A per-file schema/database isolation approach is also acceptable but more invasive than required.",
+      "verification_method": "Run the full integration suite at least 3 consecutive times against real Postgres after the fix; every run must show the full expected test count passing with no deadlocks, no vanished-row assertions, and no cross-file truncation races. A single green run is not sufficient evidence."
+    },
+    {
+      "id": "TAB-REVIEW-001",
+      "severity": "MAJOR",
+      "category": "auditability / committed-contract violation",
+      "target_sha": "b27a072ec4f4099ec93265853759d7002ea3d3d4",
+      "summary": "Session cancellation's DB trigger (enforce_session_queue_terminal_transition) bulk-cancels every waiting/checked_in/called queue entry, but SessionService.command's cancel path calls appendAuditEvent exactly once (session-level only) -- no per-entry audit event is ever written for the entries the trigger disposes of.",
+      "evidence": "Traced the exact code path in src/modules/session/index.ts and the migration trigger in db/migrations/0004_walkin_queue_foundation.sql. ARCHITECTURE.md's 'Session cancellation' section already commits to '...atomically transitions every remaining waiting, checked_in, and called entry to cancelled, ... records audit events ...' and SECURITY.md's Auditability section explicitly requires auditing queue creation/removal and session cancel. Originally raised by the Codex automated review bot; independently verified by Claude against the actual code and the committed spec text before being accepted, not taken on the bot's word.",
+      "required_resolution": "Ensure every queue entry the cancellation trigger disposes of receives its own auditable record (actor, reason, prior state) consistent with the committed contract, not only the session-level event.",
+      "verification_method": "Regression test: cancel a session with multiple waiting/checked_in/called entries and assert one session-level audit event plus one audit event per affected queue entry, each carrying the actor and cancellation reason."
+    },
+    {
+      "id": "TAB-REVIEW-002",
+      "severity": "MINOR",
+      "category": "data-integrity / localization",
+      "target_sha": "b27a072ec4f4099ec93265853759d7002ea3d3d4",
+      "summary": "The walk-in registration form sends the receptionist's own current UI-display locale as the patient's preferredLocale, not a distinct choice -- verified in walk-in-queue.tsx (`preferredLocale: locale`).",
+      "required_resolution": "Do not silently derive the patient's preferred locale from receptionist UI state; provide a separate selection or an explicit product-defined default independent of the staff UI language.",
+      "verification_method": "Test that registering a patient while the receptionist UI is in French can still record an Arabic (or other) patient preferred locale, and vice versa."
+    },
+    {
+      "id": "TAB-REVIEW-003",
+      "severity": "MINOR",
+      "category": "data-integrity",
+      "target_sha": "b27a072ec4f4099ec93265853759d7002ea3d3d4",
+      "summary": "Contact email normalization lowercases the entire address including the local part (`.toLowerCase()` in src/modules/queue/index.ts), which is technically case-sensitive per RFC 5321.",
+      "required_resolution": "Preserve the local part's case (normalize only the domain) or explicitly document and test the chosen normalization contract if full lowercasing is intentional.",
+      "verification_method": "Test round-tripping a mixed-case local part and confirm the stored/used value matches the intended normalization contract."
+    }
+  ],
   "accepted_nonblocking_notes": [
     "CLAUDE-025-NOTE",
     "CLAUDE-026-NOTE"
@@ -205,20 +255,29 @@
     "work_unit": 3,
     "work_unit_title": "Walk-in/guest patient intake and waiting QueueEntry materialization",
     "approval_comment": 5558643274,
-    "implementation_status": "green_waiting_independent_review",
+    "implementation_status": "changes_required_pending_fix",
     "implementation_pr": 20,
     "canonical_branch": "claude/issue-4-work-unit-3-walkin-queue",
     "current_head": "b27a072ec4f4099ec93265853759d7002ea3d3d4",
+    "reviewed_head": "b27a072ec4f4099ec93265853759d7002ea3d3d4",
+    "review_verdict": "CHANGES_REQUIRED",
     "ci_run": 34032205360,
-    "ci_status": "success",
+    "ci_status": "success_but_not_sufficient_evidence",
     "ci_passed": [
       "Quality and build",
       "PostgreSQL integration",
       "Browser smoke"
     ],
+    "ci_caveat": "PostgreSQL integration reported success on this run, but Claude independently reproduced non-deterministic failure (CLAUDE-027) by re-running the same suite 3x locally against real Postgres; a single green CI run is not sufficient evidence for this project until the file-parallelism fix lands.",
     "ci_remaining": [],
     "scope": "receptionist walk-in/guest registration plus atomic waiting QueueEntry creation only; check-in/call/priority/ETA/notifications/remote guest credentials remain out of scope"
   },
-  "next_work": null,
-  "notes": "PR #20 remains the sole canonical Work Unit 3 stream and is waiting for Claude independent review. Gemini Chat integration infrastructure is installed, but first onboarding proved the GitHub secret is wired and non-empty while the supplied key itself is rejected by Google as invalid. No engineering work depends on Gemini Chat, so the project continues while owner replaces that secret value."
+  "next_work": {
+    "issue": 4,
+    "work_unit": 4,
+    "work_unit_title": "not yet defined",
+    "pre_approved": false,
+    "blocked_by": "Work Unit 3 (PR #20) must reach a clean PASS/MERGE_READY and merge first"
+  },
+  "notes": "PR #20 exact head b27a072ec4f4099ec93265853759d7002ea3d3d4 received Claude's independent gating verdict: CHANGES_REQUIRED, with CLAUDE-027 and TAB-REVIEW-001 (both MAJOR) blocking, and TAB-REVIEW-002/TAB-REVIEW-003 (MINOR) to fix in the same pass. All four findings were verified by direct code inspection and/or reproduction, not accepted on description or CI status alone -- CLAUDE-027 in particular was found by Claude independently re-running CI's own command against real Postgres 3 times locally after the reported GitHub run was already green. ChatGPT resumes as implementer on the existing canonical branch/PR; no new PR or branch. Claude retains the gating-review lease for the next exact head. Gemini Chat integration infrastructure is installed, but first onboarding proved the GitHub secret is wired and non-empty while the supplied key itself is rejected by Google as invalid; no engineering work depends on Gemini Chat, so the project continues while the owner replaces that secret value."
 }
