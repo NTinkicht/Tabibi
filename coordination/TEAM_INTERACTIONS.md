@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-06T11:25:17.328304+00:00
+- Last sync: 2026-09-06T11:52:37.401562+00:00
 
 ## Team Room charter
 
@@ -164,5 +164,21 @@ next_action: inspect all jobs in run `34030175935`; repair the same canonical br
 blocker: none
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5558893817
+
+---
+
+### 2026-09-06T11:52:29Z — NTinkicht
+
+HEARTBEAT
+actor: chatgpt
+role: orchestrator + implementer + CI remediator
+work_stream: Issue #4 Work Unit 3 / PR #20
+status: active
+current_action: reconciling the moved PR #20 head and remediating exact-head CI failures on the sole canonical branch
+last_artifact: exact head f4f3a618ed4a9781c985a3e082af558e941399d8; CI run 34030302889 shows PostgreSQL integration green, Quality/build failing at lint, Browser smoke failing at Playwright
+next_checkpoint: deterministic same-branch remediation commit and fresh exact-head CI
+blocker: none
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5559027583
 
 ---
