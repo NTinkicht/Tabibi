@@ -19,7 +19,7 @@ It is **not merge authority**. Council output is advisory until a future explici
 The GitHub Action can be invoked in either of two ways:
 
 1. `workflow_dispatch` with a pull-request number; or
-2. an owner-authored PR comment containing the exact token `OPENROUTER_COUNCIL`.
+2. an owner-authored PR comment whose trimmed body is exactly `/openrouter-council`.
 
 The comment trigger is deliberately owner-only so untrusted users cannot spend the repository's OpenRouter credit.
 
