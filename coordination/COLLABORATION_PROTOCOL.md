@@ -1,8 +1,8 @@
 # Tabibi Collaboration, Heartbeat and Learning Protocol v3
 
-This protocol is binding for **ChatGPT, Codex Cloud, Claude, Gemini Agent, and Gemini Chat**. It supplements `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, `coordination/COMPANY_OPERATING_SYSTEM.md`, `coordination/WORK_QUEUE.md`, and `coordination/STATE.json`. Product, architecture, security, reviewer-independence, role-lease, and owner-authority rules remain unchanged.
+This protocol is binding for **ChatGPT, Codex Cloud, Claude, GitHub Copilot, Gemini Agent, and Gemini Chat**. It supplements `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, `coordination/COMPANY_OPERATING_SYSTEM.md`, `coordination/WORK_QUEUE.md`, and `coordination/STATE.json`. Product, architecture, security, reviewer-independence, role-lease, and owner-authority rules remain unchanged.
 
-Gemini Agent (`gemini_agent`) and Gemini Chat (`gemini_chat`) are distinct actors. They may share a model family, but they do not share identity, role leases, heartbeats, authored changes, findings, review authority, or accountability. Historical `actor: gemini` Team Room entries are interpreted as Gemini Agent.
+**Gemini Agent (`gemini_agent`) and Gemini Chat (`gemini_chat`) are explicitly paused/off-roster** as of 2026-09-07 (Issue #60) and must not be invoked for new work while paused; every rule below that names them still governs how they behave once the owner re-enables them. They are distinct actors from each other: they may share a model family, but they do not share identity, role leases, heartbeats, authored changes, findings, review authority, or accountability. Historical `actor: gemini` Team Room entries are interpreted as Gemini Agent. `copilot` is the actor ID for GitHub Copilot (both its coding-agent and Code Review identities, per `AGENTS.md`'s non-self-gating rule).
 
 ## 1. Permanent Team Room
 
@@ -38,7 +38,7 @@ Template:
 
 ```text
 HEARTBEAT
-actor: <chatgpt|codex|claude|gemini_agent|gemini_chat>
+actor: <chatgpt|codex|claude|copilot|gemini_agent|gemini_chat>
 role: <leased role>
 work_stream: <issue/pr/work unit>
 status: <active|blocked|waiting_external|complete>
@@ -90,7 +90,7 @@ lesson: <reusable lesson>
 
 Retrospectives are candid but technical and respectful. Critique process, decisions, assumptions, and artifacts rather than personalities.
 
-Gemini Chat is expected to participate as a peer when available, not merely observe other agents' retrospectives.
+Gemini Chat is expected to participate as a peer when available (currently paused; see the intro above), not merely observe other agents' retrospectives. Copilot is expected to participate as a peer on its QA stream.
 
 ## 6. Discussion and consensus
 
@@ -167,8 +167,9 @@ Heartbeats from a limited actor should say exactly which capability is affected 
 
 - **Codex:** `AGENTS.md` is authoritative; every Codex task must honor this protocol and post heartbeats/checkpoints while active.
 - **Claude:** `CLAUDE.md` plus this protocol are authoritative for Claude-specific behavior; Claude participates in Team Room retrospectives and consensus even when its current role is reviewer rather than implementer.
-- **Gemini Agent:** `GEMINI.md` plus this protocol are authoritative; Gemini Agent contributes UX/system lessons and retrospective feedback, not only pass/fail reviews.
-- **Gemini Chat:** `GEMINI_CHAT.md` plus this protocol are authoritative. Gemini Chat identifies itself as `gemini_chat`, may hold any transferable role lease, and never impersonates Gemini Agent.
+- **GitHub Copilot:** `.github/copilot-instructions.md` and `.github/agents/tabibi-qa.agent.md` plus this protocol are authoritative. Copilot identifies itself as `copilot` in Team Room and participates in retrospectives/consensus for its QA stream, not only pass/fail reviews; its Code Review identity and coding-agent authorship remain one actor for self-gating purposes.
+- **Gemini Agent (paused):** `GEMINI.md` plus this protocol are authoritative; Gemini Agent contributes UX/system lessons and retrospective feedback, not only pass/fail reviews, once re-activated.
+- **Gemini Chat (paused):** `GEMINI_CHAT.md` plus this protocol are authoritative. Gemini Chat identifies itself as `gemini_chat`, may hold any transferable role lease, and never impersonates Gemini Agent, once re-activated.
 - **ChatGPT:** ChatGPT must treat Team Room, `STATE.json`, CI, and branch/PR evidence as live orchestration state and post its own heartbeats/checkpoints when actively operating the project.
 
 No actor is exempt because it is the orchestrator, reviewer, conversational collaborator, or fallback runtime.
