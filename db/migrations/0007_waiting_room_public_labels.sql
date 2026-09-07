@@ -32,18 +32,23 @@ EXECUTE FUNCTION assign_privacy_safe_public_display_label();
 COMMENT ON COLUMN queue_entries.public_display_label IS
   'Non-secret shared waiting-room label. Never use for authentication or derive from patient/internal identifiers.';
 
--- Backfill: every row that existed before this migration was assigned its
--- public_display_label by application code that derived it directly from the
--- queue entry's own UUID (CLAUDE-034). The trigger above only governs future
--- inserts, so regenerate every existing row's label with the same
--- collision-safe random generation, scoped per session, to close the gap for
--- any entry created before this migration runs.
+-- Backfill only the legacy application-generated labels that are provably
+-- derived from the queue entry UUID. Normal pre-0007 registrations used this
+-- exact W-<first 10 UUID hex chars> scheme. Preserve any non-legacy label so a
+-- deployment does not churn a label that was supplied through another safe
+-- operational path, while still eliminating every known ID-derived value.
 DO $$
 DECLARE
   entry RECORD;
   candidate text;
 BEGIN
-  FOR entry IN SELECT id, session_id FROM queue_entries ORDER BY id LOOP
+  FOR entry IN
+    SELECT id, session_id
+      FROM queue_entries
+     WHERE public_display_label =
+           'W-' || upper(substr(replace(id::text, '-', ''), 1, 10))
+     ORDER BY id
+  LOOP
     LOOP
       candidate := 'W-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));
       EXIT WHEN NOT EXISTS (
