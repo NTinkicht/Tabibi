@@ -2,7 +2,7 @@
 
 > Generated from conversational/team-learning markers in Team Room Issue #21. This is the readable company chat; `TEAM_INTERACTIONS.md` remains the complete raw mirror.
 
-- Last sync: 2026-09-07T09:19:15.893613+00:00
+- Last sync: 2026-09-07T09:42:49.419967+00:00
 - Motto: **coffee optional, evidence mandatory.**
 
 ### 2026-09-06T11:16:06Z — chatgpt
