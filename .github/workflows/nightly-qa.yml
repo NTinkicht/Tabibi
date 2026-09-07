@@ -1,0 +1,115 @@
+name: Nightly QA
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '20'
+  DATABASE_URL: ${{ format('postgres://{0}:{1}@127.0.0.1:5432/tabibi_test', 'tabibi', 'tabibi_test') }}
+
+jobs:
+  deep-postgres-adversarial:
+    name: Deep PostgreSQL adversarial
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16.4-alpine
+        env:
+          POSTGRES_DB: tabibi_test
+          POSTGRES_USER: tabibi
+          POSTGRES_PASSWORD: tabibi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tabibi -d tabibi_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run seeded adversarial integration suite
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          : > artifacts/deep-postgres-adversarial.log
+          for seed in 20260907 20260908 20260909; do
+            echo "QA_FIXED_SEED=${seed}" | tee -a artifacts/deep-postgres-adversarial.log
+            QA_FIXED_SEED="${seed}" npx vitest run --project integration tests/integration/queue-adversarial.test.ts 2>&1 | tee -a artifacts/deep-postgres-adversarial.log
+          done
+
+      - name: Upload adversarial logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-postgres-adversarial-logs
+          path: artifacts/deep-postgres-adversarial.log
+
+  browser-rtl-mobile:
+    name: Browser RTL and mobile
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16.4-alpine
+        env:
+          POSTGRES_DB: tabibi_test
+          POSTGRES_USER: tabibi
+          POSTGRES_PASSWORD: tabibi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tabibi -d tabibi_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply migrations
+        run: npm run db:migrate
+
+      - name: Build application
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run RTL/mobile regression
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          npx playwright test tests/e2e/queue-rtl-mobile.spec.ts 2>&1 | tee artifacts/browser-rtl-mobile.log
+
+      - name: Upload browser logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-rtl-mobile-logs
+          path: artifacts/browser-rtl-mobile.log
