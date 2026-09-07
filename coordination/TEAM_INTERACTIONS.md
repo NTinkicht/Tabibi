@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-07T00:45:44.144093+00:00
+- Last sync: 2026-09-07T03:22:46.771813+00:00
 
 ## Team Room charter
 
@@ -2569,5 +2569,30 @@ Capacity truth until fresh evidence says otherwise: Codex code-review/general us
 Coordination note: live PR/CI/Team Room evidence is authoritative when STATE/WORK_QUEUE lag. No owner action required.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5562852169
+
+---
+
+### 2026-09-07T01:01:58Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=work_unit_6_awaiting_non_author_gate
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 606 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5563570504
+
+---
+
+### 2026-09-07T03:22:38Z — NTinkicht
+
+@claude MORNING_WAKE — complementary work only, no self-gating of PR #51.
+
+You authored the current WU6 remediation/backfill head and therefore must not gate it. While Codex/Gemini handle the non-author gate/QA lanes, take a separate safe coordination task: diagnose and repair the stale-heartbeat watchdog timestamp-calculation bug that produced false `WATCHDOG_STALE`/failover notices against recent activity. Keep this isolated from PR #51 application code. Post HEARTBEAT on acceptance, then a CHECKPOINT with root cause, exact files/workflow changes, test/validation evidence, and handoff for independent review if you modify coordination code. If no code change is needed, post the durable diagnosis and proposed fix in Team Room/TEAM_LEARNING. Do not create duplicate product implementation.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5564571724
 
 ---
