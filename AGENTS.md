@@ -2,9 +2,9 @@
 
 ## Governing rule
 
-Tabibi uses a **capability-resilient five-actor mesh**. Roles belong to the project, not permanently to a provider. ChatGPT, Codex, Claude, Gemini Agent, and Gemini Chat have preferred responsibilities, but any transferable technical role may be reassigned when the preferred actor is blocked by quota, authentication, runtime, outage, latency, or tool limitations.
+Tabibi uses a **capability-resilient actor mesh**. Roles belong to the project, not permanently to a provider. The currently **active roster** is ChatGPT (orchestration/architecture), Codex (production implementation/CI when available), Claude (architecture/security/adversarial gating review), and GitHub Copilot (independent QA/Test Automation). Any transferable technical role may be reassigned among active actors when the preferred actor is blocked by quota, authentication, runtime, outage, latency, or tool limitations.
 
-**Gemini Agent (`gemini_agent`) and Gemini Chat (`gemini_chat`) are distinct actors.** They may use the same model family, but their role leases, heartbeats, authored changes, findings, reviews, capacity state, and accountability are separate.
+**Gemini Agent (`gemini_agent`) and Gemini Chat (`gemini_chat`) are explicitly paused/off-roster** as of 2026-09-07 (owner decision, tracked in Issue #60) and must not be invoked for new work while paused. They remain distinct actors with their own role leases, heartbeats, authored changes, findings, reviews, capacity state, and accountability, and this mesh design still applies to them the moment the owner re-enables them — nothing below is a permanent removal.
 
 All agents MUST read:
 - `PRODUCT.md`
@@ -66,9 +66,28 @@ Preferred responsibilities:
 
 Claude may become developer, CI fixer, orchestrator, or merge executor when needed. If Claude authors or materially changes the exact head, Claude cannot be the sole gating reviewer for that head.
 
-### Gemini Agent — Experience / QA / System Verification Runtime
+### GitHub Copilot — Independent QA / Test Automation Engineer
 
-Actor ID: `gemini_agent`.
+Actor ID: `copilot`. Currently the **primary** owner of this preferred-role slot while Gemini Agent/Gemini Chat are paused.
+
+Preferred responsibilities:
+- authoring and maintaining independent test suites, harnesses, test-only utilities, test CI workflows, and testing documentation (`coordination/TEST_STRATEGY.md`, `tests/TEST_MATRIX.md`);
+- adversarial/property-style, API-negative, migration-path, and browser/RTL regression coverage;
+- reporting production defects it discovers with stable `QA-xxx` finding IDs to the canonical production stream rather than silently patching production behavior.
+
+Copilot QA must not modify production application behavior to make tests pass unless explicitly reassigned to a bounded production task outside the QA role.
+
+**Copilot Code Review gating eligibility (resolved by Issue #60):** Copilot Code Review is **adopted as an eligible non-author exact-SHA gate**, subject to the same non-self-gating rule as every other actor. Concretely:
+- Copilot's GitHub-native **Code Review** identity and Copilot's **coding-agent** authorship are treated as the same actor for self-gating purposes — Copilot Code Review may gate a PR only when Copilot did not author or materially modify the exact reviewed head.
+- A gating verdict requires an explicit GitHub Copilot Code Review on the exact current head, with the PR's required CI green on that same exact SHA. A generic "advisory" comment predating a code push, or a review of an older head, does not count.
+- Copilot Code Review may post `PASS`/`CHANGES_REQUIRED`/`MERGE_READY` under the same finding-format and severity rules as any other gating reviewer (see Finding severity and Independent-review rule below).
+- Copilot Code Review comments on a PR Copilot itself authored (e.g. its own QA-stream PRs) remain **advisory-only** per `.github/copilot-instructions.md` and do not gate that PR — a different eligible non-author reviewer is still required there.
+
+GitHub Copilot-specific repository instructions are in `.github/copilot-instructions.md` and `.github/agents/tabibi-qa.agent.md`.
+
+### Gemini Agent — Experience / QA / System Verification Runtime — **PAUSED / off-roster**
+
+Actor ID: `gemini_agent`. Paused as of 2026-09-07 pending the owner re-enabling it; do not invoke for new work while paused. The role/preferences below apply again immediately once the owner records `CAPACITY_RECOVERED`/re-activation.
 
 Preferred responsibilities:
 - end-to-end product and workflow verification;
@@ -81,9 +100,9 @@ Gemini Agent is also a full failover runtime. It may implement, fix CI, review, 
 
 Gemini Agent-specific repository instructions are in `GEMINI.md`.
 
-### Gemini Chat — Adaptive Generalist Collaborator
+### Gemini Chat — Adaptive Generalist Collaborator — **PAUSED / off-roster**
 
-Actor ID: `gemini_chat`.
+Actor ID: `gemini_chat`. Paused as of 2026-09-07 pending the owner re-enabling it; do not invoke for new work while paused. The role/preferences below apply again immediately once the owner records `CAPACITY_RECOVERED`/re-activation.
 
 Preferred strengths:
 - independent architecture critique and alternative design reasoning;
@@ -121,13 +140,15 @@ Rules:
 
 ## Capability-aware failover
 
-Use the matrix in `coordination/ROLE_FAILOVER_PROTOCOL.md`. Current default preference is:
-- orchestration: ChatGPT -> Claude -> Gemini Chat -> Gemini Agent -> Codex;
-- implementation: Codex -> Claude -> Gemini Chat -> Gemini Agent -> ChatGPT;
-- gating review: Claude -> Gemini Chat -> Gemini Agent -> ChatGPT -> eligible non-author Codex;
-- UX/system verification: Gemini Agent -> Gemini Chat -> Claude -> ChatGPT -> Codex;
-- CI remediation: Codex -> Gemini Chat -> Gemini Agent -> Claude -> ChatGPT;
-- merge execution: Codex -> ChatGPT -> Gemini Chat -> Gemini Agent -> Claude.
+Use the matrix in `coordination/ROLE_FAILOVER_PROTOCOL.md`. Current default preference **while Gemini Agent/Gemini Chat are paused** is:
+- orchestration: ChatGPT -> Claude -> Codex;
+- implementation: Codex -> Claude -> ChatGPT;
+- gating review: Claude -> ChatGPT -> eligible non-author Codex -> eligible non-author Copilot Code Review (see Independent-review rule);
+- QA/test automation and system verification: Copilot -> Claude -> ChatGPT -> Codex;
+- CI remediation: Codex -> Claude -> ChatGPT;
+- merge execution: Codex -> ChatGPT -> Claude.
+
+Gemini Agent and Gemini Chat resume their original positions in each chain (as ordered before 2026-09-07) immediately once the owner records their re-activation; this section is not a permanent rewrite of their preferred roles.
 
 Architecture normally belongs to ChatGPT. If ChatGPT is unavailable, consequential non-owner technical decisions require a two-agent technical quorum as defined by the failover protocol.
 
@@ -158,7 +179,7 @@ Every actor holding an active role lease, including ChatGPT and reviewers, must:
 - post a final heartbeat/checkpoint before handoff, completion, or failover;
 - record exact blockers rather than remaining silently idle.
 
-Heartbeat actor IDs are `chatgpt`, `codex`, `claude`, `gemini_agent`, and `gemini_chat`. Historical `actor: gemini` entries are interpreted as Gemini Agent.
+Heartbeat actor IDs are `chatgpt`, `codex`, `claude`, `copilot`, `gemini_agent`, and `gemini_chat`. Historical `actor: gemini` entries are interpreted as Gemini Agent. `gemini_agent`/`gemini_chat` remain valid IDs for when those actors resume.
 
 A heartbeat is visibility, not proof of progress. Observable artifacts (commits, PR movement, CI, findings, merges) remain the evidence of execution.
 
@@ -186,9 +207,11 @@ Verdicts:
 
 The project requires an **independent reviewer**, not one specific model.
 
-A PR may be gated by Claude, Gemini Chat, Gemini Agent, ChatGPT, or Codex only if that actor did not author/materially modify the exact reviewed head. High-risk authentication, authorization, tenant-isolation, secret-handling, migration, or concurrency work should receive a second independent model review when another non-author reviewer is available.
+A PR may be gated by Claude, ChatGPT, Codex, Copilot Code Review, Gemini Chat, or Gemini Agent only if that actor did not author/materially modify the exact reviewed head. High-risk authentication, authorization, tenant-isolation, secret-handling, migration, or concurrency work should receive a second independent model review when another non-author reviewer is available.
 
-Gemini Agent and Gemini Chat count as distinct operational actors, but reviewers must still reason independently and must not treat shared model-family output as automatic corroboration. For especially consequential high-risk review, diversity across model families is preferred when available.
+Copilot Code Review's eligibility as a gate is conditional per the GitHub Copilot role section above: an explicit GitHub Copilot Code Review on the exact non-authored head, with required CI green on that same SHA — a passive/advisory comment does not count, and Copilot cannot gate a PR it authored.
+
+Gemini Agent and Gemini Chat count as distinct operational actors (currently paused; see Governing rule), but reviewers must still reason independently and must not treat shared model-family output as automatic corroboration. For especially consequential high-risk review, diversity across model families is preferred when available.
 
 ## Communication and wakeups
 
@@ -197,9 +220,10 @@ GitHub is the durable communication bus.
 Supported wake conventions:
 - Codex: executable `@codex ...` command;
 - Claude: the persistent Claude review session's own PR-activity subscription and heartbeat (see below for the separate `@claude` Action trigger);
-- Gemini Agent: `@gemini-cli /review ...`, `@gemini-cli /verify ...`, `@gemini-cli /implement ...`, or a bounded general instruction;
-- Gemini Chat: `@gemini-chat ...`, `@gemini-chat /implement ...`, `@gemini-chat /fix ...`, `@gemini-chat /merge ...`, plus its low-cost scheduled Team Room monitor;
-- ChatGPT: repository watch / active orchestration turn.
+- Copilot: `@copilot ...` / `@copilot review` (coding-agent assignment or Copilot Code Review request), plus `assign_copilot_to_issue`-style issue assignment;
+- ChatGPT: repository watch / active orchestration turn;
+- Gemini Agent (**paused**): `@gemini-cli /review ...`, `@gemini-cli /verify ...`, `@gemini-cli /implement ...`, or a bounded general instruction — do not invoke while paused;
+- Gemini Chat (**paused**): `@gemini-chat ...`, `@gemini-chat /implement ...`, `@gemini-chat /fix ...`, `@gemini-chat /merge ...`, plus its low-cost scheduled Team Room monitor — do not invoke while paused.
 
 No agent should depend on Nassim copying messages or announcing that another agent finished.
 
