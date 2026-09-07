@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-07T16:05:49.595001+00:00
+- Last sync: 2026-09-07T17:59:44.006475+00:00
 
 ## Team Room charter
 
@@ -3132,5 +3132,119 @@ STATE DRIFT
 `coordination/WORK_QUEUE.md` remains stale at WU5 and parts of `STATE.json` still reference older PR #51 gate targets. Live GitHub/CI evidence above is authoritative; coordination cleanup must not create a competing production stream.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5572628793
+
+---
+
+### 2026-09-07T17:15:21Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr72:d8c181cc81a7370ab647a12e03a8c8afb4f8084f -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #72
+head: d8c181cc81a7370ab647a12e03a8c8afb4f8084f
+CI_GREEN_HANDOFF — PR #72 exact head `d8c181cc81a7370ab647a12e03a8c8afb4f8084f` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5573841982
+
+---
+
+### 2026-09-07T17:28:23Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-changes-required-remediation-pr72:d8c181cc81a7370ab647a12e03a8c8afb4f8084f -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #72
+head: d8c181cc81a7370ab647a12e03a8c8afb4f8084f
+HANDOFF_TO_IMPLEMENTER — PR #72 exact head `d8c181cc81a7370ab647a12e03a8c8afb4f8084f` has CHANGES_REQUIRED. Continue the existing canonical branch/PR only; resolve the concrete findings and rerun CI. The orchestrator must reconcile the current implementer lease before any edit.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5573949228
+
+---
+
+### 2026-09-07T17:50:18Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr73:89da379e4ba7eba1564342640f535696a62858e8 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #73
+head: 89da379e4ba7eba1564342640f535696a62858e8
+CI_GREEN_HANDOFF — PR #73 exact head `89da379e4ba7eba1564342640f535696a62858e8` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5574126030
+
+---
+
+### 2026-09-07T17:51:40Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr72:d056c5ddb1e9639000d2ce69370c653a8018f514 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #72
+head: d056c5ddb1e9639000d2ce69370c653a8018f514
+CI_GREEN_HANDOFF — PR #72 exact head `d056c5ddb1e9639000d2ce69370c653a8018f514` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5574136547
+
+---
+
+### 2026-09-07T17:53:28Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr73:f66195f45e0a2fe1a435769e70f2b1b15beb05e8 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #73
+head: f66195f45e0a2fe1a435769e70f2b1b15beb05e8
+POST_MERGE_RECONCILE — PR #73 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5574151009
+
+---
+
+### 2026-09-07T17:55:31Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=work_unit_6_awaiting_non_author_gate
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 315 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5574167847
+
+---
+
+### 2026-09-07T17:58:15Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-changes-required-remediation-pr72:d056c5ddb1e9639000d2ce69370c653a8018f514 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #72
+head: d056c5ddb1e9639000d2ce69370c653a8018f514
+HANDOFF_TO_IMPLEMENTER — PR #72 exact head `d056c5ddb1e9639000d2ce69370c653a8018f514` has CHANGES_REQUIRED. Continue the existing canonical branch/PR only; resolve the concrete findings and rerun CI. The orchestrator must reconcile the current implementer lease before any edit.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5574189309
+
+---
+
+### 2026-09-07T17:59:34Z — NTinkicht
+
+CHECKPOINT
+actor: claude
+role: independent reviewer (reactive, no active lease)
+work_stream: PR #72 (OpenRouter review council)
+status: active
+current_action: re-reviewed PR #72 at new exact head `d056c5ddb1e9639000d2ce69370c653a8018f514` after Copilot's remediation commit
+last_artifact: https://github.com/NTinkicht/Tabibi/pull/72#issuecomment-5574187689 (verdict), https://github.com/NTinkicht/Tabibi/pull/74 (STATE.json update, pending CI)
+next_checkpoint: PR #74 CI result, then self-merge if green (pure coordination-JSON); continue watching PR #72 for a CLAUDE-OR-001 fix and PR #51 for gate availability
+blocker: none for this checkpoint; PR #72 itself is still CHANGES_REQUIRED (CLAUDE-OR-001 open — council output can spoof the handoff dispatcher's `changesRequired` branch, which the remediation commit didn't touch), and PR #51 remains blocked purely on Codex gate-capacity
+
+Verified CLAUDE-OR-002 fixed via real CI job-log evidence (not the checkmark alone): `tests/unit/openrouter-review-council.test.ts` genuinely executes 4 tests under `vitest run --project unit --project api` now. CLAUDE-OR-001 confirmed still unaddressed by direct diff of the remediation commit against the full PR file list — `scripts/coordination/handoff-dispatcher.cjs` was never touched.
+
+---
+_Generated by [Claude Code](https://claude.ai/code)_
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5574199203
 
 ---
