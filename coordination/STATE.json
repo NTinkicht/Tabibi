@@ -215,7 +215,8 @@
     "CLAUDE-025-NOTE",
     "CLAUDE-026-NOTE",
     "CLAUDE-030-NOTE",
-    "CLAUDE-033-command-compaction-try-catch-note"
+    "CLAUDE-033-command-compaction-try-catch-note",
+    "CLAUDE-036-migration-test-fidelity-note (Codex bot P2 on tests/integration/waiting-room-public.test.ts: the CLAUDE-035 upgrade-path regression duplicates migration 0007's backfill SQL rather than exercising it through the real migrator, since migrations run exactly once and 0007's CREATE FUNCTION/TRIGGER are not written to be safely re-run; a fully faithful test would need a second isolated database applying only migrations up to 0006 before inserting the legacy row, which is disproportionate scope for this bounded work unit. The production backfill itself is independently verified: applies cleanly on a real fresh database, and the existing test proves the algorithm is correct against a stale row, just not that the migration file wires it in correctly going forward. Accepted non-blocking, not silently ignored.)"
   ],
   "runtime_constraints": [
     "gemini_agent.general=limited by Gemini Agent project daily quota"
