@@ -3,8 +3,6 @@ name: Team Room Sync
 on:
   issue_comment:
     types: [created, edited, deleted]
-  schedule:
-    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -115,7 +113,6 @@ jobs:
                   match = pattern.search(body)
                   parsed[field] = match.group(1).strip() if match else ''
               actor = parsed.get('actor', '').lower()
-              # Historical Gemini Agent heartbeats used `actor: gemini`.
               if actor == 'gemini':
                   actor = 'gemini_agent'
               if actor not in {'chatgpt', 'codex', 'claude', 'gemini_agent', 'gemini_chat'}:
