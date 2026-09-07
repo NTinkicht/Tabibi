@@ -19,30 +19,13 @@ export class WaitingRoomService {
     clinicId: string,
     sessionId: string,
   ): Promise<PublicWaitingRoomSnapshot> {
-    const session = await this.pool.query(
-      `SELECT 1
-         FROM consultation_sessions
-        WHERE id = $1 AND clinic_id = $2`,
-      [sessionId, clinicId],
-    );
-
-    if (session.rowCount !== 1) {
-      return { entries: [] };
-    }
-
     const result = await this.pool.query<{
       public_display_label: string;
       state: PublicWaitingRoomState;
-      priority_order: string | null;
-      eligibility_order: string | null;
-      registration_order: string;
     }>(
       `SELECT public_display_label,
-              state,
-              priority_order,
-              eligibility_order,
-              registration_order
-         FROM queue_entries
+             state
+        FROM queue_entries
         WHERE clinic_id = $1
           AND session_id = $2
           AND state IN ('waiting', 'checked_in', 'called')
