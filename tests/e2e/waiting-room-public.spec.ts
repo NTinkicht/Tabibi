@@ -65,8 +65,12 @@ test('public waiting-room renders Arabic RTL and French LTR without PII', async 
 
     await page.goto(`/waiting-room/${clinicId}/${sessionId}`);
     await expect(page.locator('main')).toHaveAttribute('dir', 'rtl');
-    await expect(page.getByRole('heading', { name: 'قاعة الانتظار' })).toBeVisible();
-    await expect(page.getByText(registration.entry.publicDisplayLabel)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'قاعة الانتظار' }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(registration.entry.publicDisplayLabel),
+    ).toBeVisible();
     await expect(page.getByText('في الانتظار')).toBeVisible();
 
     const arabicBody = await page.locator('body').innerText();
@@ -78,8 +82,12 @@ test('public waiting-room renders Arabic RTL and French LTR without PII', async 
 
     await page.goto(`/waiting-room/${clinicId}/${sessionId}?lang=fr`);
     await expect(page.locator('main')).toHaveAttribute('dir', 'ltr');
-    await expect(page.getByRole('heading', { name: "Salle d'attente" })).toBeVisible();
-    await expect(page.getByText(registration.entry.publicDisplayLabel)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: "Salle d'attente" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(registration.entry.publicDisplayLabel),
+    ).toBeVisible();
     await expect(page.getByText('En attente')).toBeVisible();
 
     const frenchBody = await page.locator('body').innerText();
