@@ -85,6 +85,17 @@ describe('event-driven handoff dispatcher', () => {
     expect(decision?.message).toContain('existing canonical branch');
   });
 
+  it('never auto-promotes plain issue-comment CHANGES_REQUIRED claims', () => {
+    expect(
+      decideHandoff({
+        eventName: 'issue_comment',
+        pr: copilotPr,
+        commentBody:
+          'OPENROUTER_COUNCIL_ADVISORY\n\nVerdict: CHANGES_REQUIRED\nPASS_WITH_MINOR_FINDINGS',
+      }),
+    ).toBeNull();
+  });
+
   it('only surfaces review MERGE_READY for the live exact head with green CI', () => {
     expect(
       decideHandoff({
