@@ -44,17 +44,19 @@ You must not modify production application behavior to make a failing test pass.
 - audit remains metadata-only
 - public waiting-room surfaces expose no patient/contact/internal identifiers and derive no public identifier from protected/internal identifiers
 
-## First assignment
-On Issue #47, create one canonical QA branch/PR and begin with executable tests, prioritizing:
-1. WU6 real migration-chain backfill regression via the actual migrator.
-2. PostgreSQL tenant/role isolation.
-3. Exact retry vs conflicting idempotency-key reuse.
-4. Queue lifecycle concurrency races.
-5. Stale queue-version rejection.
-6. Priority ordering/compaction invariants.
-7. Deterministic adversarial queue sequences.
-8. API negative/forged/malformed requests.
-9. Arabic RTL/mobile browser regressions.
+## Before taking any assignment
+Before creating or modifying a QA branch/PR, read `coordination/STATE.json`, `coordination/WORK_QUEUE.md`, and the latest Team Room (Issue #21) evidence. Confirm that the target stream has no active conflicting implementer lease or canonical PR. If one exists, join/review/handoff as instructed rather than starting a duplicate stream. Only claim work that is explicitly available or handed off to Copilot.
+
+When assigned an available QA stream, begin with executable tests and prioritize:
+1. real migration-chain regressions through the actual migrator;
+2. PostgreSQL tenant/role isolation;
+3. exact retry vs conflicting idempotency-key reuse;
+4. queue lifecycle concurrency races;
+5. stale queue-version rejection;
+6. priority ordering/compaction invariants;
+7. deterministic adversarial queue sequences;
+8. API negative/forged/malformed requests;
+9. Arabic/French RTL and mobile browser regressions.
 
 Maintain `coordination/TEST_STRATEGY.md` and `tests/TEST_MATRIX.md` as durable evidence. Every future MAJOR/BLOCKER must gain a permanent regression test.
 
