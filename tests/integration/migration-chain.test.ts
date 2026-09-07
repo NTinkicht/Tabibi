@@ -10,6 +10,7 @@ const committedMigrations = [
   '0004_walkin_queue_foundation.sql',
   '0005_queue_lifecycle.sql',
   '0006_queue_priority_order.sql',
+  '0007_waiting_room_public_labels.sql',
 ];
 
 beforeAll(async () => {
