@@ -2,18 +2,27 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { decideHandoff, assertAllowedTarget, dedupKey, isCopilotLogin } =
-  require('../../scripts/coordination/handoff-dispatcher.cjs') as {
-    decideHandoff: (input: Record<string, unknown>) => {
-      kind: string;
-      target: string;
-      sha: string;
-      message: string;
-    } | null;
-    assertAllowedTarget: (target: string) => void;
-    dedupKey: (kind: string, sha?: string) => string;
-    isCopilotLogin: (login: string) => boolean;
-  };
+const {
+  decideHandoff,
+  assertAllowedTarget,
+  dedupKey,
+  getPrNumber,
+  isCopilotLogin,
+} = require('../../scripts/coordination/handoff-dispatcher.cjs') as {
+  decideHandoff: (input: Record<string, unknown>) => {
+    kind: string;
+    target: string;
+    sha: string;
+    message: string;
+  } | null;
+  assertAllowedTarget: (target: string) => void;
+  dedupKey: (kind: string, sha?: string) => string;
+  getPrNumber: (
+    eventName: string,
+    payload: Record<string, unknown>,
+  ) => number | null;
+  isCopilotLogin: (login: string) => boolean;
+};
 
 const copilotPr = {
   number: 57,
@@ -100,6 +109,25 @@ describe('event-driven handoff dispatcher', () => {
     expect(() => assertAllowedTarget('gemini_chat')).toThrow(/Paused actor/);
     expect(() => assertAllowedTarget('gemini_agent')).toThrow(/Paused actor/);
     expect(() => assertAllowedTarget('claude')).not.toThrow();
+  });
+
+  it('ignores normal Issue #21-style comments before any PR lookup or routing', () => {
+    expect(
+      getPrNumber('issue_comment', {
+        issue: { number: 21 },
+        comment: { body: 'HEARTBEAT' },
+      }),
+    ).toBeNull();
+
+    expect(
+      getPrNumber('issue_comment', {
+        issue: {
+          number: 65,
+          pull_request: { url: 'https://example.test/pr/65' },
+        },
+        comment: { body: '@copilot review' },
+      }),
+    ).toBe(65);
   });
 
   it('uses deterministic dedup markers and recognizes Copilot identities', () => {

@@ -197,6 +197,17 @@ async function postTeamRoomOnce(token, repo, kind, sha, prNumber, message) {
   return true;
 }
 
+function getPrNumber(eventName, payload) {
+  if (eventName === 'workflow_run') {
+    const prs = payload.workflow_run?.pull_requests || [];
+    return prs[0]?.number || null;
+  }
+  if (eventName === 'issue_comment' && !payload.issue?.pull_request) {
+    return null;
+  }
+  return payload.pull_request?.number || payload.issue?.number || null;
+}
+
 async function main() {
   const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
   const repo = process.env.GITHUB_REPOSITORY;
@@ -227,11 +238,7 @@ async function main() {
     return;
   }
 
-  let prNumber = payload.pull_request?.number || payload.issue?.number || null;
-  if (eventName === 'workflow_run') {
-    const prs = payload.workflow_run?.pull_requests || [];
-    prNumber = prs[0]?.number || null;
-  }
+  const prNumber = getPrNumber(eventName, payload);
   if (!prNumber) return;
 
   const pr = await fetchPr(token, repo, prNumber);
@@ -289,4 +296,5 @@ module.exports = {
   dedupKey,
   decideHandoff,
   assertAllowedTarget,
+  getPrNumber,
 };
