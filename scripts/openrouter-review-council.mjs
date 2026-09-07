@@ -10,13 +10,33 @@ if (!repository) throw new Error('GITHUB_REPOSITORY is required');
 if (!prNumber) throw new Error('PR_NUMBER is required');
 
 const MAX_DIFF_CHARS = 60000;
+const MAX_ERROR_TEXT_CHARS = 500;
+const REDACTED = '[redacted]';
+
+function sanitizeErrorText(text) {
+  return text
+    .replaceAll(apiKey, REDACTED)
+    .replace(/sk-or-v1-[A-Za-z0-9]+/g, REDACTED)
+    .slice(0, MAX_ERROR_TEXT_CHARS);
+}
 
 function gh(args) {
-  return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024 });
+  return execFileSync('gh', args, {
+    encoding: 'utf8',
+    maxBuffer: 5 * 1024 * 1024,
+  });
 }
 
 const pr = JSON.parse(
-  gh(['pr', 'view', prNumber, '--repo', repository, '--json', 'number,title,body,headRefOid,baseRefName,headRefName,url'])
+  gh([
+    'pr',
+    'view',
+    prNumber,
+    '--repo',
+    repository,
+    '--json',
+    'number,title,body,headRefOid,baseRefName,headRefName,url',
+  ]),
 );
 
 let diff = gh(['pr', 'diff', prNumber, '--repo', repository]);
@@ -55,28 +75,31 @@ async function ask(model, system, user, maxTokens = 1100) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 90000);
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': `${serverUrl}/${repository}`,
-        'X-Title': 'Tabibi OpenRouter Review Council',
+    const response = await fetch(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': `${serverUrl}/${repository}`,
+          'X-Title': 'Tabibi OpenRouter Review Council',
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.1,
+          max_tokens: maxTokens,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+        }),
+        signal: controller.signal,
       },
-      body: JSON.stringify({
-        model,
-        temperature: 0.1,
-        max_tokens: maxTokens,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-      }),
-      signal: controller.signal,
-    });
+    );
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`${response.status} ${text.slice(0, 500)}`);
+      throw new Error(`${response.status} ${sanitizeErrorText(text)}`);
     }
     const json = await response.json();
     return json?.choices?.[0]?.message?.content?.trim() || '(empty response)';
@@ -90,16 +113,25 @@ const systemBase = `You are an independent advisory reviewer for the Tabibi soft
 const specialistResults = await Promise.all(
   specialists.map(async (s) => {
     try {
-      const text = await ask(s.model, `${systemBase}\n\nSpecialist mandate: ${s.role}`, sharedContext);
+      const text = await ask(
+        s.model,
+        `${systemBase}\n\nSpecialist mandate: ${s.role}`,
+        sharedContext,
+      );
       return { ...s, ok: true, text };
     } catch (error) {
-      return { ...s, ok: false, text: `UNAVAILABLE: ${error instanceof Error ? error.message : String(error)}` };
+      return {
+        ...s,
+        ok: false,
+        text: `UNAVAILABLE: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
-  })
+  }),
 );
 
 const successful = specialistResults.filter((r) => r.ok);
-let synthesis = 'Judge unavailable: fewer than two specialist responses succeeded.';
+let synthesis =
+  'Judge unavailable: fewer than two specialist responses succeeded.';
 
 if (successful.length >= 2) {
   const councilEvidence = successful
@@ -110,7 +142,7 @@ if (successful.length >= 2) {
       'deepseek/deepseek-v4-flash',
       `${systemBase}\n\nYou are the council synthesizer. Reconcile specialist outputs without inventing evidence. Deduplicate findings. Explicitly separate CONSENSUS findings (2+ specialists materially agree), SINGLE-MODEL findings, and DISAGREEMENTS. Give an overall advisory verdict: ADVISORY_PASS, ADVISORY_PASS_WITH_FINDINGS, or ADVISORY_CHANGES_RECOMMENDED. Do not emit PASS/MERGE_READY.`,
       `PR exact head: ${pr.headRefOid}\nDiff truncated: ${truncated ? 'yes' : 'no'}\n\nSPECIALIST OUTPUTS:\n${councilEvidence}`,
-      1500
+      1500,
     );
   } catch (error) {
     synthesis = `Judge unavailable: ${error instanceof Error ? error.message : String(error)}`;
@@ -127,4 +159,6 @@ const tmp = '/tmp/openrouter-council-comment.md';
 await import('node:fs').then(({ writeFileSync }) => writeFileSync(tmp, body));
 gh(['pr', 'comment', prNumber, '--repo', repository, '--body-file', tmp]);
 
-console.log(`OpenRouter council posted advisory review for PR #${prNumber} at ${pr.headRefOid}`);
+console.log(
+  `OpenRouter council posted advisory review for PR #${prNumber} at ${pr.headRefOid}`,
+);
