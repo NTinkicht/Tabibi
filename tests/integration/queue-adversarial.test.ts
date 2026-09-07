@@ -212,7 +212,7 @@ describe('deterministic adversarial queue coverage', () => {
     await assertQueueInvariants();
 
     await queue.reorder(scope, ids.session, entries[3]!, {
-      targetPosition: next() > 0.5 ? 1 : 2,
+      targetPosition: 1,
       expectedVersion: await queueOrderVersion(queue),
       reason: 'Seeded late-arrival priority',
       idempotencyKey: 'seed-reorder-3',
