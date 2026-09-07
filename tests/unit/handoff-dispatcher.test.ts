@@ -2,22 +2,18 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const {
-  decideHandoff,
-  assertAllowedTarget,
-  dedupKey,
-  isCopilotLogin,
-} = require('../../scripts/coordination/handoff-dispatcher.cjs') as {
-  decideHandoff: (input: Record<string, unknown>) => {
-    kind: string;
-    target: string;
-    sha: string;
-    message: string;
-  } | null;
-  assertAllowedTarget: (target: string) => void;
-  dedupKey: (kind: string, sha?: string) => string;
-  isCopilotLogin: (login: string) => boolean;
-};
+const { decideHandoff, assertAllowedTarget, dedupKey, isCopilotLogin } =
+  require('../../scripts/coordination/handoff-dispatcher.cjs') as {
+    decideHandoff: (input: Record<string, unknown>) => {
+      kind: string;
+      target: string;
+      sha: string;
+      message: string;
+    } | null;
+    assertAllowedTarget: (target: string) => void;
+    dedupKey: (kind: string, sha?: string) => string;
+    isCopilotLogin: (login: string) => boolean;
+  };
 
 const copilotPr = {
   number: 57,
@@ -36,7 +32,11 @@ describe('event-driven handoff dispatcher', () => {
     const decision = decideHandoff({
       eventName: 'workflow_run',
       pr: copilotPr,
-      workflowRun: { status: 'completed', conclusion: 'success', head_sha: 'abc123' },
+      workflowRun: {
+        status: 'completed',
+        conclusion: 'success',
+        head_sha: 'abc123',
+      },
     });
 
     expect(decision).toMatchObject({
@@ -52,7 +52,11 @@ describe('event-driven handoff dispatcher', () => {
       decideHandoff({
         eventName: 'workflow_run',
         pr: copilotPr,
-        workflowRun: { status: 'completed', conclusion: 'success', head_sha: 'old-sha' },
+        workflowRun: {
+          status: 'completed',
+          conclusion: 'success',
+          head_sha: 'old-sha',
+        },
       }),
     ).toBeNull();
   });
@@ -99,7 +103,9 @@ describe('event-driven handoff dispatcher', () => {
   });
 
   it('uses deterministic dedup markers and recognizes Copilot identities', () => {
-    expect(dedupKey('review', 'abc')).toBe('<!-- tabibi-handoff:review:abc -->');
+    expect(dedupKey('review', 'abc')).toBe(
+      '<!-- tabibi-handoff:review:abc -->',
+    );
     expect(isCopilotLogin('Copilot')).toBe(true);
     expect(isCopilotLogin('copilot-swe-agent[bot]')).toBe(true);
     expect(isCopilotLogin('NTinkicht')).toBe(false);

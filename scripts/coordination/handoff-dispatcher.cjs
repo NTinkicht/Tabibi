@@ -14,14 +14,30 @@ function dedupKey(kind, sha = 'none') {
   return `<!-- tabibi-handoff:${kind}:${sha} -->`;
 }
 
-function decideHandoff({ eventName, pr, review, commentBody = '', workflowRun, ciGreen = false }) {
+function decideHandoff({
+  eventName,
+  pr,
+  review,
+  commentBody = '',
+  workflowRun,
+  ciGreen = false,
+}) {
   if (!pr) return null;
   const sha = pr.head?.sha || workflowRun?.head_sha || 'unknown';
   const author = pr.user?.login || '';
 
   if (eventName === 'workflow_run') {
-    if (workflowRun?.status !== 'completed' || workflowRun?.conclusion !== 'success') return null;
-    if (workflowRun.head_sha && pr.head?.sha && workflowRun.head_sha !== pr.head.sha) return null;
+    if (
+      workflowRun?.status !== 'completed' ||
+      workflowRun?.conclusion !== 'success'
+    )
+      return null;
+    if (
+      workflowRun.head_sha &&
+      pr.head?.sha &&
+      workflowRun.head_sha !== pr.head.sha
+    )
+      return null;
     if (isCopilotLogin(author)) {
       return {
         kind: 'copilot-ci-green-review',
@@ -41,20 +57,25 @@ function decideHandoff({ eventName, pr, review, commentBody = '', workflowRun, c
   const reviewBody = review?.body || '';
   const reviewState = String(review?.state || '').toLowerCase();
   const combined = `${reviewBody}\n${commentBody}`;
-  const changesRequired = reviewState === 'changes_requested' || /\bCHANGES_REQUIRED\b/i.test(combined);
+  const changesRequired =
+    reviewState === 'changes_requested' ||
+    /\bCHANGES_REQUIRED\b/i.test(combined);
   if (changesRequired) {
     const target = isCopilotLogin(author) ? 'copilot' : 'implementer';
     return {
       kind: 'changes-required-remediation',
       target,
       sha,
-      message: target === 'copilot'
-        ? `@copilot\n\nSAME-BRANCH REMEDIATION — PR #${pr.number} exact head \`${sha}\` has CHANGES_REQUIRED. Address the concrete reviewer findings on this existing canonical branch only, run CI, and hand the new exact SHA to an independent non-author reviewer. Do not open a duplicate PR.`
-        : `HANDOFF_TO_IMPLEMENTER — PR #${pr.number} exact head \`${sha}\` has CHANGES_REQUIRED. Continue the existing canonical branch/PR only; resolve the concrete findings and rerun CI. The orchestrator must reconcile the current implementer lease before any edit.`,
+      message:
+        target === 'copilot'
+          ? `@copilot\n\nSAME-BRANCH REMEDIATION — PR #${pr.number} exact head \`${sha}\` has CHANGES_REQUIRED. Address the concrete reviewer findings on this existing canonical branch only, run CI, and hand the new exact SHA to an independent non-author reviewer. Do not open a duplicate PR.`
+          : `HANDOFF_TO_IMPLEMENTER — PR #${pr.number} exact head \`${sha}\` has CHANGES_REQUIRED. Continue the existing canonical branch/PR only; resolve the concrete findings and rerun CI. The orchestrator must reconcile the current implementer lease before any edit.`,
     };
   }
 
-  const mergeReady = /\bMERGE_READY\b/i.test(combined) && /\bPASS(?:_WITH_MINOR_FINDINGS)?\b/i.test(combined);
+  const mergeReady =
+    /\bMERGE_READY\b/i.test(combined) &&
+    /\bPASS(?:_WITH_MINOR_FINDINGS)?\b/i.test(combined);
   if (mergeReady && ciGreen) {
     return {
       kind: 'merge-ready-green',
@@ -84,19 +105,30 @@ function requestJson({ token, repo, path, method = 'GET', body }) {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'tabibi-handoff-dispatcher',
-      ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': payload.length } : {}),
+      ...(payload
+        ? {
+            'Content-Type': 'application/json',
+            'Content-Length': payload.length,
+          }
+        : {}),
     },
   };
   return new Promise((resolve, reject) => {
     const req = https.request(options, (res) => {
       let data = '';
       res.setEncoding('utf8');
-      res.on('data', (chunk) => { data += chunk; });
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(data ? JSON.parse(data) : {});
         } else {
-          reject(new Error(`${method} ${path} -> ${res.statusCode}: ${data.slice(0, 500)}`));
+          reject(
+            new Error(
+              `${method} ${path} -> ${res.statusCode}: ${data.slice(0, 500)}`,
+            ),
+          );
         }
       });
     });
@@ -116,13 +148,24 @@ async function exactHeadCiGreen(token, repo, sha) {
     repo,
     path: `/actions/runs?head_sha=${encodeURIComponent(sha)}&per_page=50`,
   });
-  return (data.workflow_runs || []).some((run) =>
-    run.name === 'CI' && run.head_sha === sha && run.status === 'completed' && run.conclusion === 'success');
+  return (data.workflow_runs || []).some(
+    (run) =>
+      run.name === 'CI' &&
+      run.head_sha === sha &&
+      run.status === 'completed' &&
+      run.conclusion === 'success',
+  );
 }
 
 async function alreadyPosted(token, repo, issueNumber, marker) {
-  const comments = await requestJson({ token, repo, path: `/issues/${issueNumber}/comments?per_page=100` });
-  return comments.some((comment) => String(comment.body || '').includes(marker));
+  const comments = await requestJson({
+    token,
+    repo,
+    path: `/issues/${issueNumber}/comments?per_page=100`,
+  });
+  return comments.some((comment) =>
+    String(comment.body || '').includes(marker),
+  );
 }
 
 async function postOnce(token, repo, issueNumber, kind, sha, message) {
@@ -158,17 +201,28 @@ async function main() {
   const repo = process.env.GITHUB_REPOSITORY;
   const eventName = process.env.GITHUB_EVENT_NAME;
   const eventPath = process.env.GITHUB_EVENT_PATH;
-  if (!token || !repo || !eventName || !eventPath) throw new Error('Missing GitHub Actions environment');
+  if (!token || !repo || !eventName || !eventPath)
+    throw new Error('Missing GitHub Actions environment');
 
   const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
   const incomingBody = payload.comment?.body || payload.review?.body || '';
   if (incomingBody.includes('<!-- tabibi-handoff:')) return;
 
-  if (eventName === 'pull_request' && payload.action === 'closed' && payload.pull_request?.merged) {
+  if (
+    eventName === 'pull_request' &&
+    payload.action === 'closed' &&
+    payload.pull_request?.merged
+  ) {
     const pr = payload.pull_request;
     const sha = pr.merge_commit_sha || pr.head?.sha || 'unknown';
-    await postTeamRoomOnce(token, repo, 'post-merge', sha, pr.number,
-      `POST_MERGE_RECONCILE — PR #${pr.number} merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.`);
+    await postTeamRoomOnce(
+      token,
+      repo,
+      'post-merge',
+      sha,
+      pr.number,
+      `POST_MERGE_RECONCILE — PR #${pr.number} merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.`,
+    );
     return;
   }
 
@@ -186,7 +240,8 @@ async function main() {
   let ciGreen = false;
   if (eventName === 'pull_request_review' || eventName === 'issue_comment') {
     const combined = `${payload.review?.body || ''}\n${payload.comment?.body || ''}`;
-    if (/\bMERGE_READY\b/i.test(combined)) ciGreen = await exactHeadCiGreen(token, repo, sha);
+    if (/\bMERGE_READY\b/i.test(combined))
+      ciGreen = await exactHeadCiGreen(token, repo, sha);
   }
 
   const decision = decideHandoff({
@@ -200,9 +255,23 @@ async function main() {
   if (!decision) return;
   assertAllowedTarget(decision.target);
 
-  const posted = await postOnce(token, repo, pr.number, decision.kind, decision.sha, decision.message);
+  const posted = await postOnce(
+    token,
+    repo,
+    pr.number,
+    decision.kind,
+    decision.sha,
+    decision.message,
+  );
   if (posted) {
-    await postTeamRoomOnce(token, repo, decision.kind, decision.sha, pr.number, decision.message);
+    await postTeamRoomOnce(
+      token,
+      repo,
+      decision.kind,
+      decision.sha,
+      pr.number,
+      decision.message,
+    );
   }
 }
 
