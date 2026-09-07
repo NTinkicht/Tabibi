@@ -77,6 +77,14 @@ function decideHandoff({
   const mergeReady =
     /\bMERGE_READY\b/i.test(combined) &&
     /\bPASS(?:_WITH_MINOR_FINDINGS)?\b/i.test(combined);
+  if (mergeReady) {
+    if (eventName === 'issue_comment') return null;
+    if (
+      eventName === 'pull_request_review' &&
+      (!review?.commit_id || review.commit_id !== pr.head?.sha)
+    )
+      return null;
+  }
   if (mergeReady && ciGreen) {
     return {
       kind: 'merge-ready-green',
@@ -246,10 +254,15 @@ async function main() {
   if (!sha) return;
 
   let ciGreen = false;
-  if (eventName === 'pull_request_review' || eventName === 'issue_comment') {
-    const combined = `${payload.review?.body || ''}\n${payload.comment?.body || ''}`;
-    if (/\bMERGE_READY\b/i.test(combined))
+  if (eventName === 'pull_request_review') {
+    const reviewBody = payload.review?.body || '';
+    if (
+      /\bMERGE_READY\b/i.test(reviewBody) &&
+      payload.review?.commit_id &&
+      payload.review.commit_id === sha
+    ) {
       ciGreen = await exactHeadCiGreen(token, repo, sha);
+    }
   }
 
   const decision = decideHandoff({
