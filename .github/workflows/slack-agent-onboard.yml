@@ -21,6 +21,7 @@ jobs:
       SLACK_CHATGPT_BOT_TOKEN: ${{ secrets.SLACK_CHATGPT_BOT_TOKEN }}
       SLACK_CODEX_BOT_TOKEN: ${{ secrets.SLACK_CODEX_BOT_TOKEN }}
       SLACK_CLAUDE_BOT_TOKEN: ${{ secrets.SLACK_CLAUDE_BOT_TOKEN }}
+      SLACK_COPILOT_BOT_TOKEN: ${{ secrets.SLACK_COPILOT_BOT_TOKEN }}
       SLACK_GEMINI_AGENT_BOT_TOKEN: ${{ secrets.SLACK_GEMINI_AGENT_BOT_TOKEN }}
       SLACK_GEMINI_CHAT_BOT_TOKEN: ${{ secrets.SLACK_GEMINI_CHAT_BOT_TOKEN }}
     steps:
@@ -33,8 +34,9 @@ jobs:
               ('ChatGPT', 'SLACK_CHATGPT_BOT_TOKEN', 'Product Architect / Orchestrator'),
               ('Codex', 'SLACK_CODEX_BOT_TOKEN', 'Implementation / CI Engineer'),
               ('Claude', 'SLACK_CLAUDE_BOT_TOKEN', 'Independent Adversarial Reviewer'),
-              ('Gemini Agent', 'SLACK_GEMINI_AGENT_BOT_TOKEN', 'QA / UX / System Verification'),
-              ('Gemini Chat', 'SLACK_GEMINI_CHAT_BOT_TOKEN', 'Adaptive Generalist Collaborator'),
+              ('GitHub Copilot', 'SLACK_COPILOT_BOT_TOKEN', 'Independent QA / Test Automation Engineer'),
+              ('Gemini Agent', 'SLACK_GEMINI_AGENT_BOT_TOKEN', 'Overflow QA / UX / System Verification'),
+              ('Gemini Chat', 'SLACK_GEMINI_CHAT_BOT_TOKEN', 'Overflow Generalist Collaborator'),
           ]
           channel = os.environ['SLACK_CHANNEL_ID']
 
