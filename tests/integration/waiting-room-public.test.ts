@@ -155,20 +155,26 @@ describe('privacy-preserving waiting-room projection', () => {
     expect(afterTerminal.entries).toEqual([]);
   });
 
-  it('backfills an ID-derived label on an entry that predates migration 0007 (CLAUDE-034 upgrade path)', async () => {
-    const patientId = randomUUID();
-    const entryId = randomUUID();
-    const legacyLabel = `W-${entryId.replaceAll('-', '').slice(0, 10).toUpperCase()}`;
+  it('backfills legacy ID-derived labels without churning an existing non-legacy label', async () => {
+    const legacyPatientId = randomUUID();
+    const safePatientId = randomUUID();
+    const legacyEntryId = randomUUID();
+    const safeEntryId = randomUUID();
+    const legacyLabel = `W-${legacyEntryId.replaceAll('-', '').slice(0, 10).toUpperCase()}`;
+    const safeLabel = 'W-SAFE-LABEL';
 
     await pool.query(
       `INSERT INTO patient_operational_records
          (id, clinic_id, private_display_name, preferred_locale)
-       VALUES ($1, $2, 'Legacy Patient', 'fr')`,
-      [patientId, ids.clinic],
+       VALUES
+         ($1, $3, 'Legacy Patient', 'fr'),
+         ($2, $3, 'Safe Label Patient', 'fr')`,
+      [legacyPatientId, safePatientId, ids.clinic],
     );
-    // Simulate a row created before migration 0007's trigger existed: disable
-    // the trigger so we can insert the exact pre-migration insecure label
-    // (the app's old ID-derived scheme), matching real historical data.
+
+    // Simulate rows created before migration 0007's trigger existed. One row
+    // has the exact legacy ID-derived label; the other represents a pre-existing
+    // non-legacy label that the migration must preserve.
     await pool.query(
       `ALTER TABLE queue_entries DISABLE TRIGGER queue_entries_assign_public_display_label`,
     );
@@ -177,8 +183,19 @@ describe('privacy-preserving waiting-room projection', () => {
         `INSERT INTO queue_entries
            (id, clinic_id, session_id, patient_id, state, source, registration_order,
             eligibility_order, priority_order, public_display_label)
-         VALUES ($1, $2, $3, $4, 'waiting', 'walk_in', 1, NULL, NULL, $5)`,
-        [entryId, ids.clinic, ids.session, patientId, legacyLabel],
+         VALUES
+           ($1, $3, $4, $5, 'waiting', 'walk_in', 1, NULL, NULL, $7),
+           ($2, $3, $4, $6, 'waiting', 'walk_in', 2, NULL, NULL, $8)`,
+        [
+          legacyEntryId,
+          safeEntryId,
+          ids.clinic,
+          ids.session,
+          legacyPatientId,
+          safePatientId,
+          legacyLabel,
+          safeLabel,
+        ],
       );
     } finally {
       await pool.query(
@@ -186,22 +203,36 @@ describe('privacy-preserving waiting-room projection', () => {
       );
     }
 
-    const before = await pool.query<{ public_display_label: string }>(
-      `SELECT public_display_label FROM queue_entries WHERE id = $1`,
-      [entryId],
+    const before = await pool.query<{
+      id: string;
+      public_display_label: string;
+    }>(
+      `SELECT id, public_display_label
+         FROM queue_entries
+        WHERE id = ANY($1::uuid[])
+        ORDER BY registration_order`,
+      [[legacyEntryId, safeEntryId]],
     );
-    expect(before.rows[0]?.public_display_label).toBe(legacyLabel);
+    expect(before.rows.map((row) => row.public_display_label)).toEqual([
+      legacyLabel,
+      safeLabel,
+    ]);
 
-    // Re-run migration 0007's exact backfill logic (not the trigger, which
-    // only governs future inserts) to prove it closes the gap for entries
-    // that already existed when the migration runs.
+    // Re-run migration 0007's exact filtered backfill logic. Only the label
+    // that exactly matches the legacy W-<UUID prefix> derivation is replaced.
     await pool.query(`
       DO $$
       DECLARE
         entry RECORD;
         candidate text;
       BEGIN
-        FOR entry IN SELECT id, session_id FROM queue_entries ORDER BY id LOOP
+        FOR entry IN
+          SELECT id, session_id
+            FROM queue_entries
+           WHERE public_display_label =
+                 'W-' || upper(substr(replace(id::text, '-', ''), 1, 10))
+           ORDER BY id
+        LOOP
           LOOP
             candidate := 'W-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));
             EXIT WHEN NOT EXISTS (
@@ -218,11 +249,18 @@ describe('privacy-preserving waiting-room projection', () => {
       $$;
     `);
 
-    const after = await pool.query<{ public_display_label: string }>(
-      `SELECT public_display_label FROM queue_entries WHERE id = $1`,
-      [entryId],
+    const after = await pool.query<{
+      id: string;
+      public_display_label: string;
+    }>(
+      `SELECT id, public_display_label
+         FROM queue_entries
+        WHERE id = ANY($1::uuid[])
+        ORDER BY registration_order`,
+      [[legacyEntryId, safeEntryId]],
     );
     expect(after.rows[0]?.public_display_label).not.toBe(legacyLabel);
     expect(after.rows[0]?.public_display_label).toMatch(/^W-[A-F0-9]{10}$/);
+    expect(after.rows[1]?.public_display_label).toBe(safeLabel);
   });
 });
