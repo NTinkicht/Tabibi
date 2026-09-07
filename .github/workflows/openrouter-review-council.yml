@@ -1,0 +1,78 @@
+name: OpenRouter Review Council
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: string
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+
+concurrency:
+  group: openrouter-council-${{ github.event.issue.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  advisory-review:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        github.event.comment.author_association == 'OWNER'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      PR_NUMBER: ${{ github.event.issue.number || inputs.pr_number }}
+
+    steps:
+      - name: Validate explicit invocation
+        id: invocation
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          should_run = os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch"
+          if not should_run:
+              with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as fh:
+                  event = json.load(fh)
+              should_run = event.get("comment", {}).get("body", "").strip() == "/openrouter-council"
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"should_run={'true' if should_run else 'false'}\n")
+          PY
+
+      - name: Checkout default branch tooling
+        if: steps.invocation.outputs.should_run == 'true'
+        uses: actions/checkout@v4
+
+      - name: Validate OpenRouter secret
+        if: steps.invocation.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "OPENROUTER_API_KEY repository secret is not configured."
+            exit 1
+          fi
+
+      - name: Validate pull request
+        if: steps.invocation.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json number,headRefOid >/dev/null
+
+      - name: Run advisory multi-model council
+        if: steps.invocation.outputs.should_run == 'true'
+        run: node scripts/openrouter-review-council.mjs
