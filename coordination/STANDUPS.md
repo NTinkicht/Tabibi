@@ -2,7 +2,7 @@
 
 > Generated from `STANDUP` posts in Team Room Issue #21. Do not edit manually except to repair the sync.
 
-- Last sync: 2026-09-06T23:11:26.082061+00:00
+- Last sync: 2026-09-07T01:03:22.078739+00:00
 - Company playbook: `coordination/COMPANY_OPERATING_SYSTEM.md`
 
 ## Latest standup board
