@@ -3,8 +3,6 @@ name: Company Room Sync
 on:
   issue_comment:
     types: [created, edited, deleted]
-  schedule:
-    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
