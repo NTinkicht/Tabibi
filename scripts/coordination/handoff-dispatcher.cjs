@@ -62,6 +62,7 @@ function decideHandoff({
     reviewState === 'changes_requested' ||
     /\bCHANGES_REQUIRED\b/i.test(combined);
   if (changesRequired) {
+    if (eventName === 'issue_comment') return null;
     const target = isCopilotLogin(author) ? 'copilot' : 'implementer';
     return {
       kind: 'changes-required-remediation',
