@@ -3,8 +3,6 @@ name: Gemini Chat Collaborator
 on:
   issue_comment:
     types: [created]
-  schedule:
-    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -204,7 +202,7 @@ jobs:
             Do not alter or re-review the head. Post the merge evidence and continuation.
 
   monitor-gate:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
