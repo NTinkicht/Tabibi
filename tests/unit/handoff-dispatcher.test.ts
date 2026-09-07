@@ -85,24 +85,56 @@ describe('event-driven handoff dispatcher', () => {
     expect(decision?.message).toContain('existing canonical branch');
   });
 
-  it('only surfaces MERGE_READY when exact-head CI is green', () => {
+  it('only surfaces review MERGE_READY for the live exact head with green CI', () => {
     expect(
       decideHandoff({
-        eventName: 'issue_comment',
+        eventName: 'pull_request_review',
         pr: normalPr,
-        commentBody: 'PASS / MERGE_READY',
+        review: {
+          state: 'approved',
+          body: 'PASS / MERGE_READY',
+          commit_id: 'old-sha',
+        },
+        ciGreen: true,
+      }),
+    ).toBeNull();
+
+    expect(
+      decideHandoff({
+        eventName: 'pull_request_review',
+        pr: normalPr,
+        review: {
+          state: 'approved',
+          body: 'PASS / MERGE_READY',
+          commit_id: 'def456',
+        },
         ciGreen: false,
       }),
     ).toBeNull();
 
     expect(
       decideHandoff({
-        eventName: 'issue_comment',
+        eventName: 'pull_request_review',
         pr: normalPr,
-        commentBody: 'PASS / MERGE_READY',
+        review: {
+          state: 'approved',
+          body: 'PASS / MERGE_READY',
+          commit_id: 'def456',
+        },
         ciGreen: true,
       }),
     ).toMatchObject({ kind: 'merge-ready-green', target: 'orchestrator' });
+  });
+
+  it('never auto-promotes plain issue-comment MERGE_READY claims', () => {
+    expect(
+      decideHandoff({
+        eventName: 'issue_comment',
+        pr: normalPr,
+        commentBody: 'PASS / MERGE_READY for def456',
+        ciGreen: true,
+      }),
+    ).toBeNull();
   });
 
   it('hard-blocks paused Gemini targets', () => {
