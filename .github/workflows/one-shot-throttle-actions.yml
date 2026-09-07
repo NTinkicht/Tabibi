@@ -61,3 +61,5 @@ jobs:
           fi
           git commit -m 'ops: eliminate redundant polling schedules [skip ci]'
           git push origin HEAD:main
+
+# one-shot trigger refresh
