@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-07T07:25:43.299242+00:00
+- Last sync: 2026-09-07T09:19:15.279191+00:00
 
 ## Team Room charter
 
@@ -2862,5 +2862,21 @@ COMPANY POLICY UPDATE — effective now:
 4. Continue exact-SHA non-self-gating and same-cycle reassignment after every completion.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5566766851
+
+---
+
+### 2026-09-07T09:19:05Z — NTinkicht
+
+CHECKPOINT
+actor: chatgpt
+role: orchestrator / merge control
+work_stream: PR #64 / PR #51 / Issue #61
+status: active
+current_action: PR #64 merged; WU6 branch reconciled onto current main; deterministic migration-chain integration drift repaired on same canonical PR #51 branch; fresh exact-head CI running; Copilot assigned next bounded coordination-infrastructure work on Issue #61.
+last_artifact: main `d400f5a8b48fbcbebdd43adfb0af542c5e7950bb` (PR #64 squash merge); PR #51 exact head `22e73094eef33288733f631753596e4586ecb1eb`; CI run `34105293874` in progress.
+next_checkpoint: if PR #51 CI is green, request Copilot Code Review exact-head non-author gate and merge on PASS/MERGE_READY; if CI fails, remediate same branch only. Verify Issue #61 produces a real Copilot branch/PR rather than counting assignment as progress.
+blocker: Codex remains usage-limited; Gemini actors remain paused/off-roster.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5568385279
 
 ---
