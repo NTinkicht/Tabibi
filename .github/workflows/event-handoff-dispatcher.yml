@@ -1,0 +1,51 @@
+name: Event Handoff Dispatcher
+
+on:
+  pull_request:
+    types: [closed]
+  pull_request_review:
+    types: [submitted]
+  issue_comment:
+    types: [created]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: handoff-dispatch-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    if: >-
+      github.event_name != 'workflow_dispatch' &&
+      !(github.event_name == 'issue_comment' && contains(github.event.comment.body, '<!-- tabibi-handoff:'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout dispatcher from main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Dispatch deterministic handoff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/coordination/handoff-dispatcher.cjs
+
+  static-check:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Parse dispatcher
+        run: node --check scripts/coordination/handoff-dispatcher.cjs
