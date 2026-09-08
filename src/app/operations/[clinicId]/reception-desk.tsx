@@ -39,6 +39,7 @@ export function ReceptionDesk({
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [pending, setPending] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [delayMinutes, setDelayMinutes] = useState<Record<string, string>>({});
   const pendingKeysRef = useRef(new Map<string, string>());
 
   function keyFor(opId: string): string {
@@ -124,10 +125,17 @@ export function ReceptionDesk({
       reason,
     });
   }
-  async function delay(session: Session) {
-    const raw = window.prompt(t.promptDelay);
-    if (raw === null) return;
+  async function delay(
+    event: React.FormEvent<HTMLFormElement>,
+    session: Session,
+  ) {
+    event.preventDefault();
+    const raw = delayMinutes[session.id] ?? '';
     const minutes = Number(raw);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 720) {
+      setMessage(t.delayInvalid);
+      return;
+    }
     const delayCommand =
       session.declaredDelayMinutes === null ? 'declare_delay' : 'update_delay';
     await mutate(session.id, `${session.id}:delay:${delayCommand}`, 'delay', {
@@ -287,9 +295,40 @@ export function ReceptionDesk({
                 </button>
               )}
               {!['closed', 'cancelled'].includes(session.status) && (
-                <button className="quiet" onClick={() => void delay(session)}>
-                  {t.delay}
-                </button>
+                <form
+                  className="delayControl"
+                  onSubmit={(event) => void delay(event, session)}
+                >
+                  <label htmlFor={`delay-${session.id}`}>
+                    {t.delayMinutes}
+                  </label>
+                  <input
+                    id={`delay-${session.id}`}
+                    aria-describedby={`delay-hint-${session.id}`}
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    max="720"
+                    step="1"
+                    required
+                    value={
+                      delayMinutes[session.id] ??
+                      String(session.declaredDelayMinutes ?? '')
+                    }
+                    onChange={(event) =>
+                      setDelayMinutes((values) => ({
+                        ...values,
+                        [session.id]: event.target.value,
+                      }))
+                    }
+                  />
+                  <span className="srOnly" id={`delay-hint-${session.id}`}>
+                    {t.delayRange}
+                  </span>
+                  <button className="quiet" type="submit">
+                    {t.delay}
+                  </button>
+                </form>
               )}
               {session.declaredDelayMinutes !== null && (
                 <button

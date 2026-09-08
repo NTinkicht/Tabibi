@@ -17,6 +17,9 @@ This matrix maps committed requirements/invariants to their current test layer, 
 | `priority_order` is the authoritative live override and stays contiguous | Integration | `tests/integration/queue-priority.test.ts`, `tests/integration/queue-adversarial.test.ts` | `CI / PostgreSQL integration`, `Nightly QA / Deep PostgreSQL adversarial` | Covered |
 | Deterministic adversarial queue sequences preserve invariants after every step | Integration | `tests/integration/queue-adversarial.test.ts` | `CI / PostgreSQL integration`, `Nightly QA / Deep PostgreSQL adversarial` | Covered |
 | Arabic/French + RTL/LTR + mobile reception flows remain usable | E2E | `tests/e2e/smoke.spec.ts`, `tests/e2e/queue-rtl-mobile.spec.ts` | `CI / Browser smoke`, `Nightly QA / Browser RTL and mobile` | Covered |
+| Delay commands serialize with update/clear and terminal lifecycle races | Integration | `tests/integration/session-delay-hardening.test.ts` | `CI / PostgreSQL integration` | Covered |
+| Delay HTTP tenant/role boundaries, cross-command idempotency, and minimized non-duplicated audit metadata | Integration | `tests/integration/session-delay-hardening.test.ts` | `CI / PostgreSQL integration` | Covered |
+| Bounded Arabic/French mobile delay entry avoids browser prompts | E2E | `tests/e2e/smoke.spec.ts` | `CI / Browser smoke` | Covered |
 | Current migration chain applies through the real migrator and remains idempotent | Integration | `tests/integration/database.test.ts`, `tests/integration/migration-chain.test.ts` | `CI / PostgreSQL integration` | Covered for `0001`-`0006` |
 
 ## Known regression / finding mapping
