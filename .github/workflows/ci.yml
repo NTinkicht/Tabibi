@@ -49,8 +49,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: prettier-diagnostic
-          path: prettier.patch
-          if-no-files-found: ignore
+          path: |
+            prettier.patch
+            scripts/coordination/handoff-dispatcher.cjs
+            tests/unit/handoff-dispatcher.test.ts
+          if-no-files-found: error
 
       - name: Lint
         run: npm run lint
