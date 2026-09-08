@@ -39,8 +39,8 @@ beforeEach(async () => {
     [ids.clinicA, ids.clinicB],
   );
   await pool.query(
-    `INSERT INTO clinic_memberships(clinic_id,user_id,role) VALUES($1,$3,'receptionist')`,
-    [ids.clinicA, ids.clinicB, ids.receptionist],
+    `INSERT INTO clinic_memberships(clinic_id,user_id,role) VALUES($1,$2,'receptionist')`,
+    [ids.clinicA, ids.receptionist],
   );
   await pool.query(
     `INSERT INTO doctor_profiles(id,user_id,display_name) VALUES($1,$2,'Dr Dashboard')`,

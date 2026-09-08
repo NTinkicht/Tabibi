@@ -154,7 +154,7 @@ test('mobile Arabic queue view reloads safely after a stale reorder conflict and
     await stalePage.setViewportSize({ width: 1280, height: 800 });
     await expect(
       stalePage.getByLabel('Vue opérationnelle de la réception'),
-    ).toContainText('Dr');
+    ).toContainText('د. ليلى');
   } finally {
     await stalePage?.close();
     await pool.end();
