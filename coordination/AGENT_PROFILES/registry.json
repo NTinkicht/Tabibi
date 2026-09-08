@@ -9,8 +9,11 @@
     "creates_actor": false,
     "creates_implementation_lease": false,
     "overrides_self_gate_rule": false,
+    "requires_material_authorship_check": true,
+    "requires_actor_backed_specialist_lanes": true,
     "max_primary_overlays_per_task": 1,
-    "severity": ["BLOCKER", "SHOULD_FIX", "FOLLOW_UP", "NIT"]
+    "severity": ["BLOCKER", "MAJOR", "MINOR", "NOTE"],
+    "verdicts": ["PASS", "PASS_WITH_MINOR_FINDINGS", "CHANGES_REQUIRED"]
   },
   "profiles": [
     {
