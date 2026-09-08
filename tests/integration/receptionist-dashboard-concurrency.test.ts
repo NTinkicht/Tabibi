@@ -98,7 +98,7 @@ beforeEach(async () => {
   await pool.query(
     `INSERT INTO consultation_sessions
     (id,clinic_id,doctor_id,service_date,starts_at,ends_at,status,declared_delay_minutes,delay_version,delay_updated_at)
-    VALUES ($1,$2,$3,'2026-09-08','2026-09-08 09:00Z','2026-09-08 12:00Z','open',0,0,NULL)`,
+    VALUES ($1,$2,$3,'2026-09-08','2026-09-08 09:00Z','2026-09-08 12:00Z','open',NULL,0,NULL)`,
     [ids.session, ids.clinic, ids.doctor],
   );
 });
