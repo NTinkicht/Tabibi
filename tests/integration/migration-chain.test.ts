@@ -94,4 +94,4 @@ describe('committed migration chain', () => {
       appointment_source_allowed: true,
     });
   });
-}
+});
