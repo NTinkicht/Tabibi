@@ -51,7 +51,7 @@ describe('committed migration chain', () => {
       eta_timing_idx: string | null;
       appointments: string | null;
       appointment_receipts: string | null;
-      appointment_source_allowed: string;
+      appointment_source_allowed: boolean;
     }>(
       `SELECT
          EXISTS (
@@ -91,7 +91,7 @@ describe('committed migration chain', () => {
       eta_timing_idx: 'queue_entries_session_completed_timing_idx',
       appointments: 'appointments',
       appointment_receipts: 'appointment_booking_receipts',
-      appointment_source_allowed: 'true',
+      appointment_source_allowed: true,
     });
   });
-});
+}
