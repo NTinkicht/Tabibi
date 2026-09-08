@@ -1,14 +1,18 @@
+import {
+  AppointmentConflictError,
+  AppointmentValidationError,
+} from '@/modules/appointment';
 import { AuthorizationError } from '@/modules/identity';
 import { QueueConflictError, QueueValidationError } from '@/modules/queue';
+import { ReceptionistDashboardNotFoundError } from '@/modules/receptionist-dashboard';
 import {
   SessionConflictError,
   SessionValidationError,
 } from '@/modules/session';
-import { StaffAuthenticationError, StaffCsrfError } from './staff-auth';
-import { correlationId } from './request-context';
 import { getLogger } from '@/platform/observability/logger';
 import { ZodError } from 'zod';
-import { ReceptionistDashboardNotFoundError } from '@/modules/receptionist-dashboard';
+import { correlationId } from './request-context';
+import { StaffAuthenticationError, StaffCsrfError } from './staff-auth';
 
 function isPostgresCheckConflict(error: unknown): boolean {
   return (
@@ -46,6 +50,7 @@ export async function operationalJson(
       status = 404;
       code = 'not_found';
     } else if (
+      error instanceof AppointmentValidationError ||
       error instanceof SessionValidationError ||
       error instanceof QueueValidationError ||
       error instanceof ZodError ||
@@ -54,6 +59,7 @@ export async function operationalJson(
       status = 400;
       code = 'invalid_request';
     } else if (
+      error instanceof AppointmentConflictError ||
       error instanceof SessionConflictError ||
       error instanceof QueueConflictError ||
       isPostgresCheckConflict(error)
