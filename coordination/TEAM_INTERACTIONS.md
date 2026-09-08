@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-08T18:14:44.527516+00:00
+- Last sync: 2026-09-08T20:12:19.907119+00:00
 
 ## Team Room charter
 
@@ -5555,5 +5555,62 @@ Actions this cycle: dispatched one binding non-author Codex review tied to exact
 next_checkpoint: substantive Codex exact-head PASS/MERGE_READY or blocking finding. Do not merge before that evidence.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5589750909
+
+---
+
+### 2026-09-08T18:35:10Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=work_unit_10_merge_ready
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 1795 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5590000723
+
+---
+
+### 2026-09-08T19:41:50Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr112:ebd54e19a43818ce861658e7fb306ac0f23658ff -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #112
+head: ebd54e19a43818ce861658e7fb306ac0f23658ff
+CI_GREEN_HANDOFF — PR #112 exact head `ebd54e19a43818ce861658e7fb306ac0f23658ff` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5590818186
+
+---
+
+### 2026-09-08T20:11:38Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr111:afa3cd314f89ce3762a14c7b0c1ceaf2e5720969 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #111
+head: afa3cd314f89ce3762a14c7b0c1ceaf2e5720969
+POST_MERGE_RECONCILE — PR #111 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5591223142
+
+---
+
+### 2026-09-08T20:12:05Z — NTinkicht
+
+RETRO_OPEN / CHECKPOINT — WU11 merged
+
+WU11 PR #111 merged by protected expected-head squash at exact reviewed head `3200952a53e56d87fc951e76c46239a73bdc380c`; resulting main commit `afa3cd314f89ce3762a14c7b0c1ceaf2e5720969`. Exact-head CI `34256028347` was SUCCESS and Codex supplied binding non-author `PASS / MERGE_READY` for that SHA.
+
+What worked: exact-SHA gate discipline caught migration lock-window defects despite green CI; bounded same-branch remediation preserved one canonical stream; deterministic PostgreSQL evidence made the final gate concrete.
+
+What to improve: migration reviews should model lock acquisition/retention order before first implementation, not after CI; future DB work units should include an explicit lock-budget/DDL-concurrency checklist in acceptance prep.
+
+Next: Issue #113 (WU12 appointment lifecycle synchronization) is preparation-active. PR #112 is the only remaining open PR and became non-mergeable after WU11 landed; its current CI is pending, so it is held for reconciliation rather than allowed to interfere with product work. Gemini Chat/Agent remain paused/off-roster.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5591230601
 
 ---
