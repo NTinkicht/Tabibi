@@ -38,11 +38,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate dependency remediation diff
+      - name: Generate dependency remediation patch
         run: |
           npm install --package-lock-only --save-exact sharp@0.35.4 vitest@4.1.11
-          git diff -- package.json package-lock.json
-          exit 1
+          git diff -- package.json package-lock.json > dependency-remediation.patch
+
+      - name: Upload dependency remediation patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-remediation-patch
+          path: dependency-remediation.patch
+
+      - name: Stop after patch capture
+        run: exit 1
 
       - name: Formatting
         run: npm run format
