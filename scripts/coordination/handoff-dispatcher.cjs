@@ -15,11 +15,37 @@ function dedupKey(kind, sha = 'none') {
   return `<!-- tabibi-handoff:${kind}:${sha} -->`;
 }
 
-function hasExplicitMergeReadySignal(text = '') {
-  return (
-    /(?:^|\n)\s*MERGE_READY\s*(?:$|\n)/i.test(text) ||
-    /\bPASS(?:_WITH_MINOR_FINDINGS)?\s*\/\s*MERGE_READY\b/i.test(text)
-  );
+function parseSpecialistReview(text = '') {
+  const lines = String(text).split(/\r?\n/);
+  const firstNonEmpty = lines.findIndex((line) => line.trim() !== '');
+  if (firstNonEmpty < 0 || lines[firstNonEmpty].trim() !== 'SPECIALIST_REVIEW') {
+    return null;
+  }
+
+  const fields = {};
+  for (const rawLine of lines.slice(firstNonEmpty + 1)) {
+    const line = rawLine.trim();
+    if (!line || line === 'findings:') continue;
+    if (line.startsWith('```') || line.startsWith('>')) return null;
+    const match = /^([a-z_]+):\s*(.+)$/i.exec(line);
+    if (!match) continue;
+    fields[match[1].toLowerCase()] = match[2].trim();
+  }
+
+  if (!fields.actor || !fields.overlay || !fields.pr || !fields.exact_sha) return null;
+  if (!fields.verdict || !fields.merge_ready) return null;
+  return fields;
+}
+
+function hasExplicitMergeReadySignal(text = '', expectedSha, expectedPrNumber) {
+  const artifact = parseSpecialistReview(text);
+  if (!artifact) return false;
+  const verdict = String(artifact.verdict || '').toUpperCase();
+  if (!['PASS', 'PASS_WITH_MINOR_FINDINGS'].includes(verdict)) return false;
+  if (String(artifact.merge_ready || '').toLowerCase() !== 'yes') return false;
+  if (expectedSha && artifact.exact_sha !== expectedSha) return false;
+  if (expectedPrNumber && Number(artifact.pr) !== Number(expectedPrNumber)) return false;
+  return true;
 }
 
 function decideHandoff({
@@ -29,6 +55,7 @@ function decideHandoff({
   commentBody = '',
   workflowRun,
   ciGreen = false,
+  reviewerEligible = false,
 }) {
   if (!pr) return null;
   const sha = pr.head?.sha || workflowRun?.head_sha || 'unknown';
@@ -82,23 +109,19 @@ function decideHandoff({
     };
   }
 
-  const mergeReady =
-    hasExplicitMergeReadySignal(combined) &&
-    /\bPASS(?:_WITH_MINOR_FINDINGS)?\b/i.test(combined);
+  const mergeReady = hasExplicitMergeReadySignal(reviewBody, sha, pr.number);
   if (mergeReady) {
-    if (eventName === 'issue_comment') return null;
-    if (
-      eventName === 'pull_request_review' &&
-      (!review?.commit_id || review.commit_id !== pr.head?.sha)
-    )
-      return null;
+    if (eventName !== 'pull_request_review') return null;
+    if (reviewState !== 'approved') return null;
+    if (!reviewerEligible) return null;
+    if (!review?.commit_id || review.commit_id !== pr.head?.sha) return null;
   }
   if (mergeReady && ciGreen) {
     return {
       kind: 'merge-ready-green',
       target: 'orchestrator',
       sha,
-      message: `MERGE_READY_HANDOFF — PR #${pr.number} exact head \`${sha}\` has an independent PASS/MERGE_READY signal and green exact-head CI. Orchestrator: re-check unchanged head, open blocking findings, and merge mechanically if all binding gates remain satisfied.`,
+      message: `MERGE_READY_HANDOFF — PR #${pr.number} exact head \`${sha}\` has an approved, independently eligible structured PASS gate and green exact-head CI. Orchestrator: re-check unchanged head and all known-open BLOCKER/MAJOR findings before mechanical merge.`,
     };
   }
 
@@ -265,13 +288,18 @@ async function main() {
   if (eventName === 'pull_request_review') {
     const reviewBody = payload.review?.body || '';
     if (
-      hasExplicitMergeReadySignal(reviewBody) &&
-      payload.review?.commit_id &&
-      payload.review.commit_id === sha
+      hasExplicitMergeReadySignal(reviewBody, sha, pr.number) &&
+      payload.review?.state === 'approved' &&
+      payload.review?.commit_id === sha
     ) {
       ciGreen = await exactHeadCiGreen(token, repo, sha);
     }
   }
+
+  // GitHub event data alone cannot prove material-authorship independence.
+  // Keep automatic merge routing conservative; the orchestrator must explicitly
+  // reconcile reviewer eligibility before a binding merge handoff is emitted.
+  const reviewerEligible = false;
 
   const decision = decideHandoff({
     eventName,
@@ -280,6 +308,7 @@ async function main() {
     commentBody: payload.comment?.body || '',
     workflowRun: payload.workflow_run,
     ciGreen,
+    reviewerEligible,
   });
   if (!decision) return;
   assertAllowedTarget(decision.target);
@@ -315,6 +344,7 @@ module.exports = {
   PAUSED_ACTORS,
   isCopilotLogin,
   dedupKey,
+  parseSpecialistReview,
   hasExplicitMergeReadySignal,
   decideHandoff,
   assertAllowedTarget,
