@@ -39,7 +39,10 @@ jobs:
         run: npm ci
 
       - name: Formatting
-        run: npm run format
+        run: |
+          npx prettier --write tests/unit/handoff-dispatcher-reconciliation-order.test.ts
+          git diff -- tests/unit/handoff-dispatcher-reconciliation-order.test.ts
+          exit 1
 
       - name: Lint
         run: npm run lint
