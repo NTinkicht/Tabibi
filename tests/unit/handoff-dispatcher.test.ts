@@ -8,6 +8,8 @@ const {
   dedupKey,
   getPrNumber,
   isCopilotLogin,
+  parseSpecialistReview,
+  hasExplicitMergeReadySignal,
 } = require('../../scripts/coordination/handoff-dispatcher.cjs') as {
   decideHandoff: (input: Record<string, unknown>) => {
     kind: string;
@@ -22,6 +24,12 @@ const {
     payload: Record<string, unknown>,
   ) => number | null;
   isCopilotLogin: (login: string) => boolean;
+  parseSpecialistReview: (text: string) => Record<string, string> | null;
+  hasExplicitMergeReadySignal: (
+    text: string,
+    expectedSha?: string,
+    expectedPrNumber?: number,
+  ) => boolean;
 };
 
 const copilotPr = {
@@ -35,6 +43,23 @@ const normalPr = {
   user: { login: 'NTinkicht' },
   head: { sha: 'def456' },
 };
+
+function specialistReviewBody(
+  verdict: 'PASS' | 'PASS_WITH_MINOR_FINDINGS' = 'PASS',
+  overrides: Record<string, string> = {},
+) {
+  return [
+    'SPECIALIST_REVIEW',
+    `actor: ${overrides.actor ?? 'codex'}`,
+    `overlay: ${overrides.overlay ?? 'code-reviewer'}`,
+    `pr: ${overrides.pr ?? '51'}`,
+    `exact_sha: ${overrides.exact_sha ?? 'def456'}`,
+    `verdict: ${overrides.verdict ?? verdict}`,
+    `merge_ready: ${overrides.merge_ready ?? 'yes'}`,
+    'findings:',
+    verdict === 'PASS' ? '- NOTE: none' : '- MINOR: non-blocking follow-up',
+  ].join('\n');
+}
 
 describe('event-driven handoff dispatcher', () => {
   it('routes a green Copilot-authored exact head to Claude without invoking paused Gemini', () => {
@@ -96,63 +121,10 @@ describe('event-driven handoff dispatcher', () => {
     ).toBeNull();
   });
 
-  it('only surfaces review MERGE_READY for the live exact head with green CI', () => {
-    expect(
-      decideHandoff({
-        eventName: 'pull_request_review',
-        pr: normalPr,
-        review: {
-          state: 'approved',
-          body: 'PASS / MERGE_READY',
-          commit_id: 'old-sha',
-        },
-        ciGreen: true,
-      }),
-    ).toBeNull();
-
-    expect(
-      decideHandoff({
-        eventName: 'pull_request_review',
-        pr: normalPr,
-        review: {
-          state: 'approved',
-          body: 'PASS / MERGE_READY',
-          commit_id: 'def456',
-        },
-        ciGreen: false,
-      }),
-    ).toBeNull();
-
-    expect(
-      decideHandoff({
-        eventName: 'pull_request_review',
-        pr: normalPr,
-        review: {
-          state: 'approved',
-          body: 'PASS / MERGE_READY',
-          commit_id: 'def456',
-        },
-        ciGreen: true,
-      }),
-    ).toMatchObject({ kind: 'merge-ready-green', target: 'orchestrator' });
-  });
-
-  it.each(['PASS', 'PASS_WITH_MINOR_FINDINGS'])(
-    'routes a canonical %s specialist-review template when it explicitly emits MERGE_READY',
+  it.each(['PASS', 'PASS_WITH_MINOR_FINDINGS'] as const)(
+    'routes a canonical %s structured specialist review only when approval, eligibility, exact head, and green CI all match',
     (verdict) => {
-      const body = [
-        'SPECIALIST_REVIEW',
-        'actor: codex',
-        'overlay: code-reviewer',
-        'pr: 51',
-        'exact_sha: def456',
-        `verdict: ${verdict}`,
-        'merge_ready: yes',
-        'findings:',
-        verdict === 'PASS' ? '- NOTE: none' : '- MINOR: non-blocking follow-up',
-        'MERGE_READY',
-      ].join('\n');
-
+      const body = specialistReviewBody(verdict);
       expect(
         decideHandoff({
           eventName: 'pull_request_review',
@@ -163,32 +135,82 @@ describe('event-driven handoff dispatcher', () => {
             commit_id: 'def456',
           },
           ciGreen: true,
+          reviewerEligible: true,
         }),
       ).toMatchObject({ kind: 'merge-ready-green', target: 'orchestrator' });
     },
   );
 
-  it('does not route a specialist-review template without the explicit MERGE_READY signal', () => {
-    expect(
-      decideHandoff({
-        eventName: 'pull_request_review',
-        pr: normalPr,
-        review: {
-          state: 'approved',
-          body: [
-            'SPECIALIST_REVIEW',
-            'actor: codex',
-            'overlay: code-reviewer',
-            'pr: 51',
-            'exact_sha: def456',
-            'verdict: PASS',
-            'merge_ready: no',
-          ].join('\n'),
-          commit_id: 'def456',
-        },
-        ciGreen: true,
-      }),
-    ).toBeNull();
+  it('rejects stale exact_sha, wrong PR, merge_ready no, non-approved reviews, and ineligible reviewers', () => {
+    const cases = [
+      {
+        body: specialistReviewBody('PASS', { exact_sha: 'old-sha' }),
+        state: 'approved',
+        eligible: true,
+      },
+      {
+        body: specialistReviewBody('PASS', { pr: '99' }),
+        state: 'approved',
+        eligible: true,
+      },
+      {
+        body: specialistReviewBody('PASS', { merge_ready: 'no' }),
+        state: 'approved',
+        eligible: true,
+      },
+      {
+        body: specialistReviewBody('PASS'),
+        state: 'commented',
+        eligible: true,
+      },
+      {
+        body: specialistReviewBody('PASS'),
+        state: 'approved',
+        eligible: false,
+      },
+    ];
+
+    for (const testCase of cases) {
+      expect(
+        decideHandoff({
+          eventName: 'pull_request_review',
+          pr: normalPr,
+          review: {
+            state: testCase.state,
+            body: testCase.body,
+            commit_id: 'def456',
+          },
+          ciGreen: true,
+          reviewerEligible: testCase.eligible,
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it('rejects prose, quoted text, and fenced examples containing PASS / MERGE_READY', () => {
+    const bodies = [
+      'Expected output is PASS / MERGE_READY',
+      '> SPECIALIST_REVIEW\n> actor: codex\n> overlay: code-reviewer\n> pr: 51\n> exact_sha: def456\n> verdict: PASS\n> merge_ready: yes',
+      '```text\nSPECIALIST_REVIEW\nactor: codex\noverlay: code-reviewer\npr: 51\nexact_sha: def456\nverdict: PASS\nmerge_ready: yes\n```',
+    ];
+
+    for (const body of bodies) {
+      expect(hasExplicitMergeReadySignal(body, 'def456', 51)).toBe(false);
+      expect(parseSpecialistReview(body)).toBeNull();
+    }
+  });
+
+  it('requires a literal structured artifact at the start of the review body', () => {
+    const body = specialistReviewBody('PASS');
+    expect(parseSpecialistReview(body)).toMatchObject({
+      actor: 'codex',
+      overlay: 'code-reviewer',
+      pr: '51',
+      exact_sha: 'def456',
+      verdict: 'PASS',
+      merge_ready: 'yes',
+    });
+    expect(hasExplicitMergeReadySignal(body, 'def456', 51)).toBe(true);
   });
 
   it('never auto-promotes plain issue-comment MERGE_READY claims', () => {
@@ -198,6 +220,7 @@ describe('event-driven handoff dispatcher', () => {
         pr: normalPr,
         commentBody: 'PASS / MERGE_READY for def456',
         ciGreen: true,
+        reviewerEligible: true,
       }),
     ).toBeNull();
   });
