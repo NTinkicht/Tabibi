@@ -124,6 +124,7 @@ function reconcileGateEligibility({
 }) {
   if (!artifact || artifact.overlay !== 'code-reviewer') return null;
 
+  let latestRecord = null;
   for (const comment of comments) {
     if (
       !TRUSTED_ASSOCIATIONS.has(
@@ -139,17 +140,19 @@ function reconcileGateEligibility({
     if (record.gate_actor !== artifact.actor) continue;
     if (record.reviewer_login !== reviewLogin) continue;
     if (record.overlay !== 'code-reviewer') continue;
-    if (record.material_authorship !== 'independent') continue;
-    if (record.status !== 'eligible') continue;
-    if (
-      Number(record.open_blockers) !== 0 ||
-      Number(record.open_majors) !== 0
-    ) {
-      continue;
-    }
-    return record;
+    latestRecord = record;
   }
-  return null;
+
+  if (!latestRecord) return null;
+  if (latestRecord.material_authorship !== 'independent') return null;
+  if (latestRecord.status !== 'eligible') return null;
+  if (
+    Number(latestRecord.open_blockers) !== 0 ||
+    Number(latestRecord.open_majors) !== 0
+  ) {
+    return null;
+  }
+  return latestRecord;
 }
 
 function hasBlockingFindings(artifact) {
