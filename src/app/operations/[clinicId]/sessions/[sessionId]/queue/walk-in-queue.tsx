@@ -74,8 +74,12 @@ export function WalkInQueue({
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const [stale, setStale] = useState(false);
   const pendingKeysRef = useRef(new Map<string, string>());
+  const loadRequestRef = useRef(0);
+  const hasSnapshotRef = useRef(false);
 
   const load = useCallback(async () => {
+    const requestId = loadRequestRef.current + 1;
+    loadRequestRef.current = requestId;
     try {
       const response = await fetch(
         `/api/clinics/${clinicId}/sessions/${sessionId}/dashboard`,
@@ -91,17 +95,27 @@ export function WalkInQueue({
       };
       if (!response.ok || !body.entries || !body.session || !body.generatedAt)
         throw new Error(body.message);
+      if (requestId !== loadRequestRef.current) return;
       setEntries(body.entries);
       setSession(body.session);
       setQueueOrderVersion(body.session.queueOrderVersion);
       setRefreshedAt(new Date(body.generatedAt));
+      hasSnapshotRef.current = true;
+      setMessage('');
       setStale(false);
       setState('ready');
     } catch (error) {
+      if (requestId !== loadRequestRef.current) return;
+      const nextMessage =
+        error instanceof Error && error.message ? error.message : t.error;
+      if (hasSnapshotRef.current) {
+        setStale(true);
+        setState('ready');
+        setMessage(nextMessage);
+        return;
+      }
       setState('error');
-      setMessage(
-        error instanceof Error && error.message ? error.message : t.error,
-      );
+      setMessage(nextMessage);
     }
   }, [clinicId, sessionId, t.error]);
 
@@ -188,8 +202,8 @@ export function WalkInQueue({
   }
 
   function reload() {
-    setState('loading');
     setMessage('');
+    if (!hasSnapshotRef.current) setState('loading');
     void load();
   }
 
