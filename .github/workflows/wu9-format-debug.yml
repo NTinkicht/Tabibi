@@ -1,0 +1,24 @@
+name: WU9 format debug
+
+on:
+  push:
+    branches:
+      - chatgpt/issue-96-deterministic-eta
+
+permissions:
+  contents: read
+
+jobs:
+  format-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Show Prettier diff
+        run: |
+          npx prettier --write tests/integration/receptionist-dashboard.test.ts
+          git diff --no-ext-diff -- tests/integration/receptionist-dashboard.test.ts || true
