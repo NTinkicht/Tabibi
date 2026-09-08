@@ -68,7 +68,9 @@ function parseSpecialistReview(text = '') {
     }
 
     if (inFindings) {
-      const findingMatch = /^-\s*(BLOCKER|MAJOR|MINOR|NOTE):\s*(.+)$/i.exec(line);
+      const findingMatch = /^-\s*(BLOCKER|MAJOR|MINOR|NOTE):\s*(.+)$/i.exec(
+        line,
+      );
       if (!findingMatch) return null;
       const severity = findingMatch[1].toUpperCase();
       if (!FINDING_SEVERITIES.has(severity)) return null;
@@ -83,7 +85,9 @@ function parseSpecialistReview(text = '') {
     fields[key] = match[2].trim();
   }
 
-  if (!fields.actor || !fields.overlay || !fields.pr || !fields.exact_sha) return null;
+  if (!fields.actor || !fields.overlay || !fields.pr || !fields.exact_sha) {
+    return null;
+  }
   if (!fields.verdict || !fields.merge_ready || !inFindings) return null;
   return { ...fields, findings };
 }
@@ -108,11 +112,21 @@ function parseGateReconciliation(text = '') {
   return fields;
 }
 
-function reconcileGateEligibility({ comments = [], prNumber, sha, artifact, reviewLogin }) {
+function reconcileGateEligibility({
+  comments = [],
+  prNumber,
+  sha,
+  artifact,
+  reviewLogin,
+}) {
   if (!artifact || artifact.overlay !== 'code-reviewer') return null;
 
   for (const comment of comments) {
-    if (!TRUSTED_ASSOCIATIONS.has(String(comment.author_association || '').toUpperCase())) {
+    if (
+      !TRUSTED_ASSOCIATIONS.has(
+        String(comment.author_association || '').toUpperCase(),
+      )
+    ) {
       continue;
     }
     const record = parseGateReconciliation(comment.body || '');
@@ -124,7 +138,12 @@ function reconcileGateEligibility({ comments = [], prNumber, sha, artifact, revi
     if (record.overlay !== 'code-reviewer') continue;
     if (record.material_authorship !== 'independent') continue;
     if (record.status !== 'eligible') continue;
-    if (Number(record.open_blockers) !== 0 || Number(record.open_majors) !== 0) continue;
+    if (
+      Number(record.open_blockers) !== 0 ||
+      Number(record.open_majors) !== 0
+    ) {
+      continue;
+    }
     return record;
   }
   return null;
@@ -136,7 +155,11 @@ function hasBlockingFindings(artifact) {
   );
 }
 
-function hasExplicitMergeReadySignal(text = '', expectedSha, expectedPrNumber) {
+function hasExplicitMergeReadySignal(
+  text = '',
+  expectedSha,
+  expectedPrNumber,
+) {
   const artifact = parseSpecialistReview(text);
   if (!artifact) return false;
   const verdict = String(artifact.verdict || '').toUpperCase();
@@ -145,7 +168,12 @@ function hasExplicitMergeReadySignal(text = '', expectedSha, expectedPrNumber) {
   if (String(artifact.merge_ready || '').toLowerCase() !== 'yes') return false;
   if (hasBlockingFindings(artifact)) return false;
   if (expectedSha && artifact.exact_sha !== expectedSha) return false;
-  if (expectedPrNumber && Number(artifact.pr) !== Number(expectedPrNumber)) return false;
+  if (
+    expectedPrNumber &&
+    Number(artifact.pr) !== Number(expectedPrNumber)
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -314,7 +342,9 @@ async function exactHeadCiGreen(token, repo, sha) {
 
 async function alreadyPosted(token, repo, issueNumber, marker) {
   const comments = await fetchIssueComments(token, repo, issueNumber);
-  return comments.some((comment) => String(comment.body || '').includes(marker));
+  return comments.some((comment) =>
+    String(comment.body || '').includes(marker),
+  );
 }
 
 async function postOnce(token, repo, issueNumber, kind, sha, message) {
@@ -411,7 +441,9 @@ async function main() {
         artifact,
         reviewLogin: payload.review?.user?.login || '',
       });
-      if (gateReconciliation) ciGreen = await exactHeadCiGreen(token, repo, sha);
+      if (gateReconciliation) {
+        ciGreen = await exactHeadCiGreen(token, repo, sha);
+      }
     }
   }
 
