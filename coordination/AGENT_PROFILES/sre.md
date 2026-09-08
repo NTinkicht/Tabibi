@@ -26,6 +26,7 @@
 ## Clinic-day fault scenarios
 
 At minimum consider:
+
 - database unavailable for 30-120 seconds;
 - receptionist refresh fails while the last queue snapshot is usable;
 - duplicate/retried mutation after response loss;
