@@ -8,6 +8,10 @@ const {
   dedupKey,
   getPrNumber,
   isCopilotLogin,
+  parseSpecialistReview,
+  parseGateReconciliation,
+  reconcileGateEligibility,
+  hasExplicitMergeReadySignal,
 } = require('../../scripts/coordination/handoff-dispatcher.cjs') as {
   decideHandoff: (input: Record<string, unknown>) => {
     kind: string;
@@ -22,6 +26,20 @@ const {
     payload: Record<string, unknown>,
   ) => number | null;
   isCopilotLogin: (login: string) => boolean;
+  parseSpecialistReview: (text: string) =>
+    | (Record<string, string> & {
+        findings: Array<{ severity: string; text: string }>;
+      })
+    | null;
+  parseGateReconciliation: (text: string) => Record<string, string> | null;
+  reconcileGateEligibility: (
+    input: Record<string, unknown>,
+  ) => Record<string, string> | null;
+  hasExplicitMergeReadySignal: (
+    text: string,
+    expectedSha?: string,
+    expectedPrNumber?: number,
+  ) => boolean;
 };
 
 const copilotPr = {
@@ -35,6 +53,58 @@ const normalPr = {
   user: { login: 'NTinkicht' },
   head: { sha: 'def456' },
 };
+
+function specialistReviewBody(
+  verdict: 'PASS' | 'PASS_WITH_MINOR_FINDINGS' = 'PASS',
+  overrides: Record<string, string> = {},
+  findings = verdict === 'PASS'
+    ? ['- NOTE: none']
+    : ['- MINOR: non-blocking follow-up'],
+) {
+  return [
+    'SPECIALIST_REVIEW',
+    `actor: ${overrides.actor ?? 'codex'}`,
+    `overlay: ${overrides.overlay ?? 'code-reviewer'}`,
+    `pr: ${overrides.pr ?? '51'}`,
+    `exact_sha: ${overrides.exact_sha ?? 'def456'}`,
+    `verdict: ${overrides.verdict ?? verdict}`,
+    `merge_ready: ${overrides.merge_ready ?? 'yes'}`,
+    'findings:',
+    ...findings,
+  ].join('\n');
+}
+
+function reconciliationComment(
+  overrides: Record<string, string> = {},
+  authorAssociation = 'OWNER',
+) {
+  return {
+    author_association: authorAssociation,
+    body: [
+      'GATE_RECONCILIATION',
+      `pr: ${overrides.pr ?? '51'}`,
+      `exact_sha: ${overrides.exact_sha ?? 'def456'}`,
+      `gate_actor: ${overrides.gate_actor ?? 'codex'}`,
+      `reviewer_login: ${overrides.reviewer_login ?? 'chatgpt-codex-connector'}`,
+      `overlay: ${overrides.overlay ?? 'code-reviewer'}`,
+      `material_authorship: ${overrides.material_authorship ?? 'independent'}`,
+      `open_blockers: ${overrides.open_blockers ?? '0'}`,
+      `open_majors: ${overrides.open_majors ?? '0'}`,
+      `status: ${overrides.status ?? 'eligible'}`,
+    ].join('\n'),
+  };
+}
+
+function trustedGateReconciliation() {
+  const artifact = parseSpecialistReview(specialistReviewBody());
+  return reconcileGateEligibility({
+    comments: [reconciliationComment()],
+    prNumber: 51,
+    sha: 'def456',
+    artifact,
+    reviewLogin: 'chatgpt-codex-connector',
+  });
+}
 
 describe('event-driven handoff dispatcher', () => {
   it('routes a green Copilot-authored exact head to Claude without invoking paused Gemini', () => {
@@ -96,17 +166,66 @@ describe('event-driven handoff dispatcher', () => {
     ).toBeNull();
   });
 
-  it('only surfaces review MERGE_READY for the live exact head with green CI', () => {
+  it.each(['PASS', 'PASS_WITH_MINOR_FINDINGS'] as const)(
+    'routes canonical %s only with trusted exact-head reconciliation and green CI',
+    (verdict) => {
+      const body = specialistReviewBody(verdict);
+      const artifact = parseSpecialistReview(body);
+      const gateReconciliation = reconcileGateEligibility({
+        comments: [reconciliationComment()],
+        prNumber: 51,
+        sha: 'def456',
+        artifact,
+        reviewLogin: 'chatgpt-codex-connector',
+      });
+
+      expect(gateReconciliation).not.toBeNull();
+      expect(
+        decideHandoff({
+          eventName: 'pull_request_review',
+          pr: normalPr,
+          review: {
+            state: 'approved',
+            body,
+            commit_id: 'def456',
+          },
+          ciGreen: true,
+          gateReconciliation,
+        }),
+      ).toMatchObject({ kind: 'merge-ready-green', target: 'orchestrator' });
+    },
+  );
+
+  it('rejects stale SHA, wrong PR, merge_ready no, non-approved review, or missing reconciliation', () => {
+    const cases = [
+      specialistReviewBody('PASS', { exact_sha: 'old-sha' }),
+      specialistReviewBody('PASS', { pr: '99' }),
+      specialistReviewBody('PASS', { merge_ready: 'no' }),
+    ];
+
+    for (const body of cases) {
+      expect(
+        decideHandoff({
+          eventName: 'pull_request_review',
+          pr: normalPr,
+          review: { state: 'approved', body, commit_id: 'def456' },
+          ciGreen: true,
+          gateReconciliation: trustedGateReconciliation(),
+        }),
+      ).toBeNull();
+    }
+
     expect(
       decideHandoff({
         eventName: 'pull_request_review',
         pr: normalPr,
         review: {
-          state: 'approved',
-          body: 'PASS / MERGE_READY',
-          commit_id: 'old-sha',
+          state: 'commented',
+          body: specialistReviewBody(),
+          commit_id: 'def456',
         },
         ciGreen: true,
+        gateReconciliation: trustedGateReconciliation(),
       }),
     ).toBeNull();
 
@@ -116,25 +235,146 @@ describe('event-driven handoff dispatcher', () => {
         pr: normalPr,
         review: {
           state: 'approved',
-          body: 'PASS / MERGE_READY',
-          commit_id: 'def456',
-        },
-        ciGreen: false,
-      }),
-    ).toBeNull();
-
-    expect(
-      decideHandoff({
-        eventName: 'pull_request_review',
-        pr: normalPr,
-        review: {
-          state: 'approved',
-          body: 'PASS / MERGE_READY',
+          body: specialistReviewBody(),
           commit_id: 'def456',
         },
         ciGreen: true,
+        gateReconciliation: null,
       }),
-    ).toMatchObject({ kind: 'merge-ready-green', target: 'orchestrator' });
+    ).toBeNull();
+  });
+
+  it('rejects every non-code-reviewer overlay as a binding merge gate', () => {
+    for (const overlay of [
+      'persona-walkthrough',
+      'database-reliability',
+      'sre',
+      'backend-architect',
+    ]) {
+      const body = specialistReviewBody('PASS', { overlay });
+      expect(hasExplicitMergeReadySignal(body, 'def456', 51)).toBe(false);
+    }
+  });
+
+  it('rejects prose, quoted text, fenced examples, and prose inside SPECIALIST_REVIEW', () => {
+    const bodies = [
+      'Expected output is PASS / MERGE_READY',
+      '> SPECIALIST_REVIEW\n> actor: codex\n> overlay: code-reviewer\n> pr: 51\n> exact_sha: def456\n> verdict: PASS\n> merge_ready: yes',
+      '```text\nSPECIALIST_REVIEW\nactor: codex\noverlay: code-reviewer\npr: 51\nexact_sha: def456\nverdict: PASS\nmerge_ready: yes\n```',
+      [
+        'SPECIALIST_REVIEW',
+        'This is only an example; do not merge:',
+        'actor: codex',
+        'overlay: code-reviewer',
+        'pr: 51',
+        'exact_sha: def456',
+        'verdict: PASS',
+        'merge_ready: yes',
+        'findings:',
+        '- NOTE: none',
+      ].join('\n'),
+    ];
+
+    for (const body of bodies) {
+      expect(hasExplicitMergeReadySignal(body, 'def456', 51)).toBe(false);
+      expect(parseSpecialistReview(body)).toBeNull();
+    }
+  });
+
+  it('rejects passing artifacts containing BLOCKER or MAJOR findings', () => {
+    for (const severity of ['BLOCKER', 'MAJOR']) {
+      const body = specialistReviewBody('PASS', {}, [
+        `- ${severity}: unresolved defect`,
+      ]);
+      expect(hasExplicitMergeReadySignal(body, 'def456', 51)).toBe(false);
+    }
+  });
+
+  it('accepts trusted reconciliation only from authorized associations with zero blocking findings', () => {
+    const artifact = parseSpecialistReview(specialistReviewBody());
+    const common = {
+      prNumber: 51,
+      sha: 'def456',
+      artifact,
+      reviewLogin: 'chatgpt-codex-connector',
+    };
+
+    expect(
+      reconcileGateEligibility({
+        ...common,
+        comments: [reconciliationComment()],
+      }),
+    ).toMatchObject({ status: 'eligible', material_authorship: 'independent' });
+
+    expect(
+      reconcileGateEligibility({
+        ...common,
+        comments: [reconciliationComment({}, 'NONE')],
+      }),
+    ).toBeNull();
+    expect(
+      reconcileGateEligibility({
+        ...common,
+        comments: [
+          reconciliationComment({ material_authorship: 'material_author' }),
+        ],
+      }),
+    ).toBeNull();
+    expect(
+      reconcileGateEligibility({
+        ...common,
+        comments: [reconciliationComment({ open_majors: '1' })],
+      }),
+    ).toBeNull();
+    expect(
+      reconcileGateEligibility({
+        ...common,
+        comments: [reconciliationComment({ open_blockers: '1' })],
+      }),
+    ).toBeNull();
+  });
+
+  it('requires the trusted reconciliation to match the leased actor, reviewer login, overlay, PR, and SHA', () => {
+    const artifact = parseSpecialistReview(specialistReviewBody());
+    const common = {
+      prNumber: 51,
+      sha: 'def456',
+      artifact,
+      reviewLogin: 'chatgpt-codex-connector',
+    };
+    const reconciliationOverrides: Array<Record<string, string>> = [
+      { gate_actor: 'claude' },
+      { reviewer_login: 'someone-else' },
+      { overlay: 'persona-walkthrough' },
+      { pr: '99' },
+      { exact_sha: 'old-sha' },
+      { status: 'ineligible' },
+    ];
+
+    for (const overrides of reconciliationOverrides) {
+      expect(
+        reconcileGateEligibility({
+          ...common,
+          comments: [reconciliationComment(overrides)],
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it('parses only the canonical gate reconciliation schema', () => {
+    expect(parseGateReconciliation(reconciliationComment().body)).toMatchObject(
+      {
+        gate_actor: 'codex',
+        reviewer_login: 'chatgpt-codex-connector',
+        overlay: 'code-reviewer',
+        status: 'eligible',
+      },
+    );
+    expect(
+      parseGateReconciliation(
+        `${reconciliationComment().body}\nThis prose is not allowed`,
+      ),
+    ).toBeNull();
   });
 
   it('never auto-promotes plain issue-comment MERGE_READY claims', () => {
@@ -144,6 +384,7 @@ describe('event-driven handoff dispatcher', () => {
         pr: normalPr,
         commentBody: 'PASS / MERGE_READY for def456',
         ciGreen: true,
+        gateReconciliation: trustedGateReconciliation(),
       }),
     ).toBeNull();
   });

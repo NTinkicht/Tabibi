@@ -6,11 +6,25 @@ The goal is simple: ship the best Algeria-first healthcare operations product we
 
 This file supplements `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, `coordination/COLLABORATION_PROTOCOL.md`, and `coordination/STATE.json`. Product, security, architecture, reviewer-independence, and owner-authority rules still win when there is a conflict.
 
+## Mandatory specialist-overlay startup path
+
+Because `AGENTS.md` requires every active actor to read this Company OS before material implementation, review, architecture arbitration, or failover work, this section is part of the mandatory startup path.
+
+For every substantial work unit, the actor must also read:
+
+- `coordination/ROLE_OVERLAY_PROTOCOL.md`;
+- `coordination/WORK_UNIT_TEMPLATE.md` when creating or accepting a new work unit;
+- `coordination/AGENT_PROFILES/registry.json`;
+- every selected profile file named by that work unit before acting under the overlay.
+
+If a work unit does not select an overlay, no profile file is required, but the protocol must still be read so actors do not accidentally infer authority from role names. Overlay selection never replaces the mandatory actor/lease, authorship, exact-SHA, or failover rules in `AGENTS.md`.
+
 ## 1. Work like one engineering team
 
 Agents are expected to talk to each other, not merely pass tickets.
 
 Useful team conversation includes:
+
 - design thoughts and alternatives;
 - questions and answers;
 - refactoring ideas;
@@ -70,6 +84,7 @@ GitHub Issue #21 remains the permanent live Team Room. Agents may use these ligh
 A little personality is welcome. Keep it short and never let it block delivery.
 
 Good targets for jokes:
+
 - flaky tests;
 - absurd bug symptoms;
 - harmless mistakes made by the team, preferably including self-deprecating ones;
@@ -77,6 +92,7 @@ Good targets for jokes:
 - the universal mystery of why something passed locally.
 
 Off-limits:
+
 - patients or medical conditions;
 - personal/sensitive characteristics;
 - harassment or humiliation;
@@ -92,6 +108,7 @@ An available model should not remain idle while useful, non-conflicting work exi
 The project uses `coordination/WORK_QUEUE.md` as the human-readable work marketplace.
 
 Rules:
+
 1. One canonical implementation stream and one active implementer per bounded feature/work unit still applies.
 2. Other available actors may work in parallel on non-conflicting lanes: architecture/risk analysis, UX/system verification, test design, refactoring analysis, documentation, observability, security review, backlog decomposition, reproducibility checks, or retrospective/process improvement.
 3. An available actor with no current lease checks `WORK_QUEUE.md` for a `READY` task compatible with its capabilities.
@@ -130,6 +147,7 @@ The orchestrator continuously tries to keep every available actor on valuable wo
 ## 7. Task quality standard
 
 Every queued task should say:
+
 - task ID;
 - goal;
 - owner/claim status;
@@ -148,6 +166,7 @@ A vague request such as “look around” is not enough. Bounded exploration is 
 The company should disagree usefully.
 
 When criticizing another actor:
+
 - name the decision/artifact, not the personality;
 - explain evidence and impact;
 - say what was done well too when true;

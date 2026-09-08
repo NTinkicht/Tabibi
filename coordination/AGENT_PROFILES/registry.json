@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "upstream": {
+    "repository": "NTinkicht/agency-agents",
+    "commit": "647c8baa42b6842afb4a97bf2c0950d45ba88e8b",
+    "license": "MIT"
+  },
+  "rules": {
+    "creates_actor": false,
+    "creates_implementation_lease": false,
+    "overrides_self_gate_rule": false,
+    "requires_material_authorship_check": true,
+    "requires_actor_backed_specialist_lanes": true,
+    "max_primary_overlays_per_task": 1,
+    "severity": ["BLOCKER", "MAJOR", "MINOR", "NOTE"],
+    "verdicts": ["PASS", "PASS_WITH_MINOR_FINDINGS", "CHANGES_REQUIRED"]
+  },
+  "profiles": [
+    {
+      "id": "backend-architect",
+      "path": "coordination/AGENT_PROFILES/backend-architect.md",
+      "default_lane": "architecture_or_implementation",
+      "recommended_for": [
+        "domain",
+        "api",
+        "migration",
+        "appointments",
+        "notifications",
+        "guest-access",
+        "sse"
+      ]
+    },
+    {
+      "id": "database-reliability",
+      "path": "coordination/AGENT_PROFILES/database-reliability.md",
+      "default_lane": "specialist_review",
+      "recommended_for": [
+        "postgresql",
+        "concurrency",
+        "migration",
+        "queue",
+        "appointments",
+        "outbox"
+      ]
+    },
+    {
+      "id": "code-reviewer",
+      "path": "coordination/AGENT_PROFILES/code-reviewer.md",
+      "default_lane": "independent_gate",
+      "recommended_for": ["all-code-prs"]
+    },
+    {
+      "id": "sre",
+      "path": "coordination/AGENT_PROFILES/sre.md",
+      "default_lane": "production_readiness",
+      "recommended_for": [
+        "deployment",
+        "notifications",
+        "sse",
+        "external-provider",
+        "observability",
+        "recovery"
+      ]
+    },
+    {
+      "id": "persona-walkthrough",
+      "path": "coordination/AGENT_PROFILES/persona-walkthrough.md",
+      "default_lane": "experience_qa",
+      "recommended_for": [
+        "patient-ui",
+        "receptionist-ui",
+        "arabic",
+        "french",
+        "rtl",
+        "mobile",
+        "low-connectivity"
+      ]
+    },
+    {
+      "id": "healthcare-innovation-strategist",
+      "path": "coordination/AGENT_PROFILES/healthcare-innovation-strategist.md",
+      "default_lane": "external_strategy",
+      "recommended_for": [
+        "pilot",
+        "clinic-proposal",
+        "investor",
+        "website",
+        "partnership",
+        "regulatory-narrative"
+      ]
+    },
+    {
+      "id": "sovereign-health-systems",
+      "path": "coordination/AGENT_PROFILES/sovereign-health-systems.md",
+      "default_lane": "dormant_external_strategy",
+      "recommended_for": [
+        "public-sector",
+        "ministry",
+        "public-hospital",
+        "sovereign-data",
+        "institutional-pilot"
+      ]
+    }
+  ]
+}
