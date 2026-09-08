@@ -15,6 +15,13 @@ function dedupKey(kind, sha = 'none') {
   return `<!-- tabibi-handoff:${kind}:${sha} -->`;
 }
 
+function hasExplicitMergeReadySignal(text = '') {
+  return (
+    /(?:^|\n)\s*MERGE_READY\s*(?:$|\n)/i.test(text) ||
+    /\bPASS(?:_WITH_MINOR_FINDINGS)?\s*\/\s*MERGE_READY\b/i.test(text)
+  );
+}
+
 function decideHandoff({
   eventName,
   pr,
@@ -76,7 +83,7 @@ function decideHandoff({
   }
 
   const mergeReady =
-    /\bMERGE_READY\b/i.test(combined) &&
+    hasExplicitMergeReadySignal(combined) &&
     /\bPASS(?:_WITH_MINOR_FINDINGS)?\b/i.test(combined);
   if (mergeReady) {
     if (eventName === 'issue_comment') return null;
@@ -258,7 +265,7 @@ async function main() {
   if (eventName === 'pull_request_review') {
     const reviewBody = payload.review?.body || '';
     if (
-      /\bMERGE_READY\b/i.test(reviewBody) &&
+      hasExplicitMergeReadySignal(reviewBody) &&
       payload.review?.commit_id &&
       payload.review.commit_id === sha
     ) {
@@ -308,6 +315,7 @@ module.exports = {
   PAUSED_ACTORS,
   isCopilotLogin,
   dedupKey,
+  hasExplicitMergeReadySignal,
   decideHandoff,
   assertAllowedTarget,
   getPrNumber,
