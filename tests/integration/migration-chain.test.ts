@@ -12,6 +12,7 @@ const committedMigrations = [
   '0006_queue_priority_order.sql',
   '0007_waiting_room_public_labels.sql',
   '0008_queue_eta_timing.sql',
+  '0009_appointment_booking_foundation.sql',
 ];
 
 beforeAll(async () => {
@@ -38,7 +39,7 @@ describe('committed migration chain', () => {
     expect(rerun.rows[0]!.count).toBe(String(committedMigrations.length));
   });
 
-  it('exposes queue lifecycle and ETA timing artifacts created by later migrations', async () => {
+  it('exposes queue lifecycle, ETA timing and appointment-booking artifacts created by later migrations', async () => {
     const artifacts = await client.query<{
       queue_order_version: string;
       reorder_receipts: string | null;
@@ -48,6 +49,9 @@ describe('committed migration chain', () => {
       consultation_started_at: string;
       completed_at: string;
       eta_timing_idx: string | null;
+      appointments: string | null;
+      appointment_receipts: string | null;
+      appointment_source_allowed: string;
     }>(
       `SELECT
          EXISTS (
@@ -68,7 +72,12 @@ describe('committed migration chain', () => {
            SELECT 1 FROM information_schema.columns
             WHERE table_name='queue_entries' AND column_name='completed_at'
          )::text completed_at,
-         to_regclass('queue_entries_session_completed_timing_idx')::text eta_timing_idx`,
+         to_regclass('queue_entries_session_completed_timing_idx')::text eta_timing_idx,
+         to_regclass('appointments')::text appointments,
+         to_regclass('appointment_booking_receipts')::text appointment_receipts,
+         pg_get_constraintdef(oid) LIKE '%appointment%' AS appointment_source_allowed
+       FROM pg_constraint
+      WHERE conname='queue_entries_source_check'`,
     );
 
     expect(artifacts.rows[0]).toEqual({
@@ -80,6 +89,9 @@ describe('committed migration chain', () => {
       consultation_started_at: 'true',
       completed_at: 'true',
       eta_timing_idx: 'queue_entries_session_completed_timing_idx',
+      appointments: 'appointments',
+      appointment_receipts: 'appointment_booking_receipts',
+      appointment_source_allowed: 'true',
     });
   });
 });
