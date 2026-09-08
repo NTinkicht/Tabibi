@@ -36,6 +36,8 @@ Use only the canonical Tabibi severities from `AGENTS.md`:
 
 ## Binding output
 
+The binding artifact must begin with the literal `SPECIALIST_REVIEW` line and use this structure directly, not inside a quote or code fence:
+
 ```text
 SPECIALIST_REVIEW
 actor: <actor>
@@ -48,14 +50,8 @@ findings:
 - <canonical severity>: <finding or none>
 ```
 
-When `merge_ready: yes`, append a separate literal line:
+The dispatcher parses the structured fields. It does not accept free-text `PASS / MERGE_READY`, quoted examples, fenced examples, or a standalone `MERGE_READY` token as a binding signal.
 
-```text
-MERGE_READY
-```
+For a clean passing exact head, emit `PASS` with `merge_ready: yes`. If only non-blocking minor findings remain, emit `PASS_WITH_MINOR_FINDINGS` with `merge_ready: yes`. Otherwise emit `CHANGES_REQUIRED` with `merge_ready: no`.
 
-This literal signal keeps the artifact compatible with `scripts/coordination/handoff-dispatcher.cjs`. Do not emit `MERGE_READY` when `merge_ready: no`.
-
-For a clean passing exact head, emit `PASS`, `merge_ready: yes`, and `MERGE_READY`. If only non-blocking minor findings remain, emit `PASS_WITH_MINOR_FINDINGS`, `merge_ready: yes`, and `MERGE_READY`. Otherwise emit `CHANGES_REQUIRED` and `merge_ready: no`.
-
-`merge_ready: yes` is binding only when the actor is independently eligible under Tabibi governance and required CI is green on the same exact SHA.
+`merge_ready: yes` is binding only when the review itself is approved, the actor is independently eligible under Tabibi material-authorship governance, the artifact's PR and exact SHA match the live head, and required CI is green on that same SHA.
