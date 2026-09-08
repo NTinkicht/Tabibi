@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-08T01:16:23.418058+00:00
+- Last sync: 2026-09-08T01:24:32.275816+00:00
 
 ## Team Room charter
 
@@ -4023,5 +4023,84 @@ status: active
 Accepted the authoritative hardening-only scope correction. Reading the existing delay implementation and test harness now; no new schema, reason/free-text, version, or idempotency mechanism will be introduced.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5577596783
+
+---
+
+### 2026-09-08T01:17:07Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr86:af2e5ac3d76b3420123e64923f8f0452cae51e8e -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #86
+head: af2e5ac3d76b3420123e64923f8f0452cae51e8e
+CI_GREEN_HANDOFF — PR #86 exact head `af2e5ac3d76b3420123e64923f8f0452cae51e8e` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5577604519
+
+---
+
+### 2026-09-08T01:18:15Z — github-actions[bot]
+
+SLACK_TO_TEAM_ROOM
+source: #all-tabibi
+slack_ts: 1788830040.608459
+slack_user_id: U0BUW7EGJPR
+actor: nassim
+role: product_owner
+
+*Tabibi checkpoint:* WU6 PR #51 has merged safely after Codex recovered review capacity and completed the independent exact-SHA gate. Merge commit: `df3b7400d0544ea7afd632efb8fe270cdd2a51fb`; Issue #49 closed. WU7 Issue #71 is now production-active from that exact `main`: Codex has the single canonical implementation lease _only if production capacity is actually available_, Copilot owns independent QA/Test Automation, and Claude owns adversarial architecture/security review + future non-author gate. Gemini Chat/Agent remain paused and were not invoked. *Sent using* <@U0BVBHVGLQ2>
+
+TEAM_CHAT_NOTE: This is a live message from Nassim in Slack, verified by Slack user ID. Treat it as company-room input. Discuss naturally, but promote any authoritative engineering decision/finding/lease into the normal GitHub protocol.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5577613931
+
+---
+
+### 2026-09-08T01:18:16Z — github-actions[bot]
+
+SLACK_TO_TEAM_ROOM
+source: #all-tabibi
+slack_ts: 1788830128.229039
+slack_user_id: U0BUW7EGJPR
+actor: nassim
+role: product_owner
+
+*WU7 scope correction:* Claude’s completed premortem proved doctor-delay declare/update/clear already exists on `main`, so WU7 is now explicitly *hardening-only*—no duplicate schema/service/version/idempotency mechanism and no reason/free-text field. Codex’s canonical lease is narrowed to missing concurrency/security/audit regressions and the bounded mobile/RTL inline-control improvement; Copilot remains independent QA, Claude has a narrow authorization-acceptance task and stays eligible for future exact-SHA review. Gemini remains paused. *Sent using* <@U0BVBHVGLQ2>
+
+TEAM_CHAT_NOTE: This is a live message from Nassim in Slack, verified by Slack user ID. Treat it as company-room input. Discuss naturally, but promote any authoritative engineering decision/finding/lease into the normal GitHub protocol.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5577614013
+
+---
+
+### 2026-09-08T01:23:05Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr86:9ffcb182c444ed34180b4132d8d2373968eba02b -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #86
+head: 9ffcb182c444ed34180b4132d8d2373968eba02b
+POST_MERGE_RECONCILE — PR #86 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5577653803
+
+---
+
+### 2026-09-08T01:24:20Z — NTinkicht
+
+CHECKPOINT / HANDOFF_TO_CLAUDE
+actor: codex
+role: implementer
+work_stream: Issue #71 / WU7 doctor-delay hardening
+lease: WU7-IMPLEMENT-001
+exact_head: 37e8c05f17050909af42523e039cece4ef028e76
+pr: #87
+status: implementation complete; independent exact-head gate required
+
+Implemented a no-schema hardening pass over the existing session-scoped versioned delay state: Arabic/French inline 1–720 minute editor, terminal-state UI precedence, unauthenticated route coverage, and PostgreSQL tests for authorization/isolation, conflicting idempotency reuse, audit minimization/non-duplication, update-vs-clear concurrency, and close/cancel serialization.
+
+Local evidence: typecheck, lint, format, unit/API (29/29), and diff-check pass. Integration execution is deferred to CI because this runtime has no Docker/PostgreSQL server. Screenshot capture was attempted, but Playwright browser download was blocked by HTTP 403. Codex authored this head and does not self-gate. Persistent Claude is requested as the independent gating reviewer after exact-head required CI is green; this is a protocol handoff marker, not an invocation of the stateless @claude Action.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5577664172
 
 ---
