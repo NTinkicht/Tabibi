@@ -32,19 +32,30 @@ function parseSpecialistReview(text = '') {
     fields[match[1].toLowerCase()] = match[2].trim();
   }
 
-  if (!fields.actor || !fields.overlay || !fields.pr || !fields.exact_sha) return null;
+  if (!fields.actor || !fields.overlay || !fields.pr || !fields.exact_sha) {
+    return null;
+  }
   if (!fields.verdict || !fields.merge_ready) return null;
   return fields;
 }
 
-function hasExplicitMergeReadySignal(text = '', expectedSha, expectedPrNumber) {
+function hasExplicitMergeReadySignal(
+  text = '',
+  expectedSha,
+  expectedPrNumber,
+) {
   const artifact = parseSpecialistReview(text);
   if (!artifact) return false;
   const verdict = String(artifact.verdict || '').toUpperCase();
   if (!['PASS', 'PASS_WITH_MINOR_FINDINGS'].includes(verdict)) return false;
   if (String(artifact.merge_ready || '').toLowerCase() !== 'yes') return false;
   if (expectedSha && artifact.exact_sha !== expectedSha) return false;
-  if (expectedPrNumber && Number(artifact.pr) !== Number(expectedPrNumber)) return false;
+  if (
+    expectedPrNumber &&
+    Number(artifact.pr) !== Number(expectedPrNumber)
+  ) {
+    return false;
+  }
   return true;
 }
 
