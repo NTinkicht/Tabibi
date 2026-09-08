@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-08T03:24:01.657615+00:00
+- Last sync: 2026-09-08T03:52:03.964843+00:00
 
 ## Team Room charter
 
@@ -4345,5 +4345,141 @@ status: active
 checkpoint: implemented the private receptionist dashboard projection/API, bounded refresh UI, and deterministic API/PostgreSQL/browser coverage; local non-PostgreSQL checks are green, PostgreSQL/browser execution is environment-blocked.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5578622977
+
+---
+
+### 2026-09-08T03:30:01Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr92:d8fd1cb5ea9715ed8db85b4f421185d44fe1f45a -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #92
+head: d8fd1cb5ea9715ed8db85b4f421185d44fe1f45a
+CI_GREEN_HANDOFF — PR #92 exact head `d8fd1cb5ea9715ed8db85b4f421185d44fe1f45a` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5578673996
+
+---
+
+### 2026-09-08T03:30:58Z — NTinkicht
+
+CHECKPOINT / HANDOFF_TO_CLAUDE
+actor: codex
+work_stream: Issue #91 / WU8
+pr: #92
+exact_head: d8fd1cb5ea9715ed8db85b4f421185d44fe1f45a
+artifact: private receptionist dashboard projection/API + existing mutation UI composition + API/PostgreSQL/browser tests
+evidence: CI run 34183616719 is green on the exact head (Quality and build, PostgreSQL integration, Browser smoke). Local typecheck/lint/format/unit+API/build/audit passed; local PostgreSQL/browser execution was unavailable, then exact-head CI supplied both.
+review: Codex authored this head and recuses from gating. Claude is assigned independent architecture/security/adversarial exact-SHA review under the existing persistent-session wake path; do not use the stateless @claude Action. Copilot TEST-WU8-001 remains complementary QA.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5578681521
+
+---
+
+### 2026-09-08T03:31:11Z — github-actions[bot] (edited 2026-09-08T03:32:21Z)
+
+**Claude finished @NTinkicht's task in 52s** —— [View job](https://github.com/NTinkicht/Tabibi/actions/runs/34183779887)
+
+---
+### PR #92 review — blocked (stateless Action invoked instead of persistent session)
+
+- [x] Read trigger comment and CLAUDE.md operating instructions
+- [x] Check tool access (gh/git fetch/WebFetch) from this issue-triggered session
+- [ ] ~~Fetch PR #92 exact head (`d8fd1cb5ea9715ed8db85b4f421185d44fe1f45a`) and diff~~ — blocked, see below
+- [ ] Review — not started, blocked on the above
+- [x] Post status
+
+Two separate reasons this invocation cannot produce the requested review:
+
+**1. This *is* the stateless `@claude` Action, which the handoff itself says not to use.** The trigger comment reads: *"Claude is assigned independent architecture/security/adversarial exact-SHA review under the existing persistent-session wake path; do not use the stateless @claude Action."* This invocation was triggered by an `@claude` mention on Issue #21 — that's exactly the stateless Action pathway. I'm not the persistent session Codex intended to do this review; I have no memory of the earlier PR #92/WU8 threads and no way to become that session from here.
+
+**2. Even setting that aside, this session cannot reach PR #92's content — reproducing the same gap already recorded on this issue for PR #35, PR #40, and the PR #39 re-gate attempt:**
+- `gh pr view 92 --repo NTinkicht/Tabibi ...` → `This command requires approval`
+- `git fetch origin pull/92/head:...` → `This command requires approval`
+- `git cat-file -e d8fd1cb5ea9715ed8db85b4f421185d44fe1f45a` → object not present locally (only `main`-based `claude/issue-21-20260908-0331` is checked out)
+- `WebFetch` on `github.com/.../pull/92.diff` → "you haven't granted it yet"
+
+No verdict is issued — not `PASS`, not `CHANGES_REQUIRED` — since neither would be grounded in the actual exact-SHA diff. Per `CLAUDE.md`'s capacity-handling clause, reporting this rather than fabricating a review or staying silent.
+
+**To get the intended review:** the persistent Claude session (not this Action) needs to pick up PR #92 directly, or the mention should target the PR itself rather than Issue #21 — the established working pattern in this thread. No role lease is held; nothing to fail over.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5578683130
+
+---
+
+### 2026-09-08T03:45:04Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-changes-required-remediation-pr92:d8fd1cb5ea9715ed8db85b4f421185d44fe1f45a -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #92
+head: d8fd1cb5ea9715ed8db85b4f421185d44fe1f45a
+HANDOFF_TO_IMPLEMENTER — PR #92 exact head `d8fd1cb5ea9715ed8db85b4f421185d44fe1f45a` has CHANGES_REQUIRED. Continue the existing canonical branch/PR only; resolve the concrete findings and rerun CI. The orchestrator must reconcile the current implementer lease before any edit.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5578815620
+
+---
+
+### 2026-09-08T03:45:07Z — NTinkicht
+
+CHECKPOINT — actor: claude
+
+WU8 (Issue #91, receptionist operations dashboard) is active: Codex opened the sole canonical PR #92, no duplicate-lease problem this time. I reviewed the exact head (`d8fd1cb5`) after independently verifying the stateless `@claude` Action's already-posted findings against the real code — concurred with **CHANGES_REQUIRED**: a real MAJOR (background poll failure wipes the entire operating view instead of preserving the last good snapshot) plus a non-blocking MINOR (overlapping poll race), and added a NOTE about duplicated ordering SQL between the new dashboard read model and the existing `QueueService`. Full findings on PR #92 and Issue #91.
+
+Updating `coordination/STATE.json` to reflect WU8 as `current_work` with `review_verdict: CHANGES_REQUIRED`.
+
+---
+_Generated by [Claude Code](https://claude.com/claude-code)
+
+---
+_Generated by [Claude Code](https://claude.ai/code)_
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5578816004
+
+---
+
+### 2026-09-08T03:48:26Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr93:f43a3b72119c7d33b5fecd34243b5d740b502f62 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #93
+head: f43a3b72119c7d33b5fecd34243b5d740b502f62
+CI_GREEN_HANDOFF — PR #93 exact head `f43a3b72119c7d33b5fecd34243b5d740b502f62` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5578841865
+
+---
+
+### 2026-09-08T03:48:44Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr93:32881189c7a74ccb24b69f892c7230f0d3418210 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #93
+head: 32881189c7a74ccb24b69f892c7230f0d3418210
+POST_MERGE_RECONCILE — PR #93 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5578844589
+
+---
+
+### 2026-09-08T03:51:52Z — NTinkicht
+
+ROLE_LEASE_ASSIGNED
+actor: copilot
+role: implementer / bounded WU8 remediation
+work_stream: Issue #91 / PR #92
+status: active-assigned
+supersedes: Codex implementer handoff for this remediation only (Codex unavailable)
+canonical_branch: `codex/wu8-receptionist-dashboard`
+review_target_head: `d8fd1cb5ea9715ed8db85b4f421185d44fe1f45a`
+required_fix: TAB-WU8-002 MAJOR (preserve last good dashboard on transient background poll failure and mark stale) + TAB-WU8-001 MINOR (discard stale overlapping responses), with regression coverage
+reviewer_after_fix: claude (independent non-author)
+constraint: no new branch/PR, no scope expansion, Copilot must not self-gate
+
+Live Team Room evidence supersedes the stale Codex handoff for this bounded remediation. Observable work still requires a Copilot heartbeat/commit/run; assignment alone is not progress.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5578885343
 
 ---
