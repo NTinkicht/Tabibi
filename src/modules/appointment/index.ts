@@ -13,6 +13,14 @@ export type AppointmentStatus =
   | 'no_show';
 
 export type AppointmentContactPreference = 'none' | 'phone' | 'email';
+export type AppointmentQueueState =
+  | 'waiting'
+  | 'checked_in'
+  | 'called'
+  | 'in_consultation'
+  | 'completed'
+  | 'cancelled'
+  | 'no_show';
 
 export interface AppointmentBookingInput {
   patientId: string;
@@ -40,7 +48,7 @@ export interface AppointmentBooking {
   entry: {
     id: string;
     sessionId: string;
-    state: 'waiting';
+    state: AppointmentQueueState;
     registrationOrder: number;
     publicDisplayLabel: string;
   };
@@ -119,7 +127,7 @@ async function loadBooking(
     scheduled_end_at: Date;
     preferred_locale: 'ar' | 'fr';
     contact_preference: AppointmentContactPreference;
-    entry_state: 'waiting';
+    entry_state: AppointmentQueueState;
     registration_order: string;
     public_display_label: string;
   }>(
@@ -147,10 +155,6 @@ async function loadBooking(
   const row = result.rows[0];
   if (!row)
     throw new AppointmentConflictError('Appointment booking no longer exists');
-  if (row.entry_state !== 'waiting')
-    throw new AppointmentConflictError(
-      'Appointment booking is no longer in its initial waiting state',
-    );
   return {
     appointment: {
       id: row.appointment_id,
