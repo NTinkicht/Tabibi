@@ -111,7 +111,9 @@ export class ReceptionistDashboardService {
       // PostgreSQL READ COMMITTED takes a fresh snapshot per statement, which can mix
       // queue/session rows from one version with duration samples from a later commit.
       // This read-only REPEATABLE READ transaction fixes one snapshot for the whole read.
-      await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      await client.query(
+        'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
+      );
       await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
       const result = await client.query<Row>(
         `SELECT session.id AS session_id,
