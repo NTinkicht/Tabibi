@@ -76,6 +76,7 @@ export function WalkInQueue({
   const pendingKeysRef = useRef(new Map<string, string>());
   const loadRequestRef = useRef(0);
   const hasSnapshotRef = useRef(false);
+  const lastLoadFailedRef = useRef(false);
 
   const load = useCallback(async () => {
     const requestId = loadRequestRef.current + 1;
@@ -101,6 +102,7 @@ export function WalkInQueue({
       setQueueOrderVersion(body.session.queueOrderVersion);
       setRefreshedAt(new Date(body.generatedAt));
       hasSnapshotRef.current = true;
+      lastLoadFailedRef.current = false;
       setMessage('');
       setStale(false);
       setState('ready');
@@ -109,6 +111,7 @@ export function WalkInQueue({
       const nextMessage =
         error instanceof Error && error.message ? error.message : t.error;
       if (hasSnapshotRef.current) {
+        lastLoadFailedRef.current = true;
         setStale(true);
         setState('ready');
         setMessage(nextMessage);
@@ -128,7 +131,9 @@ export function WalkInQueue({
     const poll = window.setInterval(() => void load(), 30_000);
     const staleTimer = window.setInterval(() => {
       setStale(
-        refreshedAt === null || Date.now() - refreshedAt.getTime() > 45_000,
+        lastLoadFailedRef.current ||
+          refreshedAt === null ||
+          Date.now() - refreshedAt.getTime() > 45_000,
       );
     }, 5_000);
     return () => {
