@@ -137,6 +137,60 @@ describe('event-driven handoff dispatcher', () => {
     ).toMatchObject({ kind: 'merge-ready-green', target: 'orchestrator' });
   });
 
+  it.each(['PASS', 'PASS_WITH_MINOR_FINDINGS'])(
+    'routes a canonical %s specialist-review template when it explicitly emits MERGE_READY',
+    (verdict) => {
+      const body = [
+        'SPECIALIST_REVIEW',
+        'actor: codex',
+        'overlay: code-reviewer',
+        'pr: 51',
+        'exact_sha: def456',
+        `verdict: ${verdict}`,
+        'merge_ready: yes',
+        'findings:',
+        verdict === 'PASS' ? '- NOTE: none' : '- MINOR: non-blocking follow-up',
+        'MERGE_READY',
+      ].join('\n');
+
+      expect(
+        decideHandoff({
+          eventName: 'pull_request_review',
+          pr: normalPr,
+          review: {
+            state: 'approved',
+            body,
+            commit_id: 'def456',
+          },
+          ciGreen: true,
+        }),
+      ).toMatchObject({ kind: 'merge-ready-green', target: 'orchestrator' });
+    },
+  );
+
+  it('does not route a specialist-review template without the explicit MERGE_READY signal', () => {
+    expect(
+      decideHandoff({
+        eventName: 'pull_request_review',
+        pr: normalPr,
+        review: {
+          state: 'approved',
+          body: [
+            'SPECIALIST_REVIEW',
+            'actor: codex',
+            'overlay: code-reviewer',
+            'pr: 51',
+            'exact_sha: def456',
+            'verdict: PASS',
+            'merge_ready: no',
+          ].join('\n'),
+          commit_id: 'def456',
+        },
+        ciGreen: true,
+      }),
+    ).toBeNull();
+  });
+
   it('never auto-promotes plain issue-comment MERGE_READY claims', () => {
     expect(
       decideHandoff({
