@@ -227,7 +227,10 @@ describe('appointment booking foundation', () => {
         (a, b) => a - b,
       ),
     ).toEqual([1, 2]);
-    const rows = await pool.query<{ registration_order: string; source: string }>(
+    const rows = await pool.query<{
+      registration_order: string;
+      source: string;
+    }>(
       `SELECT registration_order, source FROM queue_entries
         WHERE session_id=$1 ORDER BY registration_order`,
       [ids.sessionA],

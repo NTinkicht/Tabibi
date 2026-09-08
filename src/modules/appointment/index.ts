@@ -286,7 +286,13 @@ export class AppointmentService {
            (id, clinic_id, session_id, patient_id, state, source, registration_order,
             eligibility_order, priority_order)
          VALUES ($1, $2, $3, $4, 'waiting', 'appointment', $5, NULL, NULL)`,
-        [entryId, scope.clinicId, sessionId, input.patientId, registrationOrder],
+        [
+          entryId,
+          scope.clinicId,
+          sessionId,
+          input.patientId,
+          registrationOrder,
+        ],
       );
       await client.query(
         `INSERT INTO appointments
