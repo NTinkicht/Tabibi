@@ -10,12 +10,23 @@ const MIN_SAMPLE_MINUTES = 2;
 const MAX_SAMPLE_MINUTES = 120;
 const ETA_MIN_MULTIPLIER = 0.75;
 const ETA_MAX_MULTIPLIER = 1.5;
-const ETA_ELIGIBLE_STATES = new Set<QueueEntryState>([
-  'in_consultation',
-  'called',
-  'checked_in',
-  'waiting',
-]);
+const TERMINAL_STATE_RANK = 3;
+
+// One dashboard-local state contract drives both ordering and ETA eligibility.
+// QueueService.listOperational() intentionally retains its pre-WU9 SQL ordering;
+// WU9 must not introduce a third independent active-state enumeration.
+const OPERATIONAL_STATE_RANK: Readonly<Record<QueueEntryState, number>> = {
+  in_consultation: 0,
+  called: 0,
+  checked_in: 1,
+  waiting: 2,
+  completed: TERMINAL_STATE_RANK,
+  cancelled: TERMINAL_STATE_RANK,
+  no_show: TERMINAL_STATE_RANK,
+};
+const OPERATIONAL_STATE_ORDER_SQL = Object.entries(OPERATIONAL_STATE_RANK)
+  .map(([state, rank]) => `WHEN '${state}' THEN ${rank}`)
+  .join(' ');
 
 export interface ReceptionistDashboardEntry {
   id: string;
@@ -116,9 +127,7 @@ export class ReceptionistDashboardService {
            LEFT JOIN patient_operational_records patient
              ON patient.id = entry.patient_id AND patient.clinic_id = entry.clinic_id
           WHERE session.id = $1 AND session.clinic_id = $2
-          ORDER BY CASE entry.state
-                     WHEN 'in_consultation' THEN 0 WHEN 'called' THEN 0
-                     WHEN 'checked_in' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END,
+          ORDER BY CASE entry.state ${OPERATIONAL_STATE_ORDER_SQL} ELSE ${TERMINAL_STATE_RANK} END,
                    CASE WHEN entry.priority_order IS NULL THEN 1 ELSE 0 END,
                    entry.priority_order NULLS LAST,
                    entry.eligibility_order NULLS LAST,
@@ -150,7 +159,8 @@ export class ReceptionistDashboardService {
 
       const entries = result.rows.flatMap((row) => {
         if (!row.entry_id) return [];
-        const eligible = ETA_ELIGIBLE_STATES.has(row.entry_state!);
+        const state = row.entry_state!;
+        const eligible = OPERATIONAL_STATE_RANK[state] < TERMINAL_STATE_RANK;
         const eta = eligible
           ? {
               patientsAhead,
@@ -178,7 +188,7 @@ export class ReceptionistDashboardService {
           {
             id: row.entry_id,
             sessionId: row.session_id,
-            state: row.entry_state!,
+            state,
             registrationOrder: Number(row.registration_order),
             eligibilityOrder:
               row.eligibility_order === null
