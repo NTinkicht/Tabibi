@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { QueueService } from '@/modules/queue';
 import { ReceptionistDashboardService } from '@/modules/receptionist-dashboard';
+import { SessionService } from '@/modules/session';
 import { migrate } from '../../scripts/db/lib';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -200,5 +201,156 @@ describe('receptionist dashboard concurrency snapshot', () => {
       state: 'completed',
       eta: null,
     });
+  });
+
+  it('keeps doctor-delay version and ETA bounds on one committed PostgreSQL snapshot', async () => {
+    const queue = new QueueService(pool);
+    const sessions = new SessionService(pool);
+    const entry = await queue.registerWalkIn(scope, ids.session, {
+      privateDisplayName: 'Delay patient',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu10-delay-register',
+      correlationId: 'wu10-delay-register',
+    });
+    await progress(queue, entry.entry.id, ['check_in'], 'wu10-delay-check-in');
+
+    await sessions.delay(scope, ids.session, {
+      command: 'declare_delay',
+      minutes: 10,
+      expectedVersion: 0,
+      idempotencyKey: 'wu10-delay-declare',
+      correlationId: 'wu10-delay-declare',
+    });
+
+    const firstQueryReached = deferred();
+    const releaseFirstQuery = deferred();
+    const service = new ReceptionistDashboardService(
+      poolWithDashboardFirstQueryBarrier(firstQueryReached, releaseFirstQuery),
+    );
+    const snapshotPromise = service.getSnapshot(scope, ids.session);
+    await firstQueryReached.promise;
+
+    await sessions.delay(scope, ids.session, {
+      command: 'update_delay',
+      minutes: 40,
+      expectedVersion: 1,
+      idempotencyKey: 'wu10-delay-update',
+      correlationId: 'wu10-delay-update',
+    });
+    releaseFirstQuery.resolve();
+
+    const snapshot = await snapshotPromise;
+    expect(snapshot.session).toMatchObject({
+      declaredDelayMinutes: 10,
+      delayVersion: 1,
+    });
+    expect(snapshot.entries[0]?.eta).toMatchObject({
+      patientsAhead: 0,
+      minWaitMinutes: 10,
+      maxWaitMinutes: 10,
+    });
+
+    const after = await new ReceptionistDashboardService(pool).getSnapshot(
+      scope,
+      ids.session,
+    );
+    expect(after.session).toMatchObject({
+      declaredDelayMinutes: 40,
+      delayVersion: 2,
+    });
+    expect(after.entries[0]?.eta).toMatchObject({
+      patientsAhead: 0,
+      minWaitMinutes: 40,
+      maxWaitMinutes: 40,
+    });
+  });
+
+  it('keeps priority reorder and patients-ahead values on one committed PostgreSQL snapshot', async () => {
+    const queue = new QueueService(pool);
+    const first = await queue.registerWalkIn(scope, ids.session, {
+      privateDisplayName: 'Priority first',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu10-priority-first-register',
+      correlationId: 'wu10-priority-first-register',
+    });
+    const second = await queue.registerWalkIn(scope, ids.session, {
+      privateDisplayName: 'Priority second',
+      preferredLocale: 'ar',
+      idempotencyKey: 'wu10-priority-second-register',
+      correlationId: 'wu10-priority-second-register',
+    });
+    await progress(queue, first.entry.id, ['check_in'], 'wu10-priority-first');
+    await progress(queue, second.entry.id, ['check_in'], 'wu10-priority-second');
+
+    const beforePriority = await new ReceptionistDashboardService(pool).getSnapshot(
+      scope,
+      ids.session,
+    );
+    await queue.reorder(scope, ids.session, first.entry.id, {
+      targetPosition: 1,
+      expectedVersion: beforePriority.session.queueOrderVersion,
+      reason: 'WU10 deterministic priority setup',
+      idempotencyKey: 'wu10-priority-seed',
+      correlationId: 'wu10-priority-seed',
+    });
+
+    const seeded = await new ReceptionistDashboardService(pool).getSnapshot(
+      scope,
+      ids.session,
+    );
+    expect(seeded.entries.map((entry) => entry.id)).toEqual([
+      first.entry.id,
+      second.entry.id,
+    ]);
+    expect(seeded.entries.map((entry) => entry.eta?.patientsAhead)).toEqual([
+      0,
+      1,
+    ]);
+
+    const firstQueryReached = deferred();
+    const releaseFirstQuery = deferred();
+    const service = new ReceptionistDashboardService(
+      poolWithDashboardFirstQueryBarrier(firstQueryReached, releaseFirstQuery),
+    );
+    const snapshotPromise = service.getSnapshot(scope, ids.session);
+    await firstQueryReached.promise;
+
+    await queue.reorder(scope, ids.session, second.entry.id, {
+      targetPosition: 1,
+      expectedVersion: seeded.session.queueOrderVersion,
+      reason: 'WU10 concurrent priority reorder',
+      idempotencyKey: 'wu10-priority-race',
+      correlationId: 'wu10-priority-race',
+    });
+    releaseFirstQuery.resolve();
+
+    const snapshot = await snapshotPromise;
+    expect(snapshot.session.queueOrderVersion).toBe(
+      seeded.session.queueOrderVersion,
+    );
+    expect(snapshot.entries.map((entry) => entry.id)).toEqual([
+      first.entry.id,
+      second.entry.id,
+    ]);
+    expect(snapshot.entries.map((entry) => entry.eta?.patientsAhead)).toEqual([
+      0,
+      1,
+    ]);
+
+    const after = await new ReceptionistDashboardService(pool).getSnapshot(
+      scope,
+      ids.session,
+    );
+    expect(after.session.queueOrderVersion).toBe(
+      seeded.session.queueOrderVersion + 1,
+    );
+    expect(after.entries.map((entry) => entry.id)).toEqual([
+      second.entry.id,
+      first.entry.id,
+    ]);
+    expect(after.entries.map((entry) => entry.eta?.patientsAhead)).toEqual([
+      0,
+      1,
+    ]);
   });
 });
