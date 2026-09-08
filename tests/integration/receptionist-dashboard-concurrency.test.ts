@@ -107,7 +107,9 @@ afterAll(async () => pool.end());
 async function progress(
   queue: QueueService,
   entryId: string,
-  commands: Array<'check_in' | 'call' | 'start_consultation' | 'complete_consultation'>,
+  commands: Array<
+    'check_in' | 'call' | 'start_consultation' | 'complete_consultation'
+  >,
   prefix: string,
 ) {
   for (const [index, command] of commands.entries()) {
@@ -195,7 +197,9 @@ describe('receptionist dashboard concurrency snapshot', () => {
       scope,
       ids.session,
     );
-    expect(after.entries.find((entry) => entry.id === racing.entry.id)).toMatchObject({
+    expect(
+      after.entries.find((entry) => entry.id === racing.entry.id),
+    ).toMatchObject({
       state: 'completed',
       eta: null,
     });
