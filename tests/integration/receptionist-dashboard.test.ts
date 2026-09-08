@@ -116,70 +116,75 @@ describe('receptionist dashboard read model', () => {
     expect(Object.keys(snapshot.entries[0]!)).not.toContain('diagnosis');
   });
 
-  it('uses a clamped same-session observed median only after three completed samples and stays deterministic', async () => {
-    const queue = new QueueService(pool);
-    const durations = [8, 10, 12];
-    for (let index = 0; index < durations.length; index++) {
-      const registered = await queue.registerWalkIn(scope, ids.sessionA, {
-        privateDisplayName: `Completed ${index}`,
-        preferredLocale: 'fr',
-        idempotencyKey: `sample-register-${index}`,
-        correlationId: `sample-register-${index}`,
-      });
-      for (const [commandIndex, command] of [
-        'check_in',
-        'call',
-        'start_consultation',
-        'complete_consultation',
-      ].entries()) {
-        await queue.command(scope, ids.sessionA, registered.entry.id, {
-          command: command as
-            | 'check_in'
-            | 'call'
-            | 'start_consultation'
-            | 'complete_consultation',
-          idempotencyKey: `sample-${index}-${commandIndex}`,
-          correlationId: `sample-${index}-${commandIndex}`,
+  it(
+    'uses a clamped same-session observed median only after three completed samples and stays deterministic',
+    async () => {
+      const queue = new QueueService(pool);
+      const durations = [8, 10, 12];
+      for (let index = 0; index < durations.length; index++) {
+        const registered = await queue.registerWalkIn(scope, ids.sessionA, {
+          privateDisplayName: `Completed ${index}`,
+          preferredLocale: 'fr',
+          idempotencyKey: `sample-register-${index}`,
+          correlationId: `sample-register-${index}`,
         });
+        for (const [commandIndex, command] of [
+          'check_in',
+          'call',
+          'start_consultation',
+          'complete_consultation',
+        ].entries()) {
+          await queue.command(scope, ids.sessionA, registered.entry.id, {
+            command: command as
+              | 'check_in'
+              | 'call'
+              | 'start_consultation'
+              | 'complete_consultation',
+            idempotencyKey: `sample-${index}-${commandIndex}`,
+            correlationId: `sample-${index}-${commandIndex}`,
+          });
+        }
+        await pool.query(
+          `UPDATE queue_entries
+              SET completed_at = '2026-09-08 10:00Z'::timestamptz,
+                  in_consultation_started_at = '2026-09-08 10:00Z'::timestamptz - ($2 * interval '1 minute')
+            WHERE id = $1`,
+          [registered.entry.id, durations[index]],
+        );
       }
-      await pool.query(
-        `UPDATE queue_entries
-            SET completed_at = '2026-09-08 10:00Z'::timestamptz,
-                in_consultation_started_at = '2026-09-08 10:00Z'::timestamptz - ($2 * interval '1 minute')
-          WHERE id = $1`,
-        [registered.entry.id, durations[index]],
+
+      await queue.registerWalkIn(scope, ids.sessionA, {
+        privateDisplayName: 'ETA first',
+        preferredLocale: 'ar',
+        idempotencyKey: 'eta-first',
+        correlationId: 'eta-first',
+      });
+      const second = await queue.registerWalkIn(scope, ids.sessionA, {
+        privateDisplayName: 'ETA second',
+        preferredLocale: 'ar',
+        idempotencyKey: 'eta-second',
+        correlationId: 'eta-second',
+      });
+
+      const service = new ReceptionistDashboardService(pool);
+      const firstRead = await service.getSnapshot(scope, ids.sessionA);
+      const secondRead = await service.getSnapshot(scope, ids.sessionA);
+      const secondEntry = firstRead.entries.find(
+        (entry) => entry.id === second.entry.id,
+      )!;
+      expect(secondEntry.eta).toEqual({
+        patientsAhead: 1,
+        minWaitMinutes: 28,
+        maxWaitMinutes: 35,
+        estimatedConsultationMinutes: 10,
+        estimateSource: 'observed_median',
+        observedSampleCount: 3,
+      });
+      expect(secondRead.entries.map((entry) => entry.eta)).toEqual(
+        firstRead.entries.map((entry) => entry.eta),
       );
-    }
-
-    await queue.registerWalkIn(scope, ids.sessionA, {
-      privateDisplayName: 'ETA first',
-      preferredLocale: 'ar',
-      idempotencyKey: 'eta-first',
-      correlationId: 'eta-first',
-    });
-    const second = await queue.registerWalkIn(scope, ids.sessionA, {
-      privateDisplayName: 'ETA second',
-      preferredLocale: 'ar',
-      idempotencyKey: 'eta-second',
-      correlationId: 'eta-second',
-    });
-
-    const service = new ReceptionistDashboardService(pool);
-    const firstRead = await service.getSnapshot(scope, ids.sessionA);
-    const secondRead = await service.getSnapshot(scope, ids.sessionA);
-    const secondEntry = firstRead.entries.find((entry) => entry.id === second.entry.id)!;
-    expect(secondEntry.eta).toEqual({
-      patientsAhead: 1,
-      minWaitMinutes: 28,
-      maxWaitMinutes: 35,
-      estimatedConsultationMinutes: 10,
-      estimateSource: 'observed_median',
-      observedSampleCount: 3,
-    });
-    expect(secondRead.entries.map((entry) => entry.eta)).toEqual(
-      firstRead.entries.map((entry) => entry.eta),
-    );
-  });
+    },
+  );
 
   it('denies wrong roles and treats a cross-clinic session as absent', async () => {
     await pool.query(
