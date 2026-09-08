@@ -48,6 +48,14 @@ findings:
 - <canonical severity>: <finding or none>
 ```
 
-For a clean passing exact head, emit `PASS` and `merge_ready: yes` (equivalent to `PASS / MERGE_READY` for the handoff dispatcher). If only non-blocking minor findings remain, emit `PASS_WITH_MINOR_FINDINGS`; otherwise emit `CHANGES_REQUIRED`.
+When `merge_ready: yes`, append a separate literal line:
+
+```text
+MERGE_READY
+```
+
+This literal signal keeps the artifact compatible with `scripts/coordination/handoff-dispatcher.cjs`. Do not emit `MERGE_READY` when `merge_ready: no`.
+
+For a clean passing exact head, emit `PASS`, `merge_ready: yes`, and `MERGE_READY`. If only non-blocking minor findings remain, emit `PASS_WITH_MINOR_FINDINGS`, `merge_ready: yes`, and `MERGE_READY`. Otherwise emit `CHANGES_REQUIRED` and `merge_ready: no`.
 
 `merge_ready: yes` is binding only when the actor is independently eligible under Tabibi governance and required CI is green on the same exact SHA.
