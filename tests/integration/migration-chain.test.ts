@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
@@ -12,6 +14,8 @@ const committedMigrations = [
   '0006_queue_priority_order.sql',
   '0007_waiting_room_public_labels.sql',
   '0008_queue_eta_timing.sql',
+  '0009_appointment_booking_foundation.sql',
+  '0010_appointment_booking_constraint_validation.sql',
 ];
 
 beforeAll(async () => {
@@ -38,7 +42,7 @@ describe('committed migration chain', () => {
     expect(rerun.rows[0]!.count).toBe(String(committedMigrations.length));
   });
 
-  it('exposes queue lifecycle and ETA timing artifacts created by later migrations', async () => {
+  it('exposes queue lifecycle, ETA timing and appointment-booking artifacts created by later migrations', async () => {
     const artifacts = await client.query<{
       queue_order_version: string;
       reorder_receipts: string | null;
@@ -48,6 +52,13 @@ describe('committed migration chain', () => {
       consultation_started_at: string;
       completed_at: string;
       eta_timing_idx: string | null;
+      appointments: string | null;
+      appointment_receipts: string | null;
+      appointment_source_allowed: boolean;
+      appointment_entity_allowed: boolean;
+      patient_session_uq: string | null;
+      temp_queue_source_constraint: string | null;
+      temp_audit_constraint: string | null;
     }>(
       `SELECT
          EXISTS (
@@ -68,7 +79,24 @@ describe('committed migration chain', () => {
            SELECT 1 FROM information_schema.columns
             WHERE table_name='queue_entries' AND column_name='completed_at'
          )::text completed_at,
-         to_regclass('queue_entries_session_completed_timing_idx')::text eta_timing_idx`,
+         to_regclass('queue_entries_session_completed_timing_idx')::text eta_timing_idx,
+         to_regclass('appointments')::text appointments,
+         to_regclass('appointment_booking_receipts')::text appointment_receipts,
+         (SELECT pg_get_constraintdef(oid) LIKE '%appointment%'
+            FROM pg_constraint
+           WHERE conname='queue_entries_source_check') AS appointment_source_allowed,
+         (SELECT pg_get_constraintdef(oid) LIKE '%appointment%'
+            FROM pg_constraint
+           WHERE conname='audit_events_entity_type_check') AS appointment_entity_allowed,
+         (SELECT conname
+            FROM pg_constraint
+           WHERE conname='appointments_clinic_session_patient_uq') patient_session_uq,
+         (SELECT conname
+            FROM pg_constraint
+           WHERE conname='queue_entries_source_check_wu11_tmp') temp_queue_source_constraint,
+         (SELECT conname
+            FROM pg_constraint
+           WHERE conname='audit_events_entity_type_check_wu11_tmp') temp_audit_constraint`,
     );
 
     expect(artifacts.rows[0]).toEqual({
@@ -80,6 +108,134 @@ describe('committed migration chain', () => {
       consultation_started_at: 'true',
       completed_at: 'true',
       eta_timing_idx: 'queue_entries_session_completed_timing_idx',
+      appointments: 'appointments',
+      appointment_receipts: 'appointment_booking_receipts',
+      appointment_source_allowed: true,
+      appointment_entity_allowed: true,
+      patient_session_uq: 'appointments_clinic_session_patient_uq',
+      temp_queue_source_constraint: null,
+      temp_audit_constraint: null,
     });
+  });
+
+  it('keeps 0010 queue lock escalation after both validation scans', async () => {
+    const migration = await readFile(
+      resolve(
+        process.cwd(),
+        'db/migrations/0010_appointment_booking_constraint_validation.sql',
+      ),
+      'utf8',
+    );
+    const queueValidate = migration.indexOf(
+      'ALTER TABLE queue_entries\n  VALIDATE CONSTRAINT queue_entries_source_check_wu11_tmp;',
+    );
+    const auditValidate = migration.indexOf(
+      'ALTER TABLE audit_events\n  VALIDATE CONSTRAINT audit_events_entity_type_check_wu11_tmp;',
+    );
+    const queueRename = migration.indexOf(
+      'ALTER TABLE queue_entries\n  RENAME CONSTRAINT queue_entries_source_check_wu11_tmp',
+    );
+    const auditRename = migration.indexOf(
+      'ALTER TABLE audit_events\n  RENAME CONSTRAINT audit_events_entity_type_check_wu11_tmp',
+    );
+    expect(queueValidate).toBeGreaterThanOrEqual(0);
+    expect(auditValidate).toBeGreaterThan(queueValidate);
+    expect(queueRename).toBeGreaterThan(auditValidate);
+    expect(auditRename).toBeGreaterThan(queueRename);
+
+    const writer = new Client({ connectionString: process.env.DATABASE_URL });
+    const competitor = new Client({
+      connectionString: process.env.DATABASE_URL,
+    });
+    const tryQueueWriterLock = async () => {
+      await competitor.query('BEGIN');
+      try {
+        const result = await competitor.query(
+          'LOCK TABLE queue_entries IN ROW EXCLUSIVE MODE NOWAIT',
+        );
+        await competitor.query('ROLLBACK');
+        return result;
+      } catch (error) {
+        await competitor.query('ROLLBACK');
+        throw error;
+      }
+    };
+    const queueConstraint = 'queue_entries_source_check_lock_probe_tmp';
+    const auditConstraint = 'audit_events_entity_type_check_lock_probe_tmp';
+    await writer.connect();
+    await competitor.connect();
+    await client.query(
+      `ALTER TABLE queue_entries
+         DROP CONSTRAINT IF EXISTS ${queueConstraint}`,
+    );
+    await client.query(
+      `ALTER TABLE queue_entries
+         DROP CONSTRAINT IF EXISTS ${queueConstraint}_renamed`,
+    );
+    await client.query(
+      `ALTER TABLE audit_events
+         DROP CONSTRAINT IF EXISTS ${auditConstraint}`,
+    );
+    await client.query(
+      `ALTER TABLE queue_entries
+         ADD CONSTRAINT ${queueConstraint}
+         CHECK (source IN ('walk_in', 'appointment')) NOT VALID`,
+    );
+    await client.query(
+      `ALTER TABLE audit_events
+         ADD CONSTRAINT ${auditConstraint}
+         CHECK (entity_type IN (
+           'clinic',
+           'membership',
+           'doctor',
+           'schedule_template',
+           'consultation_session',
+           'queue_entry',
+           'appointment'
+         )) NOT VALID`,
+    );
+    let writerInTransaction = false;
+    try {
+      await writer.query('BEGIN');
+      writerInTransaction = true;
+      await writer.query(
+        `ALTER TABLE queue_entries VALIDATE CONSTRAINT ${queueConstraint}`,
+      );
+      await writer.query(
+        `ALTER TABLE audit_events VALIDATE CONSTRAINT ${auditConstraint}`,
+      );
+      await expect(tryQueueWriterLock()).resolves.toMatchObject({
+        command: 'LOCK',
+      });
+
+      await writer.query(
+        `ALTER TABLE queue_entries
+           RENAME CONSTRAINT ${queueConstraint} TO ${queueConstraint}_renamed`,
+      );
+
+      await expect(tryQueueWriterLock()).rejects.toMatchObject({
+        code: '55P03',
+      });
+      await writer.query('ROLLBACK');
+      writerInTransaction = false;
+    } finally {
+      if (writerInTransaction) {
+        await writer.query('ROLLBACK');
+      }
+      await client.query(
+        `ALTER TABLE queue_entries
+           DROP CONSTRAINT IF EXISTS ${queueConstraint}`,
+      );
+      await client.query(
+        `ALTER TABLE queue_entries
+           DROP CONSTRAINT IF EXISTS ${queueConstraint}_renamed`,
+      );
+      await client.query(
+        `ALTER TABLE audit_events
+           DROP CONSTRAINT IF EXISTS ${auditConstraint}`,
+      );
+      await writer.end();
+      await competitor.end();
+    }
   });
 });
