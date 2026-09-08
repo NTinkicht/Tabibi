@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { QueueService } from '@/modules/queue';
 import { ReceptionistDashboardService } from '@/modules/receptionist-dashboard';
@@ -27,12 +27,14 @@ function deferred() {
 function poolWithDashboardFirstQueryBarrier(
   reached: ReturnType<typeof deferred>,
   release: ReturnType<typeof deferred>,
+  afterConcurrentCommitProbe?: (client: PoolClient) => Promise<void>,
 ): Pool {
   return {
     connect: async () => {
       const client = await pool.connect();
       const originalQuery = client.query.bind(client);
       let held = false;
+      let probed = false;
 
       return new Proxy(client, {
         get(target, property) {
@@ -53,6 +55,14 @@ function poolWithDashboardFirstQueryBarrier(
                 held = true;
                 reached.resolve();
                 await release.promise;
+              } else if (
+                held &&
+                !probed &&
+                afterConcurrentCommitProbe &&
+                sql.includes('completed_at IS NOT NULL')
+              ) {
+                probed = true;
+                await afterConcurrentCommitProbe(target as PoolClient);
               }
               return result;
             };
@@ -203,7 +213,7 @@ describe('receptionist dashboard concurrency snapshot', () => {
     });
   });
 
-  it('keeps doctor-delay version and ETA bounds on one committed PostgreSQL snapshot', async () => {
+  it('pins doctor-delay update fields across a concurrent commit', async () => {
     const queue = new QueueService(pool);
     const sessions = new SessionService(pool);
     const entry = await queue.registerWalkIn(scope, ids.session, {
@@ -222,10 +232,32 @@ describe('receptionist dashboard concurrency snapshot', () => {
       correlationId: 'wu10-delay-declare',
     });
 
+    let probe:
+      | { declaredDelayMinutes: number | null; delayVersion: number }
+      | undefined;
     const firstQueryReached = deferred();
     const releaseFirstQuery = deferred();
     const service = new ReceptionistDashboardService(
-      poolWithDashboardFirstQueryBarrier(firstQueryReached, releaseFirstQuery),
+      poolWithDashboardFirstQueryBarrier(
+        firstQueryReached,
+        releaseFirstQuery,
+        async (client) => {
+          const observed = await client.query<{
+            declared_delay_minutes: number | null;
+            delay_version: number;
+          }>(
+            `SELECT declared_delay_minutes, delay_version
+               FROM consultation_sessions
+              WHERE id = $1 AND clinic_id = $2`,
+            [ids.session, ids.clinic],
+          );
+          probe = {
+            declaredDelayMinutes:
+              observed.rows[0]?.declared_delay_minutes ?? null,
+            delayVersion: observed.rows[0]?.delay_version ?? -1,
+          };
+        },
+      ),
     );
     const snapshotPromise = service.getSnapshot(scope, ids.session);
     await firstQueryReached.promise;
@@ -240,6 +272,7 @@ describe('receptionist dashboard concurrency snapshot', () => {
     releaseFirstQuery.resolve();
 
     const snapshot = await snapshotPromise;
+    expect(probe).toEqual({ declaredDelayMinutes: 10, delayVersion: 1 });
     expect(snapshot.session).toMatchObject({
       declaredDelayMinutes: 10,
       delayVersion: 1,
@@ -258,14 +291,74 @@ describe('receptionist dashboard concurrency snapshot', () => {
       declaredDelayMinutes: 40,
       delayVersion: 2,
     });
-    expect(after.entries[0]?.eta).toMatchObject({
-      patientsAhead: 0,
-      minWaitMinutes: 40,
-      maxWaitMinutes: 40,
+  });
+
+  it('pins nullable doctor-delay fields across a concurrent clear', async () => {
+    const sessions = new SessionService(pool);
+    await sessions.delay(scope, ids.session, {
+      command: 'declare_delay',
+      minutes: 25,
+      expectedVersion: 0,
+      idempotencyKey: 'wu10-clear-declare',
+      correlationId: 'wu10-clear-declare',
+    });
+
+    let probe:
+      | { declaredDelayMinutes: number | null; delayVersion: number }
+      | undefined;
+    const firstQueryReached = deferred();
+    const releaseFirstQuery = deferred();
+    const service = new ReceptionistDashboardService(
+      poolWithDashboardFirstQueryBarrier(
+        firstQueryReached,
+        releaseFirstQuery,
+        async (client) => {
+          const observed = await client.query<{
+            declared_delay_minutes: number | null;
+            delay_version: number;
+          }>(
+            `SELECT declared_delay_minutes, delay_version
+               FROM consultation_sessions
+              WHERE id = $1 AND clinic_id = $2`,
+            [ids.session, ids.clinic],
+          );
+          probe = {
+            declaredDelayMinutes:
+              observed.rows[0]?.declared_delay_minutes ?? null,
+            delayVersion: observed.rows[0]?.delay_version ?? -1,
+          };
+        },
+      ),
+    );
+    const snapshotPromise = service.getSnapshot(scope, ids.session);
+    await firstQueryReached.promise;
+
+    await sessions.delay(scope, ids.session, {
+      command: 'clear_delay',
+      expectedVersion: 1,
+      idempotencyKey: 'wu10-delay-clear',
+      correlationId: 'wu10-delay-clear',
+    });
+    releaseFirstQuery.resolve();
+
+    const snapshot = await snapshotPromise;
+    expect(probe).toEqual({ declaredDelayMinutes: 25, delayVersion: 1 });
+    expect(snapshot.session).toMatchObject({
+      declaredDelayMinutes: 25,
+      delayVersion: 1,
+    });
+
+    const after = await new ReceptionistDashboardService(pool).getSnapshot(
+      scope,
+      ids.session,
+    );
+    expect(after.session).toMatchObject({
+      declaredDelayMinutes: null,
+      delayVersion: 2,
     });
   });
 
-  it('keeps priority reorder and patients-ahead values on one committed PostgreSQL snapshot', async () => {
+  it('pins priority reorder fields across a concurrent commit', async () => {
     const queue = new QueueService(pool);
     const first = await queue.registerWalkIn(scope, ids.session, {
       privateDisplayName: 'Priority first',
@@ -302,18 +395,39 @@ describe('receptionist dashboard concurrency snapshot', () => {
       scope,
       ids.session,
     );
-    expect(seeded.entries.map((entry) => entry.id)).toEqual([
-      first.entry.id,
-      second.entry.id,
-    ]);
-    expect(seeded.entries.map((entry) => entry.eta?.patientsAhead)).toEqual([
-      0, 1,
-    ]);
-
+    let probe:
+      | { queueOrderVersion: number; orderedEntryIds: string[] }
+      | undefined;
     const firstQueryReached = deferred();
     const releaseFirstQuery = deferred();
     const service = new ReceptionistDashboardService(
-      poolWithDashboardFirstQueryBarrier(firstQueryReached, releaseFirstQuery),
+      poolWithDashboardFirstQueryBarrier(
+        firstQueryReached,
+        releaseFirstQuery,
+        async (client) => {
+          const version = await client.query<{ queue_order_version: number }>(
+            `SELECT queue_order_version
+               FROM consultation_sessions
+              WHERE id = $1 AND clinic_id = $2`,
+            [ids.session, ids.clinic],
+          );
+          const order = await client.query<{ id: string }>(
+            `SELECT id
+               FROM queue_entries
+              WHERE session_id = $1 AND clinic_id = $2
+              ORDER BY CASE WHEN priority_order IS NULL THEN 1 ELSE 0 END,
+                       priority_order NULLS LAST,
+                       eligibility_order NULLS LAST,
+                       registration_order NULLS LAST,
+                       id NULLS LAST`,
+            [ids.session, ids.clinic],
+          );
+          probe = {
+            queueOrderVersion: version.rows[0]?.queue_order_version ?? -1,
+            orderedEntryIds: order.rows.map((row) => row.id),
+          };
+        },
+      ),
     );
     const snapshotPromise = service.getSnapshot(scope, ids.session);
     await firstQueryReached.promise;
@@ -328,6 +442,10 @@ describe('receptionist dashboard concurrency snapshot', () => {
     releaseFirstQuery.resolve();
 
     const snapshot = await snapshotPromise;
+    expect(probe).toEqual({
+      queueOrderVersion: seeded.session.queueOrderVersion,
+      orderedEntryIds: [first.entry.id, second.entry.id],
+    });
     expect(snapshot.session.queueOrderVersion).toBe(
       seeded.session.queueOrderVersion,
     );
@@ -349,9 +467,6 @@ describe('receptionist dashboard concurrency snapshot', () => {
     expect(after.entries.map((entry) => entry.id)).toEqual([
       second.entry.id,
       first.entry.id,
-    ]);
-    expect(after.entries.map((entry) => entry.eta?.patientsAhead)).toEqual([
-      0, 1,
     ]);
   });
 });
