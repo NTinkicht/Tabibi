@@ -82,4 +82,6 @@ findings:
 - BLOCKER | MAJOR | MINOR | NOTE: ...
 ```
 
+A passing binding review with `merge_ready: yes` must additionally emit the literal line `MERGE_READY` so the existing handoff dispatcher recognizes the gate. Do not emit `MERGE_READY` for a non-ready review.
+
 Only a reviewer who is independently eligible under the existing exact-SHA and material-authorship governance may issue the binding merge gate.
