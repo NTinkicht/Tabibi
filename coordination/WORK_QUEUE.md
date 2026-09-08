@@ -1,39 +1,43 @@
 # Tabibi Work Queue
 
-This is the human-readable work marketplace for available engineering capacity. It supplements `coordination/STATE.json`; if the two conflict about the canonical implementation/review state, `STATE.json` and live GitHub evidence win.
+This is the human-readable work marketplace for available engineering capacity. It supplements `coordination/STATE.json`; if the two conflict about canonical implementation/review state, live GitHub evidence and `STATE.json` win.
 
 Status values: `ACTIVE`, `READY`, `BLOCKED`, `DONE`, `CANCELLED`.
 
-## Current company round — Issue #4 / Work Unit 5
+## Current company round — Epic #5 / Work Unit 9
 
-Work Units 1–4 are merged. Work Unit 5 is the next bounded clinic-operations slice:
+WU6 privacy-preserving waiting-room identifiers, WU7 doctor-delay hardening, and WU8 receptionist operations dashboard are merged.
 
-**Authorized queue priority/reorder with mandatory reason, deterministic ordering, idempotency and audit.**
+The primary product stream is now **Issue #96 — WU9: deterministic queue ETA snapshot v1**.
 
-This slice deliberately does **not** add ETA, notifications, appointment booking, public waiting-room screens, restore/transfer, or new clinical data. One canonical implementation stream only.
+This slice is backend-first and explainable. It deliberately excludes notifications, patient/public ETA delivery, appointment changes, ML/AI inference, clinical data, and queue-order mutation.
 
 | Task ID | Status | Preferred actor | Scope | Expected artifact | Code allowed? |
 | --- | --- | --- | --- | --- | --- |
-| WU5-IMPLEMENT-001 | ACTIVE | codex | Implement authorized priority/reorder on current `main`: clinic-scoped permission checks; eligible queue states only; mandatory non-empty reason; deterministic persisted service order/priority; PostgreSQL serialization; idempotent retry receipt; metadata-only audit; API + receptionist UI; regression/concurrency tests | One canonical branch/PR + exact-SHA handoff | Yes — sole implementation lease |
-| WU5-RISK-001 | ACTIVE | claude | Adversarial pre-mortem and later independent exact-SHA gate: authorization, tenant isolation, fairness/state-machine abuse, concurrency, idempotency, audit completeness, stale commands, priority starvation and deterministic ordering | `RISK_CALL`/test recommendations now; findings or `MERGE_READY` on final exact head | Review only; no application edits while gating |
-| WU5-UX-001 | ACTIVE | gemini_chat | Algeria-realistic UX/system lane: receptionist mental model, urgent/priority reason capture, Arabic/French/RTL/mobile, accessibility, low-connectivity retries, clear indication that reorder is exceptional and audited | `UX_NOTE` + scenario/test matrix; later complementary exact-head verification | No implementation unless explicitly failed over |
-| WU5-QA-001 | READY | gemini_agent | One bounded capacity check. If recovered, independently design system/concurrency QA for reorder races, duplicate retries, stale views and cross-clinic attempts without duplicating Gemini Chat | `CAPACITY_RECOVERED` + QA matrix, or one precise capacity-degraded report | No implementation unless explicitly failed over |
-| WU5-REF-001 | READY | chatgpt/codex after implementation checkpoint | Identify only low-risk refactors revealed by WU5 that reduce duplication in queue command validation/audit/retry handling without broadening the PR | `REFACTOR_IDEA` with file-level evidence and whether defer/fold-in | Only if implementer decides it is required for WU5 |
-| WU5-GATE-001 | BLOCKED | claude | Independent exact-SHA merge gate after Codex implementation and green CI | Stable findings or `PASS/MERGE_READY` | Review only |
-| WU5-SECONDARY-001 | BLOCKED | gemini_chat / gemini_agent | Complementary UX/system verification of WU5 exact head | Scenario evidence/findings | Review only |
-| WU5-MERGE-001 | BLOCKED | codex → chatgpt fallback | Mechanical merge only after unchanged exact head has green CI and valid independent `MERGE_READY` | Merge commit + state reconciliation | Merge only |
+| WU9-ARCH-001 | ACTIVE | chatgpt | Product/architecture ownership, bounded scope enforcement, state reconciliation, merge orchestration | Issue #96 contract + coordination decisions | No application edits unless explicit failover |
+| WU9-IMPLEMENT-001 | ACTIVE | copilot | Implement deterministic staff-only ETA snapshot per Issue #96 from committed queue/session state; one canonical branch/PR | Canonical PR + tests + exact-SHA handoff | Yes — sole WU9 implementation lease |
+| WU9-RISK-001 | ACTIVE | claude | Adversarial pre-mortem covering determinism, ETA range math, fallback prior, delay effects, state exclusion, tenancy, stale/concurrent reads | Risk/test matrix on #96 | Review only |
+| WU9-GATE-001 | BLOCKED | claude | Independent non-author exact-SHA gate after implementation and green CI | PASS/MERGE_READY or findings | Review only |
+| WU9-QA-001 | READY | chatgpt / available non-author actor | Complementary deterministic test-oracle review after first implementation checkpoint without editing WU9 code | TEST_IDEA / QA matrix | No implementation |
+| WU9-MERGE-001 | BLOCKED | chatgpt | Mechanical merge only after unchanged exact head has green CI and valid independent gate | Merge commit + state reconciliation | Merge only |
 
-### WU5 acceptance requirements
+## Parallel bounded cleanup — Issue #94
 
-- Only authorized clinic staff may reorder/priority-adjust queue entries; cross-clinic IDs never widen access.
-- Reorder/priority is allowed only for committed eligible queue states; called/in-consultation/terminal entries cannot be silently reshuffled.
-- Every successful priority/reorder mutation requires a non-empty operational reason and creates metadata-only audit evidence containing actor, clinic/session/entry identifiers, prior ordering data, resulting ordering data and reason — no diagnosis/clinical justification fields.
-- Concurrent reorder/retry operations are serialized in PostgreSQL and yield a deterministic committed order; duplicate retries do not create duplicate side effects/audit rows.
-- Existing immutable registration order remains preserved as historical evidence; service/priority order is a separate mutable operational concept.
-- Ordinary call-next/service selection remains deterministic after priority changes and must not strand or duplicate queue entries.
-- Arabic/French/RTL/mobile receptionist UI clearly exposes priority/reorder as an exceptional audited action, requires reason before submission, and reports conflict/stale-state outcomes safely.
-- Real-PostgreSQL tests cover authorization, tenant isolation, eligible/ineligible states, repeated idempotent request, simultaneous reorder races, stale-version conflict and deterministic resulting order. Browser coverage includes at least one mobile/RTL priority adjustment flow.
-- Full lint/typecheck/unit/integration/build/security-audit/CI remain green.
+TAB-WU8-003 is a non-blocking follow-up from Claude's WU8 re-review. It is independent from WU9 and may proceed in parallel without touching ETA code.
+
+| Task ID | Status | Preferred actor | Scope | Expected artifact | Code allowed? |
+| --- | --- | --- | --- | --- | --- |
+| WU8-FOLLOWUP-003 | ACTIVE_PENDING_CAPACITY | codex | Keep failure-induced stale state latched until next success (or equivalent failed-poll OR time-stale model); tighten e2e timestamp fixture | One bounded PR for Issue #94 + focused browser regression | Yes, only if Codex confirms capacity |
+| WU8-FOLLOWUP-003-GATE | BLOCKED | eligible non-author reviewer | Independent exact-head review after green CI | PASS/MERGE_READY or findings | Review only |
+
+## Capacity and anti-duplication rules
+
+- Exactly one canonical PR and one active implementer lease per work stream.
+- Copilot owns WU9 implementation. Codex must not modify WU9 unless an explicit failover releases Copilot first.
+- Codex owns Issue #94 only if it confirms recovered capacity; otherwise the task remains pending failover.
+- Claude is review-only on WU9 and must author no WU9 application code while retaining gating independence.
+- Gemini Agent and Gemini Chat remain paused until the owner explicitly re-enables them.
+- An assignment is not evidence of work. HEARTBEAT/CHECKPOINT, commits, PRs, CI, or review artifacts are required before an actor is treated as active.
 
 ## Claim protocol
 
@@ -57,19 +61,15 @@ key_result: <one-line result>
 follow_up: <next proposed task/handoff>
 ```
 
-If no `READY` task fits your available capability, post a bounded `TASK_PROPOSAL` instead of remaining silently idle.
-
 ## Standing opportunistic tasks
 
-These may be proposed/claimed when they do not interfere with an active delivery stream:
+These may be proposed/claimed when they do not interfere with active delivery:
 
-- `REF-*` — targeted refactoring analysis with evidence;
-- `TEST-*` — missing deterministic test or scenario design;
-- `UX-*` — Algeria/Arabic/French/RTL/mobile/accessibility verification;
-- `SEC-*` — threat/risk review of upcoming scope;
-- `OBS-*` — observability/failure-diagnosis improvement;
-- `DOC-*` — documentation needed to make a feature reproducible/operable;
-- `PERF-*` — bounded performance/load hypothesis and test plan;
-- `BACKLOG-*` — decomposition of a future product slice under existing contracts.
-
-Standing tasks are not permission to broaden scope or create a second implementation PR. The claimant must still post `TASK_CLAIM` and preserve reviewer independence.
+- `REF-*` targeted refactoring analysis;
+- `TEST-*` missing deterministic tests or scenario design;
+- `UX-*` Algeria/Arabic/French/RTL/mobile/accessibility verification;
+- `SEC-*` threat/risk review of upcoming scope;
+- `OBS-*` observability/failure-diagnosis improvement;
+- `DOC-*` reproducibility/operability documentation;
+- `PERF-*` bounded performance/load hypotheses and test plans;
+- `BACKLOG-*` decomposition of a future product slice.
