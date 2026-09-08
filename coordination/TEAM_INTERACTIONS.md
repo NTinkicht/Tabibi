@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-08T14:19:35.807046+00:00
+- Last sync: 2026-09-08T15:11:26.736760+00:00
 
 ## Team Room charter
 
@@ -5422,5 +5422,56 @@ review_independence: ChatGPT will not gate its own WU11 SHA; use eligible non-au
 conflict_check: WU10 is merged; no other active product PR exists.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5586609639
+
+---
+
+### 2026-09-08T14:28:22Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=work_unit_10_merge_ready
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 1548 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5586737077
+
+---
+
+### 2026-09-08T14:38:09Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr111:38c6869c0b698c289c2084465bc0e39fe2e0aa29 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #111
+head: 38c6869c0b698c289c2084465bc0e39fe2e0aa29
+CI_GREEN_HANDOFF — PR #111 exact head `38c6869c0b698c289c2084465bc0e39fe2e0aa29` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5586880438
+
+---
+
+### 2026-09-08T15:11:15Z — NTinkicht
+
+CHECKPOINT — WU11 review-driven hold and remediation
+actor: chatgpt
+role: CTO/orchestrator/architecture/merge control + prior WU11 author
+work_stream: Issue #110 / PR #111
+status: active
+
+Live reconciliation: PR #111 is the only open product PR. Exact pre-remediation head `38c6869c0b698c289c2084465bc0e39fe2e0aa29` is mergeable and CI `34239160985` is SUCCESS, but current-head review found two unresolved majors: migration replacement constraints are validated inside the same transaction that acquires ACCESS EXCLUSIVE, and a new idempotency key can create a duplicate appointment for the same patient/session.
+
+Actions this cycle:
+- merge remains blocked despite green CI;
+- Copilot has a single same-branch bounded remediation lease for those two majors plus the cheap clinic-membership authorization regression; it already demonstrated repo-backed capacity on this stream via commit `c65d042`, but is an author and cannot gate;
+- Issue #110 scope clarified: existing queue/session→appointment status synchronization is retained only as invariant preservation, not as delivery of the deferred appointment lifecycle product feature;
+- Codex is preserved as preferred independent non-author exact-SHA gate after a meaningful new head + green CI; no repeated capacity probe now;
+- Claude remains unavailable per current temporary staffing state; Gemini Chat/Agent remain PAUSED/OFF-ROSTER.
+
+next_checkpoint: require actual Copilot commit/test evidence or explicit capacity failure. If a new head lands, require exact-head CI and then one Codex binding review; merge only on a valid PASS/MERGE_READY.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5587372472
 
 ---
