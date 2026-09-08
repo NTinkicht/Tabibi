@@ -2,14 +2,13 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { parseSpecialistReview, reconcileGateEligibility } = require(
-  '../../scripts/coordination/handoff-dispatcher.cjs',
-) as {
-  parseSpecialistReview: (text: string) => Record<string, unknown> | null;
-  reconcileGateEligibility: (
-    input: Record<string, unknown>,
-  ) => Record<string, string> | null;
-};
+const { parseSpecialistReview, reconcileGateEligibility } =
+  require('../../scripts/coordination/handoff-dispatcher.cjs') as {
+    parseSpecialistReview: (text: string) => Record<string, unknown> | null;
+    reconcileGateEligibility: (
+      input: Record<string, unknown>,
+    ) => Record<string, string> | null;
+  };
 
 function specialistReviewBody() {
   return [
