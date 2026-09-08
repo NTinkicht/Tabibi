@@ -48,6 +48,12 @@
       "path": "coordination/AGENT_PROFILES/healthcare-innovation-strategist.md",
       "default_lane": "external_strategy",
       "recommended_for": ["pilot", "clinic-proposal", "investor", "website", "partnership", "regulatory-narrative"]
+    },
+    {
+      "id": "sovereign-health-systems",
+      "path": "coordination/AGENT_PROFILES/sovereign-health-systems.md",
+      "default_lane": "dormant_external_strategy",
+      "recommended_for": ["public-sector", "ministry", "public-hospital", "sovereign-data", "institutional-pilot"]
     }
   ]
 }
