@@ -4,6 +4,19 @@ import type { QueueEntryState } from '@/modules/queue';
 import type { SessionStatus } from '@/modules/session';
 import { inTransaction } from '@/platform/database/transaction';
 
+const FALLBACK_CONSULTATION_MINUTES = 15;
+const MIN_OBSERVED_SAMPLES = 3;
+const MIN_SAMPLE_MINUTES = 2;
+const MAX_SAMPLE_MINUTES = 120;
+const ETA_MIN_MULTIPLIER = 0.75;
+const ETA_MAX_MULTIPLIER = 1.5;
+const ETA_ELIGIBLE_STATES = new Set<QueueEntryState>([
+  'in_consultation',
+  'called',
+  'checked_in',
+  'waiting',
+]);
+
 export interface ReceptionistDashboardEntry {
   id: string;
   sessionId: string;
@@ -15,6 +28,14 @@ export interface ReceptionistDashboardEntry {
   privateDisplayName: string;
   preferredLocale: 'ar' | 'fr';
   hasContact: boolean;
+  eta: {
+    patientsAhead: number;
+    minWaitMinutes: number;
+    maxWaitMinutes: number;
+    estimatedConsultationMinutes: number;
+    estimateSource: 'fallback' | 'observed_median';
+    observedSampleCount: number;
+  } | null;
 }
 
 export interface ReceptionistDashboardSnapshot {
@@ -54,6 +75,17 @@ type Row = {
   preferred_locale: 'ar' | 'fr' | null;
   has_contact: boolean | null;
 };
+
+function clampDuration(value: number): number {
+  return Math.min(MAX_SAMPLE_MINUTES, Math.max(MIN_SAMPLE_MINUTES, value));
+}
+
+function median(values: number[]): number {
+  const ordered = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(ordered.length / 2);
+  if (ordered.length % 2 === 1) return ordered[middle]!;
+  return (ordered[middle - 1]! + ordered[middle]!) / 2;
+}
 
 /** Private receptionist projection. Never reuse this query for public displays. */
 export class ReceptionistDashboardService {
@@ -96,6 +128,73 @@ export class ReceptionistDashboardService {
       );
       const first = result.rows[0];
       if (!first) throw new ReceptionistDashboardNotFoundError();
+
+      const durationResult = await client.query<{ duration_minutes: string }>(
+        `SELECT EXTRACT(EPOCH FROM (completed_at - in_consultation_started_at)) / 60 AS duration_minutes
+           FROM queue_entries
+          WHERE clinic_id = $1 AND session_id = $2
+            AND completed_at IS NOT NULL
+            AND in_consultation_started_at IS NOT NULL`,
+        [scope.clinicId, sessionId],
+      );
+      const samples = durationResult.rows
+        .map((row) => Number(row.duration_minutes))
+        .filter((value) => Number.isFinite(value))
+        .map(clampDuration);
+      const useObserved = samples.length >= MIN_OBSERVED_SAMPLES;
+      const estimatedConsultationMinutes = useObserved
+        ? median(samples)
+        : FALLBACK_CONSULTATION_MINUTES;
+      const declaredDelayMinutes = first.declared_delay_minutes ?? 0;
+      let patientsAhead = 0;
+
+      const entries = result.rows.flatMap((row) => {
+        if (!row.entry_id) return [];
+        const eligible = ETA_ELIGIBLE_STATES.has(row.entry_state!);
+        const eta = eligible
+          ? {
+              patientsAhead,
+              minWaitMinutes: Math.round(
+                declaredDelayMinutes +
+                  patientsAhead *
+                    estimatedConsultationMinutes *
+                    ETA_MIN_MULTIPLIER,
+              ),
+              maxWaitMinutes: Math.round(
+                declaredDelayMinutes +
+                  patientsAhead *
+                    estimatedConsultationMinutes *
+                    ETA_MAX_MULTIPLIER,
+              ),
+              estimatedConsultationMinutes,
+              estimateSource: useObserved
+                ? ('observed_median' as const)
+                : ('fallback' as const),
+              observedSampleCount: samples.length,
+            }
+          : null;
+        if (eligible) patientsAhead += 1;
+        return [
+          {
+            id: row.entry_id,
+            sessionId: row.session_id,
+            state: row.entry_state!,
+            registrationOrder: Number(row.registration_order),
+            eligibilityOrder:
+              row.eligibility_order === null
+                ? null
+                : Number(row.eligibility_order),
+            priorityOrder:
+              row.priority_order === null ? null : Number(row.priority_order),
+            publicDisplayLabel: row.public_display_label!,
+            privateDisplayName: row.private_display_name!,
+            preferredLocale: row.preferred_locale!,
+            hasContact: row.has_contact!,
+            eta,
+          },
+        ];
+      });
+
       return {
         generatedAt: new Date().toISOString(),
         refreshAfterSeconds: 30,
@@ -110,30 +209,7 @@ export class ReceptionistDashboardService {
           delayUpdatedAt: first.delay_updated_at?.toISOString() ?? null,
           queueOrderVersion: Number(first.queue_order_version),
         },
-        entries: result.rows.flatMap((row) =>
-          row.entry_id
-            ? [
-                {
-                  id: row.entry_id,
-                  sessionId: row.session_id,
-                  state: row.entry_state!,
-                  registrationOrder: Number(row.registration_order),
-                  eligibilityOrder:
-                    row.eligibility_order === null
-                      ? null
-                      : Number(row.eligibility_order),
-                  priorityOrder:
-                    row.priority_order === null
-                      ? null
-                      : Number(row.priority_order),
-                  publicDisplayLabel: row.public_display_label!,
-                  privateDisplayName: row.private_display_name!,
-                  preferredLocale: row.preferred_locale!,
-                  hasContact: row.has_contact!,
-                },
-              ]
-            : [],
-        ),
+        entries,
       };
     });
   }
