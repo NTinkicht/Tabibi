@@ -423,7 +423,9 @@ describe('receptionist dashboard concurrency snapshot', () => {
             [ids.session, ids.clinic],
           );
           probe = {
-            queueOrderVersion: version.rows[0]?.queue_order_version ?? -1,
+            queueOrderVersion: Number(
+              version.rows[0]?.queue_order_version ?? -1,
+            ),
             orderedEntryIds: order.rows.map((row) => row.id),
           };
         },
