@@ -57,6 +57,12 @@ export const receptionistCopy = {
     reorderPosition: 'Nouvelle position de service',
     reorderReason: 'Motif opérationnel obligatoire (cette action est auditée)',
     reorderInvalid: 'La position doit être un nombre entier positif.',
+    operatingView: 'Vue opérationnelle de la réception',
+    doctorLabel: 'Médecin',
+    sessionState: 'État de la session',
+    noDelay: 'Aucun retard',
+    lastRefresh: 'Actualisé',
+    stale: 'Données anciennes — actualisez',
     patientCancellation:
       'Confirmer : annulation demandée par le patient ? Annuler = décision de la clinique.',
     queueStatuses: {
@@ -134,6 +140,12 @@ export const receptionistCopy = {
     reorderPosition: 'موضع الخدمة الجديد',
     reorderReason: 'سبب تشغيلي إلزامي (يتم تدقيق هذا الإجراء)',
     reorderInvalid: 'يجب أن يكون الموضع عددًا صحيحًا موجبًا.',
+    operatingView: 'لوحة عمليات الاستقبال',
+    doctorLabel: 'الطبيب',
+    sessionState: 'حالة الجلسة',
+    noDelay: 'لا يوجد تأخير',
+    lastRefresh: 'آخر تحديث',
+    stale: 'البيانات قديمة — قم بالتحديث',
     patientCancellation:
       'تأكيد: هل طلب المريض الإلغاء؟ اختر إلغاء إذا كان القرار من العيادة.',
     queueStatuses: {

@@ -289,6 +289,26 @@ h1 {
   gap: 1rem;
   margin: 2rem 0 0;
 }
+.dashboardSummary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #c9dcda;
+  border-radius: 1rem;
+  background: #f7fbfa;
+}
+.dashboardSummary div {
+  display: grid;
+  gap: 0.25rem;
+}
+.dashboardSummary small {
+  color: #52716d;
+}
+.dashboardSummary .staleSnapshot {
+  color: #8d3039;
+}
 .secondaryLink {
   color: #164d45;
   font-weight: 800;
@@ -340,6 +360,9 @@ h1 {
   }
 }
 @media (max-width: 700px) {
+  .dashboardSummary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .createPanel form,
   .createPanel .walkInForm {
     grid-template-columns: 1fr;

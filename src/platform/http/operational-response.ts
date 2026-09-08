@@ -8,6 +8,7 @@ import { StaffAuthenticationError, StaffCsrfError } from './staff-auth';
 import { correlationId } from './request-context';
 import { getLogger } from '@/platform/observability/logger';
 import { ZodError } from 'zod';
+import { ReceptionistDashboardNotFoundError } from '@/modules/receptionist-dashboard';
 
 function isPostgresCheckConflict(error: unknown): boolean {
   return (
@@ -41,6 +42,9 @@ export async function operationalJson(
     } else if (error instanceof StaffCsrfError) {
       status = 403;
       code = 'csrf_rejected';
+    } else if (error instanceof ReceptionistDashboardNotFoundError) {
+      status = 404;
+      code = 'not_found';
     } else if (
       error instanceof SessionValidationError ||
       error instanceof QueueValidationError ||
