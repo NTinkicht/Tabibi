@@ -70,13 +70,21 @@ test('background dashboard poll failure preserves the last good snapshot and mar
   await authenticate(page);
   await page.addInitScript(() => {
     const originalSetInterval = globalThis.setInterval;
+    const originalSetTimeout = globalThis.setTimeout;
     const acceleratedSetInterval = (
       ...params: Parameters<typeof globalThis.setInterval>
     ): ReturnType<typeof globalThis.setInterval> => {
       const [handler, timeout, ...args] = params;
+      if (timeout === 30_000) {
+        return originalSetTimeout(
+          handler as never,
+          50,
+          ...(args as never[]),
+        ) as ReturnType<typeof globalThis.setInterval>;
+      }
       return originalSetInterval(
         handler as never,
-        timeout === 30_000 || timeout === 5_000 ? 50 : timeout,
+        timeout === 5_000 ? 50 : timeout,
         ...(args as never[]),
       );
     };
@@ -97,7 +105,7 @@ test('background dashboard poll failure preserves the last good snapshot and mar
               patientName: 'مريض ثابت',
               publicDisplayLabel: 'W-KEEP00001',
               queueOrderVersion: 1,
-              generatedAt: '2026-09-08T09:00:00.000Z',
+              generatedAt: new Date().toISOString(),
             }),
           ),
         });
@@ -129,6 +137,12 @@ test('background dashboard poll failure preserves the last good snapshot and mar
       .getByRole('alert')
       .filter({ hasText: 'Transient dashboard fetch failed' }),
   ).toBeVisible();
+  await expect(
+    page
+      .getByLabel('لوحة عمليات الاستقبال')
+      .getByText('البيانات قديمة — قم بالتحديث'),
+  ).toBeVisible();
+  await page.waitForTimeout(200);
   await expect(
     page
       .getByLabel('لوحة عمليات الاستقبال')
