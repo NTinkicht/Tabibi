@@ -183,6 +183,71 @@ describe('receptionist dashboard read model', () => {
     );
   });
 
+  it('excludes terminal entries from ETA output and future service-time consumption', async () => {
+    const queue = new QueueService(pool);
+    const completed = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Completed terminal',
+      preferredLocale: 'fr',
+      idempotencyKey: 'terminal-completed-register',
+      correlationId: 'terminal-completed-register',
+    });
+    for (const [index, command] of [
+      'check_in',
+      'call',
+      'start_consultation',
+      'complete_consultation',
+    ].entries()) {
+      await queue.command(scope, ids.sessionA, completed.entry.id, {
+        command: command as
+          | 'check_in'
+          | 'call'
+          | 'start_consultation'
+          | 'complete_consultation',
+        idempotencyKey: `terminal-completed-${index}`,
+        correlationId: `terminal-completed-${index}`,
+      });
+    }
+    const cancelled = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Cancelled terminal',
+      preferredLocale: 'ar',
+      idempotencyKey: 'terminal-cancelled-register',
+      correlationId: 'terminal-cancelled-register',
+    });
+    await queue.command(scope, ids.sessionA, cancelled.entry.id, {
+      command: 'cancel',
+      reason: 'patient request',
+      cancellationSource: 'patient',
+      idempotencyKey: 'terminal-cancelled-command',
+      correlationId: 'terminal-cancelled-command',
+    });
+    const waiting = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Still waiting',
+      preferredLocale: 'fr',
+      idempotencyKey: 'terminal-waiting-register',
+      correlationId: 'terminal-waiting-register',
+    });
+
+    const snapshot = await new ReceptionistDashboardService(pool).getSnapshot(
+      scope,
+      ids.sessionA,
+    );
+    const completedEntry = snapshot.entries.find(
+      (entry) => entry.id === completed.entry.id,
+    )!;
+    const cancelledEntry = snapshot.entries.find(
+      (entry) => entry.id === cancelled.entry.id,
+    )!;
+    const waitingEntry = snapshot.entries.find(
+      (entry) => entry.id === waiting.entry.id,
+    )!;
+
+    expect(completedEntry.state).toBe('completed');
+    expect(completedEntry.eta).toBeNull();
+    expect(cancelledEntry.state).toBe('cancelled');
+    expect(cancelledEntry.eta).toBeNull();
+    expect(waitingEntry.eta).toMatchObject({ patientsAhead: 0 });
+  });
+
   it('denies wrong roles and treats a cross-clinic session as absent', async () => {
     await pool.query(
       `UPDATE clinic_memberships SET role='doctor' WHERE clinic_id=$1 AND user_id=$2`,
