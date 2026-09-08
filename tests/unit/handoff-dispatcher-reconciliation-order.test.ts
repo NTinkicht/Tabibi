@@ -87,6 +87,10 @@ describe('gate reconciliation ordering', () => {
           reconciliationComment(),
         ],
       }),
-    ).toMatchObject({ status: 'eligible', open_blockers: '0', open_majors: '0' });
+    ).toMatchObject({
+      status: 'eligible',
+      open_blockers: '0',
+      open_majors: '0',
+    });
   });
 });
