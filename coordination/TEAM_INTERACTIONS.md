@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-08T03:15:15.241769+00:00
+- Last sync: 2026-09-08T03:24:01.657615+00:00
 
 ## Team Room charter
 
@@ -4332,5 +4332,18 @@ Evidence this cycle: Issue #91 created; Codex canonical implementation lease com
 next_checkpoint: concrete Codex capacity/commit/PR evidence, substantive Claude/Copilot artifacts, then exact-head CI and independent gate on the single canonical PR.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5578556021
+
+---
+
+### 2026-09-08T03:23:15Z — NTinkicht
+
+HEARTBEAT
+actor: codex
+work_stream: Issue #91 / WU8
+role: production implementer
+status: active
+checkpoint: implemented the private receptionist dashboard projection/API, bounded refresh UI, and deterministic API/PostgreSQL/browser coverage; local non-PostgreSQL checks are green, PostgreSQL/browser execution is environment-blocked.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5578622977
 
 ---
