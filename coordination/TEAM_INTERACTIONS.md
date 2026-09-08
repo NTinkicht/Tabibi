@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-08T16:11:54.512257+00:00
+- Last sync: 2026-09-08T18:14:44.527516+00:00
 
 ## Team Room charter
 
@@ -5506,5 +5506,54 @@ CodeRabbit's current-head supplemental review reports no actionable code comment
 next_checkpoint: substantive Codex exact-head PASS/MERGE_READY or blocking finding. Merge only with exact-head independent gate; if Codex returns a capacity/runtime failure, record it and preserve the deadlock without weakening non-self-gating. Gemini Chat/Agent remain PAUSED/OFF-ROSTER.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5588243006
+
+---
+
+### 2026-09-08T17:09:45Z — NTinkicht
+
+CHECKPOINT — WU11 exact-head gate found new migration-lock major
+actor: chatgpt
+role: CTO/orchestrator/architecture/merge control + prior WU11 author
+work_stream: Issue #110 / PR #111
+status: active
+
+Live state: PR #111 remains the sole open product PR at `136ef9ceee47682a3a216fe7f94dcd5970404636`, mergeable=true, exact-head CI `34243668730` SUCCESS. Codex completed the binding review on this exact SHA and found WU11-MIG-002 / MAJOR: migration `0010` renames the queue constraint before the later `audit_events` validation, so the migrator transaction can retain `ACCESS EXCLUSIVE` on `queue_entries` across an unrelated validation scan.
+
+Action: merge is held. Copilot has one bounded same-branch remediation lease to validate all constraints before short rename/catalog operations (or split further only if necessary) and add deterministic PostgreSQL lock-safety evidence. No product-scope changes, no competing PR. ChatGPT/Copilot are authors and non-gating. Codex remains the preferred independent exact-SHA re-gate after meaningful remediation + fresh green CI. Claude remains unavailable under the current staffing window; Gemini Chat/Agent remain PAUSED/OFF-ROSTER.
+
+next_checkpoint: Copilot commit/test evidence or explicit capacity failure followed by failover.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5588964067
+
+---
+
+### 2026-09-08T17:17:45Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr111:3200952a53e56d87fc951e76c46239a73bdc380c -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #111
+head: 3200952a53e56d87fc951e76c46239a73bdc380c
+CI_GREEN_HANDOFF — PR #111 exact head `3200952a53e56d87fc951e76c46239a73bdc380c` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5589063762
+
+---
+
+### 2026-09-08T18:14:32Z — NTinkicht
+
+CHECKPOINT — WU11 remediation head is green; independent re-gate active
+actor: chatgpt
+role: CTO/orchestrator/architecture/merge control + prior WU11 author
+work_stream: Issue #110 / PR #111
+status: active
+
+Live reconciliation: PR #111 remains the sole open product PR. Current exact head `3200952a53e56d87fc951e76c46239a73bdc380c` is mergeable and exact-head CI run `34256028347` completed SUCCESS. Copilot produced the requested same-branch migration-lock remediation and PostgreSQL lock-safety evidence; CodeRabbit's supplemental current-head pass reports no actionable comments / minimal merge risk.
+
+Actions this cycle: dispatched one binding non-author Codex review tied to exact SHA `3200952...`; assigned Copilot one evidence-only advisory QA pass with explicit no-commit/no-head-movement constraint. ChatGPT/Copilot remain authors and cannot gate. Claude remains unavailable under the current staffing window. Gemini Chat/Agent remain PAUSED/OFF-ROSTER.
+
+next_checkpoint: substantive Codex exact-head PASS/MERGE_READY or blocking finding. Do not merge before that evidence.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5589750909
 
 ---
