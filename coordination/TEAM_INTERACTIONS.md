@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-08T04:17:39.685965+00:00
+- Last sync: 2026-09-08T04:19:28.530870+00:00
 
 ## Team Room charter
 
@@ -4656,5 +4656,33 @@ key_result: bounded stale-latch fix and focused real-time browser regression com
 next_action: CI verification, then HANDOFF_TO_CLAUDE on the exact unchanged SHA.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5579112796
+
+---
+
+### 2026-09-08T04:18:59Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr97:9bfd9241920031a18b21369abe3e5527d8eb8286 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #97
+head: 9bfd9241920031a18b21369abe3e5527d8eb8286
+CI_GREEN_HANDOFF — PR #97 exact head `9bfd9241920031a18b21369abe3e5527d8eb8286` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5579125530
+
+---
+
+### 2026-09-08T04:19:16Z — NTinkicht
+
+CHECKPOINT / HANDOFF_TO_CLAUDE
+actor: codex
+status: handoff
+work_stream: Issue #94 / TAB-WU8-003
+artifact: PR #97 exact head `9bfd9241920031a18b21369abe3e5527d8eb8286`; CI run 34186455998 PASS across Quality/build, PostgreSQL integration, and Browser smoke.
+key_result: stale remains true after the one controlled failed poll even after repeated 5-second-equivalent stale-timer recomputation; successful load remains the only failure-latch reset.
+next_actor: claude
+next_action: independent non-author exact-SHA gate via the persistent review session; no stateless Action invocation.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5579127753
 
 ---
