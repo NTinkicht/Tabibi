@@ -57,9 +57,10 @@ const normalPr = {
 function specialistReviewBody(
   verdict: 'PASS' | 'PASS_WITH_MINOR_FINDINGS' = 'PASS',
   overrides: Record<string, string> = {},
-  findings = verdict === 'PASS'
-    ? ['- NOTE: none']
-    : ['- MINOR: non-blocking follow-up'],
+  findings =
+    verdict === 'PASS'
+      ? ['- NOTE: none']
+      : ['- MINOR: non-blocking follow-up'],
 ) {
   return [
     'SPECIALIST_REVIEW',
@@ -342,15 +343,16 @@ describe('event-driven handoff dispatcher', () => {
       artifact,
       reviewLogin: 'chatgpt-codex-connector',
     };
-
-    for (const overrides of [
+    const reconciliationOverrides: Array<Record<string, string>> = [
       { gate_actor: 'claude' },
       { reviewer_login: 'someone-else' },
       { overlay: 'persona-walkthrough' },
       { pr: '99' },
       { exact_sha: 'old-sha' },
       { status: 'ineligible' },
-    ]) {
+    ];
+
+    for (const overrides of reconciliationOverrides) {
       expect(
         reconcileGateEligibility({
           ...common,
