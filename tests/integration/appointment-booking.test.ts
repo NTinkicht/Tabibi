@@ -61,7 +61,7 @@ beforeEach(async () => {
     `INSERT INTO consultation_sessions
       (id,clinic_id,doctor_id,service_date,starts_at,ends_at,status)
      VALUES
-      ($1,$3,$4,'2026-09-15','2026-09-15 09:00Z','2026-09-15 12:00Z','planned'),
+      ($1,$3,$4,'2026-09-15','2026-09-15 09:00Z','2026-09-15 12:00Z','open'),
       ($2,$3,$4,'2026-09-14','2026-09-14 09:00Z','2026-09-14 12:00Z','closed')`,
     [ids.sessionA, ids.sessionClosed, ids.clinicA, ids.doctor],
   );
@@ -89,7 +89,7 @@ function bookingInput(idempotencyKey = 'book-1') {
 }
 
 describe('appointment booking foundation', () => {
-  it('atomically creates one confirmed appointment linked to one waiting queue entry and makes exact retry side-effect free', async () => {
+  it('atomically creates one confirmed appointment linked to one waiting queue entry and preserves exact retry after check-in', async () => {
     const service = new AppointmentService(pool);
     const first = await service.bookForExistingPatient(
       scope,
@@ -158,6 +158,51 @@ describe('appointment booking foundation', () => {
       contactPreference: 'phone',
     });
     expect(JSON.stringify(audit.rows[0]?.metadata)).not.toContain('0555000001');
+
+    await new QueueService(pool).command(scope, ids.sessionA, first.entry.id, {
+      command: 'check_in',
+      idempotencyKey: 'check-in-booked',
+      correlationId: 'check-in-booked',
+    });
+    const retryAfterCheckIn = await service.bookForExistingPatient(
+      scope,
+      ids.sessionA,
+      bookingInput(),
+    );
+    expect(retryAfterCheckIn.appointment.status).toBe('checked_in');
+    expect(retryAfterCheckIn.entry.state).toBe('checked_in');
+    const auditCount = await pool.query<{ count: string }>(
+      `SELECT count(*)::text count FROM audit_events
+        WHERE clinic_id=$1 AND entity_type='appointment' AND entity_id=$2`,
+      [ids.clinicA, first.appointment.id],
+    );
+    expect(auditCount.rows[0]!.count).toBe('1');
+  });
+
+  it('synchronizes whole-session cancellation into the linked appointment', async () => {
+    const service = new AppointmentService(pool);
+    const booking = await service.bookForExistingPatient(
+      scope,
+      ids.sessionA,
+      bookingInput('book-session-cancel'),
+    );
+
+    await pool.query(
+      `UPDATE consultation_sessions SET status='cancelled',updated_at=now()
+        WHERE id=$1 AND clinic_id=$2`,
+      [ids.sessionA, ids.clinicA],
+    );
+    const states = await pool.query<{ appointment: string; entry: string }>(
+      `SELECT appointment.status::text appointment, entry.state::text entry
+         FROM appointments appointment
+         JOIN queue_entries entry ON entry.id=appointment.queue_entry_id
+        WHERE appointment.id=$1`,
+      [booking.appointment.id],
+    );
+    expect(states.rows[0]).toEqual({
+      appointment: 'cancelled',
+      entry: 'cancelled',
+    });
   });
 
   it('rejects conflicting idempotency reuse, foreign patients, terminal sessions and invalid contact preferences without extra queue rows', async () => {
