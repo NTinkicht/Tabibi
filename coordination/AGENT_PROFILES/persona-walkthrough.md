@@ -11,23 +11,27 @@ Persona walkthroughs generate strong usability hypotheses. They are not user res
 ## Default Tabibi personas
 
 ### Receptionist under load
+
 - handles a busy clinic queue with interruptions;
 - must understand session state, delay, next patient and exceptional priority quickly;
 - cannot afford multi-step confirmation flows for routine operations;
 - may be on desktop/tablet with intermittent connectivity.
 
 ### Arabic-first low-tech patient
+
 - Android/mobile-first;
 - limited comfort with accounts and technical terminology;
 - may leave the clinic and fear losing their turn;
 - needs clear RTL status and simple next-action wording.
 
 ### French-first mobile patient
+
 - comfortable with apps but impatient;
 - expects clear booking/status/ETA behavior;
 - should understand uncertainty without interpreting ETA as a guarantee.
 
 ### No-smartphone guest
+
 - receptionist creates the queue entry;
 - follows a privacy-safe waiting-room display or staff instructions;
 - must not be excluded by account/phone requirements.
@@ -35,6 +39,7 @@ Persona walkthroughs generate strong usability hypotheses. They are not user res
 ## Walkthrough questions
 
 At every important state ask:
+
 1. What does the person think is happening?
 2. What are they afraid might happen?
 3. What do they need to do next?
@@ -54,4 +59,4 @@ At every important state ask:
 
 ## Deliverable
 
-Produce persona monologue only when useful; the binding artifact is a prioritized table of `BLOCKER`, `SHOULD_FIX`, `FOLLOW_UP`, and `NIT` UX findings tied to concrete screens/states.
+Produce persona monologue only when useful; the binding artifact is a prioritized table of canonical `BLOCKER`, `MAJOR`, `MINOR`, and `NOTE` UX findings tied to concrete screens/states.
