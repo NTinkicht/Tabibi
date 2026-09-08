@@ -61,7 +61,7 @@ beforeEach(async () => {
 afterAll(async () => pool.end());
 
 describe('receptionist dashboard read model', () => {
-  it('composes session, delay and deterministic service order without clinical/contact values', async () => {
+  it('composes session, delay and deterministic fallback ETA without clinical/contact values', async () => {
     const queue = new QueueService(pool);
     const waiting = await queue.registerWalkIn(scope, ids.sessionA, {
       privateDisplayName: 'Waiting',
@@ -96,9 +96,156 @@ describe('receptionist dashboard read model', () => {
       checked.entry.id,
       waiting.entry.id,
     ]);
+    expect(snapshot.entries[0]!.eta).toEqual({
+      patientsAhead: 0,
+      minWaitMinutes: 20,
+      maxWaitMinutes: 20,
+      estimatedConsultationMinutes: 15,
+      estimateSource: 'fallback',
+      observedSampleCount: 0,
+    });
+    expect(snapshot.entries[1]!.eta).toMatchObject({
+      patientsAhead: 1,
+      minWaitMinutes: 31,
+      maxWaitMinutes: 43,
+      estimatedConsultationMinutes: 15,
+      estimateSource: 'fallback',
+    });
     expect(snapshot.refreshAfterSeconds).toBe(30);
     expect(JSON.stringify(snapshot)).not.toContain('0555000000');
     expect(Object.keys(snapshot.entries[0]!)).not.toContain('diagnosis');
+  });
+
+  it('uses a clamped same-session observed median only after three completed samples and stays deterministic', async () => {
+    const queue = new QueueService(pool);
+    const durations = [8, 10, 12];
+    for (let index = 0; index < durations.length; index++) {
+      const registered = await queue.registerWalkIn(scope, ids.sessionA, {
+        privateDisplayName: `Completed ${index}`,
+        preferredLocale: 'fr',
+        idempotencyKey: `sample-register-${index}`,
+        correlationId: `sample-register-${index}`,
+      });
+      for (const [commandIndex, command] of [
+        'check_in',
+        'call',
+        'start_consultation',
+        'complete_consultation',
+      ].entries()) {
+        await queue.command(scope, ids.sessionA, registered.entry.id, {
+          command: command as
+            | 'check_in'
+            | 'call'
+            | 'start_consultation'
+            | 'complete_consultation',
+          idempotencyKey: `sample-${index}-${commandIndex}`,
+          correlationId: `sample-${index}-${commandIndex}`,
+        });
+      }
+      await pool.query(
+        `UPDATE queue_entries
+            SET completed_at = '2026-09-08 10:00Z'::timestamptz,
+                in_consultation_started_at = '2026-09-08 10:00Z'::timestamptz - ($2 * interval '1 minute')
+          WHERE id = $1`,
+        [registered.entry.id, durations[index]],
+      );
+    }
+
+    await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'ETA first',
+      preferredLocale: 'ar',
+      idempotencyKey: 'eta-first',
+      correlationId: 'eta-first',
+    });
+    const second = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'ETA second',
+      preferredLocale: 'ar',
+      idempotencyKey: 'eta-second',
+      correlationId: 'eta-second',
+    });
+
+    const service = new ReceptionistDashboardService(pool);
+    const firstRead = await service.getSnapshot(scope, ids.sessionA);
+    const secondRead = await service.getSnapshot(scope, ids.sessionA);
+    const secondEntry = firstRead.entries.find(
+      (entry) => entry.id === second.entry.id,
+    )!;
+    expect(secondEntry.eta).toEqual({
+      patientsAhead: 1,
+      minWaitMinutes: 28,
+      maxWaitMinutes: 35,
+      estimatedConsultationMinutes: 10,
+      estimateSource: 'observed_median',
+      observedSampleCount: 3,
+    });
+    expect(secondRead.entries.map((entry) => entry.eta)).toEqual(
+      firstRead.entries.map((entry) => entry.eta),
+    );
+  });
+
+  it('excludes terminal entries from ETA output and future service-time consumption', async () => {
+    const queue = new QueueService(pool);
+    const completed = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Completed terminal',
+      preferredLocale: 'fr',
+      idempotencyKey: 'terminal-completed-register',
+      correlationId: 'terminal-completed-register',
+    });
+    for (const [index, command] of [
+      'check_in',
+      'call',
+      'start_consultation',
+      'complete_consultation',
+    ].entries()) {
+      await queue.command(scope, ids.sessionA, completed.entry.id, {
+        command: command as
+          | 'check_in'
+          | 'call'
+          | 'start_consultation'
+          | 'complete_consultation',
+        idempotencyKey: `terminal-completed-${index}`,
+        correlationId: `terminal-completed-${index}`,
+      });
+    }
+    const cancelled = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Cancelled terminal',
+      preferredLocale: 'ar',
+      idempotencyKey: 'terminal-cancelled-register',
+      correlationId: 'terminal-cancelled-register',
+    });
+    await queue.command(scope, ids.sessionA, cancelled.entry.id, {
+      command: 'cancel',
+      reason: 'patient request',
+      cancellationSource: 'patient',
+      idempotencyKey: 'terminal-cancelled-command',
+      correlationId: 'terminal-cancelled-command',
+    });
+    const waiting = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Still waiting',
+      preferredLocale: 'fr',
+      idempotencyKey: 'terminal-waiting-register',
+      correlationId: 'terminal-waiting-register',
+    });
+
+    const snapshot = await new ReceptionistDashboardService(pool).getSnapshot(
+      scope,
+      ids.sessionA,
+    );
+    const completedEntry = snapshot.entries.find(
+      (entry) => entry.id === completed.entry.id,
+    )!;
+    const cancelledEntry = snapshot.entries.find(
+      (entry) => entry.id === cancelled.entry.id,
+    )!;
+    const waitingEntry = snapshot.entries.find(
+      (entry) => entry.id === waiting.entry.id,
+    )!;
+
+    expect(completedEntry.state).toBe('completed');
+    expect(completedEntry.eta).toBeNull();
+    expect(cancelledEntry.state).toBe('cancelled');
+    expect(cancelledEntry.eta).toBeNull();
+    expect(waitingEntry.eta).toMatchObject({ patientsAhead: 0 });
   });
 
   it('denies wrong roles and treats a cross-clinic session as absent', async () => {
@@ -141,6 +288,10 @@ describe('receptionist dashboard read model', () => {
     expect(after.session).toMatchObject({
       declaredDelayMinutes: 35,
       delayVersion: 2,
+    });
+    expect(after.entries[0]!.eta).toMatchObject({
+      minWaitMinutes: 35,
+      maxWaitMinutes: 35,
     });
   });
 });

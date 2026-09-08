@@ -11,6 +11,7 @@ const committedMigrations = [
   '0005_queue_lifecycle.sql',
   '0006_queue_priority_order.sql',
   '0007_waiting_room_public_labels.sql',
+  '0008_queue_eta_timing.sql',
 ];
 
 beforeAll(async () => {
@@ -37,13 +38,16 @@ describe('committed migration chain', () => {
     expect(rerun.rows[0]!.count).toBe(String(committedMigrations.length));
   });
 
-  it('exposes queue lifecycle and stale-version artifacts created by later migrations', async () => {
+  it('exposes queue lifecycle and ETA timing artifacts created by later migrations', async () => {
     const artifacts = await client.query<{
       queue_order_version: string;
       reorder_receipts: string | null;
       priority_selection_idx: string | null;
       one_called_idx: string | null;
       one_consultation_idx: string | null;
+      consultation_started_at: string;
+      completed_at: string;
+      eta_timing_idx: string | null;
     }>(
       `SELECT
          EXISTS (
@@ -55,7 +59,16 @@ describe('committed migration chain', () => {
          to_regclass('queue_reorder_receipts')::text reorder_receipts,
          to_regclass('queue_entries_session_priority_selection_idx')::text priority_selection_idx,
          to_regclass('queue_entries_one_called_per_session_uq')::text one_called_idx,
-         to_regclass('queue_entries_one_consultation_per_session_uq')::text one_consultation_idx`,
+         to_regclass('queue_entries_one_consultation_per_session_uq')::text one_consultation_idx,
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+            WHERE table_name='queue_entries' AND column_name='in_consultation_started_at'
+         )::text consultation_started_at,
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+            WHERE table_name='queue_entries' AND column_name='completed_at'
+         )::text completed_at,
+         to_regclass('queue_entries_session_completed_timing_idx')::text eta_timing_idx`,
     );
 
     expect(artifacts.rows[0]).toEqual({
@@ -64,6 +77,9 @@ describe('committed migration chain', () => {
       priority_selection_idx: 'queue_entries_session_priority_selection_idx',
       one_called_idx: 'queue_entries_one_called_per_session_uq',
       one_consultation_idx: 'queue_entries_one_consultation_per_session_uq',
+      consultation_started_at: 'true',
+      completed_at: 'true',
+      eta_timing_idx: 'queue_entries_session_completed_timing_idx',
     });
   });
 });
