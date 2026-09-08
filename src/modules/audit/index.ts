@@ -6,7 +6,8 @@ export type AuditEntity =
   | 'doctor'
   | 'schedule_template'
   | 'consultation_session'
-  | 'queue_entry';
+  | 'queue_entry'
+  | 'appointment';
 
 type AuditValue =
   | string
