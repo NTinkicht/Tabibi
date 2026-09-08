@@ -67,14 +67,13 @@ This means Copilot implements while operating as Backend Architect, Codex indepe
 
 ## Review output
 
-Specialist reviews should produce a compact artifact:
+Specialist reviews should produce a compact artifact using only the fields accepted by the dispatcher:
 
 ```text
 SPECIALIST_REVIEW
 actor: <actor>
 overlay: <overlay-id>
 pr: <number>
-work_unit: <issue/pr>
 exact_sha: <sha or n/a for pre-mortem>
 verdict: PASS | PASS_WITH_MINOR_FINDINGS | CHANGES_REQUIRED
 merge_ready: yes | no
@@ -82,6 +81,6 @@ findings:
 - BLOCKER | MAJOR | MINOR | NOTE: ...
 ```
 
-A passing binding review with `merge_ready: yes` must additionally emit the literal line `MERGE_READY` so the existing handoff dispatcher recognizes the gate. Do not emit `MERGE_READY` for a non-ready review.
+Do not add unsupported fields, standalone `MERGE_READY` lines, quoted examples, fenced wrapper text, or free-form prose to a binding artifact. For an independently eligible `code-reviewer` on the exact current SHA, `merge_ready: yes` together with a passing verdict is the structured merge-readiness signal consumed by the dispatcher.
 
 Only a reviewer who is independently eligible under the existing exact-SHA and material-authorship governance may issue the binding merge gate.
