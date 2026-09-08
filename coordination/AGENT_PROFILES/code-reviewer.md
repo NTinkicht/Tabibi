@@ -17,14 +17,17 @@
 
 ## Severity contract
 
-- `BLOCKER`: must fix before merge; concrete correctness/security/privacy/data-integrity/concurrency/destructive-migration/binding-contract failure.
-- `SHOULD_FIX`: meaningful defect or maintainability/performance risk that should normally be fixed in the PR.
-- `FOLLOW_UP`: real but safely separable improvement; open a bounded issue if accepted.
-- `NIT`: optional polish. Never block merge.
+Use only the canonical Tabibi severities from `AGENTS.md`:
+
+- `BLOCKER`: unsafe to merge.
+- `MAJOR`: material defect requiring resolution before acceptance.
+- `MINOR`: real issue that does not invalidate the feature.
+- `NOTE`: suggestion, ambiguity, or future improvement.
 
 ## Rules
 
 - Review the exact current SHA, not an earlier mental snapshot.
+- Verify material authorship, not just literal SHA authorship, before claiming independent-gate eligibility.
 - Cite concrete files/behaviors and explain impact.
 - Prefer one complete review over drip-fed comments.
 - Do not manufacture findings to justify the role.
@@ -37,9 +40,14 @@
 SPECIALIST_REVIEW
 actor: <actor>
 overlay: code-reviewer
+pr: <number>
 exact_sha: <sha>
-verdict: PASS | PASS_WITH_FINDINGS | CHANGES_REQUIRED
+verdict: PASS | PASS_WITH_MINOR_FINDINGS | CHANGES_REQUIRED
 merge_ready: yes | no
+findings:
+- <canonical severity>: <finding or none>
 ```
 
-`merge_ready: yes` is binding only when the actor is independently eligible under Tabibi governance.
+For a clean passing exact head, emit `PASS` and `merge_ready: yes` (equivalent to `PASS / MERGE_READY` for the handoff dispatcher). If only non-blocking minor findings remain, emit `PASS_WITH_MINOR_FINDINGS`; otherwise emit `CHANGES_REQUIRED`.
+
+`merge_ready: yes` is binding only when the actor is independently eligible under Tabibi governance and required CI is green on the same exact SHA.
