@@ -40,7 +40,10 @@ function parseKeyValueArtifact(text, marker, allowedFields) {
 function parseSpecialistReview(text = '') {
   const lines = String(text).split(/\r?\n/);
   const firstNonEmpty = lines.findIndex((line) => line.trim() !== '');
-  if (firstNonEmpty < 0 || lines[firstNonEmpty].trim() !== 'SPECIALIST_REVIEW') {
+  if (
+    firstNonEmpty < 0 ||
+    lines[firstNonEmpty].trim() !== 'SPECIALIST_REVIEW'
+  ) {
     return null;
   }
 
@@ -155,11 +158,7 @@ function hasBlockingFindings(artifact) {
   );
 }
 
-function hasExplicitMergeReadySignal(
-  text = '',
-  expectedSha,
-  expectedPrNumber,
-) {
+function hasExplicitMergeReadySignal(text = '', expectedSha, expectedPrNumber) {
   const artifact = parseSpecialistReview(text);
   if (!artifact) return false;
   const verdict = String(artifact.verdict || '').toUpperCase();
@@ -168,10 +167,7 @@ function hasExplicitMergeReadySignal(
   if (String(artifact.merge_ready || '').toLowerCase() !== 'yes') return false;
   if (hasBlockingFindings(artifact)) return false;
   if (expectedSha && artifact.exact_sha !== expectedSha) return false;
-  if (
-    expectedPrNumber &&
-    Number(artifact.pr) !== Number(expectedPrNumber)
-  ) {
+  if (expectedPrNumber && Number(artifact.pr) !== Number(expectedPrNumber)) {
     return false;
   }
   return true;
@@ -380,7 +376,8 @@ function getPrNumber(eventName, payload) {
     const prs = payload.workflow_run?.pull_requests || [];
     return prs[0]?.number || null;
   }
-  if (eventName === 'issue_comment' && !payload.issue?.pull_request) return null;
+  if (eventName === 'issue_comment' && !payload.issue?.pull_request)
+    return null;
   return payload.pull_request?.number || payload.issue?.number || null;
 }
 

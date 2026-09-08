@@ -32,9 +32,9 @@ const {
       })
     | null;
   parseGateReconciliation: (text: string) => Record<string, string> | null;
-  reconcileGateEligibility: (input: Record<string, unknown>) =>
-    | Record<string, string>
-    | null;
+  reconcileGateEligibility: (
+    input: Record<string, unknown>,
+  ) => Record<string, string> | null;
   hasExplicitMergeReadySignal: (
     text: string,
     expectedSha?: string,
@@ -57,10 +57,9 @@ const normalPr = {
 function specialistReviewBody(
   verdict: 'PASS' | 'PASS_WITH_MINOR_FINDINGS' = 'PASS',
   overrides: Record<string, string> = {},
-  findings =
-    verdict === 'PASS'
-      ? ['- NOTE: none']
-      : ['- MINOR: non-blocking follow-up'],
+  findings = verdict === 'PASS'
+    ? ['- NOTE: none']
+    : ['- MINOR: non-blocking follow-up'],
 ) {
   return [
     'SPECIALIST_REVIEW',
@@ -363,12 +362,14 @@ describe('event-driven handoff dispatcher', () => {
   });
 
   it('parses only the canonical gate reconciliation schema', () => {
-    expect(parseGateReconciliation(reconciliationComment().body)).toMatchObject({
-      gate_actor: 'codex',
-      reviewer_login: 'chatgpt-codex-connector',
-      overlay: 'code-reviewer',
-      status: 'eligible',
-    });
+    expect(parseGateReconciliation(reconciliationComment().body)).toMatchObject(
+      {
+        gate_actor: 'codex',
+        reviewer_login: 'chatgpt-codex-connector',
+        overlay: 'code-reviewer',
+        status: 'eligible',
+      },
+    );
     expect(
       parseGateReconciliation(
         `${reconciliationComment().body}\nThis prose is not allowed`,
