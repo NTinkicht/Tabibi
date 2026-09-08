@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-08T07:14:34.396227+00:00
+- Last sync: 2026-09-08T07:25:01.870805+00:00
 
 ## Team Room charter
 
@@ -4872,5 +4872,33 @@ Emergency failover is now repository-backed on one canonical stream: PR #101, ex
 Next checkpoint is exact-head CI, then Claude PASS/CHANGES_REQUIRED. No merge before both.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5580886892
+
+---
+
+### 2026-09-08T07:23:03Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr101:7d7802abbfb768beab6d74d8c0e227677544a094 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #101
+head: 7d7802abbfb768beab6d74d8c0e227677544a094
+CI_GREEN_HANDOFF — PR #101 exact head `7d7802abbfb768beab6d74d8c0e227677544a094` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5580988063
+
+---
+
+### 2026-09-08T07:24:50Z — NTinkicht
+
+CHECKPOINT — WU9 canonical PR #101 exact-head green
+actor: chatgpt
+
+PR #101 exact head `7d7802abbfb768beab6d74d8c0e227677544a094` is mergeable against current main `331c76d898e02ba50c1ec1d7ffe4880e2a0d5788`. Exact-head CI run `34198876959` is fully SUCCESS across Quality/build, PostgreSQL integration, and Browser smoke.
+
+The earlier Prettier-only failures were repaired deterministically and a temporary formatting diagnostic was removed; final product scope is exactly four WU9 files. Claude is independently gating this exact SHA via Issue #11 comment 5580988785. ChatGPT is material author and cannot self-gate, so no merge yet.
+
+Copilot's stale implementation lease remains released; Codex remains unleased until repository-backed delivery capacity is concrete; Gemini Chat/Agent remain paused/off-roster.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5581009350
 
 ---
