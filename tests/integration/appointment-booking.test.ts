@@ -61,9 +61,9 @@ beforeEach(async () => {
     `INSERT INTO consultation_sessions
       (id,clinic_id,doctor_id,service_date,starts_at,ends_at,status)
      VALUES
-      ($1,$3,$5,'2026-09-15','2026-09-15 09:00Z','2026-09-15 12:00Z','planned'),
-      ($2,$3,$5,'2026-09-14','2026-09-14 09:00Z','2026-09-14 12:00Z','closed')`,
-    [ids.sessionA, ids.sessionClosed, ids.clinicA, ids.clinicB, ids.doctor],
+      ($1,$3,$4,'2026-09-15','2026-09-15 09:00Z','2026-09-15 12:00Z','planned'),
+      ($2,$3,$4,'2026-09-14','2026-09-14 09:00Z','2026-09-14 12:00Z','closed')`,
+    [ids.sessionA, ids.sessionClosed, ids.clinicA, ids.doctor],
   );
   await pool.query(
     `INSERT INTO patient_operational_records
