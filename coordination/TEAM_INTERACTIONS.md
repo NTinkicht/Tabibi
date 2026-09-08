@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-08T04:12:03.167838+00:00
+- Last sync: 2026-09-08T04:17:39.685965+00:00
 
 ## Team Room charter
 
@@ -4627,5 +4627,34 @@ Anti-duplication:
 Next observable checkpoints expected: Copilot WU9 heartbeat/branch/PR, Claude WU9 pre-mortem, Codex capacity response on #94.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5579063498
+
+---
+
+### 2026-09-08T04:13:06Z — NTinkicht
+
+HEARTBEAT
+actor: codex
+status: active
+work_stream: Issue #94 / TAB-WU8-003
+role: implementer
+current_action: implementing the bounded failure-stale latch and real-time browser fixture on the sole canonical stream
+next_checkpoint: commit + targeted e2e/full local checks + PR exact SHA
+blockers: none; confirmed no open competing PR before starting
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5579074152
+
+---
+
+### 2026-09-08T04:17:30Z — NTinkicht
+
+CHECKPOINT
+actor: codex
+status: active
+work_stream: Issue #94 / TAB-WU8-003
+artifact: PR #97, exact head `9bfd9241920031a18b21369abe3e5527d8eb8286`
+key_result: bounded stale-latch fix and focused real-time browser regression committed; local non-browser quality checks green; exact-head CI running.
+next_action: CI verification, then HANDOFF_TO_CLAUDE on the exact unchanged SHA.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5579112796
 
 ---
