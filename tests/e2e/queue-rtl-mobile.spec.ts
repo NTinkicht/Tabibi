@@ -98,6 +98,12 @@ test('mobile Arabic queue view reloads safely after a stale reorder conflict and
     await expect(
       page.getByRole('heading', { name: 'قائمة المرضى بدون موعد' }),
     ).toBeVisible();
+    await expect(page.getByLabel('لوحة عمليات الاستقبال')).toContainText(
+      'د. ليلى',
+    );
+    await expect(page.getByLabel('لوحة عمليات الاستقبال')).toContainText(
+      'مفتوحة',
+    );
 
     stalePage = await page.context().newPage();
     await stalePage.setViewportSize({ width: 390, height: 844 });
@@ -145,6 +151,10 @@ test('mobile Arabic queue view reloads safely after a stale reorder conflict and
         name: 'File des patients sans rendez-vous',
       }),
     ).toBeVisible();
+    await stalePage.setViewportSize({ width: 1280, height: 800 });
+    await expect(
+      stalePage.getByLabel('Vue opérationnelle de la réception'),
+    ).toContainText('د. ليلى');
   } finally {
     await stalePage?.close();
     await pool.end();

@@ -39,6 +39,15 @@ type WalkInRegistration = {
     publicDisplayLabel: string;
   };
 };
+type DashboardSession = {
+  doctorDisplayName: string;
+  startsAt: string;
+  endsAt: string;
+  status: 'planned' | 'open' | 'paused' | 'closed' | 'cancelled';
+  declaredDelayMinutes: number | null;
+  delayVersion: number;
+  queueOrderVersion: number;
+};
 
 function key() {
   return crypto.randomUUID();
@@ -61,28 +70,52 @@ export function WalkInQueue({
   const [pending, setPending] = useState(false);
   const [pendingEntry, setPendingEntry] = useState<string | null>(null);
   const [queueOrderVersion, setQueueOrderVersion] = useState(0);
+  const [session, setSession] = useState<DashboardSession | null>(null);
+  const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
+  const [stale, setStale] = useState(false);
   const pendingKeysRef = useRef(new Map<string, string>());
+  const loadRequestRef = useRef(0);
+  const hasSnapshotRef = useRef(false);
 
   const load = useCallback(async () => {
+    const requestId = loadRequestRef.current + 1;
+    loadRequestRef.current = requestId;
     try {
       const response = await fetch(
-        `/api/clinics/${clinicId}/sessions/${sessionId}/queue`,
+        `/api/clinics/${clinicId}/sessions/${sessionId}/dashboard`,
         { cache: 'no-store' },
       );
       const body = (await response.json()) as {
         entries?: WaitingEntry[];
         queueOrderVersion?: number;
+        session?: DashboardSession;
+        generatedAt?: string;
+        refreshAfterSeconds?: number;
         message?: string;
       };
-      if (!response.ok || !body.entries) throw new Error(body.message);
+      if (!response.ok || !body.entries || !body.session || !body.generatedAt)
+        throw new Error(body.message);
+      if (requestId !== loadRequestRef.current) return;
       setEntries(body.entries);
-      setQueueOrderVersion(body.queueOrderVersion ?? 0);
+      setSession(body.session);
+      setQueueOrderVersion(body.session.queueOrderVersion);
+      setRefreshedAt(new Date(body.generatedAt));
+      hasSnapshotRef.current = true;
+      setMessage('');
+      setStale(false);
       setState('ready');
     } catch (error) {
+      if (requestId !== loadRequestRef.current) return;
+      const nextMessage =
+        error instanceof Error && error.message ? error.message : t.error;
+      if (hasSnapshotRef.current) {
+        setStale(true);
+        setState('ready');
+        setMessage(nextMessage);
+        return;
+      }
       setState('error');
-      setMessage(
-        error instanceof Error && error.message ? error.message : t.error,
-      );
+      setMessage(nextMessage);
     }
   }, [clinicId, sessionId, t.error]);
 
@@ -90,6 +123,19 @@ export function WalkInQueue({
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    const poll = window.setInterval(() => void load(), 30_000);
+    const staleTimer = window.setInterval(() => {
+      setStale(
+        refreshedAt === null || Date.now() - refreshedAt.getTime() > 45_000,
+      );
+    }, 5_000);
+    return () => {
+      window.clearInterval(poll);
+      window.clearInterval(staleTimer);
+    };
+  }, [load, refreshedAt]);
 
   async function register(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -156,8 +202,8 @@ export function WalkInQueue({
   }
 
   function reload() {
-    setState('loading');
     setMessage('');
+    if (!hasSnapshotRef.current) setState('loading');
     void load();
   }
 
@@ -323,6 +369,36 @@ export function WalkInQueue({
           {t.reload}
         </button>
       </div>
+
+      {session && (
+        <section className="dashboardSummary" aria-label={t.operatingView}>
+          <div>
+            <small>{t.doctorLabel}</small>
+            <strong>{session.doctorDisplayName}</strong>
+          </div>
+          <div>
+            <small>{t.sessionState}</small>
+            <strong>{t.statuses[session.status]}</strong>
+          </div>
+          <div>
+            <small>{t.delay}</small>
+            <strong>
+              {session.declaredDelayMinutes
+                ? `${session.declaredDelayMinutes} ${t.minutes}`
+                : t.noDelay}
+            </strong>
+          </div>
+          <div className={stale ? 'staleSnapshot' : ''}>
+            <small>{stale ? t.stale : t.lastRefresh}</small>
+            <strong>
+              {refreshedAt?.toLocaleTimeString(
+                locale === 'ar' ? 'ar-DZ' : 'fr-DZ',
+                { hour: '2-digit', minute: '2-digit' },
+              )}
+            </strong>
+          </div>
+        </section>
+      )}
 
       {message && (
         <div className="alert" role="alert">
