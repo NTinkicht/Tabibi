@@ -29,7 +29,7 @@
 - concurrency/race matrix;
 - migration-risk assessment;
 - PostgreSQL integration tests or precise missing-test findings;
-- verdict using BLOCKER / SHOULD_FIX / FOLLOW_UP / NIT.
+- verdict using canonical `BLOCKER` / `MAJOR` / `MINOR` / `NOTE` severities.
 
 ## Automatic BLOCKER classes
 
