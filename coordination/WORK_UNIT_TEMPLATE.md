@@ -49,7 +49,7 @@ review_independence:
 - Every substantial work unit names all four mandatory leases: orchestrator, implementer, gating reviewer, and merge executor.
 - Every active specialist or experience-QA lane names exactly one actor and one overlay. An overlay never creates or shares a lease by itself.
 - Secondary verifiers cannot issue the authoritative `MERGE_READY` verdict and receive no implementation authority from the overlay. However, any known-open `BLOCKER` or `MAJOR` finding from a secondary verifier invalidates merge readiness until the orchestrator reconciles and re-checks it.
-- The merge executor performs only the mechanical merge after a valid exact-head gate, zero known-open `BLOCKER`/`MAJOR` findings, and green required CI.
+- The merge executor performs only the mechanical merge after all gates in `coordination/AUTONOMY_PROTOCOL.md` pass, including a valid unchanged exact-head gate, an open non-draft mergeable PR, zero known-open `BLOCKER`/`MAJOR` findings, green required CI, no unresolved `BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION`, and an executable merge handoff.
 
 ## Overlay selection defaults
 
