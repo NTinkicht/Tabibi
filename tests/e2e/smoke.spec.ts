@@ -50,7 +50,9 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
   await pool.query(
     `INSERT INTO consultation_sessions(id,clinic_id,doctor_id,service_date,starts_at,ends_at,status)
     VALUES($1,$2,$3,$4,$4::date+time '09:00',$4::date+time '12:00','open')
-    ON CONFLICT (id) DO UPDATE SET status='open',queue_order_version=0`,
+    ON CONFLICT (id) DO UPDATE SET status='open',queue_order_version=0,
+      declared_delay_minutes=NULL,delay_version=0,delay_updated_at=NULL,
+      delay_updated_by=NULL`,
     [sessionId, clinicId, doctorId, today],
   );
   const secret =
@@ -79,6 +81,22 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
   await expect(
     page.getByRole('heading', { name: 'Sessions du jour' }),
   ).toBeVisible();
+  await expect(page.getByLabel('Minutes de retard')).toHaveAttribute(
+    'inputmode',
+    'numeric',
+  );
+  await page.getByLabel('Minutes de retard').fill('35');
+  const delayResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/sessions/${sessionId}/delay`),
+  );
+  await page.getByRole('button', { name: 'Retard' }).click();
+  expect((await delayResponsePromise).status()).toBe(200);
+  await expect(page.getByText('+35 minutes')).toBeVisible();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  await expect(page.getByLabel('دقائق التأخير')).toHaveValue('35');
+  await page.getByRole('button', { name: 'Français' }).click();
 
   await page.getByRole('link', { name: 'Patients sans rendez-vous' }).click();
   await expect(

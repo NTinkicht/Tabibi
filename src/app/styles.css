@@ -138,6 +138,31 @@ h1 {
   gap: 0.5rem;
   margin-top: 1rem;
 }
+.delayControl {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem;
+  border: 1px solid #c9dcda;
+  border-radius: 0.8rem;
+  background: #f7fbfa;
+}
+.delayControl label {
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+.delayControl input {
+  width: 5rem;
+  min-height: 2.2rem;
+  border: 1px solid #9fbbb6;
+  border-radius: 0.55rem;
+  padding: 0.4rem;
+  color: #153b36;
+  background: white;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
 .actions button,
 .actions .queueLink {
   padding: 0.55rem 0.8rem;
@@ -324,6 +349,9 @@ h1 {
   }
   .sessionGrid {
     grid-template-columns: 1fr;
+  }
+  .delayControl {
+    width: 100%;
   }
   .queueRow {
     grid-template-columns: 1fr auto;
