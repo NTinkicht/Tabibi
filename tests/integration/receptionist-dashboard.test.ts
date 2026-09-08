@@ -54,7 +54,7 @@ beforeEach(async () => {
     `INSERT INTO consultation_sessions
     (id,clinic_id,doctor_id,service_date,starts_at,ends_at,status,declared_delay_minutes,delay_version,delay_updated_at)
     VALUES ($1,$3,$5,'2026-09-08','2026-09-08 09:00Z','2026-09-08 12:00Z','open',20,1,now()),
-           ($2,$4,$5,'2026-09-08','2026-09-08 13:00Z','2026-09-08 16:00Z','open',NULL,0,NULL)`,
+           ($2,$4,$5,'2026-09-08','2026-09-08 13:00Z','2026-09-08 16:00Z','planned',NULL,0,NULL)`,
     [ids.sessionA, ids.sessionB, ids.clinicA, ids.clinicB, ids.doctor],
   );
 });
