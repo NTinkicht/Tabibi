@@ -314,11 +314,18 @@ async function fetchPr(token, repo, number) {
 }
 
 async function fetchIssueComments(token, repo, number) {
-  return requestJson({
-    token,
-    repo,
-    path: `/issues/${number}/comments?per_page=100`,
-  });
+  const comments = [];
+  for (let page = 1; ; page += 1) {
+    const batch = await requestJson({
+      token,
+      repo,
+      path: `/issues/${number}/comments?per_page=100&page=${page}`,
+    });
+    const items = Array.isArray(batch) ? batch : [];
+    comments.push(...items);
+    if (items.length < 100) break;
+  }
+  return comments;
 }
 
 async function exactHeadCiGreen(token, repo, sha) {
