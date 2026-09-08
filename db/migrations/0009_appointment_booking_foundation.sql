@@ -59,6 +59,42 @@ CREATE TABLE appointment_booking_receipts (
     REFERENCES appointments(id, clinic_id) ON DELETE RESTRICT
 );
 
+CREATE FUNCTION synchronize_appointment_from_queue_state()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  target_status appointment_status;
+BEGIN
+  IF NEW.state = OLD.state OR NEW.source <> 'appointment' THEN
+    RETURN NEW;
+  END IF;
+
+  target_status := CASE NEW.state
+    WHEN 'waiting' THEN 'confirmed'::appointment_status
+    WHEN 'checked_in' THEN 'checked_in'::appointment_status
+    WHEN 'called' THEN 'checked_in'::appointment_status
+    WHEN 'in_consultation' THEN 'checked_in'::appointment_status
+    WHEN 'completed' THEN 'completed'::appointment_status
+    WHEN 'cancelled' THEN 'cancelled'::appointment_status
+    WHEN 'no_show' THEN 'no_show'::appointment_status
+  END;
+
+  UPDATE appointments
+     SET status = target_status,
+         updated_at = now()
+   WHERE queue_entry_id = NEW.id
+     AND clinic_id = NEW.clinic_id;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER queue_entries_appointment_state_sync
+AFTER UPDATE OF state ON queue_entries
+FOR EACH ROW
+EXECUTE FUNCTION synchronize_appointment_from_queue_state();
+
 ALTER TABLE audit_events
   DROP CONSTRAINT audit_events_entity_type_check,
   ADD CONSTRAINT audit_events_entity_type_check
