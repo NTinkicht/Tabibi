@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { POST as appointmentRoute } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/appointments/route';
 import {
   AppointmentConflictError,
   AppointmentService,
@@ -8,12 +9,15 @@ import {
 } from '@/modules/appointment';
 import { QueueService } from '@/modules/queue';
 import { migrate } from '../../scripts/db/lib';
+import { closePool } from '@/platform/database/pool';
+import { createStaffSessionToken } from '@/platform/http/staff-auth';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const ids = {
   clinicA: randomUUID(),
   clinicB: randomUUID(),
   receptionist: randomUUID(),
+  otherReceptionist: randomUUID(),
   doctorUser: randomUUID(),
   doctor: randomUUID(),
   sessionA: randomUUID(),
@@ -26,6 +30,8 @@ const scope = { clinicId: ids.clinicA, actorUserId: ids.receptionist };
 
 beforeAll(async () => migrate());
 beforeEach(async () => {
+  process.env.STAFF_SESSION_SECRET =
+    'appointment-booking-test-secret-at-least-32-characters';
   await pool.query(`TRUNCATE appointment_booking_receipts, appointments,
     audit_events, queue_command_receipts, queue_reorder_receipts,
     queue_registration_receipts, queue_entries, patient_operational_records,
@@ -34,8 +40,9 @@ beforeEach(async () => {
   await pool.query(
     `INSERT INTO users(id,auth_subject,display_name) VALUES
       ($1,'booking-reception','Reception'),
-      ($2,'booking-doctor','Doctor')`,
-    [ids.receptionist, ids.doctorUser],
+      ($2,'booking-reception-b','Reception B'),
+      ($3,'booking-doctor','Doctor')`,
+    [ids.receptionist, ids.otherReceptionist, ids.doctorUser],
   );
   await pool.query(
     `INSERT INTO clinics(id,tenant_key,name) VALUES
@@ -44,8 +51,9 @@ beforeEach(async () => {
   );
   await pool.query(
     `INSERT INTO clinic_memberships(clinic_id,user_id,role)
-     VALUES($1,$2,'receptionist')`,
-    [ids.clinicA, ids.receptionist],
+     VALUES($1,$2,'receptionist'),
+           ($3,$4,'receptionist')`,
+    [ids.clinicA, ids.receptionist, ids.clinicB, ids.otherReceptionist],
   );
   await pool.query(
     `INSERT INTO doctor_profiles(id,user_id,display_name)
@@ -75,7 +83,10 @@ beforeEach(async () => {
     [ids.patientA, ids.patientA2, ids.patientB, ids.clinicA, ids.clinicB],
   );
 });
-afterAll(async () => pool.end());
+afterAll(async () => {
+  await closePool();
+  await pool.end();
+});
 
 function bookingInput(idempotencyKey = 'book-1') {
   return {
@@ -86,6 +97,13 @@ function bookingInput(idempotencyKey = 'book-1') {
     idempotencyKey,
     correlationId: idempotencyKey,
   };
+}
+
+function authCookie(authSubject: string) {
+  return `tabibi_staff_session=${createStaffSessionToken(
+    authSubject,
+    new Date(Date.now() + 60_000),
+  )}`;
 }
 
 describe('appointment booking foundation', () => {
@@ -205,6 +223,43 @@ describe('appointment booking foundation', () => {
     });
   });
 
+  it('rejects a second patient booking for the same session under a different idempotency key without committing another pair', async () => {
+    const service = new AppointmentService(pool);
+    const first = await service.bookForExistingPatient(
+      scope,
+      ids.sessionA,
+      bookingInput('book-dup-1'),
+    );
+
+    await expect(
+      service.bookForExistingPatient(
+        scope,
+        ids.sessionA,
+        bookingInput('book-dup-2'),
+      ),
+    ).rejects.toBeInstanceOf(AppointmentConflictError);
+
+    const counts = await pool.query<{
+      appointments: string;
+      entries: string;
+      appointment_id: string;
+      queue_entry_id: string;
+    }>(
+      `SELECT
+         (SELECT count(*)::text FROM appointments WHERE clinic_id=$1) appointments,
+         (SELECT count(*)::text FROM queue_entries WHERE clinic_id=$1) entries,
+         (SELECT id FROM appointments WHERE clinic_id=$1) appointment_id,
+         (SELECT id FROM queue_entries WHERE clinic_id=$1) queue_entry_id`,
+      [ids.clinicA],
+    );
+    expect(counts.rows[0]).toEqual({
+      appointments: '1',
+      entries: '1',
+      appointment_id: first.appointment.id,
+      queue_entry_id: first.entry.id,
+    });
+  });
+
   it('rejects conflicting idempotency reuse, foreign patients, terminal sessions and invalid contact preferences without extra queue rows', async () => {
     const service = new AppointmentService(pool);
     await service.bookForExistingPatient(scope, ids.sessionA, bookingInput());
@@ -244,6 +299,57 @@ describe('appointment booking foundation', () => {
       [ids.clinicA],
     );
     expect(counts.rows[0]).toEqual({ appointments: '1', entries: '1' });
+  });
+
+  it('rejects an authenticated actor without target-clinic membership before side effects', async () => {
+    const response = await appointmentRoute(
+      new Request(
+        `http://localhost/api/clinics/${ids.clinicA}/sessions/${ids.sessionA}/appointments`,
+        {
+          method: 'POST',
+          headers: {
+            origin: 'http://localhost',
+            'content-type': 'application/json',
+            'idempotency-key': 'book-forbidden',
+            cookie: authCookie('booking-reception-b'),
+          },
+          body: JSON.stringify({
+            patientId: ids.patientA,
+            scheduledStartAt: '2026-09-15T09:30:00Z',
+            scheduledEndAt: '2026-09-15T09:45:00Z',
+            contactPreference: 'phone',
+          }),
+        },
+      ),
+      {
+        params: Promise.resolve({
+          clinicId: ids.clinicA,
+          sessionId: ids.sessionA,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'forbidden',
+    });
+
+    const counts = await pool.query<{
+      appointments: string;
+      entries: string;
+      audits: string;
+    }>(
+      `SELECT
+         (SELECT count(*)::text FROM appointments WHERE clinic_id=$1) appointments,
+         (SELECT count(*)::text FROM queue_entries WHERE clinic_id=$1) entries,
+         (SELECT count(*)::text FROM audit_events WHERE clinic_id=$1 AND entity_type='appointment') audits`,
+      [ids.clinicA],
+    );
+    expect(counts.rows[0]).toEqual({
+      appointments: '0',
+      entries: '0',
+      audits: '0',
+    });
   });
 
   it('serializes concurrent walk-in and appointment registration through the shared session lock', async () => {

@@ -68,6 +68,17 @@ export class AppointmentConflictError extends Error {
   }
 }
 
+function isDuplicatePatientSessionConflict(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === '23505' &&
+    'constraint' in error &&
+    error.constraint === 'appointments_clinic_session_patient_uq'
+  );
+}
+
 function normalizeInput(input: AppointmentBookingInput) {
   if (!input.patientId)
     throw new AppointmentValidationError('Patient id is required');
@@ -294,25 +305,33 @@ export class AppointmentService {
           registrationOrder,
         ],
       );
-      await client.query(
-        `INSERT INTO appointments
-           (id, clinic_id, doctor_id, session_id, patient_id, queue_entry_id,
-            status, scheduled_start_at, scheduled_end_at, preferred_locale,
-            contact_preference, source)
-         VALUES ($1, $2, $3, $4, $5, $6, 'confirmed', $7, $8, $9, $10, 'staff')`,
-        [
-          appointmentId,
-          scope.clinicId,
-          session.doctor_id,
-          sessionId,
-          input.patientId,
-          entryId,
-          input.scheduledStartAt,
-          input.scheduledEndAt,
-          patient.preferred_locale,
-          input.contactPreference,
-        ],
-      );
+      try {
+        await client.query(
+          `INSERT INTO appointments
+             (id, clinic_id, doctor_id, session_id, patient_id, queue_entry_id,
+              status, scheduled_start_at, scheduled_end_at, preferred_locale,
+              contact_preference, source)
+           VALUES ($1, $2, $3, $4, $5, $6, 'confirmed', $7, $8, $9, $10, 'staff')`,
+          [
+            appointmentId,
+            scope.clinicId,
+            session.doctor_id,
+            sessionId,
+            input.patientId,
+            entryId,
+            input.scheduledStartAt,
+            input.scheduledEndAt,
+            patient.preferred_locale,
+            input.contactPreference,
+          ],
+        );
+      } catch (error) {
+        if (isDuplicatePatientSessionConflict(error))
+          throw new AppointmentConflictError(
+            'Patient already has an appointment for this session',
+          );
+        throw error;
+      }
       await appendAuditEvent(client, {
         clinicId: scope.clinicId,
         actorUserId: scope.actorUserId,

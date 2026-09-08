@@ -8,9 +8,11 @@ CREATE TYPE appointment_status AS ENUM (
 );
 
 ALTER TABLE queue_entries
-  DROP CONSTRAINT IF EXISTS queue_entries_source_check,
-  ADD CONSTRAINT queue_entries_source_check
-    CHECK (source IN ('walk_in', 'appointment'));
+  ADD CONSTRAINT queue_entries_source_check_wu11_tmp
+    CHECK (source IN ('walk_in', 'appointment')) NOT VALID;
+
+ALTER TABLE queue_entries
+  DROP CONSTRAINT IF EXISTS queue_entries_source_check;
 
 CREATE TABLE appointments (
   id uuid PRIMARY KEY,
@@ -38,6 +40,8 @@ CREATE TABLE appointments (
   FOREIGN KEY (queue_entry_id, clinic_id)
     REFERENCES queue_entries(id, clinic_id) ON DELETE RESTRICT,
   UNIQUE (id, clinic_id),
+  CONSTRAINT appointments_clinic_session_patient_uq
+    UNIQUE (clinic_id, session_id, patient_id),
   UNIQUE (queue_entry_id),
   UNIQUE (queue_entry_id, clinic_id)
 );
@@ -96,8 +100,7 @@ FOR EACH ROW
 EXECUTE FUNCTION synchronize_appointment_from_queue_state();
 
 ALTER TABLE audit_events
-  DROP CONSTRAINT audit_events_entity_type_check,
-  ADD CONSTRAINT audit_events_entity_type_check
+  ADD CONSTRAINT audit_events_entity_type_check_wu11_tmp
     CHECK (entity_type IN (
       'clinic',
       'membership',
@@ -106,4 +109,7 @@ ALTER TABLE audit_events
       'consultation_session',
       'queue_entry',
       'appointment'
-    ));
+    )) NOT VALID;
+
+ALTER TABLE audit_events
+  DROP CONSTRAINT audit_events_entity_type_check;

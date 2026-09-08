@@ -13,6 +13,7 @@ const committedMigrations = [
   '0007_waiting_room_public_labels.sql',
   '0008_queue_eta_timing.sql',
   '0009_appointment_booking_foundation.sql',
+  '0010_appointment_booking_constraint_validation.sql',
 ];
 
 beforeAll(async () => {
@@ -52,6 +53,10 @@ describe('committed migration chain', () => {
       appointments: string | null;
       appointment_receipts: string | null;
       appointment_source_allowed: boolean;
+      appointment_entity_allowed: boolean;
+      patient_session_uq: string | null;
+      temp_queue_source_constraint: string | null;
+      temp_audit_constraint: string | null;
     }>(
       `SELECT
          EXISTS (
@@ -75,9 +80,21 @@ describe('committed migration chain', () => {
          to_regclass('queue_entries_session_completed_timing_idx')::text eta_timing_idx,
          to_regclass('appointments')::text appointments,
          to_regclass('appointment_booking_receipts')::text appointment_receipts,
-         pg_get_constraintdef(oid) LIKE '%appointment%' AS appointment_source_allowed
-       FROM pg_constraint
-      WHERE conname='queue_entries_source_check'`,
+         (SELECT pg_get_constraintdef(oid) LIKE '%appointment%'
+            FROM pg_constraint
+           WHERE conname='queue_entries_source_check') AS appointment_source_allowed,
+         (SELECT pg_get_constraintdef(oid) LIKE '%appointment%'
+            FROM pg_constraint
+           WHERE conname='audit_events_entity_type_check') AS appointment_entity_allowed,
+         (SELECT conname
+            FROM pg_constraint
+           WHERE conname='appointments_clinic_session_patient_uq') patient_session_uq,
+         (SELECT conname
+            FROM pg_constraint
+           WHERE conname='queue_entries_source_check_wu11_tmp') temp_queue_source_constraint,
+         (SELECT conname
+            FROM pg_constraint
+           WHERE conname='audit_events_entity_type_check_wu11_tmp') temp_audit_constraint`,
     );
 
     expect(artifacts.rows[0]).toEqual({
@@ -92,6 +109,10 @@ describe('committed migration chain', () => {
       appointments: 'appointments',
       appointment_receipts: 'appointment_booking_receipts',
       appointment_source_allowed: true,
+      appointment_entity_allowed: true,
+      patient_session_uq: 'appointments_clinic_session_patient_uq',
+      temp_queue_source_constraint: null,
+      temp_audit_constraint: null,
     });
   });
 });
