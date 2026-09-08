@@ -67,7 +67,7 @@ A binding gate must include:
 - canonical verdict (`PASS`, `PASS_WITH_MINOR_FINDINGS`, or `CHANGES_REQUIRED`);
 - whether merge is ready.
 
-Any code-changing commit invalidates a previous exact-SHA binding gate. Non-governance documentation-only changes may use existing zero-drift rules only when governance evidence explicitly proves no reviewed product/test drift. Any governance change affecting reviewer eligibility, leases, severity rules, startup requirements, handoff policy, or merge-control semantics requires a fresh independent exact-SHA gate.
+Any code-changing commit invalidates a previous exact-SHA binding gate. Non-governance documentation-only changes may use existing zero-drift rules only when governance evidence explicitly proves no reviewed product/test drift. Any governance change requires a fresh independent exact-SHA gate.
 
 Reviewer independence is based on **material authorship**, not commit metadata alone. Before assigning a failover gate, orchestration must check whether the candidate authored or materially modified the reviewed diff. Replayed/cherry-picked/equivalent patches do not launder authorship: if a candidate authored a commit whose tree or stable patch content is materially equivalent to the current head changes, that candidate is ineligible to be the sole binding reviewer even when the literal head SHA or committer differs. When provenance is ambiguous, treat the candidate as non-independent and select another reviewer.
 
