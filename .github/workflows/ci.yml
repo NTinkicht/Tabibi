@@ -39,7 +39,12 @@ jobs:
         run: npm ci
 
       - name: Formatting
-        run: npm run format
+        run: |
+          if ! npm run format; then
+            npx prettier@3.6.2 --write tests/integration/receptionist-dashboard-concurrency.test.ts
+            git diff -- tests/integration/receptionist-dashboard-concurrency.test.ts
+            exit 1
+          fi
 
       - name: Lint
         run: npm run lint
