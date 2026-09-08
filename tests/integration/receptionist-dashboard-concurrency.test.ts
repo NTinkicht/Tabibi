@@ -48,10 +48,7 @@ function poolWithDashboardFirstQueryBarrier(
                     ? String((firstArg as { text?: unknown }).text ?? '')
                     : '';
 
-              if (
-                !held &&
-                sql.includes('FROM consultation_sessions session')
-              ) {
+              if (!held && sql.includes('FROM consultation_sessions session')) {
                 held = true;
                 reached.resolve();
                 await release.promise;
