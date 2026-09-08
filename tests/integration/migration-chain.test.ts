@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
@@ -114,5 +116,126 @@ describe('committed migration chain', () => {
       temp_queue_source_constraint: null,
       temp_audit_constraint: null,
     });
+  });
+
+  it('keeps 0010 queue lock escalation after both validation scans', async () => {
+    const migration = await readFile(
+      resolve(
+        process.cwd(),
+        'db/migrations/0010_appointment_booking_constraint_validation.sql',
+      ),
+      'utf8',
+    );
+    const queueValidate = migration.indexOf(
+      'ALTER TABLE queue_entries\n  VALIDATE CONSTRAINT queue_entries_source_check_wu11_tmp;',
+    );
+    const auditValidate = migration.indexOf(
+      'ALTER TABLE audit_events\n  VALIDATE CONSTRAINT audit_events_entity_type_check_wu11_tmp;',
+    );
+    const queueRename = migration.indexOf(
+      'ALTER TABLE queue_entries\n  RENAME CONSTRAINT queue_entries_source_check_wu11_tmp',
+    );
+    const auditRename = migration.indexOf(
+      'ALTER TABLE audit_events\n  RENAME CONSTRAINT audit_events_entity_type_check_wu11_tmp',
+    );
+    expect(queueValidate).toBeGreaterThanOrEqual(0);
+    expect(auditValidate).toBeGreaterThan(queueValidate);
+    expect(queueRename).toBeGreaterThan(auditValidate);
+    expect(auditRename).toBeGreaterThan(queueRename);
+
+    const writer = new Client({ connectionString: process.env.DATABASE_URL });
+    const competitor = new Client({
+      connectionString: process.env.DATABASE_URL,
+    });
+    const tryQueueWriterLock = async () => {
+      await competitor.query('BEGIN');
+      try {
+        const result = await competitor.query(
+          'LOCK TABLE queue_entries IN ROW EXCLUSIVE MODE NOWAIT',
+        );
+        await competitor.query('ROLLBACK');
+        return result;
+      } catch (error) {
+        await competitor.query('ROLLBACK');
+        throw error;
+      }
+    };
+    const queueConstraint = 'queue_entries_source_check_lock_probe_tmp';
+    const auditConstraint = 'audit_events_entity_type_check_lock_probe_tmp';
+    await writer.connect();
+    await competitor.connect();
+    await client.query(
+      `ALTER TABLE queue_entries
+         DROP CONSTRAINT IF EXISTS ${queueConstraint}`,
+    );
+    await client.query(
+      `ALTER TABLE queue_entries
+         DROP CONSTRAINT IF EXISTS ${queueConstraint}_renamed`,
+    );
+    await client.query(
+      `ALTER TABLE audit_events
+         DROP CONSTRAINT IF EXISTS ${auditConstraint}`,
+    );
+    await client.query(
+      `ALTER TABLE queue_entries
+         ADD CONSTRAINT ${queueConstraint}
+         CHECK (source IN ('walk_in', 'appointment')) NOT VALID`,
+    );
+    await client.query(
+      `ALTER TABLE audit_events
+         ADD CONSTRAINT ${auditConstraint}
+         CHECK (entity_type IN (
+           'clinic',
+           'membership',
+           'doctor',
+           'schedule_template',
+           'consultation_session',
+           'queue_entry',
+           'appointment'
+         )) NOT VALID`,
+    );
+    let writerInTransaction = false;
+    try {
+      await writer.query('BEGIN');
+      writerInTransaction = true;
+      await writer.query(
+        `ALTER TABLE queue_entries VALIDATE CONSTRAINT ${queueConstraint}`,
+      );
+      await writer.query(
+        `ALTER TABLE audit_events VALIDATE CONSTRAINT ${auditConstraint}`,
+      );
+      await expect(tryQueueWriterLock()).resolves.toMatchObject({
+        command: 'LOCK',
+      });
+
+      await writer.query(
+        `ALTER TABLE queue_entries
+           RENAME CONSTRAINT ${queueConstraint} TO ${queueConstraint}_renamed`,
+      );
+
+      await expect(tryQueueWriterLock()).rejects.toMatchObject({
+        code: '55P03',
+      });
+      await writer.query('ROLLBACK');
+      writerInTransaction = false;
+    } finally {
+      if (writerInTransaction) {
+        await writer.query('ROLLBACK');
+      }
+      await client.query(
+        `ALTER TABLE queue_entries
+           DROP CONSTRAINT IF EXISTS ${queueConstraint}`,
+      );
+      await client.query(
+        `ALTER TABLE queue_entries
+           DROP CONSTRAINT IF EXISTS ${queueConstraint}_renamed`,
+      );
+      await client.query(
+        `ALTER TABLE audit_events
+           DROP CONSTRAINT IF EXISTS ${auditConstraint}`,
+      );
+      await writer.end();
+      await competitor.end();
+    }
   });
 });
