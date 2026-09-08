@@ -9,6 +9,7 @@ It supplements `AGENTS.md`, `coordination/COMPANY_OPERATING_SYSTEM.md`, `coordin
 An **actor** is a model/tool identity with capacity, authorship and gating eligibility. A **role overlay** is a bounded professional lens applied to that actor for one task.
 
 Role overlays never:
+
 - create capacity;
 - create a lease;
 - grant repository permissions;
@@ -31,14 +32,14 @@ Default mapping:
 | receptionist/patient UI | `persona-walkthrough` |
 | external healthcare narrative | `healthcare-innovation-strategist` |
 
-The same actor may perform multiple non-conflicting advisory overlays, but a binding gate must remain independently eligible.
+The same actor may perform multiple non-conflicting advisory overlays, but every active specialist lane must be backed by an explicit actor lease and a binding gate must remain independently eligible.
 
 ## 3. Orthogonal review rule
 
 Parallel specialist reviews must answer different questions. Example for a transfer feature:
 
 - implementer with `backend-architect`: is the design internally coherent?
-- reviewer with `database-reliability`: can concurrent state transitions corrupt it?
+- secondary verifier with `database-reliability`: can concurrent state transitions corrupt it?
 - gate with `code-reviewer`: does the exact implementation satisfy the full contract?
 - experience QA with `persona-walkthrough`: can receptionist/patient users understand the resulting flow?
 
@@ -46,34 +47,39 @@ Do not create multiple generic reviews for reviewer-count theater.
 
 ## 4. Severity normalization
 
-All overlay findings use:
+Overlay reviews use the canonical Tabibi finding severities from `AGENTS.md`:
 
-- `BLOCKER` — concrete must-fix merge blocker.
-- `SHOULD_FIX` — important issue normally fixed in the current PR.
-- `FOLLOW_UP` — valid separable work; should become a bounded issue when accepted.
-- `NIT` — optional polish.
+- `BLOCKER` — unsafe to merge: severe correctness, security, privacy, data-loss, or direct core-spec violation.
+- `MAJOR` — material defect requiring resolution before acceptance.
+- `MINOR` — real issue that does not invalidate the feature.
+- `NOTE` — suggestion, ambiguity, or future improvement.
 
-CI failure on a required check is independently blocking regardless of overlay classification.
+No alternate severity vocabulary may be used in a binding review artifact. Required CI failures remain independently blocking.
 
-## 5. Exact-SHA gating
+## 5. Exact-SHA and material-authorship gating
 
 A binding gate must include:
+
 - PR number;
 - exact head SHA;
 - overlay id;
 - reviewer actor;
-- verdict;
+- canonical verdict (`PASS`, `PASS_WITH_MINOR_FINDINGS`, or `CHANGES_REQUIRED`);
 - whether merge is ready.
 
-Any code-changing commit invalidates a previous exact-SHA binding gate. Documentation-only changes may be treated under existing zero-drift rules only when the governance evidence explicitly proves no reviewed product/test drift.
+Any code-changing commit invalidates a previous exact-SHA binding gate. Documentation-only changes may use existing zero-drift rules only when governance evidence explicitly proves no reviewed product/test drift.
+
+Reviewer independence is based on **material authorship**, not commit metadata alone. Before assigning a failover gate, orchestration must check whether the candidate authored or materially modified the reviewed diff. Replayed/cherry-picked/equivalent patches do not launder authorship: if a candidate authored a commit whose tree or stable patch content is materially equivalent to the current head changes, that candidate is ineligible to be the sole binding reviewer even when the literal head SHA or committer differs. When provenance is ambiguous, treat the candidate as non-independent and select another reviewer.
 
 ## 6. Failover
 
-When an actor is unavailable, orchestration may move the task to another eligible actor while preserving the same overlay. Example:
+When an actor is unavailable, orchestration may move the task to another eligible actor while preserving the same overlay.
 
-`claude + code-reviewer` unavailable -> `codex + code-reviewer`, if Codex is not an author of that exact SHA.
+Example:
 
-If no eligible human/model actor remains, supplemental tools (CodeRabbit/Qodo/council) may advise, but they do not silently become binding gates unless the owner/governance explicitly promotes them for that work unit.
+`claude + code-reviewer` unavailable -> `codex + code-reviewer` only if Codex neither authored nor materially modified the reviewed diff under the material-authorship rule above.
+
+If no eligible actor remains, supplemental tools (CodeRabbit/Qodo/council) may advise, but they do not silently become binding gates unless the owner/governance explicitly promotes them for that work unit.
 
 ## 7. Persona acceptance
 
@@ -88,6 +94,7 @@ Healthcare overlays are strategic/evidence disciplines, not medical decision-mak
 The curated overlays are adapted from `NTinkicht/agency-agents` pinned at commit `647c8baa42b6842afb4a97bf2c0950d45ba88e8b`.
 
 Upstream changes are opt-in. To update:
+
 1. inspect upstream diff;
 2. decide whether behavior helps Tabibi;
 3. adapt rather than blindly copy;
@@ -97,8 +104,10 @@ Upstream changes are opt-in. To update:
 ## 10. Definition of done for overlay adoption
 
 The system is considered adopted when:
+
 - curated profiles and registry are on `main`;
-- new substantial work units declare actor + overlay assignments;
-- specialist findings use normalized severity;
-- binding review still respects exact-SHA independence;
+- the mandatory startup path requires this protocol and the selected profile(s) to be read;
+- new substantial work units declare actor-backed overlay assignments plus all mandatory role leases;
+- specialist findings use canonical Tabibi severities and verdicts;
+- binding review respects exact-SHA and material-authorship independence;
 - no overlay creates duplicate implementation streams.
