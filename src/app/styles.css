@@ -153,6 +153,33 @@ h1 {
 .actions .danger {
   background: #a93b45;
 }
+.delayEditor {
+  margin-top: 0.8rem;
+  padding: 0.8rem;
+  border: 1px solid #e3c879;
+  border-radius: 0.8rem;
+  background: #fff9e9;
+}
+.delayEditor label,
+.delayEditor small {
+  display: block;
+}
+.delayEditor label {
+  font-weight: 750;
+}
+.delayEditor div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+.delayEditor input {
+  box-sizing: border-box;
+  width: min(8rem, 100%);
+}
+.delayEditor small {
+  color: #6b5b2e;
+}
 .queueActions {
   display: flex;
   flex-wrap: wrap;

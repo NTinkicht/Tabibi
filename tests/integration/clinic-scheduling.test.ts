@@ -426,6 +426,14 @@ describe('reception session operations', () => {
     expect(retry).toMatchObject({ declaredDelayMinutes: 20, delayVersion: 1 });
     await expect(
       sessions.delay(scopeA, id, {
+        command: 'clear_delay',
+        expectedVersion: 1,
+        idempotencyKey: 'delay-1',
+        correlationId: 'conflicting-reuse',
+      }),
+    ).rejects.toThrow('Idempotency key was reused with a different request');
+    await expect(
+      sessions.delay(scopeA, id, {
         command: 'update_delay',
         minutes: 30,
         expectedVersion: 0,
@@ -451,7 +459,141 @@ describe('reception session operations', () => {
       delayVersion: 3,
       delayUpdatedAt: null,
     });
+    const audits = await pool.query<{ metadata: Record<string, unknown> }>(
+      `SELECT metadata FROM audit_events
+       WHERE clinic_id=$1 AND entity_id=$2 AND action LIKE 'consultation_session.%delay'
+       ORDER BY created_at`,
+      [ids.clinicA, id],
+    );
+    expect(audits.rows).toHaveLength(3);
+    for (const { metadata } of audits.rows) {
+      expect(metadata).not.toHaveProperty('patientId');
+      expect(metadata).not.toHaveProperty('patient');
+      expect(metadata).not.toHaveProperty('reason');
+      expect(metadata).not.toHaveProperty('clinical');
+    }
   });
+
+  it('enforces delay clinic and operational-role boundaries', async () => {
+    const id = await seedSession(ids.clinicA, '2026-09-17');
+    const sessions = new SessionService(pool);
+    const input = {
+      command: 'declare_delay' as const,
+      minutes: 10,
+      expectedVersion: 0,
+      idempotencyKey: 'scoped-delay',
+      correlationId: 'scoped-delay',
+    };
+    await expect(sessions.delay(scopeB, id, input)).rejects.toThrow(
+      'Session not found in clinic',
+    );
+    await expect(
+      sessions.delay(
+        { clinicId: ids.clinicA, actorUserId: ids.platformAdmin },
+        id,
+        input,
+      ),
+    ).rejects.toBeInstanceOf(AuthorizationError);
+    await expect(
+      sessions.delay(
+        { clinicId: ids.clinicA, actorUserId: ids.receptionistA },
+        id,
+        input,
+      ),
+    ).resolves.toMatchObject({ declaredDelayMinutes: 10, delayVersion: 1 });
+  });
+
+  it('serializes concurrent delay update and clear with a stale loser', async () => {
+    const id = await seedSession(ids.clinicA, '2026-09-13');
+    const sessions = new SessionService(pool);
+    await sessions.delay(scopeA, id, {
+      command: 'declare_delay',
+      minutes: 20,
+      expectedVersion: 0,
+      idempotencyKey: 'race-declare',
+      correlationId: 'race-declare',
+    });
+    const results = await race(
+      () =>
+        sessions.delay(scopeA, id, {
+          command: 'update_delay',
+          minutes: 30,
+          expectedVersion: 1,
+          idempotencyKey: 'race-update',
+          correlationId: 'race-update',
+        }),
+      () =>
+        sessions.delay(scopeA, id, {
+          command: 'clear_delay',
+          expectedVersion: 1,
+          idempotencyKey: 'race-clear',
+          correlationId: 'race-clear',
+        }),
+    );
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'rejected'),
+    ).toHaveLength(1);
+    expect(
+      results.find((result) => result.status === 'rejected'),
+    ).toMatchObject({
+      reason: expect.any(SessionConflictError),
+    });
+  });
+
+  it.each(['close', 'cancel'] as const)(
+    'serializes delay declaration against %s without changing terminal state',
+    async (command) => {
+      const id = await seedSession(
+        ids.clinicA,
+        `2026-09-${command === 'close' ? '15' : '16'}`,
+      );
+      const sessions = new SessionService(pool);
+      await sessions.command(scopeA, id, {
+        command: 'open',
+        idempotencyKey: `${command}-open`,
+        correlationId: `${command}-open`,
+      });
+      const results = await race(
+        () =>
+          sessions.delay(scopeA, id, {
+            command: 'declare_delay',
+            minutes: 15,
+            expectedVersion: 0,
+            idempotencyKey: `${command}-delay`,
+            correlationId: `${command}-delay`,
+          }),
+        () =>
+          sessions.command(scopeA, id, {
+            command,
+            reason: command === 'cancel' ? 'Clinic closed early' : undefined,
+            idempotencyKey: `${command}-terminal`,
+            correlationId: `${command}-terminal`,
+          }),
+      );
+      expect(results.some((result) => result.status === 'fulfilled')).toBe(
+        true,
+      );
+      const row = await pool.query<{ status: string }>(
+        'SELECT status FROM consultation_sessions WHERE id=$1',
+        [id],
+      );
+      expect(row.rows[0]?.status).toBe(
+        command === 'close' ? 'closed' : 'cancelled',
+      );
+      await expect(
+        sessions.delay(scopeA, id, {
+          command: 'update_delay',
+          minutes: 25,
+          expectedVersion: 1,
+          idempotencyKey: `${command}-after-terminal`,
+          correlationId: `${command}-after-terminal`,
+        }),
+      ).rejects.toThrow('terminal session');
+    },
+  );
 
   it('serializes competing lifecycle commands and commits one winner', async () => {
     const id = await seedSession(ids.clinicA, '2026-09-14');

@@ -39,6 +39,10 @@ export function ReceptionDesk({
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [pending, setPending] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [delayEditor, setDelayEditor] = useState<{
+    sessionId: string;
+    minutes: string;
+  } | null>(null);
   const pendingKeysRef = useRef(new Map<string, string>());
 
   function keyFor(opId: string): string {
@@ -80,7 +84,7 @@ export function ReceptionDesk({
     opId: string,
     path: string,
     body: object,
-  ) {
+  ): Promise<boolean> {
     setPending(sessionId);
     setMessage('');
     const idempotencyKey = keyFor(opId);
@@ -105,10 +109,12 @@ export function ReceptionDesk({
       setSessions((items) =>
         items.map((item) => (item.id === sessionId ? data.session! : item)),
       );
+      return true;
     } catch (error) {
       setMessage(
         error instanceof Error && error.message ? error.message : t.error,
       );
+      return false;
     } finally {
       setPending(null);
     }
@@ -124,17 +130,29 @@ export function ReceptionDesk({
       reason,
     });
   }
-  async function delay(session: Session) {
-    const raw = window.prompt(t.promptDelay);
-    if (raw === null) return;
-    const minutes = Number(raw);
+  async function delay(
+    event: React.FormEvent<HTMLFormElement>,
+    session: Session,
+  ) {
+    event.preventDefault();
+    const minutes = Number(delayEditor?.minutes);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 720) {
+      setMessage(t.delayInvalid);
+      return;
+    }
     const delayCommand =
       session.declaredDelayMinutes === null ? 'declare_delay' : 'update_delay';
-    await mutate(session.id, `${session.id}:delay:${delayCommand}`, 'delay', {
-      command: delayCommand,
-      minutes,
-      expectedVersion: session.delayVersion,
-    });
+    const saved = await mutate(
+      session.id,
+      `${session.id}:delay:${delayCommand}`,
+      'delay',
+      {
+        command: delayCommand,
+        minutes,
+        expectedVersion: session.delayVersion,
+      },
+    );
+    if (saved) setDelayEditor(null);
   }
   async function clearDelay(session: Session) {
     await mutate(session.id, `${session.id}:delay:clear_delay`, 'delay', {
@@ -252,11 +270,12 @@ export function ReceptionDesk({
               </div>
               <span className="status">{t.statuses[session.status]}</span>
             </div>
-            {session.declaredDelayMinutes !== null && (
-              <p className="delayBadge">
-                +{session.declaredDelayMinutes} {t.minutes}
-              </p>
-            )}
+            {session.declaredDelayMinutes !== null &&
+              !['closed', 'cancelled'].includes(session.status) && (
+                <p className="delayBadge">
+                  +{session.declaredDelayMinutes} {t.minutes}
+                </p>
+              )}
             <div className="actions">
               {session.status === 'planned' && (
                 <button onClick={() => void command(session, 'open')}>
@@ -287,18 +306,27 @@ export function ReceptionDesk({
                 </button>
               )}
               {!['closed', 'cancelled'].includes(session.status) && (
-                <button className="quiet" onClick={() => void delay(session)}>
+                <button
+                  className="quiet"
+                  onClick={() =>
+                    setDelayEditor({
+                      sessionId: session.id,
+                      minutes: String(session.declaredDelayMinutes ?? ''),
+                    })
+                  }
+                >
                   {t.delay}
                 </button>
               )}
-              {session.declaredDelayMinutes !== null && (
-                <button
-                  className="quiet"
-                  onClick={() => void clearDelay(session)}
-                >
-                  {t.clear}
-                </button>
-              )}
+              {session.declaredDelayMinutes !== null &&
+                !['closed', 'cancelled'].includes(session.status) && (
+                  <button
+                    className="quiet"
+                    onClick={() => void clearDelay(session)}
+                  >
+                    {t.clear}
+                  </button>
+                )}
               {['planned', 'open', 'paused'].includes(session.status) && (
                 <Link
                   className="queueLink"
@@ -308,6 +336,42 @@ export function ReceptionDesk({
                 </Link>
               )}
             </div>
+            {delayEditor?.sessionId === session.id && (
+              <form
+                className="delayEditor"
+                onSubmit={(event) => void delay(event, session)}
+              >
+                <label htmlFor={`delay-${session.id}`}>{t.delayMinutes}</label>
+                <div>
+                  <input
+                    id={`delay-${session.id}`}
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    max="720"
+                    step="1"
+                    required
+                    autoFocus
+                    value={delayEditor.minutes}
+                    onChange={(event) =>
+                      setDelayEditor({
+                        sessionId: session.id,
+                        minutes: event.target.value,
+                      })
+                    }
+                  />
+                  <button type="submit">{t.saveDelay}</button>
+                  <button
+                    type="button"
+                    className="quiet"
+                    onClick={() => setDelayEditor(null)}
+                  >
+                    {t.cancelEdit}
+                  </button>
+                </div>
+                <small>{t.delayHint}</small>
+              </form>
+            )}
             {pending === session.id && (
               <div className="pending" aria-live="polite">
                 {t.pending}
