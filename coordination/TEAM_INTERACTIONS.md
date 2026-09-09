@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-09T22:22:47.889518+00:00
+- Last sync: 2026-09-09T22:23:39.148842+00:00
 
 ## Team Room charter
 
@@ -7481,5 +7481,18 @@ No-idle continuation:
 next_checkpoint: Codex service/API/test commit on PR #126 or precise capability failure; exact-head CI is always binding.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609550892
+
+---
+
+### 2026-09-09T22:23:30Z — NTinkicht
+
+HEARTBEAT
+actor: codex
+work_unit: WU15 / Issue #125 / PR #126
+status: active
+lease: canonical implementer
+action: continuing the existing wu15-guest-exchange-foundation branch from exact handed-off head; implementing issuance, atomic consumption, HTTP security boundary, and deterministic PostgreSQL/API coverage.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609559700
 
 ---
