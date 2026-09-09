@@ -1,6 +1,6 @@
 # Tabibi Work Queue
 
-This is the human-readable work marketplace for available engineering capacity. It supplements `coordination/STATE.json`; live GitHub evidence is authoritative for transient PR/CI facts, while committed binding protocols govern role and merge policy.
+This is the human-readable work marketplace for available engineering capacity. It supplements `coordination/STATE.json`; live GitHub evidence is authoritative for transient PR/CI facts.
 
 Status values: `ACTIVE`, `READY`, `BLOCKED`, `DONE`, `CANCELLED`.
 
@@ -16,16 +16,16 @@ The immediate canonical work is bounded architecture/backlog reconciliation agai
 | --- | --- | --- | --- | --- | --- |
 | POST-WU12-ARCH-001 | ACTIVE | chatgpt | Reconcile current main, epics and dependencies; define next smallest bounded product work unit | New issue with explicit scope/exclusions/acceptance | No application edits |
 | POST-WU12-IMPLEMENT-001 | BLOCKED | unassigned | Implement the next work unit after architecture contract exists | One canonical branch/PR + tests | Yes, after explicit lease only |
-| POST-WU12-GATE-001 | BLOCKED | eligible non-author reviewer | Binding exact-head gate under `AGENTS.md`; prefer Claude, Codex, or Copilot Code Review when eligible and concretely available | PASS / PASS_WITH_MINOR_FINDINGS on exact head; no unresolved BLOCKER/MAJOR | Review only |
-| POST-WU12-MERGE-001 | BLOCKED | codex | Mechanical merge after unchanged exact head satisfies `AUTONOMY_PROTOCOL.md`; ChatGPT may execute only as explicit merge-execution failover when Codex is concretely unavailable | Merge + state reconciliation | Merge only |
+| POST-WU12-GATE-001 | BLOCKED | CodeRabbit | Binding independent exact-head gate while Codex and Claude are unavailable or limited | Full review on exact head; no unresolved BLOCKER/MAJOR | Review only |
+| POST-WU12-MERGE-001 | BLOCKED | chatgpt | Mechanical expected-head merge only after unchanged exact head has green required CI and the binding CodeRabbit gate is clean | Merge + state reconciliation | Merge only |
 
 ## Current actor status
 
 - **ChatGPT:** ACTIVE — CTO/orchestrator and state reconciler. Owns POST-WU12-ARCH-001; no product-code lease.
-- **Copilot:** AVAILABLE/UNASSIGNED — primary QA/Test Automation and eligible independent gate only on a non-authored exact head under `AGENTS.md`.
-- **Codex:** CAPABILITY-CONDITIONAL/UNASSIGNED — preferred production/CI/mechanical merge actor when concrete capacity is observed; do not spam repeated probes after a demonstrated limit.
-- **Claude:** CAPABILITY-CONDITIONAL/UNASSIGNED — principal architecture/security/adversarial reviewer and preferred independent gate when eligible and concretely available.
-- **CodeRabbit:** SUPPLEMENTAL REVIEW SIGNAL — useful for findings and full-PR re-evaluation, but not a binding gate under the exhaustive `AGENTS.md` independent-review list.
+- **Copilot:** AVAILABLE/UNASSIGNED — primary QA/Test Automation and bounded implementation/integration when explicitly leased. No current product or gate lease.
+- **Codex:** LIMITED/UNASSIGNED — no current lease; do not depend on implementation, review, or merge capacity until concrete recovery evidence appears.
+- **Claude:** LIMITED/UNASSIGNED — no current lease; optional architecture/security/adversarial review only if concrete capacity returns.
+- **CodeRabbit:** BINDING INDEPENDENT GATE — required on the exact PR head while Codex and Claude remain unavailable or limited.
 - **Gemini Agent:** PAUSED/OFF-ROSTER by owner decision.
 - **Gemini Chat:** PAUSED/OFF-ROSTER by owner decision.
 
@@ -34,7 +34,7 @@ The immediate canonical work is bounded architecture/backlog reconciliation agai
 - Exactly one canonical PR and one active implementer lease per work stream.
 - An assignment is not evidence of progress: require heartbeat/checkpoint, commit, PR, CI, review artifact, or a visibly running deterministic job.
 - A claimed active lease without observable progress for 30 minutes is stale unless a deterministic job is visibly progressing.
-- Binding review eligibility comes from `AGENTS.md`: Claude, ChatGPT, Codex, Copilot Code Review, Gemini Chat, or Gemini Agent only when that actor did not author/materially modify the exact reviewed head; paused actors remain ineligible operationally until re-enabled.
-- Merge gates and mechanical merge ownership come from `coordination/AUTONOMY_PROTOCOL.md`. Required deterministic checks must pass; preserve any explicit protocol exception rather than redefining a stricter or weaker rule here.
-- CodeRabbit may identify or clear supplemental findings but does not replace the required eligible non-author verdict.
+- While Codex and Claude are unavailable or limited, the binding merge rule is: required exact-head CI green + CodeRabbit coverage of that exact head + no unresolved CodeRabbit BLOCKER/MAJOR findings.
+- `@coderabbitai review` is incremental. When the latest commit was already reviewed but the entire PR must be re-evaluated, use `@coderabbitai full review`.
+- ChatGPT may execute the mechanical expected-head merge after all binding gates pass.
 - Gemini Agent and Gemini Chat remain paused until the owner explicitly re-enables them.
