@@ -122,48 +122,51 @@ describe('guest exchange credentials', () => {
     expect(audit).not.toContain(consumed.bearer);
   });
 
-  it('rejects database bindings that combine a queue entry with another same-clinic session', async () => {
-    const otherSession = randomUUID();
-    await pool.query(
-      `INSERT INTO consultation_sessions
-      (id,clinic_id,doctor_id,service_date,starts_at,ends_at,status)
-      VALUES($1,$2,$3,'2026-09-10','2026-09-10T09:00Z','2026-09-10T12:00Z','scheduled')`,
-      [otherSession, ids.clinic, ids.doctor],
-    );
+  it(
+    'rejects database bindings that combine a queue entry with another same-clinic session',
+    async () => {
+      const otherSession = randomUUID();
+      await pool.query(
+        `INSERT INTO consultation_sessions
+        (id,clinic_id,doctor_id,service_date,starts_at,ends_at,status)
+        VALUES($1,$2,$3,'2026-09-10','2026-09-10T09:00Z','2026-09-10T12:00Z','planned')`,
+        [otherSession, ids.clinic, ids.doctor],
+      );
 
-    await expect(
-      pool.query(
-        `INSERT INTO guest_exchange_ids
-        (id,clinic_id,session_id,queue_entry_id,issued_by_user_id,exchange_verifier,
-         contact_kind,expires_at)
-        VALUES($1,$2,$3,$4,$5,$6,'phone',now() + interval '5 minutes')`,
-        [
-          randomUUID(),
-          ids.clinic,
-          otherSession,
-          ids.entry,
-          ids.actor,
-          'a'.repeat(64),
-        ],
-      ),
-    ).rejects.toThrow();
+      await expect(
+        pool.query(
+          `INSERT INTO guest_exchange_ids
+          (id,clinic_id,session_id,queue_entry_id,issued_by_user_id,exchange_verifier,
+           contact_kind,expires_at)
+          VALUES($1,$2,$3,$4,$5,$6,'phone',now() + interval '5 minutes')`,
+          [
+            randomUUID(),
+            ids.clinic,
+            otherSession,
+            ids.entry,
+            ids.actor,
+            'a'.repeat(64),
+          ],
+        ),
+      ).rejects.toThrow();
 
-    await expect(
-      pool.query(
-        `INSERT INTO guest_credentials
-        (id,clinic_id,session_id,queue_entry_id,bearer_verifier,expires_at)
-        VALUES($1,$2,$3,$4,$5,now() + interval '1 hour')`,
-        [randomUUID(), ids.clinic, otherSession, ids.entry, 'b'.repeat(64)],
-      ),
-    ).rejects.toThrow();
+      await expect(
+        pool.query(
+          `INSERT INTO guest_credentials
+          (id,clinic_id,session_id,queue_entry_id,bearer_verifier,expires_at)
+          VALUES($1,$2,$3,$4,$5,now() + interval '1 hour')`,
+          [randomUUID(), ids.clinic, otherSession, ids.entry, 'b'.repeat(64)],
+        ),
+      ).rejects.toThrow();
 
-    expect((await pool.query('SELECT * FROM guest_exchange_ids')).rowCount).toBe(
-      0,
-    );
-    expect((await pool.query('SELECT * FROM guest_credentials')).rowCount).toBe(
-      0,
-    );
-  });
+      expect(
+        (await pool.query('SELECT * FROM guest_exchange_ids')).rowCount,
+      ).toBe(0);
+      expect(
+        (await pool.query('SELECT * FROM guest_credentials')).rowCount,
+      ).toBe(0);
+    },
+  );
 
   it('rejects expiry and terminal targets without credential side effects', async () => {
     const service = new GuestAccessService(pool);
