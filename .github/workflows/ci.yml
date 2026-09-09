@@ -129,9 +129,9 @@ jobs:
 
       - name: Install Chromium
         run: |
-          for source in /etc/apt/sources.list /etc/apt/sources.list.d/*; do
+          for source in /etc/apt/sources.list.d/*; do
             if [ -f "$source" ] && grep -q "dl.google.com/linux/chrome-stable" "$source"; then
-              sudo sed -i '/dl\.google\.com\/linux\/chrome-stable/d' "$source"
+              sudo rm -f "$source"
             fi
           done
           npx playwright install --with-deps chromium
