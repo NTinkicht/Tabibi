@@ -271,6 +271,8 @@ describe('WU14 appointment restore and transfer synchronization', () => {
 
       const snapshot = async () => {
         const result = await pool.query<{
+          appointment_snapshot: Record<string, unknown>;
+          queue_snapshot: Record<string, unknown>;
           appointment_status: string;
           queue_state: string;
           registration_order: string;
@@ -280,7 +282,9 @@ describe('WU14 appointment restore and transfer synchronization', () => {
           audit_count: string;
           receipt_count: string;
         }>(
-          `SELECT appointment.status::text appointment_status,
+          `SELECT to_jsonb(appointment) appointment_snapshot,
+                  to_jsonb(entry) queue_snapshot,
+                  appointment.status::text appointment_status,
                   entry.state::text queue_state,
                   entry.registration_order,
                   entry.eligibility_order,
