@@ -233,3 +233,264 @@ describe('WU12 appointment lifecycle synchronization', () => {
       });
   });
 });
+
+describe('WU13 appointment terminal lifecycle synchronization', () => {
+  async function checkIn(appointmentId: string, suffix: string) {
+    return new AppointmentLifecycleService(pool).command(
+      scope,
+      ids.session,
+      appointmentId,
+      {
+        command: 'check_in',
+        idempotencyKey: `wu13-check-in-${suffix}`,
+        correlationId: `wu13-check-in-${suffix}`,
+      },
+    );
+  }
+
+  async function pairedState(appointmentId: string) {
+    const result = await pool.query<{
+      appointment: string;
+      entry: string;
+      completed_at: Date | null;
+    }>(
+      `SELECT appointment.status::text appointment,
+              entry.state::text entry,
+              entry.completed_at
+         FROM appointments appointment
+         JOIN queue_entries entry ON entry.id=appointment.queue_entry_id
+        WHERE appointment.id=$1`,
+      [appointmentId],
+    );
+    return result.rows[0]!;
+  }
+
+  it('maps no-show to both records and makes the exact retry side-effect free', async () => {
+    const booking = await book('wu13-no-show-book');
+    await checkIn(booking.appointment.id, 'no-show');
+    const lifecycle = new AppointmentLifecycleService(pool);
+    const input = {
+      command: 'no_show' as const,
+      reason: 'Patient absent after verified arrival workflow',
+      idempotencyKey: 'wu13-no-show',
+      correlationId: 'wu13-no-show',
+    };
+
+    const first = await lifecycle.command(
+      scope,
+      ids.session,
+      booking.appointment.id,
+      input,
+    );
+    const retry = await lifecycle.command(
+      scope,
+      ids.session,
+      booking.appointment.id,
+      input,
+    );
+
+    expect(retry).toEqual(first);
+    expect(await pairedState(booking.appointment.id)).toMatchObject({
+      appointment: 'no_show',
+      entry: 'no_show',
+    });
+    const evidence = await pool.query<{ audits: string; receipts: string }>(
+      `SELECT
+        (SELECT count(*)::text FROM audit_events WHERE entity_id=$1 AND action='appointment.no_show') audits,
+        (SELECT count(*)::text FROM appointment_lifecycle_receipts WHERE appointment_id=$1 AND command='no_show') receipts`,
+      [booking.appointment.id],
+    );
+    expect(evidence.rows[0]).toEqual({ audits: '1', receipts: '1' });
+  });
+
+  it('maps consultation completion, records completion time, and retries exactly', async () => {
+    const booking = await book('wu13-complete-book');
+    await checkIn(booking.appointment.id, 'complete');
+    await pool.query(
+      `UPDATE queue_entries
+          SET state='in_consultation', in_consultation_started_at=now()
+        WHERE id=$1`,
+      [booking.entry.id],
+    );
+    const lifecycle = new AppointmentLifecycleService(pool);
+    const input = {
+      command: 'complete_consultation' as const,
+      idempotencyKey: 'wu13-complete',
+      correlationId: 'wu13-complete',
+    };
+
+    const first = await lifecycle.command(
+      scope,
+      ids.session,
+      booking.appointment.id,
+      input,
+    );
+    expect(
+      await lifecycle.command(
+        scope,
+        ids.session,
+        booking.appointment.id,
+        input,
+      ),
+    ).toEqual(first);
+    expect(await pairedState(booking.appointment.id)).toEqual({
+      appointment: 'completed',
+      entry: 'completed',
+      completed_at: expect.any(Date),
+    });
+    const evidence = await pool.query<{ audits: string; receipts: string }>(
+      `SELECT
+        (SELECT count(*)::text FROM audit_events WHERE entity_id=$1 AND action='appointment.complete_consultation') audits,
+        (SELECT count(*)::text FROM appointment_lifecycle_receipts WHERE appointment_id=$1 AND command='complete_consultation') receipts`,
+      [booking.appointment.id],
+    );
+    expect(evidence.rows[0]).toEqual({ audits: '1', receipts: '1' });
+  });
+
+  it('serializes conflicting terminal commands without a mismatched pair', async () => {
+    const booking = await book('wu13-terminal-race-book');
+    await checkIn(booking.appointment.id, 'terminal-race');
+    const lifecycle = new AppointmentLifecycleService(pool);
+    const results = await Promise.allSettled([
+      lifecycle.command(scope, ids.session, booking.appointment.id, {
+        command: 'no_show',
+        reason: 'Verified absence',
+        idempotencyKey: 'wu13-race-no-show',
+        correlationId: 'wu13-race-no-show',
+      }),
+      lifecycle.command(scope, ids.session, booking.appointment.id, {
+        command: 'cancel',
+        reason: 'Concurrent cancellation',
+        idempotencyKey: 'wu13-race-cancel',
+        correlationId: 'wu13-race-cancel',
+      }),
+    ]);
+
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'rejected'),
+    ).toHaveLength(1);
+    const state = await pairedState(booking.appointment.id);
+    expect([
+      { appointment: 'no_show', entry: 'no_show' },
+      { appointment: 'cancelled', entry: 'cancelled' },
+    ]).toContainEqual({ appointment: state.appointment, entry: state.entry });
+  });
+
+  it('rejects stale terminal state and leaves no lifecycle side effects', async () => {
+    const booking = await book('wu13-stale-book');
+    await checkIn(booking.appointment.id, 'stale');
+    await pool.query(`UPDATE queue_entries SET state='completed' WHERE id=$1`, [
+      booking.entry.id,
+    ]);
+
+    await expect(
+      new AppointmentLifecycleService(pool).command(
+        scope,
+        ids.session,
+        booking.appointment.id,
+        {
+          command: 'no_show',
+          reason: 'Stale terminal attempt',
+          idempotencyKey: 'wu13-stale-no-show',
+          correlationId: 'wu13-stale-no-show',
+        },
+      ),
+    ).rejects.toBeInstanceOf(AppointmentConflictError);
+    expect(await pairedState(booking.appointment.id)).toMatchObject({
+      appointment: 'completed',
+      entry: 'completed',
+    });
+    const evidence = await pool.query<{ count: string }>(
+      `SELECT count(*)::text count
+         FROM appointment_lifecycle_receipts
+        WHERE idempotency_key='wu13-stale-no-show'`,
+    );
+    expect(evidence.rows[0]!.count).toBe('0');
+  });
+
+  it('rejects an empty no-show reason before writing lifecycle state', async () => {
+    const booking = await book('wu13-reason-book');
+    await checkIn(booking.appointment.id, 'reason');
+
+    await expect(
+      new AppointmentLifecycleService(pool).command(
+        scope,
+        ids.session,
+        booking.appointment.id,
+        {
+          command: 'no_show',
+          reason: '   ',
+          idempotencyKey: 'wu13-empty-reason',
+          correlationId: 'wu13-empty-reason',
+        },
+      ),
+    ).rejects.toThrow('No-show reason is required');
+    expect(await pairedState(booking.appointment.id)).toMatchObject({
+      appointment: 'checked_in',
+      entry: 'checked_in',
+    });
+    const evidence = await pool.query<{ audits: string; receipts: string }>(
+      `SELECT
+        (SELECT count(*)::text FROM audit_events WHERE entity_id=$1 AND action='appointment.no_show') audits,
+        (SELECT count(*)::text FROM appointment_lifecycle_receipts WHERE appointment_id=$1 AND command='no_show') receipts`,
+      [booking.appointment.id],
+    );
+    expect(evidence.rows[0]).toEqual({ audits: '0', receipts: '0' });
+  });
+
+  it('rolls back tenant and queue-link mismatches without audit or receipts', async () => {
+    const booking = await book('wu13-link-book');
+    await checkIn(booking.appointment.id, 'link');
+    const otherClinic = randomUUID();
+    await pool.query(
+      `INSERT INTO clinics(id,tenant_key,name) VALUES($1,$2,'Other Clinic')`,
+      [otherClinic, `wu13-other-${otherClinic}`],
+    );
+    await pool.query(
+      `INSERT INTO clinic_memberships(clinic_id,user_id,role)
+       VALUES($1,$2,'receptionist')`,
+      [otherClinic, ids.receptionist],
+    );
+    await pool.query(`UPDATE queue_entries SET source='walk_in' WHERE id=$1`, [
+      booking.entry.id,
+    ]);
+    const lifecycle = new AppointmentLifecycleService(pool);
+
+    await expect(
+      lifecycle.command(scope, ids.session, booking.appointment.id, {
+        command: 'no_show',
+        reason: 'Invalid link attempt',
+        idempotencyKey: 'wu13-invalid-link',
+        correlationId: 'wu13-invalid-link',
+      }),
+    ).rejects.toBeInstanceOf(AppointmentConflictError);
+    await expect(
+      lifecycle.command(
+        { ...scope, clinicId: otherClinic },
+        ids.session,
+        booking.appointment.id,
+        {
+          command: 'no_show',
+          reason: 'Wrong tenant attempt',
+          idempotencyKey: 'wu13-wrong-tenant',
+          correlationId: 'wu13-wrong-tenant',
+        },
+      ),
+    ).rejects.toBeInstanceOf(AppointmentConflictError);
+
+    expect(await pairedState(booking.appointment.id)).toMatchObject({
+      appointment: 'checked_in',
+      entry: 'checked_in',
+    });
+    const evidence = await pool.query<{ audits: string; receipts: string }>(
+      `SELECT
+        (SELECT count(*)::text FROM audit_events WHERE entity_id=$1 AND action='appointment.no_show') audits,
+        (SELECT count(*)::text FROM appointment_lifecycle_receipts WHERE appointment_id=$1 AND command='no_show') receipts`,
+      [booking.appointment.id],
+    );
+    expect(evidence.rows[0]).toEqual({ audits: '0', receipts: '0' });
+  });
+});
