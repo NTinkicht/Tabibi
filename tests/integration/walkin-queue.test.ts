@@ -148,14 +148,16 @@ describe('walk-in registration foundation', () => {
       contact_phone: '+213555000001',
       contact_email: 'PatientID@example.dz',
     });
-    const credentialTables = await pool.query<{
-      bearer: string | null;
-      exchange: string | null;
+    const credentialCounts = await pool.query<{
+      bearer: string;
+      exchange: string;
     }>(
-      `SELECT to_regclass('guest_credentials')::text bearer,
-              to_regclass('guest_exchange_ids')::text exchange`,
+      `SELECT
+        (SELECT count(*)::text FROM guest_credentials WHERE queue_entry_id=$1) bearer,
+        (SELECT count(*)::text FROM guest_exchange_ids WHERE queue_entry_id=$1) exchange`,
+      [registration.entry.id],
     );
-    expect(credentialTables.rows[0]).toEqual({ bearer: null, exchange: null });
+    expect(credentialCounts.rows[0]).toEqual({ bearer: '0', exchange: '0' });
   });
 
   it('stores the patient locale selected independently from the staff interface', async () => {
