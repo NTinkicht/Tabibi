@@ -273,9 +273,18 @@ describe('WU14 appointment restore and transfer synchronization', () => {
     await checkIn(transferred.appointment.id, 'wu14-priority-transfer-ci');
     await checkIn(remaining.appointment.id, 'wu14-priority-remain-ci');
     await pool.query(
-      `UPDATE queue_entries SET priority_order=CASE id WHEN $1 THEN 1 ELSE 2 END
+      `UPDATE queue_entries
+          SET priority_order=CASE
+            WHEN id=$1 THEN 1
+            WHEN id=$2 THEN 2
+            ELSE priority_order
+          END
         WHERE id=ANY($3::uuid[])`,
-      [transferred.entry.id, remaining.entry.id, [transferred.entry.id, remaining.entry.id]],
+      [
+        transferred.entry.id,
+        remaining.entry.id,
+        [transferred.entry.id, remaining.entry.id],
+      ],
     );
 
     const result = await new AppointmentRecoveryService(pool).command(
