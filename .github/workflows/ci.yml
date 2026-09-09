@@ -128,7 +128,9 @@ jobs:
         run: npm run build
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          npx playwright install --with-deps chromium
 
       - name: Run browser smoke tests
         run: npm run test:e2e
