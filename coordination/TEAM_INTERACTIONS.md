@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-09T21:29:01.075243+00:00
+- Last sync: 2026-09-09T21:57:43.226152+00:00
 
 ## Team Room charter
 
@@ -6965,5 +6965,422 @@ review_independence: ChatGPT will be an author of the next head and cannot gate 
 blocker: none.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609001522
+
+---
+
+### 2026-09-09T21:31:48Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-changes-required-remediation-pr124:905a98abf0652df2d4caf2d5bdc6f8dad8a044bd -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #124
+head: 905a98abf0652df2d4caf2d5bdc6f8dad8a044bd
+HANDOFF_TO_IMPLEMENTER — PR #124 exact head `905a98abf0652df2d4caf2d5bdc6f8dad8a044bd` has CHANGES_REQUIRED. Continue the existing canonical branch/PR only; resolve the concrete findings and rerun CI. The orchestrator must reconcile the current implementer lease before any edit.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609033694
+
+---
+
+### 2026-09-09T21:47:04Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr124:01d48ded45ba5bee3bf839064657a723cd6ea1f6 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #124
+head: 01d48ded45ba5bee3bf839064657a723cd6ea1f6
+CI_GREEN_HANDOFF — PR #124 exact head `01d48ded45ba5bee3bf839064657a723cd6ea1f6` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609193832
+
+---
+
+### 2026-09-09T21:49:16Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr124:78f71117ead5ae7bb39a6a0fce26b0ca477477b7 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #124
+head: 78f71117ead5ae7bb39a6a0fce26b0ca477477b7
+CI_GREEN_HANDOFF — PR #124 exact head `78f71117ead5ae7bb39a6a0fce26b0ca477477b7` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609215810
+
+---
+
+### 2026-09-09T21:50:48Z — NTinkicht
+
+HEARTBEAT / WU14 GATE HANDOFF
+actor: chatgpt
+work_stream: Issue #122 / PR #124
+exact_head: `78f71117ead5ae7bb39a6a0fce26b0ca477477b7`
+status: implementation complete; independent gate running
+
+Evidence:
+- stale Codex remediation lease was reclaimed without opening a duplicate stream;
+- all verified Codex/CodeRabbit Major/P1/P2 findings were remediated/reconciled;
+- MicroReview CRITICAL findings were concretely disproven/superseded and resolved;
+- deterministic PostgreSQL recovery coverage now includes restore/restore_and_check_in, exact retries, transfer, priority compaction, target conflict, rollback, stale linkage, tenant rejection, and a real row-lock-barrier transfer-vs-cancellation race;
+- exact-head CI #455 / `34408873113`: Quality/build PASS, PostgreSQL integration PASS, Browser smoke PASS;
+- binding `@coderabbitai full review` requested on exact head in PR comment `5609221624`; CodeRabbit acknowledged with 👀 and is the only remaining merge gate.
+
+No implementation lease is active while exact-head review is running. ChatGPT authored the remediation head and is recused from gating. Merge will use expected-head protection immediately if the independent review returns with no unresolved BLOCKER/MAJOR and owner review policy remains satisfied.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609231527
+
+---
+
+### 2026-09-09T21:51:55Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="124"
+expected_head="78f71117ead5ae7bb39a6a0fce26b0ca477477b7"
+
+echo "== PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,title,state,isDraft,headRefName,headRefOid,baseRefName,mergeable,reviewDecision,url,body
+
+echo "== Expected head =="
+printf '%s\n' "$expected_head"
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,link,workflow
+
+echo "== Changed files =="
+gh pr diff "$pr" --repo "$repo" --name-only
+
+echo "== Existing review threads =="
+gh api "repos/$repo/pulls/$pr/comments?per_page=100" \
+  --jq '.[] | {user:.user.login,commit_id:.commit_id,path:.path,line:.line,body:.body}' || true
+
+echo "== Recent PR discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-30:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+
+echo "== PR patch =="
+gh pr diff "$pr" --repo "$repo" --patch
+
+echo "== Contracts =="
+for file in PRODUCT.md ARCHITECTURE.md SECURITY.md; do
+  echo "--- $file ---"
+  gh api "repos/$repo/contents/$file?ref=$expected_head" --jq '.content' | base64 -d
+done
+
+echo "== Changed-file outlines at expected head =="
+head_sha="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+if [[ "$head_sha" != "$expected_head" ]]; then
+  echo "HEAD_MOVED expected=$expected_head actual=$head_sha"
+  exit 0
+fi
+gh pr diff "$pr" --repo "$repo" --name-only | while IFS= read -r file; do
+  echo "--- $file ---"
+  case "$file" in
+    *.ts|*.tsx|*.js|*.cjs|*.mjs)
+      gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' | base64 -d > "/tmp/$(basename "$file")"
+      ast-grep outline "/tmp/$(basename "$file")" --items all || true
+      ;;
+    *)
+      gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' | base64 -d | sed -n '1,360p'
+      ;;
+  esac
+done
+```
+
+Length of output: 214383
+
+---
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+sha="78f71117ead5ae7bb39a6a0fce26b0ca477477b7"
+
+fetch() {
+  gh api "repos/$repo/contents/$1?ref=$sha" --jq '.content' | base64 -d
+}
+
+echo "== PR head verification =="
+gh pr view 124 --repo "$repo" --json headRefOid,state,mergeable,url
+
+echo "== Appointment recovery: terminal validation and restore =="
+fetch "src/modules/appointment/recovery.ts" | nl -ba | sed -n '285,425p'
+
+echo "== Appointment/queue synchronization migrations =="
+for file in \
+  db/migrations/0009_appointment_booking_foundation.sql \
+  db/migrations/0011_appointment_lifecycle.sql \
+  db/migrations/0012_appointment_lifecycle_terminal_commands.sql \
+  db/migrations/0013_appointment_recovery.sql
+do
+  echo "--- $file ---"
+  fetch "$file" | nl -ba
+done
+
+echo "== Full repository references to appointment/queue state synchronization =="
+gh api "repos/$repo/git/trees/$sha?recursive=1" --jq -r \
+  '.tree[] | select(.type=="blob" and (.path|endswith(".sql") or endswith(".ts"))) | .path' \
+  | while IFS= read -r file; do
+      content="$(fetch "$file")"
+      if grep -qE 'appointment.*status|queue.*state|synchronize.*appointment|restore_and_check_in' <<<"$content"; then
+        echo "--- $file ---"
+        grep -nE -C 4 'appointment.*status|queue.*state|synchronize.*appointment|restore_and_check_in' <<<"$content" || true
+      fi
+    done
+
+echo "== Existing recovery test coverage for mismatched terminal pairs =="
+fetch "tests/integration/appointment-recovery.test.ts" | nl -ba | grep -n -C 8E \
+  'mismatch|mismatched|cancelled|no_show|restore' || true
+```
+
+Length of output: 14757
+
+---
+
+</details>
+
+`@NTinkicht`, **CHANGES_REQUIRED** for PR `#124` at exact head `78f71117ead5ae7bb39a6a0fce26b0ca477477b7`.
+
+CI is green on this exact head. The prior composite-FK, explicit `restore_and_check_in`, target-conflict, and priority-compaction fixes are present.
+
+## MAJOR: Reject mismatched terminal appointment and queue states
+
+`AppointmentRecoveryService.restore()` validates that each record is terminal, but it does not validate that the two terminal states match.
+
+- Line 325 accepts appointment status `cancelled` or `no_show`.
+- Line 329 accepts queue-entry state `cancelled` or `no_show`.
+- The code then restores either combination.
+
+Therefore, these non-canonical pairs can be restored:
+
+- `appointment.status = cancelled` with `entry.state = no_show`
+- `appointment.status = no_show` with `entry.state = cancelled`
+
+This conflicts with the appointment-to-queue synchronization contract in `ARCHITECTURE.md`. Recovery must reject stale or non-canonical linked pairs. It must not convert inconsistent terminal history into a new active pair.
+
+### Required resolution
+
+Before any restore mutation:
+
+```ts
+if (appointment.status !== entry.state) {
+  throw new AppointmentConflictError(
+    'Appointment and queue entry terminal states are not synchronized',
+  );
+}
+```
+
+Add deterministic PostgreSQL coverage for both mismatched combinations. Each test must verify:
+
+- `AppointmentConflictError` is returned.
+- The appointment and queue entry remain unchanged.
+- No audit event is inserted.
+- No `appointment_recovery_receipts` row is inserted.
+
+No other new BLOCKER or MAJOR finding was identified in this full review. Merge must remain blocked until this finding is resolved on a new exact head and that head completes CI and review.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="124"
+expected_head="78f71117ead5ae7bb39a6a0fce26b0ca477477b7"
+
+echo "== PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,title,state,isDraft,headRefName,headRefOid,baseRefName,mergeable,reviewDecision,url,body
+
+echo "== Expected head =="
+printf '%s\n' "$expected_head"
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,link,workflow
+
+echo "== Changed files =="
+gh pr diff "$pr" --repo "$repo" --name-only
+
+echo "== Existing review threads =="
+gh api "repos/$repo/pulls/$pr/comments?per_page=100" \
+  --jq '.[] | {user:.user.login,commit_id:.commit_id,path:.path,line:.line,body:.body}' || true
+
+echo "== Recent PR discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-30:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+
+echo "== PR patch =="
+gh pr diff "$pr" --repo "$repo" --patch
+
+echo "== Contracts =="
+for file in PRODUCT.md ARCHITECTURE.md SECURITY.md; do
+  echo "--- $file ---"
+  gh api "repos/$repo/contents/$file?ref=$expected_head" --jq '.content' | base64 -d
+done
+
+echo "== Changed-file outlines at expected head =="
+head_sha="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+if [[ "$head_sha" != "$expected_head" ]]; then
+  echo "HEAD_MOVED expected=$expected_head actual=$head_sha"
+  exit 0
+fi
+gh pr diff "$pr" --repo "$repo" --name-only | while IFS= read -r file; do
+  echo "--- $file ---"
+  case "$file" in
+    *.ts|*.tsx|*.js|*.cjs|*.mjs)
+      gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' | base64 -d > "/tmp/$(basename "$file")"
+      ast-grep outline "/tmp/$(basename "$file")" --items all || true
+      ;;
+    *)
+      gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' | base64 -d | sed -n '1,360p'
+      ;;
+  esac
+done
+```
+
+Length of output: 214383
+
+---
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+sha="78f71117ead5ae7bb39a6a0fce26b0ca477477b7"
+
+fetch() {
+  gh api "repos/$repo/contents/$1?ref=$sha" --jq '.content' | base64 -d
+}
+
+echo "== PR head verification =="
+gh pr view 124 --repo "$repo" --json headRefOid,state,mergeable,url
+
+echo "== Appointment recovery: terminal validation and restore =="
+fetch "src/modules/appointment/recovery.ts" | nl -ba | sed -n '285,425p'
+
+echo "== Appointment/queue synchronization migrations =="
+for file in \
+  db/migrations/0009_appointment_booking_foundation.sql \
+  db/migrations/0011_appointment_lifecycle.sql \
+  db/migrations/0012_appointment_lifecycle_terminal_commands.sql \
+  db/migrations/0013_appointment_recovery.sql
+do
+  echo "--- $file ---"
+  fetch "$file" | nl -ba
+done
+
+echo "== Full repository references to appointment/queue state synchronization =="
+gh api "repos/$repo/git/trees/$sha?recursive=1" --jq -r \
+  '.tree[] | select(.type=="blob" and (.path|endswith(".sql") or endswith(".ts"))) | .path' \
+  | while IFS= read -r file; do
+      content="$(fetch "$file")"
+      if grep -qE 'appointment.*status|queue.*state|synchronize.*appointment|restore_and_check_in' <<<"$content"; then
+        echo "--- $file ---"
+        grep -nE -C 4 'appointment.*status|queue.*state|synchronize.*appointment|restore_and_check_in' <<<"$content" || true
+      fi
+    done
+
+echo "== Existing recovery test coverage for mismatched terminal pairs =="
+fetch "tests/integration/appointment-recovery.test.ts" | nl -ba | grep -n -C 8E \
+  'mismatch|mismatched|cancelled|no_show|restore' || true
+```
+
+Length of output: 14757
+
+---
+
+</details>
+
+`@NTinkicht`, **CHANGES_REQUIRED** for PR `#124` at exact head `78f71117ead5ae7bb39a6a0fce26b0ca477477b7`.
+
+CI is green on this exact head. The prior composite-FK, explicit `restore_and_check_in`, target-conflict, and priority-compaction fixes are present.
+
+## MAJOR: Reject mismatched terminal appointment and queue states
+
+`AppointmentRecoveryService.restore()` validates that each record is terminal, but it does not validate that the two terminal states match.
+
+- Line 325 accepts appointment status `cancelled` or `no_show`.
+- Line 329 accepts queue-entry state `cancelled` or `no_show`.
+- The code then restores either combination.
+
+Therefore, these non-canonical pairs can be restored:
+
+- `appointment.status = cancelled` with `entry.state = no_show`
+- `appointment.status = no_show` with `entry.state = cancelled`
+
+This conflicts with the appointment-to-queue synchronization contract in `ARCHITECTURE.md`. Recovery must reject stale or non-canonical linked pairs. It must not convert inconsistent terminal history into a new active pair.
+
+### Required resolution
+
+Before any restore mutation:
+
+```ts
+if (appointment.status !== entry.state) {
+  throw new AppointmentConflictError(
+    'Appointment and queue entry terminal states are not synchronized',
+  );
+}
+```
+
+Add deterministic PostgreSQL coverage for both mismatched combinations. Each test must verify:
+
+- `AppointmentConflictError` is returned.
+- The appointment and queue entry remain unchanged.
+- No audit event is inserted.
+- No `appointment_recovery_receipts` row is inserted.
+
+No other new BLOCKER or MAJOR finding was identified in this full review. Merge must remain blocked until this finding is resolved on a new exact head and that head completes CI and review.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609242582
+
+---
+
+### 2026-09-09T21:57:33Z — NTinkicht
+
+CHECKPOINT — WU14 exact-head full review found one binding Major
+actor: chatgpt
+role: CTO/orchestrator + current remediation failover implementer
+canonical stream: Issue #122 / PR #124 / `wu14-appointment-restore-transfer`
+
+Live evidence:
+- current head `78f71117ead5ae7bb39a6a0fce26b0ca477477b7`;
+- exact-head CI #455 / `34408873113` is fully green;
+- CodeRabbit completed the requested full review on that exact head and found one new **Major**: restore independently accepts terminal appointment and queue states without requiring the canonical pair to match, so crossed `cancelled`/`no_show` states could be restored instead of rejected;
+- all earlier CodeRabbit Major/P1/P2 findings are fixed/reconciled; prior MicroReview CRITICAL findings are resolved/disproven on current code; remaining MicroReview warnings are below the owner's mandatory Medium+ threshold.
+
+Lease/capacity reconciliation:
+- control room #17 still records `codex.general=limited` with no later `CAPACITY_RECOVERED` artifact;
+- prior Codex remediation dispatch was superseded before duplicate work began;
+- ChatGPT now owns remediation on the SAME canonical PR/branch; Copilot remains read-only/non-author; Gemini remains paused.
+
+Action recorded on Issue #122: require exact terminal-state match before restore mutation, deterministic PostgreSQL tests for both crossed permutations with zero side effects, fresh exact-head CI, then a new `@coderabbitai full review`.
+
+Merge is correctly blocked until that remediation lands and every Medium+/Major+ reviewer obligation is clear.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609300768
 
 ---
