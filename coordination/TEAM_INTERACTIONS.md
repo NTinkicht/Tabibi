@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-08T23:11:35.875803+00:00
+- Last sync: 2026-09-09T01:04:32.899257+00:00
 
 ## Team Room charter
 
@@ -5809,5 +5809,43 @@ CHECKPOINT — WU12 implementation lease reconciled
 No open PRs remain after #112 merged. Copilot's WU12 implementation assignment produced no repository/test/checkpoint artifact inside the 30-minute active-work window, so it has been released rather than carried as phantom progress. One bounded Codex recovery/implementation attempt is dispatched on Issue #113; it becomes real capacity only when observable evidence lands. Claude stays independent for architecture/security/adversarial review when eligible; Gemini Chat/Agent remain paused.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5593134951
+
+---
+
+### 2026-09-09T00:07:48Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=work_unit_10_merge_ready
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 2128 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5593683999
+
+---
+
+### 2026-09-09T01:04:22Z — NTinkicht
+
+CHECKPOINT — WU12 remediation is repository-backed
+
+actor: chatgpt
+role: emergency bounded remediator + CTO/orchestrator
+work_stream: Issue #113 / PR #114
+
+The prior WU12 implementation lane was stale with no artifact, while Codex remains concretely code-review LIMITED. ChatGPT failed over onto the existing canonical branch only and produced two remediation commits. Current exact head is `88b121732ca2cdbcd1baa105e48634e4c3eaf6b4`.
+
+What changed:
+- appointment lifecycle now explicitly transitions the locked appointment row inside the same transaction as the linked queue transition;
+- cancel/check-in race coverage no longer assumes a fixed commit order and instead verifies valid final appointment↔queue invariants;
+- formatting was repaired.
+
+Fresh exact-head CI run `34297542197` is in progress. Formatting and lint have already passed; PostgreSQL integration, remaining quality/build, and browser smoke are still running. ChatGPT is now an author and cannot gate this SHA. Codex is not being re-probed while LIMITED; Claude remains preserved as an independent gate if concrete capacity appears, otherwise the recorded CodeRabbit non-author gate applies.
+
+No merge until exact-head CI is fully green and a fresh independent exact-SHA gate clears all BLOCKER/MAJOR findings.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5594165488
 
 ---
