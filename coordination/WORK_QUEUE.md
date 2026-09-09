@@ -4,38 +4,38 @@ This is the human-readable work marketplace for available engineering capacity. 
 
 Status values: `ACTIVE`, `READY`, `BLOCKED`, `DONE`, `CANCELLED`.
 
-## Current company round — post-WU12 reconciliation
+## Current company round — WU14 active
 
-WU12 / Issue #113 / PR #114 is merged and complete. PR #115 is the canonical coordination-only reconciliation PR; there is no active product implementation lease.
+WU13 / Issue #120 / PR #121 is merged and complete. The reviewed exact head was `dfe015bd83d16e8924f5bfe649cf7394525b2c59`; latest exact-head CI run #437 (`34392789350`) passed Quality/build, PostgreSQL integration, and Browser smoke. MicroReview exact-head risk 16/100 (MEDIUM) was technically adjudicated as non-blocking under the owner-approved WU13-only substitution, and PR #121 merged with expected-head protection as main commit `4fcc15337fbfa41029ae7e7ce82469d0259ace96`.
 
-The previous WU9/WU10 coordination entries are stale and retired. Do not resurrect their implementation leases.
-
-The immediate canonical work is bounded architecture/backlog reconciliation against current `main`: select the smallest dependency-ready slice after appointment lifecycle synchronization, create its issue/acceptance contract, and only then assign one implementation lease.
+The canonical product stream is now WU14 / Issue #122 — appointment restore and transfer re-link synchronization. The implementation contract and deterministic PostgreSQL QA matrix are already published on Issue #122. Exactly one production implementation lease is active.
 
 | Task ID | Status | Preferred actor | Scope | Expected artifact | Code allowed? |
 | --- | --- | --- | --- | --- | --- |
-| POST-WU12-ARCH-001 | ACTIVE | chatgpt | Reconcile current main, epics and dependencies; define next smallest bounded product work unit | New issue with explicit scope/exclusions/acceptance | No application edits |
-| POST-WU12-IMPLEMENT-001 | BLOCKED | unassigned | Implement the next work unit after architecture contract exists | One canonical branch/PR + tests | Yes, after explicit lease only |
-| POST-WU12-GATE-001 | BLOCKED | CodeRabbit | Binding independent exact-head gate while Codex and Claude are unavailable or limited | Full review on exact head; no unresolved BLOCKER/MAJOR | Review only |
-| POST-WU12-MERGE-001 | BLOCKED | chatgpt | Mechanical expected-head merge only after unchanged exact head has green required CI and the binding CodeRabbit gate is clean | Merge + state reconciliation | Merge only |
+| WU14-IMPLEMENT-001 | ACTIVE | Codex | Implement Issue #122 restore + transfer appointment/queue re-link synchronization on one canonical branch/PR | Repository-backed commit + canonical PR + focused tests | Yes |
+| WU14-QA-001 | ACTIVE | Copilot | Complementary deterministic PostgreSQL QA/test automation against the published WU14 contract; do not duplicate production implementation | Test design/evidence and, only when explicitly safe, test-only artifacts | Test-only by explicit lease |
+| WU14-GATE-001 | BLOCKED | Claude or Copilot Code Review, non-author only | Independent exact-SHA correctness/concurrency/data-integrity gate after required CI is green | PASS / PASS_WITH_MINOR_FINDINGS / MERGE_READY or concrete findings | Review only |
+| WU14-MERGE-001 | BLOCKED | ChatGPT | Mechanical expected-head merge only after unchanged exact head has green required CI and an eligible independent non-author gate | Merge + state reconciliation + retro | Merge only |
+| POST-WU13-GOV-001 | READY | ChatGPT | Evaluate whether MicroReview should become a permanent eligible supplemental or conditional independent gate; update AGENTS.md only through a separately reviewed governance change | Governance issue/decision; no silent generalization from WU13 | No product edits |
 
 ## Current actor status
 
-- **ChatGPT:** ACTIVE — CTO/orchestrator and state reconciler. Owns POST-WU12-ARCH-001; no product-code lease.
-- **Copilot:** AVAILABLE/UNASSIGNED — primary QA/Test Automation and bounded implementation/integration when explicitly leased. No current product or gate lease.
-- **Codex:** LIMITED/UNASSIGNED — no current lease; do not depend on implementation, review, or merge capacity until concrete recovery evidence appears.
-- **Claude:** LIMITED/UNASSIGNED — no current lease; optional architecture/security/adversarial review only if concrete capacity returns.
-- **CodeRabbit:** BINDING INDEPENDENT GATE — required on the exact PR head while Codex and Claude remain unavailable or limited.
+- **ChatGPT:** ACTIVE — CTO/orchestrator, architecture, state reconciliation, and mechanical merge control. No WU14 product implementation lease.
+- **Codex:** ACTIVE — sole WU14 production implementer. Recent repository-read/review activity is concrete; first production proof must be a repository-backed commit/PR/test artifact or a precise capability failure.
+- **Copilot:** ACTIVE/COMPLEMENTARY — WU14 QA/Test Automation. Eligible as final exact-head gate only if it did not author/materially modify that exact head.
+- **Claude:** LIMITED/UNASSIGNED — preferred adversarial reviewer/gate if concrete capacity returns and it is non-author.
+- **CodeRabbit:** SUPPLEMENTAL ONLY — never binding under the current owner policy.
+- **MicroReview:** SUPPLEMENTAL pending separate governance decision. The WU13 owner substitution was PR-scoped and does not automatically apply to WU14.
 - **Gemini Agent:** PAUSED/OFF-ROSTER by owner decision.
 - **Gemini Chat:** PAUSED/OFF-ROSTER by owner decision.
 
 ## Binding delivery rules
 
-- Exactly one canonical PR and one active implementer lease per work stream.
-- An assignment is not evidence of progress: require heartbeat/checkpoint, commit, PR, CI, review artifact, or a visibly running deterministic job.
-- A claimed active lease without observable progress for 30 minutes is stale unless a deterministic job is visibly progressing.
-- While Codex and Claude are unavailable or limited, the binding merge rule is: required exact-head CI green + CodeRabbit coverage of that exact head + no unresolved CodeRabbit BLOCKER/MAJOR findings.
-- This temporary gate assignment is the owner's current operating directive for the limited-capacity period and must not be silently overridden by stale coordination text.
-- `@coderabbitai review` is incremental. When the latest commit was already reviewed but the entire PR must be re-evaluated, use `@coderabbitai full review`.
+- Exactly one canonical PR and one active implementer lease per product work stream.
+- Assignment is not progress: require heartbeat/checkpoint, repository-backed commit/PR, CI, review artifact, or a visibly running deterministic job.
+- An active lease with no observable progress for 30 minutes is stale unless a deterministic job is visibly progressing.
+- Required exact-head CI is always binding.
+- Final merge requires an eligible independent non-author exact-SHA gate under `AGENTS.md`; authoring/materially modifying the exact head makes that actor ineligible to self-gate it.
+- CodeRabbit remains supplemental only. MicroReview is not generalized as a permanent gate until a separately reviewed governance decision changes `AGENTS.md`.
 - ChatGPT may execute the mechanical expected-head merge after all binding gates pass.
 - Gemini Agent and Gemini Chat remain paused until the owner explicitly re-enables them.
