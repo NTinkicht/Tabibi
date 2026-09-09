@@ -1,13 +1,13 @@
 {
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
-  "round": 35,
-  "state": "post_wu12_architecture_reconciliation",
-  "current_pr": 115,
-  "current_issue": null,
+  "round": 36,
+  "state": "wu14_active",
+  "current_pr": null,
+  "current_issue": 122,
   "last_actor": "chatgpt",
-  "next_actor": "chatgpt",
-  "next_action": "Complete PR #115 coordination reconciliation, then define the smallest dependency-ready post-WU12 product work unit before opening exactly one implementation lease.",
+  "next_actor": "codex",
+  "next_action": "Implement WU14 on exactly one canonical branch and PR from current main; first acceptable progress is a repository-backed commit/PR/test artifact or a precise capability failure.",
   "operating_model": "four-active-actor-mesh-v7-copilot-qa-gemini-paused-role-failover-with-heartbeats-retrospectives",
   "binding_protocols": [
     "AGENTS.md",
@@ -20,8 +20,8 @@
     "issue": 21,
     "heartbeat_target_minutes": 15,
     "stale_active_lease_minutes": 30,
-    "active_actors": ["chatgpt", "copilot"],
-    "limited_actors": ["codex", "claude"],
+    "active_actors": ["chatgpt", "codex", "copilot"],
+    "limited_actors": ["claude"],
     "paused_actors": {
       "gemini_agent": "paused by owner decision; do not invoke until explicit re-activation",
       "gemini_chat": "paused by owner decision; do not invoke until explicit re-activation"
@@ -33,26 +33,26 @@
         "orchestration": "available",
         "architecture": "available",
         "implementation": "available",
-        "review": "available",
+        "review": "available_when_non_author",
         "merge_execution": "available"
       },
-      "current_activity": "CTO/orchestrator; post-WU12 state reconciliation and next-work architecture; no product implementation lease."
+      "current_activity": "CTO/orchestrator and merge control for WU14; not the WU14 production implementer."
     },
     "codex": {
       "capability_status": {
-        "implementation": "limited",
-        "ci_remediation": "limited",
-        "merge_execution": "limited",
-        "review": "limited"
+        "implementation": "available_pending_repository_artifact",
+        "ci_remediation": "available",
+        "merge_execution": "available",
+        "review": "available_when_non_author"
       },
-      "current_activity": "unassigned; do not depend on capacity until concrete recovery evidence appears."
+      "current_activity": "sole WU14 implementation lease; must produce one canonical repository-backed branch/PR artifact or report precise capability degradation."
     },
     "claude": {
       "capability_status": {
         "review": "limited",
         "adversarial_security_review": "limited"
       },
-      "current_activity": "unassigned; optional independent architecture/security/adversarial review if concrete capacity returns."
+      "current_activity": "preferred independent adversarial gate if concrete capacity returns and Claude is non-author."
     },
     "copilot": {
       "capability_status": {
@@ -60,14 +60,19 @@
         "implementation": "available",
         "review": "available_when_non_author"
       },
-      "current_activity": "available/unassigned; primary QA/Test Automation and bounded implementation/integration when explicitly leased. No current product or gate lease."
+      "current_activity": "complementary WU14 QA/Test Automation lane and eligible exact-head Code Review only if non-author."
     },
     "coderabbit": {
       "capability_status": {
         "review": "available"
       },
-      "current_activity": "binding independent exact-head PR gate while Codex and Claude are unavailable or limited.",
-      "full_review_command": "@coderabbitai full review"
+      "current_activity": "supplemental review evidence only; never binding under current owner policy."
+    },
+    "microreview": {
+      "capability_status": {
+        "review": "available"
+      },
+      "current_activity": "supplemental for future PRs pending a separate governance decision; WU13-specific owner substitution is complete and not generalized."
     },
     "gemini_agent": {
       "capability_status": {
@@ -88,36 +93,36 @@
       "status": "active"
     },
     "implementer": {
-      "actor": null,
-      "status": "unassigned",
-      "note": "No product implementation lease until the next work-unit contract is created."
+      "actor": "codex",
+      "status": "active",
+      "note": "Exactly one WU14 production stream; no competing branch or PR."
     },
     "gating_reviewer": {
-      "actor": "coderabbit",
-      "status": "binding_when_pr_present",
-      "note": "Required exact-head gate while Codex and Claude remain unavailable or limited; no unresolved BLOCKER/MAJOR findings may remain."
+      "actor": "claude_or_copilot_non_author",
+      "status": "reserved_for_exact_head",
+      "note": "Use one eligible independent non-author exact-SHA gate after required CI is green; preserve reviewer independence from the eventual WU14 authors."
     },
     "secondary_verifier": {
-      "actor": null,
-      "status": "not_assigned"
+      "actor": "copilot",
+      "status": "qa_active_non_conflicting"
     },
     "merge_executor": {
       "actor": "chatgpt",
       "status": "mechanical_after_gates",
-      "note": "Use expected-head protection and merge only after required exact-head CI is green and the binding CodeRabbit gate is clean."
+      "note": "Use expected-head protection only after required exact-head CI is green and an eligible independent non-author gate is clear."
     }
   },
   "current_work": {
-    "id": "POST-WU12-ARCH-001",
+    "id": "WU14-IMPLEMENT-001",
     "status": "active",
-    "actor": "chatgpt",
-    "scope": "Reconcile current main, epics and dependencies and define the next smallest bounded product work unit."
+    "actor": "codex",
+    "scope": "Issue #122 appointment restore and transfer re-link synchronization, exactly within the published contract and exclusions."
   },
   "next_work": {
-    "id": "POST-WU12-IMPLEMENT-001",
-    "status": "blocked_pending_contract",
-    "actor": null,
-    "scope": "Exactly one canonical implementation lease after the architecture contract exists."
+    "id": "WU14-GATE-001",
+    "status": "blocked_pending_implementation_and_ci",
+    "actor": "claude_or_copilot_non_author",
+    "scope": "Independent exact-head correctness/concurrency/data-integrity gate after green required CI."
   },
   "product_architect": "chatgpt",
   "deterministic_referee": "ci",
