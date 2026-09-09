@@ -382,6 +382,12 @@ describe('WU13 appointment terminal lifecycle synchronization', () => {
   it('rejects stale terminal state and leaves no lifecycle side effects', async () => {
     const booking = await book('wu13-stale-book');
     await checkIn(booking.appointment.id, 'stale');
+    await pool.query(
+      `UPDATE queue_entries
+          SET state='in_consultation', in_consultation_started_at=now()
+        WHERE id=$1`,
+      [booking.entry.id],
+    );
     await pool.query(`UPDATE queue_entries SET state='completed' WHERE id=$1`, [
       booking.entry.id,
     ]);
