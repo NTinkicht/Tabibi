@@ -14,18 +14,21 @@ test('mobile Arabic queue view reloads safely after a stale reorder conflict and
   const doctorUserId = randomUUID();
   const doctorId = randomUUID();
   const sessionId = randomUUID();
+  const receptionSubject = `browser-queue-reception-${userId}`;
+  const doctorSubject = `browser-queue-doctor-${doctorUserId}`;
+  const tenantKey = `browser-queue-clinic-${clinicId}`;
 
   let stalePage: Page | undefined;
   try {
     await pool.query(
       `INSERT INTO users(id,auth_subject,display_name) VALUES
-        ($1,'browser-queue-reception','Reception'),
-        ($2,'browser-queue-doctor','Doctor')`,
-      [userId, doctorUserId],
+        ($1,$3,'Reception'),
+        ($2,$4,'Doctor')`,
+      [userId, doctorUserId, receptionSubject, doctorSubject],
     );
     await pool.query(
-      `INSERT INTO clinics(id,tenant_key,name) VALUES($1,'browser-queue-clinic','Browser Queue Clinic')`,
-      [clinicId],
+      `INSERT INTO clinics(id,tenant_key,name) VALUES($1,$2,'Browser Queue Clinic')`,
+      [clinicId, tenantKey],
     );
     await pool.query(
       `INSERT INTO clinic_memberships(clinic_id,user_id,role) VALUES
@@ -81,7 +84,7 @@ test('mobile Arabic queue view reloads safely after a stale reorder conflict and
       {
         name: 'tabibi_staff_session',
         value: createStaffSessionToken(
-          'browser-queue-reception',
+          receptionSubject,
           new Date(Date.now() + 60_000),
         ),
         url: 'http://127.0.0.1:3000',
