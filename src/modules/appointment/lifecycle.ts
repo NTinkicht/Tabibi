@@ -210,6 +210,17 @@ export class AppointmentLifecycleService {
 
       const targetState: AppointmentQueueState =
         input.command === 'check_in' ? 'checked_in' : 'cancelled';
+      const targetStatus: AppointmentStatus =
+        input.command === 'check_in' ? 'checked_in' : 'cancelled';
+
+      await client.query(
+        `UPDATE appointments
+            SET status=$3::appointment_status,
+                updated_at=now()
+          WHERE id=$1 AND clinic_id=$2`,
+        [appointment.id, scope.clinicId, targetStatus],
+      );
+
       await client.query(
         `UPDATE queue_entries
             SET state=$4::queue_entry_status,
