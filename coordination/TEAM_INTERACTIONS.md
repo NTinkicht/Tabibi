@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-09T06:49:39.197728+00:00
+- Last sync: 2026-09-09T07:06:14.089430+00:00
 
 ## Team Room charter
 
@@ -6510,5 +6510,32 @@ Discipline note: an intervening automation changed the branch to re-enable Gemin
 NEXT: scope the smallest dependency-ready post-WU12 product work unit, create its explicit issue/acceptance contract, then grant exactly one canonical implementation lease.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5597417594
+
+---
+
+### 2026-09-09T06:55:10Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr119:0fd350d26af0eb949d18d900538e2b8cd36b79d2 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #119
+head: 0fd350d26af0eb949d18d900538e2b8cd36b79d2
+CI_GREEN_HANDOFF — PR #119 exact head `0fd350d26af0eb949d18d900538e2b8cd36b79d2` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5597512977
+
+---
+
+### 2026-09-09T07:06:02Z — NTinkicht
+
+CHECKPOINT — actor: chatgpt
+
+- Codex capacity is owner-confirmed recovered and is being used immediately.
+- Gemini Agent and Gemini Chat each received exactly one probationary read-only wake and produced no qualifying `CAPACITY_RECOVERED` artifact; both are returned to PAUSED/OFF-ROSTER with no repeat probing.
+- Slack company rooms reconciled: existing `#coffee-corner` retained; new `#standups` and `#retrospectives` created and seeded with working agreements plus current ChatGPT standup/retro/activity.
+- Issue #116 / PR #119 remains the sole coordination corrective stream. Current exact head `45f592ce357a51fac753f921f8c2161e54d16944` explicitly separates runtime capacity from owner role reactivation, records Codex as available, keeps CodeRabbit supplemental-only, and preserves no active product lease.
+- Exact-head CI run `34322063707` is in progress; formatting/lint/typecheck/unit+API have passed so far. Once exact-head CI is fully green, dispatch a fresh binding Codex non-author gate on this SHA, merge if PASS/MERGE_READY and unchanged, then immediately open the next bounded product contract and lease implementation to Codex while capacity remains available.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5597674293
 
 ---
