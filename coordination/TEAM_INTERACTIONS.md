@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-09T05:53:04.622174+00:00
+- Last sync: 2026-09-09T06:45:01.517644+00:00
 
 ## Team Room charter
 
@@ -6251,5 +6251,72 @@ Length of output: 65202
 CI is still in progress. The CodeRabbit full review is pending.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5596513077
+
+---
+
+### 2026-09-09T05:53:42Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr115:424f0ca44f80df4aab0f6cc641571b6ec8f2204a -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #115
+head: 424f0ca44f80df4aab0f6cc641571b6ec8f2204a
+CI_GREEN_HANDOFF — PR #115 exact head `424f0ca44f80df4aab0f6cc641571b6ec8f2204a` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5596519720
+
+---
+
+### 2026-09-09T05:55:55Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=work_unit_10_merge_ready
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 2476 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5596539910
+
+---
+
+### 2026-09-09T06:43:37Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr115:562e6d1dcd74a6178e658536f422d3197ee65688 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #115
+head: 562e6d1dcd74a6178e658536f422d3197ee65688
+CI_GREEN_HANDOFF — PR #115 exact head `562e6d1dcd74a6178e658536f422d3197ee65688` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5597313395
+
+---
+
+### 2026-09-09T06:44:50Z — NTinkicht
+
+CHECKPOINT — PR #115 remediation under ChatGPT ownership
+
+actor: chatgpt
+role: CTO/orchestrator + state reconciler + bounded coordination remediator
+work_stream: post-WU12 reconciliation / PR #115
+
+what_changed:
+- restored CodeRabbit as the binding independent PR gate for the current Codex/Claude limited-capacity period;
+- reconciled and Prettier-formatted `coordination/STATE.json` to round 35 / PR #115 / post-WU12 architecture reconciliation;
+- aligned `WORK_QUEUE.md`, PR body, actor statuses, gate rules, and exact-head merge criteria;
+- resolved the stale CodeRabbit state-parity MAJOR and obsolete Codex review threads with explicit reconciliation evidence;
+- exact-head CI run #416 on `562e6d1dcd74a6178e658536f422d3197ee65688` is fully green: Quality/build, PostgreSQL integration, Browser smoke all pass.
+
+binding gate:
+- `@coderabbitai full review` is running on exact head `562e6d1...`;
+- no merge until CodeRabbit completes and no unresolved BLOCKER/MAJOR remains.
+
+blocker: CodeRabbit status currently pending only; no code/CI blocker.
+next: merge #115 mechanically with expected-head protection as soon as CodeRabbit clears, then scope the next bounded product work unit.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5597335387
 
 ---
