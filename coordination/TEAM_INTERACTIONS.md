@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-09T20:38:21.143422+00:00
+- Last sync: 2026-09-09T20:39:13.089049+00:00
 
 ## Team Room charter
 
@@ -6932,5 +6932,21 @@ The active Codex lease had no visible progress for >30 minutes and no determinis
 next_checkpoint: Codex remediation commit/test artifact or precise capacity failure. New head must rerun required CI; only after green exact-head CI dispatch one eligible non-author Copilot/Claude binding gate. CodeRabbit/MicroReview remain supplemental under current governance.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5608392344
+
+---
+
+### 2026-09-09T20:39:03Z — NTinkicht
+
+HEARTBEAT
+actor: codex
+role: implementer
+work_stream: WU14 / PR #124
+status: active
+current_action: remediate verified restore/transfer findings on canonical head 4cc1d8a
+last_artifact: PR #124 exact head 4cc1d8a
+next_checkpoint: committed remediation plus focused PostgreSQL tests
+blocker: none
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5608404627
 
 ---
