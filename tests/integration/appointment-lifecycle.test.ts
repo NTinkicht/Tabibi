@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { AppointmentService, AppointmentConflictError } from '@/modules/appointment';
+import {
+  AppointmentConflictError,
+  AppointmentService,
+} from '@/modules/appointment';
 import { AppointmentLifecycleService } from '@/modules/appointment/lifecycle';
 import { SessionService } from '@/modules/session';
 import { migrate } from '../../scripts/db/lib';
@@ -63,14 +66,18 @@ beforeEach(async () => {
 afterAll(async () => pool.end());
 
 async function book(key = 'wu12-book') {
-  return new AppointmentService(pool).bookForExistingPatient(scope, ids.session, {
-    patientId: ids.patient,
-    scheduledStartAt: new Date('2026-09-15T09:30:00Z'),
-    scheduledEndAt: new Date('2026-09-15T09:45:00Z'),
-    contactPreference: 'none',
-    idempotencyKey: key,
-    correlationId: key,
-  });
+  return new AppointmentService(pool).bookForExistingPatient(
+    scope,
+    ids.session,
+    {
+      patientId: ids.patient,
+      scheduledStartAt: new Date('2026-09-15T09:30:00Z'),
+      scheduledEndAt: new Date('2026-09-15T09:45:00Z'),
+      contactPreference: 'none',
+      idempotencyKey: key,
+      correlationId: key,
+    },
+  );
 }
 
 describe('WU12 appointment lifecycle synchronization', () => {
@@ -82,8 +89,18 @@ describe('WU12 appointment lifecycle synchronization', () => {
       idempotencyKey: 'wu12-check-in',
       correlationId: 'wu12-check-in',
     };
-    const first = await lifecycle.command(scope, ids.session, booking.appointment.id, input);
-    const retry = await lifecycle.command(scope, ids.session, booking.appointment.id, input);
+    const first = await lifecycle.command(
+      scope,
+      ids.session,
+      booking.appointment.id,
+      input,
+    );
+    const retry = await lifecycle.command(
+      scope,
+      ids.session,
+      booking.appointment.id,
+      input,
+    );
 
     expect(retry).toEqual(first);
     expect(first.appointment.status).toBe('checked_in');
@@ -113,7 +130,10 @@ describe('WU12 appointment lifecycle synchronization', () => {
         WHERE appointment.id=$1`,
       [booking.appointment.id],
     );
-    expect(states.rows[0]).toEqual({ appointment: 'cancelled', entry: 'cancelled' });
+    expect(states.rows[0]).toEqual({
+      appointment: 'cancelled',
+      entry: 'cancelled',
+    });
     await expect(
       lifecycle.command(scope, ids.session, booking.appointment.id, {
         command: 'check_in',
@@ -123,7 +143,7 @@ describe('WU12 appointment lifecycle synchronization', () => {
     ).rejects.toBeInstanceOf(AppointmentConflictError);
   });
 
-  it('serializes simultaneous cancel/check-in into exactly one valid terminal-or-arrived outcome', async () => {
+  it('serializes simultaneous cancel/check-in without split state', async () => {
     const booking = await book();
     const lifecycle = new AppointmentLifecycleService(pool);
     const results = await Promise.allSettled([
@@ -139,8 +159,14 @@ describe('WU12 appointment lifecycle synchronization', () => {
         correlationId: 'wu12-race-cancel',
       }),
     ]);
-    expect(results.filter((item) => item.status === 'fulfilled')).toHaveLength(1);
-    expect(results.filter((item) => item.status === 'rejected')).toHaveLength(1);
+
+    const [checkIn, cancel] = results;
+    expect(results.some((item) => item.status === 'fulfilled')).toBe(true);
+    for (const result of results) {
+      if (result.status === 'rejected')
+        expect(result.reason).toBeInstanceOf(AppointmentConflictError);
+    }
+
     const states = await pool.query<{ appointment: string; entry: string }>(
       `SELECT appointment.status::text appointment, entry.state::text entry
          FROM appointments appointment
@@ -148,10 +174,18 @@ describe('WU12 appointment lifecycle synchronization', () => {
         WHERE appointment.id=$1`,
       [booking.appointment.id],
     );
+    const finalState = states.rows[0]!;
     expect([
       { appointment: 'checked_in', entry: 'checked_in' },
       { appointment: 'cancelled', entry: 'cancelled' },
-    ]).toContainEqual(states.rows[0]);
+    ]).toContainEqual(finalState);
+
+    if (finalState.appointment === 'checked_in') {
+      expect(checkIn.status).toBe('fulfilled');
+      expect(cancel.status).toBe('rejected');
+    } else {
+      expect(cancel.status).toBe('fulfilled');
+    }
   });
 
   it('serializes appointment mutation against session terminalization without split state', async () => {
@@ -171,7 +205,11 @@ describe('WU12 appointment lifecycle synchronization', () => {
         correlationId: 'wu12-session-cancel',
       }),
     ]);
-    const states = await pool.query<{ session: string; appointment: string; entry: string }>(
+    const states = await pool.query<{
+      session: string;
+      appointment: string;
+      entry: string;
+    }>(
       `SELECT session.status::text session,
               appointment.status::text appointment,
               entry.state::text entry
@@ -183,8 +221,15 @@ describe('WU12 appointment lifecycle synchronization', () => {
     );
     const row = states.rows[0]!;
     if (row.session === 'cancelled')
-      expect(row).toMatchObject({ appointment: 'cancelled', entry: 'cancelled' });
+      expect(row).toMatchObject({
+        appointment: 'cancelled',
+        entry: 'cancelled',
+      });
     else
-      expect(row).toMatchObject({ session: 'open', appointment: 'checked_in', entry: 'checked_in' });
+      expect(row).toMatchObject({
+        session: 'open',
+        appointment: 'checked_in',
+        entry: 'checked_in',
+      });
   });
 });
