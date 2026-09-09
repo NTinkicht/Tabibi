@@ -35,6 +35,7 @@ The immediate canonical work is bounded architecture/backlog reconciliation agai
 - An assignment is not evidence of progress: require heartbeat/checkpoint, commit, PR, CI, review artifact, or a visibly running deterministic job.
 - A claimed active lease without observable progress for 30 minutes is stale unless a deterministic job is visibly progressing.
 - While Codex and Claude are unavailable or limited, the binding merge rule is: required exact-head CI green + CodeRabbit coverage of that exact head + no unresolved CodeRabbit BLOCKER/MAJOR findings.
+- This temporary gate assignment is the owner's current operating directive for the limited-capacity period and must not be silently overridden by stale coordination text.
 - `@coderabbitai review` is incremental. When the latest commit was already reviewed but the entire PR must be re-evaluated, use `@coderabbitai full review`.
 - ChatGPT may execute the mechanical expected-head merge after all binding gates pass.
 - Gemini Agent and Gemini Chat remain paused until the owner explicitly re-enables them.
