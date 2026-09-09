@@ -12,7 +12,10 @@ import {
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
 import { inTransaction } from '@/platform/database/transaction';
 
-export type AppointmentRecoveryCommand = 'restore' | 'transfer';
+export type AppointmentRecoveryCommand =
+  | 'restore'
+  | 'restore_and_check_in'
+  | 'transfer';
 
 export interface AppointmentRecoveryInput {
   command: AppointmentRecoveryCommand;
@@ -66,7 +69,7 @@ function normalizeInput(input: AppointmentRecoveryInput) {
     throw new AppointmentValidationError(
       'Target session is required for appointment transfer',
     );
-  if (input.command === 'restore' && targetSessionId)
+  if (input.command !== 'transfer' && targetSessionId)
     throw new AppointmentValidationError(
       'Restore does not accept a target session',
     );
@@ -226,7 +229,11 @@ export class AppointmentRecoveryService {
         lockedSessions.set(id, session);
       }
 
-      const sourceSession = lockedSessions.get(sessionId)!;
+      const sourceSession = lockedSessions.get(sessionId);
+      if (!sourceSession)
+        throw new AppointmentConflictError(
+          'Recovery session was not found in this clinic',
+        );
       if (!['open', 'paused'].includes(sourceSession.status))
         throw new AppointmentConflictError(
           'Appointment recovery requires an open or paused source session',
@@ -271,7 +278,10 @@ export class AppointmentRecoveryService {
           'Appointment queue linkage is stale or invalid',
         );
 
-      if (input.command === 'restore') {
+      if (
+        input.command === 'restore' ||
+        input.command === 'restore_and_check_in'
+      ) {
         return this.restore(
           client,
           scope,
@@ -281,12 +291,23 @@ export class AppointmentRecoveryService {
           requestFingerprint,
         );
       }
+
+      const targetSessionId = input.targetSessionId;
+      if (!targetSessionId)
+        throw new AppointmentValidationError(
+          'Target session is required for appointment transfer',
+        );
+      const targetSession = lockedSessions.get(targetSessionId);
+      if (!targetSession)
+        throw new AppointmentConflictError(
+          'Recovery session was not found in this clinic',
+        );
       return this.transfer(
         client,
         scope,
         appointment,
         sourceEntry,
-        lockedSessions.get(input.targetSessionId!)!,
+        targetSession,
         input,
         requestFingerprint,
       );
@@ -310,21 +331,24 @@ export class AppointmentRecoveryService {
         `Cannot restore linked queue entry in ${entry.state}`,
       );
 
-    const wasEligible = entry.eligibility_order !== null;
+    const restoreAndCheckIn = input.command === 'restore_and_check_in';
     let eligibilityOrder: number | null = null;
-    if (wasEligible) {
+    if (restoreAndCheckIn) {
       const next = await client.query<{ value: string }>(
         `SELECT COALESCE(MAX(eligibility_order),0)+1 AS value
            FROM queue_entries
           WHERE session_id=$1 AND clinic_id=$2`,
         [appointment.session_id, scope.clinicId],
       );
-      eligibilityOrder = Number(next.rows[0]!.value);
+      const row = next.rows[0];
+      if (!row)
+        throw new AppointmentConflictError('Unable to allocate queue order');
+      eligibilityOrder = Number(row.value);
     }
-    const targetQueue: AppointmentQueueState = wasEligible
+    const targetQueue: AppointmentQueueState = restoreAndCheckIn
       ? 'checked_in'
       : 'waiting';
-    const targetAppointment: AppointmentStatus = wasEligible
+    const targetAppointment: AppointmentStatus = restoreAndCheckIn
       ? 'checked_in'
       : 'confirmed';
 
@@ -333,7 +357,6 @@ export class AppointmentRecoveryService {
           SET state=$3::queue_entry_status,
               eligibility_order=$4,
               priority_order=NULL,
-              called_at=NULL,
               in_consultation_started_at=NULL,
               completed_at=NULL,
               updated_at=now()
@@ -358,7 +381,7 @@ export class AppointmentRecoveryService {
       actorUserId: scope.actorUserId,
       entityType: 'appointment',
       entityId: appointment.id,
-      action: 'appointment.restore',
+      action: `appointment.${input.command}`,
       metadata: {
         reason: input.reason,
         sessionId: appointment.session_id,
@@ -384,6 +407,34 @@ export class AppointmentRecoveryService {
     return response;
   }
 
+  private async compactSourcePriority(
+    client: PoolClient,
+    scope: ClinicScope,
+    sessionId: string,
+  ) {
+    const cohort = await client.query<{ id: string }>(
+      `SELECT id
+         FROM queue_entries
+        WHERE session_id=$1 AND clinic_id=$2
+          AND state IN ('waiting','checked_in')
+          AND priority_order IS NOT NULL
+        ORDER BY priority_order, registration_order
+        FOR UPDATE`,
+      [sessionId, scope.clinicId],
+    );
+    const ids = cohort.rows.map((row) => row.id);
+    if (!ids.length) return;
+    await client.query(
+      'UPDATE queue_entries SET priority_order=NULL WHERE id=ANY($1::uuid[])',
+      [ids],
+    );
+    for (let index = 0; index < ids.length; index++)
+      await client.query(
+        'UPDATE queue_entries SET priority_order=$2,updated_at=now() WHERE id=$1',
+        [ids[index], index + 1],
+      );
+  }
+
   private async transfer(
     client: PoolClient,
     scope: ClinicScope,
@@ -393,7 +444,11 @@ export class AppointmentRecoveryService {
     input: ReturnType<typeof normalizeInput>,
     requestFingerprint: string,
   ): Promise<AppointmentBooking> {
-    const targetSessionId = input.targetSessionId!;
+    const targetSessionId = input.targetSessionId;
+    if (!targetSessionId)
+      throw new AppointmentValidationError(
+        'Target session is required for appointment transfer',
+      );
     if (targetSessionId === appointment.session_id)
       throw new AppointmentValidationError(
         'Target session must differ from the source session',
@@ -415,6 +470,23 @@ export class AppointmentRecoveryService {
         `Cannot transfer linked queue entry in ${sourceEntry.state}`,
       );
 
+    const existingTarget = await client.query<{ id: string }>(
+      `SELECT id
+         FROM appointments
+        WHERE clinic_id=$1 AND session_id=$2 AND patient_id=$3 AND id<>$4
+        FOR UPDATE`,
+      [
+        scope.clinicId,
+        targetSessionId,
+        appointment.patient_id,
+        appointment.id,
+      ],
+    );
+    if (existingTarget.rows[0])
+      throw new AppointmentConflictError(
+        'Patient already has an appointment in the target session',
+      );
+
     const targetQueue: AppointmentQueueState =
       sourceEntry.state === 'waiting' ? 'waiting' : 'checked_in';
     const targetAppointment: AppointmentStatus =
@@ -426,6 +498,9 @@ export class AppointmentRecoveryService {
         WHERE session_id=$1 AND clinic_id=$2`,
       [targetSessionId, scope.clinicId],
     );
+    const registrationRow = nextRegistration.rows[0];
+    if (!registrationRow)
+      throw new AppointmentConflictError('Unable to allocate registration order');
     let eligibilityOrder: number | null = null;
     if (targetQueue === 'checked_in') {
       const nextEligibility = await client.query<{ value: string }>(
@@ -434,7 +509,10 @@ export class AppointmentRecoveryService {
           WHERE session_id=$1 AND clinic_id=$2`,
         [targetSessionId, scope.clinicId],
       );
-      eligibilityOrder = Number(nextEligibility.rows[0]!.value);
+      const eligibilityRow = nextEligibility.rows[0];
+      if (!eligibilityRow)
+        throw new AppointmentConflictError('Unable to allocate queue order');
+      eligibilityOrder = Number(eligibilityRow.value);
     }
 
     const targetEntryId = randomUUID();
@@ -444,6 +522,13 @@ export class AppointmentRecoveryService {
         WHERE id=$1 AND clinic_id=$2`,
       [sourceEntry.id, scope.clinicId],
     );
+    if (sourceEntry.priority_order !== null)
+      await this.compactSourcePriority(
+        client,
+        scope,
+        appointment.session_id,
+      );
+
     await client.query(
       `INSERT INTO queue_entries
          (id, clinic_id, session_id, patient_id, state, source,
@@ -455,7 +540,7 @@ export class AppointmentRecoveryService {
         targetSessionId,
         appointment.patient_id,
         targetQueue,
-        Number(nextRegistration.rows[0]!.value),
+        Number(registrationRow.value),
         eligibilityOrder,
       ],
     );
@@ -489,6 +574,7 @@ export class AppointmentRecoveryService {
       action: 'appointment.transfer',
       metadata: {
         reason: input.reason,
+        sourceTerminalCause: 'transfer',
         sourceSessionId: appointment.session_id,
         sourceQueueEntryId: sourceEntry.id,
         targetSessionId,
