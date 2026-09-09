@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-09T18:31:15.953253+00:00
+- Last sync: 2026-09-09T20:38:21.143422+00:00
 
 ## Team Room charter
 
@@ -6788,5 +6788,149 @@ Slack owner command audit: the only `Report Progress` today is already acknowled
 next_action: if Copilot returns eligible PASS/PASS_WITH_MINOR_FINDINGS/MERGE_READY on unchanged `dfe015bd...` with no verified BLOCKER/MAJOR, expected-head merge #121 immediately; then reconcile STATE/WORK_QUEUE/retro and activate WU14 with one canonical implementation lease.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5606811459
+
+---
+
+### 2026-09-09T19:08:25Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr121:4fcc15337fbfa41029ae7e7ce82469d0259ace96 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #121
+head: 4fcc15337fbfa41029ae7e7ce82469d0259ace96
+POST_MERGE_RECONCILE — PR #121 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5607268395
+
+---
+
+### 2026-09-09T19:12:43Z — NTinkicht
+
+CHECKPOINT / RETRO_OPEN — WU13 merged; WU14 activated
+actor: chatgpt
+role: CTO/orchestrator/merge control
+
+WU13 closure evidence:
+- PR #121 exact head `dfe015bd83d16e8924f5bfe649cf7394525b2c59` had required CI run #437 (`34392789350`) fully green across Quality/build, PostgreSQL integration, and Browser smoke;
+- MicroReview independently reviewed that exact head and returned Risk Score 16/100 (MEDIUM). The four warnings were technically adjudicated: three were non-blocking TS/test-style findings (one stale/misclassified on current code), and the lifecycle timing warning was disproved by the `in_consultation` precondition plus migration-0008 timing trigger and DB CHECK rollback invariant;
+- all MicroReview warning threads were answered/resolved; no verified BLOCKER/MAJOR remained;
+- expected-head protected merge succeeded as main commit `4fcc15337fbfa41029ae7e7ce82469d0259ace96`;
+- Issue #120 auto-closed completed.
+
+RETRO_ENTRY:
+worked: keeping exact-head CI binding while adding a genuinely independent reviewer avoided weakening the product gate; MicroReview surfaced one plausible data-integrity hypothesis that was worth checking against schema invariants.
+improve: third-party reviewer installation/trigger behavior was not predictable enough to be a silent permanent dependency, and raw risk labels require mapping to Tabibi severity plus technical adjudication.
+process_change: WU13's MicroReview substitution remains PR-scoped only. Governance Issue #123 now owns the permanent-policy decision; CodeRabbit remains supplemental and Gemini actors remain paused.
+
+Post-merge reconciliation:
+- `coordination/STATE.json` advanced to round 36 / WU14 active;
+- `coordination/WORK_QUEUE.md` advanced to WU14;
+- WU14 Issue #122 is the sole canonical product stream;
+- Codex holds exactly one production implementation lease and must produce repository-backed branch/commit/test/PR evidence or a precise capability failure;
+- Copilot has an independence-preserving READ-ONLY QA lane so it remains eligible for exact-head Code Review if it does not author the head;
+- Claude remains preferred adversarial fallback when concrete capacity returns;
+- there are currently zero open PRs, so assignment is not yet counted as implementation progress.
+
+next_checkpoint: first real Codex repository artifact or explicit capacity failure; then exact-head CI and one eligible independent non-author gate. No duplicate WU14 stream.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5607319694
+
+---
+
+### 2026-09-09T19:30:58Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-changes-required-remediation-pr124:4cc1d8a16fe642e1315887cd13f5b89ccb762791 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #124
+head: 4cc1d8a16fe642e1315887cd13f5b89ccb762791
+HANDOFF_TO_IMPLEMENTER — PR #124 exact head `4cc1d8a16fe642e1315887cd13f5b89ccb762791` has CHANGES_REQUIRED. Continue the existing canonical branch/PR only; resolve the concrete findings and rerun CI. The orchestrator must reconcile the current implementer lease before any edit.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5607554685
+
+---
+
+### 2026-09-09T19:32:29Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr124:4cc1d8a16fe642e1315887cd13f5b89ccb762791 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #124
+head: 4cc1d8a16fe642e1315887cd13f5b89ccb762791
+CI_GREEN_HANDOFF — PR #124 exact head `4cc1d8a16fe642e1315887cd13f5b89ccb762791` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5607574386
+
+---
+
+### 2026-09-09T19:43:28Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 3303 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5607714809
+
+---
+
+### 2026-09-09T19:43:29Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 326 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5607715065
+
+---
+
+### 2026-09-09T19:43:31Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5607715410
+
+---
+
+### 2026-09-09T20:38:09Z — NTinkicht
+
+CHECKPOINT — WU14 PR #124 green but held on verified remediation
+actor: chatgpt
+role: CTO/orchestrator/merge control
+work_stream: Issue #122 / PR #124
+status: remediation_active
+
+Live reconciliation:
+- exactly one canonical WU14 PR exists: #124, branch `wu14-appointment-restore-transfer`, exact head `4cc1d8a16fe642e1315887cd13f5b89ccb762791`, mergeable=true;
+- exact-head CI #443 / `34395494046` is SUCCESS;
+- `STATE.json`/`WORK_QUEUE.md` still describe pre-PR WU14 activation (`current_pr: null`), so live GitHub is authoritative; do not advance main solely for bookkeeping underneath an active product PR;
+- Codex remains the sole production implementer and author-recused from final gating; Copilot remains read-only complementary QA / eligible future non-author gate; Claude remains limited fallback; Gemini actors remain paused.
+
+Review-driven hold:
+- MicroReview's CRITICAL `FROM a` claim is false on current head; `loadBooking` correctly selects from `appointments appointment` joined to `queue_entries`.
+- Verified current defects: restore writes nonexistent `queue_entries.called_at`; ordinary restore incorrectly derives checked-in state from historical eligibility instead of requiring explicit `restore_and_check_in`; transfer does not compact the source priority cohort; recovery receipt FK is not composite tenant-scoped; target-session duplicate appointment can surface as raw uniqueness violation.
+- Earlier migration-chain complaint is superseded by current green exact-head CI unless a remediation migration changes expectations.
+
+The active Codex lease had no visible progress for >30 minutes and no deterministic job was running, so it was reconciled as stale-but-recoverable and re-dispatched on the SAME canonical branch/PR with exact findings in PR comment 5608389354. No competing stream or author change.
+
+next_checkpoint: Codex remediation commit/test artifact or precise capacity failure. New head must rerun required CI; only after green exact-head CI dispatch one eligible non-author Copilot/Claude binding gate. CodeRabbit/MicroReview remain supplemental under current governance.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5608392344
 
 ---
