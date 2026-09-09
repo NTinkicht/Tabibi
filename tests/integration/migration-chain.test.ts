@@ -18,6 +18,7 @@ const committedMigrations = [
   '0010_appointment_booking_constraint_validation.sql',
   '0011_appointment_lifecycle.sql',
   '0012_appointment_lifecycle_terminal_commands.sql',
+  '0013_appointment_recovery.sql',
 ];
 
 beforeAll(async () => {
@@ -56,6 +57,7 @@ describe('committed migration chain', () => {
       eta_timing_idx: string | null;
       appointments: string | null;
       appointment_receipts: string | null;
+      appointment_recovery_receipts: string | null;
       appointment_source_allowed: boolean;
       appointment_entity_allowed: boolean;
       patient_session_uq: string | null;
@@ -84,6 +86,7 @@ describe('committed migration chain', () => {
          to_regclass('queue_entries_session_completed_timing_idx')::text eta_timing_idx,
          to_regclass('appointments')::text appointments,
          to_regclass('appointment_booking_receipts')::text appointment_receipts,
+         to_regclass('appointment_recovery_receipts')::text appointment_recovery_receipts,
          (SELECT pg_get_constraintdef(oid) LIKE '%appointment%'
             FROM pg_constraint
            WHERE conname='queue_entries_source_check') AS appointment_source_allowed,
@@ -112,6 +115,7 @@ describe('committed migration chain', () => {
       eta_timing_idx: 'queue_entries_session_completed_timing_idx',
       appointments: 'appointments',
       appointment_receipts: 'appointment_booking_receipts',
+      appointment_recovery_receipts: 'appointment_recovery_receipts',
       appointment_source_allowed: true,
       appointment_entity_allowed: true,
       patient_session_uq: 'appointments_clinic_session_patient_uq',
