@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-09T21:57:43.226152+00:00
+- Last sync: 2026-09-09T21:58:09.569734+00:00
 
 ## Team Room charter
 
@@ -7382,5 +7382,33 @@ Action recorded on Issue #122: require exact terminal-state match before restore
 Merge is correctly blocked until that remediation lands and every Medium+/Major+ reviewer obligation is clear.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609300768
+
+---
+
+### 2026-09-09T21:57:57Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+`@NTinkicht`, acknowledged.
+
+The remediation plan addresses the Major finding on PR `#124`.
+
+The restore command must reject terminal-state mismatches before it changes any row. The PostgreSQL tests should cover both crossed pairs and confirm that the command creates no audit event or recovery receipt.
+
+PR `#124` must remain blocked until a new exact head has green CI and completes a new `@coderabbitai full review` with no unresolved `BLOCKER` or `MAJOR` findings.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer>`@NTinkicht`, acknowledged.
+
+The remediation plan addresses the Major finding on PR `#124`.
+
+The restore command must reject terminal-state mismatches before it changes any row. The PostgreSQL tests should cover both crossed pairs and confirm that the command creates no audit event or recovery receipt.
+
+PR `#124` must remain blocked until a new exact head has green CI and completes a new `@coderabbitai full review` with no unresolved `BLOCKER` or `MAJOR` findings.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609304547
 
 ---
