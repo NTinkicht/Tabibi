@@ -475,12 +475,7 @@ export class AppointmentRecoveryService {
          FROM appointments
         WHERE clinic_id=$1 AND session_id=$2 AND patient_id=$3 AND id<>$4
         FOR UPDATE`,
-      [
-        scope.clinicId,
-        targetSessionId,
-        appointment.patient_id,
-        appointment.id,
-      ],
+      [scope.clinicId, targetSessionId, appointment.patient_id, appointment.id],
     );
     if (existingTarget.rows[0])
       throw new AppointmentConflictError(
@@ -500,7 +495,9 @@ export class AppointmentRecoveryService {
     );
     const registrationRow = nextRegistration.rows[0];
     if (!registrationRow)
-      throw new AppointmentConflictError('Unable to allocate registration order');
+      throw new AppointmentConflictError(
+        'Unable to allocate registration order',
+      );
     let eligibilityOrder: number | null = null;
     if (targetQueue === 'checked_in') {
       const nextEligibility = await client.query<{ value: string }>(
@@ -523,11 +520,7 @@ export class AppointmentRecoveryService {
       [sourceEntry.id, scope.clinicId],
     );
     if (sourceEntry.priority_order !== null)
-      await this.compactSourcePriority(
-        client,
-        scope,
-        appointment.session_id,
-      );
+      await this.compactSourcePriority(client, scope, appointment.session_id);
 
     await client.query(
       `INSERT INTO queue_entries

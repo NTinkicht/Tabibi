@@ -195,7 +195,11 @@ describe('WU14 appointment restore and transfer synchronization', () => {
       'wu14-tail-book',
     );
     await checkIn(first.appointment.id, 'wu14-tail-check-in');
-    const booking = await book(ids.patient, ids.sourceSession, 'wu14-raci-book');
+    const booking = await book(
+      ids.patient,
+      ids.sourceSession,
+      'wu14-raci-book',
+    );
     await checkIn(booking.appointment.id, 'wu14-raci-check-in');
     await new AppointmentLifecycleService(pool).command(
       scope,
@@ -343,7 +347,9 @@ describe('WU14 appointment restore and transfer synchronization', () => {
           correlationId: 'wu14-target-conflict',
         },
       ),
-    ).rejects.toThrow('Patient already has an appointment in the target session');
+    ).rejects.toThrow(
+      'Patient already has an appointment in the target session',
+    );
     expect(await pairedState(source.appointment.id)).toMatchObject({
       session_id: ids.sourceSession,
       queue_entry_id: source.entry.id,
