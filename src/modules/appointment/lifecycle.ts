@@ -32,6 +32,8 @@ function normalizeInput(input: AppointmentLifecycleInput) {
     );
   if (input.command === 'cancel' && !reason)
     throw new AppointmentValidationError('Cancellation reason is required');
+  if (input.command === 'no_show' && !reason)
+    throw new AppointmentValidationError('No-show reason is required');
   if (reason && reason.length > 500)
     throw new AppointmentValidationError(
       'Lifecycle reason must be at most 500 characters',
@@ -183,7 +185,7 @@ export class AppointmentLifecycleService {
       > = {
         check_in: ['booked', 'confirmed'],
         cancel: ['booked', 'confirmed', 'checked_in'],
-        no_show: ['confirmed', 'checked_in'],
+        no_show: ['checked_in'],
         complete_consultation: ['checked_in'],
       };
       const allowedQueue: Record<
@@ -192,7 +194,7 @@ export class AppointmentLifecycleService {
       > = {
         check_in: ['waiting'],
         cancel: ['waiting', 'checked_in', 'called'],
-        no_show: ['waiting', 'checked_in', 'called'],
+        no_show: ['checked_in', 'called'],
         complete_consultation: ['in_consultation'],
       };
       if (!allowedAppointment[input.command].includes(appointment.status))
