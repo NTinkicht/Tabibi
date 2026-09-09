@@ -231,6 +231,97 @@ describe('WU14 appointment restore and transfer synchronization', () => {
     expect(state.priority_order).toBeNull();
   });
 
+  it.each([
+    {
+      appointmentStatus: 'cancelled',
+      queueState: 'no_show',
+      suffix: 'cancelled-no-show',
+    },
+    {
+      appointmentStatus: 'no_show',
+      queueState: 'cancelled',
+      suffix: 'no-show-cancelled',
+    },
+  ] as const)(
+    'rejects mismatched terminal pair $appointmentStatus/$queueState without recovery side effects',
+    async ({ appointmentStatus, queueState, suffix }) => {
+      const booking = await book(
+        ids.patient,
+        ids.sourceSession,
+        `wu14-mismatch-book-${suffix}`,
+      );
+      await checkIn(booking.appointment.id, `wu14-mismatch-check-in-${suffix}`);
+      await new AppointmentLifecycleService(pool).command(
+        scope,
+        ids.sourceSession,
+        booking.appointment.id,
+        {
+          command: queueState === 'no_show' ? 'no_show' : 'cancel',
+          reason: 'Prepare terminal state mismatch',
+          idempotencyKey: `wu14-mismatch-terminal-${suffix}`,
+          correlationId: `wu14-mismatch-terminal-${suffix}`,
+        },
+      );
+      await pool.query(
+        `UPDATE appointments
+            SET status=$2::appointment_status
+          WHERE id=$1`,
+        [booking.appointment.id, appointmentStatus],
+      );
+
+      const snapshot = async () => {
+        const result = await pool.query<{
+          appointment_status: string;
+          queue_state: string;
+          registration_order: string;
+          eligibility_order: string | null;
+          priority_order: string | null;
+          queue_order_version: string;
+          audit_count: string;
+          receipt_count: string;
+        }>(
+          `SELECT appointment.status::text appointment_status,
+                  entry.state::text queue_state,
+                  entry.registration_order,
+                  entry.eligibility_order,
+                  entry.priority_order,
+                  session.queue_order_version,
+                  (SELECT count(*)::text FROM audit_events
+                    WHERE entity_id=appointment.id) audit_count,
+                  (SELECT count(*)::text FROM appointment_recovery_receipts
+                    WHERE appointment_id=appointment.id) receipt_count
+             FROM appointments appointment
+             JOIN queue_entries entry ON entry.id=appointment.queue_entry_id
+             JOIN consultation_sessions session ON session.id=appointment.session_id
+            WHERE appointment.id=$1`,
+          [booking.appointment.id],
+        );
+        return result.rows[0];
+      };
+      const before = await snapshot();
+
+      await expect(
+        new AppointmentRecoveryService(pool).command(
+          scope,
+          ids.sourceSession,
+          booking.appointment.id,
+          {
+            command: 'restore',
+            reason: 'Must reject a split terminal pair',
+            idempotencyKey: `wu14-mismatch-restore-${suffix}`,
+            correlationId: `wu14-mismatch-restore-${suffix}`,
+          },
+        ),
+      ).rejects.toBeInstanceOf(AppointmentConflictError);
+
+      expect(before).toMatchObject({
+        appointment_status: appointmentStatus,
+        queue_state: queueState,
+      });
+      expect(await snapshot()).toEqual(before);
+    },
+  );
+
   it('transfers a waiting appointment without changing identity and exact retry creates one target', async () => {
     const booking = await book(
       ids.patient,

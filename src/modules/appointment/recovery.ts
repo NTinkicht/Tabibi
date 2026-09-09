@@ -330,6 +330,10 @@ export class AppointmentRecoveryService {
       throw new AppointmentConflictError(
         `Cannot restore linked queue entry in ${entry.state}`,
       );
+    if (appointment.status !== entry.state)
+      throw new AppointmentConflictError(
+        'Appointment and linked queue entry terminal states do not match',
+      );
 
     const restoreAndCheckIn = input.command === 'restore_and_check_in';
     let eligibilityOrder: number | null = null;
