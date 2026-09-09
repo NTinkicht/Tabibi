@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AppointmentLifecycleService } from '@/modules/appointment/lifecycle';
+import { AppointmentRecoveryService } from '@/modules/appointment/recovery';
 import { getPool } from '@/platform/database/pool';
 import {
   authenticatedClinicScope,
@@ -18,6 +19,19 @@ const commandSchema = z.discriminatedUnion('command', [
   z.object({
     command: z.literal('cancel'),
     reason: z.string().trim().min(1).max(500),
+  }),
+  z.object({
+    command: z.literal('restore'),
+    reason: z.string().trim().min(1).max(500),
+  }),
+  z.object({
+    command: z.literal('restore_and_check_in'),
+    reason: z.string().trim().min(1).max(500),
+  }),
+  z.object({
+    command: z.literal('transfer'),
+    reason: z.string().trim().min(1).max(500),
+    targetSessionId: z.string().uuid(),
   }),
 ]);
 
@@ -40,16 +54,33 @@ export async function PATCH(
     );
     const scope = await authenticatedClinicScope(request, clinicId);
     const input = commandSchema.parse(await request.json());
-    const booking = await new AppointmentLifecycleService(getPool()).command(
-      scope,
-      sessionId,
-      appointmentId,
-      {
-        ...input,
-        idempotencyKey: request.headers.get('idempotency-key') ?? '',
-        correlationId,
-      },
-    );
+    const idempotencyKey = request.headers.get('idempotency-key') ?? '';
+
+    const booking =
+      input.command === 'restore' ||
+      input.command === 'restore_and_check_in' ||
+      input.command === 'transfer'
+        ? await new AppointmentRecoveryService(getPool()).command(
+            scope,
+            sessionId,
+            appointmentId,
+            {
+              ...input,
+              idempotencyKey,
+              correlationId,
+            },
+          )
+        : await new AppointmentLifecycleService(getPool()).command(
+            scope,
+            sessionId,
+            appointmentId,
+            {
+              ...input,
+              idempotencyKey,
+              correlationId,
+            },
+          );
+
     return { status: 200, body: { booking } };
   });
 }
