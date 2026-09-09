@@ -16,6 +16,7 @@ const committedMigrations = [
   '0008_queue_eta_timing.sql',
   '0009_appointment_booking_foundation.sql',
   '0010_appointment_booking_constraint_validation.sql',
+  '0011_appointment_lifecycle.sql',
 ];
 
 beforeAll(async () => {
