@@ -11,7 +11,11 @@ import {
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
 import { inTransaction } from '@/platform/database/transaction';
 
-export type AppointmentLifecycleCommand = 'check_in' | 'cancel';
+export type AppointmentLifecycleCommand =
+  | 'check_in'
+  | 'cancel'
+  | 'no_show'
+  | 'complete_consultation';
 
 export interface AppointmentLifecycleInput {
   command: AppointmentLifecycleCommand;
@@ -90,8 +94,7 @@ export class AppointmentLifecycleService {
         return receipt.rows[0].response;
       }
 
-      // Lock order intentionally matches queue/session terminalization paths:
-      // session -> appointment -> queue entry.
+      // Preserve the shared lock order: session -> appointment -> queue entry.
       const sessionResult = await client.query<{
         doctor_id: string;
         status: string;
@@ -180,6 +183,8 @@ export class AppointmentLifecycleService {
       > = {
         check_in: ['booked', 'confirmed'],
         cancel: ['booked', 'confirmed', 'checked_in'],
+        no_show: ['confirmed', 'checked_in'],
+        complete_consultation: ['checked_in'],
       };
       const allowedQueue: Record<
         AppointmentLifecycleCommand,
@@ -187,6 +192,8 @@ export class AppointmentLifecycleService {
       > = {
         check_in: ['waiting'],
         cancel: ['waiting', 'checked_in', 'called'],
+        no_show: ['waiting', 'checked_in', 'called'],
+        complete_consultation: ['in_consultation'],
       };
       if (!allowedAppointment[input.command].includes(appointment.status))
         throw new AppointmentConflictError(
@@ -209,9 +216,21 @@ export class AppointmentLifecycleService {
       }
 
       const targetState: AppointmentQueueState =
-        input.command === 'check_in' ? 'checked_in' : 'cancelled';
+        input.command === 'check_in'
+          ? 'checked_in'
+          : input.command === 'cancel'
+            ? 'cancelled'
+            : input.command === 'no_show'
+              ? 'no_show'
+              : 'completed';
       const targetStatus: AppointmentStatus =
-        input.command === 'check_in' ? 'checked_in' : 'cancelled';
+        input.command === 'check_in'
+          ? 'checked_in'
+          : input.command === 'cancel'
+            ? 'cancelled'
+            : input.command === 'no_show'
+              ? 'no_show'
+              : 'completed';
 
       await client.query(
         `UPDATE appointments
@@ -232,13 +251,21 @@ export class AppointmentLifecycleService {
                   WHEN $4::queue_entry_status IN ('waiting','checked_in') THEN priority_order
                   ELSE NULL
                 END,
+                in_consultation_started_at=CASE
+                  WHEN $4::queue_entry_status='completed' THEN in_consultation_started_at
+                  ELSE in_consultation_started_at
+                END,
+                completed_at=CASE
+                  WHEN $4::queue_entry_status='completed' THEN now()
+                  ELSE completed_at
+                END,
                 updated_at=now()
           WHERE id=$1 AND session_id=$2 AND clinic_id=$3`,
         [entry.id, sessionId, scope.clinicId, targetState, eligibilityOrder],
       );
 
       if (
-        input.command === 'cancel' &&
+        ['cancel', 'no_show'].includes(input.command) &&
         entry.priority_order !== null &&
         ['waiting', 'checked_in'].includes(entry.state)
       ) {
@@ -276,13 +303,8 @@ export class AppointmentLifecycleService {
       const current = await client.query<{
         status: AppointmentStatus;
         state: AppointmentQueueState;
-        eligibility_order: string | null;
-        priority_order: string | null;
       }>(
-        `SELECT appointment.status,
-                entry.state,
-                entry.eligibility_order,
-                entry.priority_order
+        `SELECT appointment.status, entry.state
            FROM appointments appointment
            JOIN queue_entries entry
              ON entry.id=appointment.queue_entry_id
