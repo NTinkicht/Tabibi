@@ -3,6 +3,7 @@ CREATE TABLE guest_exchange_ids (
   clinic_id uuid NOT NULL REFERENCES clinics(id) ON DELETE RESTRICT,
   session_id uuid NOT NULL,
   queue_entry_id uuid NOT NULL,
+  issued_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   exchange_verifier text NOT NULL UNIQUE CHECK (length(exchange_verifier) = 64),
   purpose text NOT NULL DEFAULT 'initial_access'
     CHECK (purpose IN ('initial_access')),
