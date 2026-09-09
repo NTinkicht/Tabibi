@@ -1,75 +1,39 @@
 # Tabibi Work Queue
 
-This is the human-readable work marketplace for available engineering capacity. It supplements `coordination/STATE.json`; if the two conflict about canonical implementation/review state, live GitHub evidence and `STATE.json` win.
+This is the human-readable work marketplace for available engineering capacity. It supplements `coordination/STATE.json`; if the two conflict about canonical implementation/review state, live GitHub evidence wins.
 
 Status values: `ACTIVE`, `READY`, `BLOCKED`, `DONE`, `CANCELLED`.
 
-## Current company round — Epic #5 / Work Unit 9
+## Current company round — post-WU12 reconciliation
 
-WU6 privacy-preserving waiting-room identifiers, WU7 doctor-delay hardening, and WU8 receptionist operations dashboard are merged.
+WU12 / Issue #113 / PR #114 is merged and complete. There are currently no open pull requests and no active product implementation lease.
 
-The primary product stream is now **Issue #96 — WU9: deterministic queue ETA snapshot v1**.
+The previous WU9/WU10 coordination entries were stale and are retired. Do not resurrect their implementation leases.
 
-This slice is backend-first and explainable. It deliberately excludes notifications, patient/public ETA delivery, appointment changes, ML/AI inference, clinical data, and queue-order mutation.
-
-| Task ID | Status | Preferred actor | Scope | Expected artifact | Code allowed? |
-| --- | --- | --- | --- | --- | --- |
-| WU9-ARCH-001 | ACTIVE | chatgpt | Product/architecture ownership, bounded scope enforcement, state reconciliation, merge orchestration | Issue #96 contract + coordination decisions | No application edits unless explicit failover |
-| WU9-IMPLEMENT-001 | ACTIVE | copilot | Implement deterministic staff-only ETA snapshot per Issue #96 from committed queue/session state; one canonical branch/PR | Canonical PR + tests + exact-SHA handoff | Yes — sole WU9 implementation lease |
-| WU9-RISK-001 | ACTIVE | claude | Adversarial pre-mortem covering determinism, ETA range math, fallback prior, delay effects, state exclusion, tenancy, stale/concurrent reads | Risk/test matrix on #96 | Review only |
-| WU9-GATE-001 | BLOCKED | claude | Independent non-author exact-SHA gate after implementation and green CI | PASS/MERGE_READY or findings | Review only |
-| WU9-QA-001 | READY | chatgpt / available non-author actor | Complementary deterministic test-oracle review after first implementation checkpoint without editing WU9 code | TEST_IDEA / QA matrix | No implementation |
-| WU9-MERGE-001 | BLOCKED | chatgpt | Mechanical merge only after unchanged exact head has green CI and valid independent gate | Merge commit + state reconciliation | Merge only |
-
-## Parallel bounded cleanup — Issue #94
-
-TAB-WU8-003 is a non-blocking follow-up from Claude's WU8 re-review. It is independent from WU9 and may proceed in parallel without touching ETA code.
+The next product slice has not yet been formally scoped. The immediate canonical work is bounded architecture/backlog reconciliation against current `main`: select the smallest dependency-ready slice after appointment lifecycle synchronization, create its issue/acceptance contract, and only then assign one implementation lease.
 
 | Task ID | Status | Preferred actor | Scope | Expected artifact | Code allowed? |
 | --- | --- | --- | --- | --- | --- |
-| WU8-FOLLOWUP-003 | ACTIVE_PENDING_CAPACITY | codex | Keep failure-induced stale state latched until next success (or equivalent failed-poll OR time-stale model); tighten e2e timestamp fixture | One bounded PR for Issue #94 + focused browser regression | Yes, only if Codex confirms capacity |
-| WU8-FOLLOWUP-003-GATE | BLOCKED | eligible non-author reviewer | Independent exact-head review after green CI | PASS/MERGE_READY or findings | Review only |
+| POST-WU12-ARCH-001 | ACTIVE | chatgpt | Reconcile current main, epics and dependencies; define next smallest bounded product work unit | New issue with explicit scope/exclusions/acceptance | No application edits |
+| POST-WU12-IMPLEMENT-001 | BLOCKED | unassigned | Implement the next work unit after architecture contract exists | One canonical branch/PR + tests | Yes, after explicit lease only |
+| POST-WU12-GATE-001 | BLOCKED | CodeRabbit | Binding independent exact-head gate while Codex/Claude are unavailable or limited | Full review with no unresolved BLOCKER/MAJOR findings | Review only |
+| POST-WU12-MERGE-001 | BLOCKED | chatgpt | Mechanical merge after unchanged exact head has green CI and CodeRabbit gate | Merge + state reconciliation | Merge only |
 
-## Capacity and anti-duplication rules
+## Current actor status
+
+- **ChatGPT:** ACTIVE — CTO/orchestrator and state reconciler. Owns only POST-WU12-ARCH-001; no product-code lease yet.
+- **Copilot:** AVAILABLE/UNASSIGNED — prior WU12 lease was released for inactivity and later superseded by ChatGPT takeover. No active lease.
+- **CodeRabbit:** AVAILABLE AS BINDING GATE — independent PR gate for the next product PR. For a complete re-evaluation after incremental review, use `@coderabbitai full review`.
+- **Codex:** LIMITED/UNASSIGNED — do not depend on it for implementation or gating until concrete capacity recovery is observed.
+- **Claude:** LIMITED/UNASSIGNED — preserve as optional independent architecture/security review if capacity returns; not required while CodeRabbit is the binding gate.
+- **Gemini Agent:** PAUSED/OFF-ROSTER by owner decision.
+- **Gemini Chat:** PAUSED/OFF-ROSTER by owner decision.
+
+## Binding delivery rules
 
 - Exactly one canonical PR and one active implementer lease per work stream.
-- Copilot owns WU9 implementation. Codex must not modify WU9 unless an explicit failover releases Copilot first.
-- Codex owns Issue #94 only if it confirms recovered capacity; otherwise the task remains pending failover.
-- Claude is review-only on WU9 and must author no WU9 application code while retaining gating independence.
+- An assignment is not evidence of progress: require heartbeat/checkpoint, commit, PR, CI, review artifact, or a visibly running deterministic job.
+- A claimed active lease without observable progress for 30 minutes is stale unless a deterministic job is visibly progressing.
+- Binding merge rule while Codex/Claude are unavailable or limited: green exact-head CI + CodeRabbit coverage of the exact head + no unresolved BLOCKER/MAJOR findings.
+- `@coderabbitai review` is incremental. Use `@coderabbitai full review` when the entire PR must be re-evaluated after the latest commit has already been reviewed.
 - Gemini Agent and Gemini Chat remain paused until the owner explicitly re-enables them.
-- An assignment is not evidence of work. HEARTBEAT/CHECKPOINT, commits, PRs, CI, or review artifacts are required before an actor is treated as active.
-
-## Claim protocol
-
-Before taking a `READY` item, post in Team Room:
-
-```text
-TASK_CLAIM <task-id>
-actor: <actor>
-work_stream: <issue/work unit>
-planned_artifact: <what you will produce>
-conflict_check: <why this does not duplicate an active implementation/review lease>
-```
-
-When done:
-
-```text
-TASK_DONE <task-id>
-actor: <actor>
-artifact: <comment/pr/commit/report>
-key_result: <one-line result>
-follow_up: <next proposed task/handoff>
-```
-
-## Standing opportunistic tasks
-
-These may be proposed/claimed when they do not interfere with active delivery:
-
-- `REF-*` targeted refactoring analysis;
-- `TEST-*` missing deterministic tests or scenario design;
-- `UX-*` Algeria/Arabic/French/RTL/mobile/accessibility verification;
-- `SEC-*` threat/risk review of upcoming scope;
-- `OBS-*` observability/failure-diagnosis improvement;
-- `DOC-*` reproducibility/operability documentation;
-- `PERF-*` bounded performance/load hypotheses and test plans;
-- `BACKLOG-*` decomposition of a future product slice.
