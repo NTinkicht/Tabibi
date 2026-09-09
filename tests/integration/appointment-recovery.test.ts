@@ -57,7 +57,7 @@ beforeEach(async () => {
       (id,clinic_id,doctor_id,service_date,starts_at,ends_at,status)
       VALUES
       ($1,$3,$4,'2026-09-16','2026-09-16 09:00Z','2026-09-16 12:00Z','open'),
-      ($2,$3,$4,'2026-09-17','2026-09-17 09:00Z','2026-09-17 12:00Z','open')`,
+      ($2,$3,$4,'2026-09-17','2026-09-17 09:00Z','2026-09-17 12:00Z','planned')`,
     [ids.sourceSession, ids.targetSession, ids.clinic, ids.doctor],
   );
   await pool.query(
@@ -72,7 +72,7 @@ afterAll(async () => pool.end());
 async function book(
   patientId = ids.patient,
   sessionId = ids.sourceSession,
-  key = randomUUID(),
+  key: string = randomUUID(),
 ) {
   return new AppointmentService(pool).bookForExistingPatient(scope, sessionId, {
     patientId,
@@ -92,7 +92,7 @@ async function book(
   });
 }
 
-async function checkIn(appointmentId: string, key = randomUUID()) {
+async function checkIn(appointmentId: string, key: string = randomUUID()) {
   return new AppointmentLifecycleService(pool).command(
     scope,
     ids.sourceSession,
@@ -130,7 +130,11 @@ async function pairedState(appointmentId: string) {
 
 describe('WU14 appointment restore and transfer synchronization', () => {
   it('ordinary restore always returns a prior checked-in cancellation to confirmed/waiting and retries exactly', async () => {
-    const booking = await book(ids.patient, ids.sourceSession, 'wu14-restore-book');
+    const booking = await book(
+      ids.patient,
+      ids.sourceSession,
+      'wu14-restore-book',
+    );
     await checkIn(booking.appointment.id, 'wu14-restore-check-in');
     await new AppointmentLifecycleService(pool).command(
       scope,
@@ -185,7 +189,11 @@ describe('WU14 appointment restore and transfer synchronization', () => {
   });
 
   it('restore_and_check_in explicitly returns a no-show to checked-in at a fresh tail', async () => {
-    const first = await book(ids.secondPatient, ids.sourceSession, 'wu14-tail-book');
+    const first = await book(
+      ids.secondPatient,
+      ids.sourceSession,
+      'wu14-tail-book',
+    );
     await checkIn(first.appointment.id, 'wu14-tail-check-in');
     const booking = await book(ids.patient, ids.sourceSession, 'wu14-raci-book');
     await checkIn(booking.appointment.id, 'wu14-raci-check-in');
@@ -220,7 +228,11 @@ describe('WU14 appointment restore and transfer synchronization', () => {
   });
 
   it('transfers a waiting appointment without changing identity and exact retry creates one target', async () => {
-    const booking = await book(ids.patient, ids.sourceSession, 'wu14-transfer-book');
+    const booking = await book(
+      ids.patient,
+      ids.sourceSession,
+      'wu14-transfer-book',
+    );
     const recovery = new AppointmentRecoveryService(pool);
     const input = {
       command: 'transfer' as const,
@@ -311,7 +323,11 @@ describe('WU14 appointment restore and transfer synchronization', () => {
   });
 
   it('rejects an existing target-session appointment before any source mutation', async () => {
-    const source = await book(ids.patient, ids.sourceSession, 'wu14-conflict-source');
+    const source = await book(
+      ids.patient,
+      ids.sourceSession,
+      'wu14-conflict-source',
+    );
     await book(ids.patient, ids.targetSession, 'wu14-conflict-target');
 
     await expect(
@@ -336,7 +352,11 @@ describe('WU14 appointment restore and transfer synchronization', () => {
   });
 
   it('rolls back source terminalization if target insertion fails after mutation', async () => {
-    const booking = await book(ids.patient, ids.sourceSession, 'wu14-rollback-book');
+    const booking = await book(
+      ids.patient,
+      ids.sourceSession,
+      'wu14-rollback-book',
+    );
     await pool.query(`CREATE FUNCTION wu14_fail_target_insert()
       RETURNS trigger LANGUAGE plpgsql AS $$
       BEGIN
@@ -387,7 +407,11 @@ describe('WU14 appointment restore and transfer synchronization', () => {
   });
 
   it('rejects stale source linkage after a successful prior transfer', async () => {
-    const booking = await book(ids.patient, ids.sourceSession, 'wu14-stale-book');
+    const booking = await book(
+      ids.patient,
+      ids.sourceSession,
+      'wu14-stale-book',
+    );
     await new AppointmentRecoveryService(pool).command(
       scope,
       ids.sourceSession,
@@ -443,7 +467,11 @@ describe('WU14 appointment restore and transfer synchronization', () => {
        VALUES($1,$2,$3,'2026-09-17','2026-09-17 09:00Z','2026-09-17 12:00Z','open')`,
       [otherSession, otherClinic, otherDoctor],
     );
-    const booking = await book(ids.patient, ids.sourceSession, 'wu14-tenant-book');
+    const booking = await book(
+      ids.patient,
+      ids.sourceSession,
+      'wu14-tenant-book',
+    );
     await expect(
       new AppointmentRecoveryService(pool).command(
         scope,
