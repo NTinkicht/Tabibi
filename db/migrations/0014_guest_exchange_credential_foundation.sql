@@ -1,3 +1,7 @@
+ALTER TABLE queue_entries
+  ADD CONSTRAINT queue_entries_id_clinic_session_uq
+  UNIQUE (id, clinic_id, session_id);
+
 CREATE TABLE guest_exchange_ids (
   id uuid PRIMARY KEY,
   clinic_id uuid NOT NULL REFERENCES clinics(id) ON DELETE RESTRICT,
@@ -13,8 +17,8 @@ CREATE TABLE guest_exchange_ids (
   consumed_at timestamptz,
   FOREIGN KEY (session_id, clinic_id)
     REFERENCES consultation_sessions(id, clinic_id) ON DELETE RESTRICT,
-  FOREIGN KEY (queue_entry_id, clinic_id)
-    REFERENCES queue_entries(id, clinic_id) ON DELETE RESTRICT,
+  FOREIGN KEY (queue_entry_id, clinic_id, session_id)
+    REFERENCES queue_entries(id, clinic_id, session_id) ON DELETE RESTRICT,
   CHECK (expires_at > created_at),
   CHECK (expires_at <= created_at + interval '10 minutes'),
   CHECK (consumed_at IS NULL OR consumed_at >= created_at),
@@ -36,8 +40,8 @@ CREATE TABLE guest_credentials (
   revoked_at timestamptz,
   FOREIGN KEY (session_id, clinic_id)
     REFERENCES consultation_sessions(id, clinic_id) ON DELETE RESTRICT,
-  FOREIGN KEY (queue_entry_id, clinic_id)
-    REFERENCES queue_entries(id, clinic_id) ON DELETE RESTRICT,
+  FOREIGN KEY (queue_entry_id, clinic_id, session_id)
+    REFERENCES queue_entries(id, clinic_id, session_id) ON DELETE RESTRICT,
   CHECK (expires_at > issued_at),
   CHECK (expires_at <= issued_at + interval '24 hours'),
   CHECK (revoked_at IS NULL OR revoked_at >= issued_at),
