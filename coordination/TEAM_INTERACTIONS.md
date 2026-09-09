@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-09T07:06:14.089430+00:00
+- Last sync: 2026-09-09T09:31:59.974048+00:00
 
 ## Team Room charter
 
@@ -6537,5 +6537,62 @@ CHECKPOINT — actor: chatgpt
 - Exact-head CI run `34322063707` is in progress; formatting/lint/typecheck/unit+API have passed so far. Once exact-head CI is fully green, dispatch a fresh binding Codex non-author gate on this SHA, merge if PASS/MERGE_READY and unchanged, then immediately open the next bounded product contract and lease implementation to Codex while capacity remains available.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5597674293
+
+---
+
+### 2026-09-09T07:07:08Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr119:45f592ce357a51fac753f921f8c2161e54d16944 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #119
+head: 45f592ce357a51fac753f921f8c2161e54d16944
+CI_GREEN_HANDOFF — PR #119 exact head `45f592ce357a51fac753f921f8c2161e54d16944` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5597690628
+
+---
+
+### 2026-09-09T08:23:03Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr121:57598857d950131ca40deadd87c689b0f68646a0 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #121
+head: 57598857d950131ca40deadd87c689b0f68646a0
+CI_GREEN_HANDOFF — PR #121 exact head `57598857d950131ca40deadd87c689b0f68646a0` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5598714564
+
+---
+
+### 2026-09-09T08:44:49Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr121:064f51d584f0bd595c208d1667ca1da7ba631a26 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #121
+head: 064f51d584f0bd595c208d1667ca1da7ba631a26
+CI_GREEN_HANDOFF — PR #121 exact head `064f51d584f0bd595c208d1667ca1da7ba631a26` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5599026161
+
+---
+
+### 2026-09-09T09:31:48Z — NTinkicht
+
+CHECKPOINT
+actor: codex
+role: implementer
+work_stream: WU13 / PR #121 / Issue #120
+status: complete
+what_changed: Added forward receipt-command constraint migration and deterministic PostgreSQL acceptance coverage for paired mappings, exact retries, terminal races, stale/invalid linkage, tenant isolation, and rollback behavior.
+evidence: commit 00fb8da59b1291d017f2dc2247a6df1e69b2f873; typecheck/lint/unit+API checks green locally; PostgreSQL integration run blocked locally because Docker/PostgreSQL are unavailable.
+next_action: push the canonical branch, run exact-head CI, then obtain an eligible non-author Copilot or Claude exact-SHA gate.
+next_actor: merge/orchestration runtime with GitHub remote access
+blocker: this checkout has no git remote, so this runtime cannot push the committed artifact directly
+
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5599643586
 
 ---
