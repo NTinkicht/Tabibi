@@ -25,6 +25,10 @@ const commandSchema = z.discriminatedUnion('command', [
     reason: z.string().trim().min(1).max(500),
   }),
   z.object({
+    command: z.literal('restore_and_check_in'),
+    reason: z.string().trim().min(1).max(500),
+  }),
+  z.object({
     command: z.literal('transfer'),
     reason: z.string().trim().min(1).max(500),
     targetSessionId: z.string().uuid(),
@@ -53,7 +57,9 @@ export async function PATCH(
     const idempotencyKey = request.headers.get('idempotency-key') ?? '';
 
     const booking =
-      input.command === 'restore' || input.command === 'transfer'
+      input.command === 'restore' ||
+      input.command === 'restore_and_check_in' ||
+      input.command === 'transfer'
         ? await new AppointmentRecoveryService(getPool()).command(
             scope,
             sessionId,
