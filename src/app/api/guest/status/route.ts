@@ -81,10 +81,7 @@ async function consumeBucket(
  * Only credential IDs that actually exist may select a credential-specific bucket;
  * fabricated or malformed identifiers share the bounded untrusted-ingress bucket.
  */
-async function withinRateLimit(
-  pool: Pool,
-  bearer: string | null,
-): Promise<boolean> {
+async function withinRateLimit(pool: Pool, bearer: string | null): Promise<boolean> {
   const credentialId = bearer ? credentialIdForRateLimit(bearer) : null;
   if (credentialId) {
     const knownCredential = await pool.query<{ exists: boolean }>(
