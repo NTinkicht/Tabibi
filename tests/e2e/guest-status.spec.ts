@@ -34,7 +34,6 @@ test('guest status renders provisional waiting state without leaking bearer mate
       name: '__Host-tabibi_guest',
       value: rawBearer,
       url: 'http://127.0.0.1:3000',
-      path: '/',
       secure: true,
       httpOnly: true,
     },
