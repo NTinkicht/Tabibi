@@ -21,6 +21,7 @@ export type GuestQueueStatusSnapshot =
       target: GuestTarget;
       publicDisplayLabel: string;
       queueState: string;
+      clinicTimezone: string;
       patientsAhead: number | null;
       positionKind: 'live' | 'provisional';
       arrivalWindow: {
@@ -128,6 +129,7 @@ export class GuestStatusService {
       declared_delay_minutes: number | null;
       delay_version: number;
       queue_order_version: string;
+      clinic_timezone: string;
     }>(
       `WITH ordered AS (
          SELECT entry.id,
@@ -161,10 +163,12 @@ export class GuestStatusService {
               appointment.scheduled_start_at AS appointment_scheduled_start_at,
               session.declared_delay_minutes,
               session.delay_version,
-              session.queue_order_version
+              session.queue_order_version,
+              clinic.timezone AS clinic_timezone
          FROM ordered
          JOIN consultation_sessions session
            ON session.id=$2 AND session.clinic_id=$1
+         JOIN clinics clinic ON clinic.id=$1
          JOIN guest_credentials credential
            ON credential.id=$5
           AND credential.queue_entry_id=$3
@@ -198,6 +202,7 @@ export class GuestStatusService {
       target,
       publicDisplayLabel: row.public_display_label,
       queueState: row.queue_state,
+      clinicTimezone: row.clinic_timezone,
       patientsAhead: livePosition
         ? Math.max(0, Number(row.service_position) - 1)
         : null,
