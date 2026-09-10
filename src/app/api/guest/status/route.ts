@@ -141,7 +141,10 @@ export async function GET(request: Request): Promise<Response> {
     }
     if (!bearer) throw new GuestAccessRejectedError();
     const snapshot = await new GuestStatusService(pool).getSnapshot(bearer);
-    return Response.json(snapshot, { status: 200, headers: SECURITY_HEADERS });
+    return Response.json(snapshot, {
+      status: 200,
+      headers: SECURITY_HEADERS,
+    });
   } catch (error) {
     const rejected = error instanceof GuestAccessRejectedError;
     if (!rejected) getLogger().error('guest status read failed');
