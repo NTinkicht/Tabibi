@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T09:57:10.310722+00:00
+- Last sync: 2026-09-10T10:49:41.535712+00:00
 
 ## Team Room charter
 
@@ -9046,5 +9046,230 @@ Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5616359034
 CHECKPOINT — WU17 CI remediation on canonical PR #131. Live head advanced through the fabricated-credential-ID throttle remediation, then exact-head CI #518 exposed two mechanical regressions: route Prettier layout and a stale trusted-ingress assertion that still expected 401 after the six-request shared untrusted bucket was exhausted. Repaired both on the same branch only. Current exact head: `840944200dc3fbfa5c3e1c19487b980c6b1e0eca`. Exact-head CI run `34463401493` is in progress across Quality/build, PostgreSQL integration, and Browser smoke. No merge and no full CodeRabbit re-gate until this exact SHA is green. Gemini Agent/Chat remain paused.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5616712762
+
+---
+
+### 2026-09-10T10:17:53Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr131:642515e0fbd0107428e27be93a7b1ed07c68ddc8 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #131
+head: 642515e0fbd0107428e27be93a7b1ed07c68ddc8
+CI_GREEN_HANDOFF — PR #131 exact head `642515e0fbd0107428e27be93a7b1ed07c68ddc8` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5617012430
+
+---
+
+### 2026-09-10T10:48:47Z — NTinkicht
+
+CHECKPOINT
+actor: chatgpt
+role: CTO/orchestrator/merge control
+work_stream: WU17 / Issue #129 / PR #131
+what_changed: Live reconciliation found canonical PR #131 at exact head `642515e0fbd0107428e27be93a7b1ed07c68ddc8`; exact-head CI run `34465955268` is fully green across Quality/build, PostgreSQL integration, and Browser smoke. A binding `@coderabbitai full review` was dispatched against exactly this SHA. Historical Codex MAJOR threads TAB-REVIEW-004, TAB-REVIEW-005, and TAB-REVIEW-006 were individually reconciled with current-head evidence and formally resolved after green CI.
+remaining_gate: the latest CodeRabbit MAJOR on rotating fabricated credential UUIDs remains intentionally unmerged pending the fresh whole-PR exact-head re-review; MicroReview warnings are below Medium unless the fresh gate exposes a real blocker.
+coordination_note: `coordination/STATE.json` and `coordination/WORK_QUEUE.md` remain stale WU14 snapshots, so live GitHub is authoritative for transient WU17/lease/gate facts. Gemini Agent and Gemini Chat remain PAUSED/OFF-ROSTER.
+next_action: inspect the fresh CodeRabbit whole-PR result, reconcile every reviewer source, and merge only if exact head is unchanged and zero Medium+/Major+/High+/Critical/Blocker obligations remain.
+blocker: no owner action required.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5617445380
+
+---
+
+### 2026-09-10T10:49:31Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="131"
+
+echo "== Required collaboration guidance =="
+for file in \
+  AGENTS.md \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  if [ -f "$file" ]; then
+    echo "--- $file ---"
+    sed -n '1,220p' "$file"
+  fi
+done
+
+echo "== Current PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent PR discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-35:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+
+echo "== CodeRabbit review comments =="
+gh api "repos/$repo/pulls/$pr/comments?per_page=100" \
+  --jq '.[] | select(.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai") | {commit_id,path,line,body,created_at}' || true
+
+echo "== Unresolved review threads =="
+gh api graphql -F owner="NTinkicht" -F name="Tabibi" -F number="$pr" -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 30) {
+            nodes {
+              author { login }
+              commit { oid }
+              body
+            }
+          }
+        }
+      }
+    }
+  }
+}' --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+  | select(.isResolved == false)
+  | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+```
+
+Length of output: 148848
+
+---
+
+</details>
+
+`@NTinkicht`, the requested full review completed on exact head `642515e0fbd0107428e27be93a7b1ed07c68ddc8`.
+
+Required CI is green on this head.
+
+**Disposition: CHANGES_REQUIRED.**
+
+One High/P1 finding remains:
+
+- A syntactically valid but fabricated credential UUID reaches a `guest_credentials` existence lookup before `UNTRUSTED_INGRESS_BUCKET` applies.
+- An attacker can rotate fabricated UUIDs.
+- This allows unbounded pre-authentication database lookups.
+- The current limiter prevents credential-bucket row churn. It does not bound this database work.
+
+Keep PR `#131` unmerged. Continue on the existing canonical branch only.
+
+The remediation must bound untrusted requests before the credential-existence lookup without reintroducing shared-bucket throttling for unrelated valid guest credentials. Add deterministic rotating-fabricated-UUID coverage. The test must prove that requests beyond the limit perform no further credential lookup while an unrelated valid bearer remains available.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="131"
+
+echo "== Required collaboration guidance =="
+for file in \
+  AGENTS.md \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  if [ -f "$file" ]; then
+    echo "--- $file ---"
+    sed -n '1,220p' "$file"
+  fi
+done
+
+echo "== Current PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent PR discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-35:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+
+echo "== CodeRabbit review comments =="
+gh api "repos/$repo/pulls/$pr/comments?per_page=100" \
+  --jq '.[] | select(.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai") | {commit_id,path,line,body,created_at}' || true
+
+echo "== Unresolved review threads =="
+gh api graphql -F owner="NTinkicht" -F name="Tabibi" -F number="$pr" -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 30) {
+            nodes {
+              author { login }
+              commit { oid }
+              body
+            }
+          }
+        }
+      }
+    }
+  }
+}' --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+  | select(.isResolved == false)
+  | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+```
+
+Length of output: 148848
+
+---
+
+</details>
+
+`@NTinkicht`, the requested full review completed on exact head `642515e0fbd0107428e27be93a7b1ed07c68ddc8`.
+
+Required CI is green on this head.
+
+**Disposition: CHANGES_REQUIRED.**
+
+One High/P1 finding remains:
+
+- A syntactically valid but fabricated credential UUID reaches a `guest_credentials` existence lookup before `UNTRUSTED_INGRESS_BUCKET` applies.
+- An attacker can rotate fabricated UUIDs.
+- This allows unbounded pre-authentication database lookups.
+- The current limiter prevents credential-bucket row churn. It does not bound this database work.
+
+Keep PR `#131` unmerged. Continue on the existing canonical branch only.
+
+The remediation must bound untrusted requests before the credential-existence lookup without reintroducing shared-bucket throttling for unrelated valid guest credentials. Add deterministic rotating-fabricated-UUID coverage. The test must prove that requests beyond the limit perform no further credential lookup while an unrelated valid bearer remains available.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5617458978
 
 ---
