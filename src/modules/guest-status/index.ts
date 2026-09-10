@@ -6,6 +6,7 @@ import {
   GuestAccessService,
   type GuestTarget,
 } from '@/modules/guest-access';
+import { abortableQuery } from '@/platform/database/abortable-query';
 
 const TERMINAL_GRACE_MS = 15 * 60 * 1_000;
 const PROVISIONAL_UNCERTAINTY_MINUTES = 15;
@@ -134,8 +135,7 @@ export class GuestStatusService {
     now: Date,
     signal?: AbortSignal,
   ): Promise<GuestQueueStatusSnapshot> {
-    signal?.throwIfAborted();
-    const result = await this.pool.query<{
+    const result = await abortableQuery<{
       public_display_label: string;
       queue_state: string;
       service_position: string;
@@ -146,8 +146,9 @@ export class GuestStatusService {
       delay_version: number;
       queue_order_version: string;
       clinic_timezone: string;
-    }>({
-      text: `WITH ordered AS (
+    }>(
+      this.pool,
+      `WITH ordered AS (
          SELECT entry.id,
                 entry.public_display_label,
                 entry.state::text AS queue_state,
@@ -198,7 +199,7 @@ export class GuestStatusService {
           AND appointment.clinic_id=$1
         WHERE ordered.id=$3
           AND session.status IN ('planned','open','paused')`,
-      values: [
+      [
         target.clinicId,
         target.sessionId,
         target.queueEntryId,
@@ -206,8 +207,7 @@ export class GuestStatusService {
         credentialId,
       ],
       signal,
-    });
-    signal?.throwIfAborted();
+    );
     const row = result.rows[0];
     if (!row) throw new GuestAccessRejectedError();
 
@@ -247,11 +247,10 @@ export class GuestStatusService {
     now: Date,
     signal?: AbortSignal,
   ): Promise<GuestQueueStatusSnapshot> {
-    signal?.throwIfAborted();
     const parsed = parseBearer(bearer);
     if (!parsed) throw new GuestAccessRejectedError();
 
-    const result = await this.pool.query<{
+    const result = await abortableQuery<{
       bearer_verifier: string;
       expires_at: Date;
       revoked_at: Date | null;
@@ -261,8 +260,9 @@ export class GuestStatusService {
       session_status: string;
       session_closed_at: Date | null;
       session_updated_at: Date;
-    }>({
-      text: `SELECT credential.bearer_verifier,credential.expires_at,credential.revoked_at,
+    }>(
+      this.pool,
+      `SELECT credential.bearer_verifier,credential.expires_at,credential.revoked_at,
               entry.state::text AS entry_state,entry.updated_at AS entry_updated_at,
               entry.completed_at,
               session.status::text AS session_status,session.closed_at AS session_closed_at,
@@ -274,10 +274,9 @@ export class GuestStatusService {
          JOIN consultation_sessions session ON session.id=credential.session_id
            AND session.clinic_id=credential.clinic_id
         WHERE credential.id=$1`,
-      values: [parsed.credentialId],
+      [parsed.credentialId],
       signal,
-    });
-    signal?.throwIfAborted();
+    );
     const row = result.rows[0];
     if (
       !row ||
