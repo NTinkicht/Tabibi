@@ -7,6 +7,7 @@ import {
 } from '@/modules/guest-access';
 
 const TERMINAL_GRACE_MS = 15 * 60 * 1_000;
+const PROVISIONAL_UNCERTAINTY_MINUTES = 15;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TERMINAL_ENTRY_STATES = ['completed', 'cancelled', 'no_show'];
@@ -21,6 +22,12 @@ export type GuestQueueStatusSnapshot =
       queueState: string;
       patientsAhead: number | null;
       positionKind: 'live' | 'provisional';
+      arrivalWindow: {
+        earliestAt: string;
+        latestAt: string;
+        uncertaintyMinutes: number;
+        basis: 'session_start_plus_declared_delay';
+      } | null;
       session: {
         status: string;
         declaredDelayMinutes: number | null;
@@ -57,6 +64,27 @@ function verifierMatches(storedVerifier: string, secret: string): boolean {
   );
 }
 
+function provisionalArrivalWindow(
+  now: Date,
+  sessionStartsAt: Date,
+  declaredDelayMinutes: number | null,
+) {
+  const declaredDelayMs = Math.max(0, declaredDelayMinutes ?? 0) * 60_000;
+  const estimatedAtMs = Math.max(
+    now.getTime(),
+    sessionStartsAt.getTime() + declaredDelayMs,
+  );
+  const uncertaintyMs = PROVISIONAL_UNCERTAINTY_MINUTES * 60_000;
+  return {
+    earliestAt: new Date(
+      Math.max(now.getTime(), estimatedAtMs - uncertaintyMs),
+    ).toISOString(),
+    latestAt: new Date(estimatedAtMs + uncertaintyMs).toISOString(),
+    uncertaintyMinutes: PROVISIONAL_UNCERTAINTY_MINUTES,
+    basis: 'session_start_plus_declared_delay' as const,
+  };
+}
+
 /** Read-only, credential-free guest projection for one authorized queue target. */
 export class GuestStatusService {
   constructor(
@@ -86,6 +114,7 @@ export class GuestStatusService {
       queue_state: string;
       service_position: string;
       session_status: string;
+      session_starts_at: Date;
       declared_delay_minutes: number | null;
       delay_version: number;
       queue_order_version: string;
@@ -118,6 +147,7 @@ export class GuestStatusService {
               ordered.queue_state,
               ordered.service_position,
               session.status::text AS session_status,
+              session.starts_at AS session_starts_at,
               session.declared_delay_minutes,
               session.delay_version,
               session.queue_order_version
@@ -148,6 +178,13 @@ export class GuestStatusService {
         ? Math.max(0, Number(row.service_position) - 1)
         : null,
       positionKind: livePosition ? 'live' : 'provisional',
+      arrivalWindow: livePosition
+        ? null
+        : provisionalArrivalWindow(
+            now,
+            row.session_starts_at,
+            row.declared_delay_minutes,
+          ),
       session: {
         status: row.session_status,
         declaredDelayMinutes: row.declared_delay_minutes,
