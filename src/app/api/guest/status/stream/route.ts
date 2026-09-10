@@ -174,10 +174,16 @@ export async function GET(request: Request): Promise<Response> {
       );
     }
 
-    initialSnapshot = await new GuestStatusService(pool).getSnapshot(bearer);
+    initialSnapshot = await new GuestStatusService(pool).getSnapshot(
+      bearer,
+      new Date(),
+      request.signal,
+    );
   } catch (error) {
     const rejected = error instanceof GuestAccessRejectedError;
-    if (!rejected) getLogger().error('guest status stream bootstrap failed');
+    if (!rejected && !request.signal.aborted) {
+      getLogger().error('guest status stream bootstrap failed');
+    }
     return Response.json(
       { error: 'Guest access rejected' },
       { status: rejected ? 401 : 500, headers: REJECT_HEADERS },
@@ -199,7 +205,13 @@ export async function GET(request: Request): Promise<Response> {
         if (!(await waitForNextTick(request.signal))) break;
 
         try {
-          const snapshot = await statusService.getSnapshot(bearer);
+          const snapshot = await statusService.getSnapshot(
+            bearer,
+            new Date(),
+            request.signal,
+          );
+          if (request.signal.aborted) break;
+
           const nextVersion = snapshotVersion(snapshot);
           if (nextVersion !== lastVersion) {
             controller.enqueue(encodeStatusEvent(snapshot));
@@ -208,7 +220,10 @@ export async function GET(request: Request): Promise<Response> {
 
           if (snapshot.terminal) break;
         } catch (error) {
-          if (!(error instanceof GuestAccessRejectedError)) {
+          if (
+            !request.signal.aborted &&
+            !(error instanceof GuestAccessRejectedError)
+          ) {
             getLogger().error('guest status stream refresh failed');
           }
           break;
