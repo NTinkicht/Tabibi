@@ -26,7 +26,7 @@ export type GuestQueueStatusSnapshot =
         earliestAt: string;
         latestAt: string;
         uncertaintyMinutes: number;
-        basis: 'session_start_plus_declared_delay';
+        basis: 'appointment_schedule_plus_declared_delay' | 'session_start_plus_declared_delay';
       } | null;
       session: {
         status: string;
@@ -66,13 +66,14 @@ function verifierMatches(storedVerifier: string, secret: string): boolean {
 
 function provisionalArrivalWindow(
   now: Date,
-  sessionStartsAt: Date,
+  scheduledContextAt: Date,
   declaredDelayMinutes: number | null,
+  appointmentBacked: boolean,
 ) {
   const declaredDelayMs = Math.max(0, declaredDelayMinutes ?? 0) * 60_000;
   const estimatedAtMs = Math.max(
     now.getTime(),
-    sessionStartsAt.getTime() + declaredDelayMs,
+    scheduledContextAt.getTime() + declaredDelayMs,
   );
   const uncertaintyMs = PROVISIONAL_UNCERTAINTY_MINUTES * 60_000;
   return {
@@ -81,7 +82,9 @@ function provisionalArrivalWindow(
     ).toISOString(),
     latestAt: new Date(estimatedAtMs + uncertaintyMs).toISOString(),
     uncertaintyMinutes: PROVISIONAL_UNCERTAINTY_MINUTES,
-    basis: 'session_start_plus_declared_delay' as const,
+    basis: appointmentBacked
+      ? ('appointment_schedule_plus_declared_delay' as const)
+      : ('session_start_plus_declared_delay' as const),
   };
 }
 
@@ -115,6 +118,7 @@ export class GuestStatusService {
       service_position: string;
       session_status: string;
       session_starts_at: Date;
+      appointment_scheduled_start_at: Date | null;
       declared_delay_minutes: number | null;
       delay_version: number;
       queue_order_version: string;
@@ -148,6 +152,7 @@ export class GuestStatusService {
               ordered.service_position,
               session.status::text AS session_status,
               session.starts_at AS session_starts_at,
+              appointment.scheduled_start_at AS appointment_scheduled_start_at,
               session.declared_delay_minutes,
               session.delay_version,
               session.queue_order_version
@@ -160,6 +165,10 @@ export class GuestStatusService {
           AND credential.clinic_id=$1
           AND credential.revoked_at IS NULL
           AND credential.expires_at>$4
+         LEFT JOIN appointments appointment
+           ON appointment.queue_entry_id=$3
+          AND appointment.session_id=$2
+          AND appointment.clinic_id=$1
         WHERE ordered.id=$3
           AND session.status IN ('planned','open','paused')`,
       [target.clinicId, target.sessionId, target.queueEntryId, now],
@@ -168,6 +177,8 @@ export class GuestStatusService {
     if (!row) throw new GuestAccessRejectedError();
 
     const livePosition = row.queue_state !== 'waiting';
+    const provisionalContextAt =
+      row.appointment_scheduled_start_at ?? row.session_starts_at;
     return {
       generatedAt: now.toISOString(),
       terminal: false,
@@ -182,8 +193,9 @@ export class GuestStatusService {
         ? null
         : provisionalArrivalWindow(
             now,
-            row.session_starts_at,
+            provisionalContextAt,
             row.declared_delay_minutes,
+            row.appointment_scheduled_start_at !== null,
           ),
       session: {
         status: row.session_status,
