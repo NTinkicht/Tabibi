@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T12:29:40.004428+00:00
+- Last sync: 2026-09-10T12:30:30.013994+00:00
 
 ## Team Room charter
 
@@ -9356,5 +9356,165 @@ Exact-head CI #538 / `34476928371` is pending. Merge is held. After full green o
 Main `coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots and do not override live WU17 evidence. Gemini Agent/Chat remain PAUSED/OFF-ROSTER. No owner action required.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5618687475
+
+---
+
+### 2026-09-10T12:30:20Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="131"
+
+echo "== PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent PR discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-30:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+
+echo "== Changed files =="
+gh pr diff "$pr" --repo "$repo" --name-only
+
+head_sha="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+echo "== Relevant files at current head: $head_sha =="
+
+for file in \
+  src/app/api/guest/status/route.ts \
+  src/modules/guest-access/index.ts \
+  src/modules/guest-status/index.ts \
+  tests/integration/guest-status-credential-rotation.test.ts \
+  tests/integration/guest-status.test.ts \
+  db/migrations/0015_guest_status_rate_limit.sql \
+  .env.example \
+  SECURITY.md \
+  PRODUCT.md \
+  ARCHITECTURE.md
+do
+  echo "--- $file ---"
+  gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' \
+    | base64 -d \
+    | sed -n '1,420p'
+done
+```
+
+Length of output: 141279
+
+---
+
+</details>
+
+`@NTinkicht`, the current head matches `d38396973a9534299c96d8a81dcebd090db5dc67`.
+
+Do not request the full review yet.
+
+- `Quality and build` is `FAILURE`.
+- `PostgreSQL integration` is `IN_PROGRESS`.
+- `Browser smoke` is `IN_PROGRESS`.
+
+I also found a likely Major regression in the current bearer-envelope change.
+
+`GuestAccessService.consume()` stores `sha256(secret)` for a bearer formatted as `<credentialId>.<secret>.<signature>`.
+
+However, `GuestStatusService.getTerminalSummary()` uses its local two-part parser. It treats the value after the first dot as `secret`. For a valid current bearer, that value is `<secret>.<signature>`. It then hashes this combined value. The hash cannot match the persisted `sha256(secret)`.
+
+As a result, a valid bearer cannot receive the required 15-minute terminal summary after queue or session termination. It receives generic guest-access rejection instead.
+
+Use the shared authenticated bearer parser or update the terminal-summary parser to validate and extract the three-part bearer secret consistently. Add terminal-summary tests for a valid signed bearer after `completed`, `cancelled`, `no_show`, and terminal session state.
+
+After the CI failures and this regression are fixed, wait for green CI on the new exact head. Then request `@coderabbitai full review`.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="131"
+
+echo "== PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent PR discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-30:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+
+echo "== Changed files =="
+gh pr diff "$pr" --repo "$repo" --name-only
+
+head_sha="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+echo "== Relevant files at current head: $head_sha =="
+
+for file in \
+  src/app/api/guest/status/route.ts \
+  src/modules/guest-access/index.ts \
+  src/modules/guest-status/index.ts \
+  tests/integration/guest-status-credential-rotation.test.ts \
+  tests/integration/guest-status.test.ts \
+  db/migrations/0015_guest_status_rate_limit.sql \
+  .env.example \
+  SECURITY.md \
+  PRODUCT.md \
+  ARCHITECTURE.md
+do
+  echo "--- $file ---"
+  gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' \
+    | base64 -d \
+    | sed -n '1,420p'
+done
+```
+
+Length of output: 141279
+
+---
+
+</details>
+
+`@NTinkicht`, the current head matches `d38396973a9534299c96d8a81dcebd090db5dc67`.
+
+Do not request the full review yet.
+
+- `Quality and build` is `FAILURE`.
+- `PostgreSQL integration` is `IN_PROGRESS`.
+- `Browser smoke` is `IN_PROGRESS`.
+
+I also found a likely Major regression in the current bearer-envelope change.
+
+`GuestAccessService.consume()` stores `sha256(secret)` for a bearer formatted as `<credentialId>.<secret>.<signature>`.
+
+However, `GuestStatusService.getTerminalSummary()` uses its local two-part parser. It treats the value after the first dot as `secret`. For a valid current bearer, that value is `<secret>.<signature>`. It then hashes this combined value. The hash cannot match the persisted `sha256(secret)`.
+
+As a result, a valid bearer cannot receive the required 15-minute terminal summary after queue or session termination. It receives generic guest-access rejection instead.
+
+Use the shared authenticated bearer parser or update the terminal-summary parser to validate and extract the three-part bearer secret consistently. Add terminal-summary tests for a valid signed bearer after `completed`, `cancelled`, `no_show`, and terminal session state.
+
+After the CI failures and this regression are fixed, wait for green CI on the new exact head. Then request `@coderabbitai full review`.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5618697718
 
 ---
