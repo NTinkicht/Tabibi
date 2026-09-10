@@ -19,6 +19,7 @@ const bearer = `${ids.credential}.${secret}`;
 
 beforeAll(async () => migrate());
 beforeEach(async () => {
+  delete process.env.GUEST_STATUS_CREDENTIAL_LOOKUP_LIMIT;
   await pool.query(`TRUNCATE guest_status_rate_limit_buckets,guest_credentials,
     guest_exchange_ids,appointment_recovery_receipts,appointment_lifecycle_receipts,
     appointment_booking_receipts,appointments,audit_events,queue_command_receipts,
@@ -73,7 +74,10 @@ beforeEach(async () => {
     ],
   );
 });
-afterAll(async () => pool.end());
+afterAll(async () => {
+  delete process.env.GUEST_STATUS_CREDENTIAL_LOOKUP_LIMIT;
+  await pool.end();
+});
 
 describe('WU17 guest status trusted ingress boundary', () => {
   it('does not let spoofed forwarding headers create independent pre-auth buckets', async () => {
@@ -130,5 +134,58 @@ describe('WU17 guest status trusted ingress boundary', () => {
         queueEntryId: ids.entry,
       },
     });
+  });
+
+  it('bounds rotating fabricated credential ids before any credential lookup', async () => {
+    process.env.GUEST_STATUS_CREDENTIAL_LOOKUP_LIMIT = '4';
+    const fabricatedIds = Array.from({ length: 5 }, () => randomUUID());
+
+    for (const fabricatedId of fabricatedIds.slice(0, 4)) {
+      const response = await GET(
+        new Request('http://localhost/api/guest/status', {
+          headers: {
+            cookie: `__Host-tabibi_guest=${fabricatedId}.fabricated-secret`,
+          },
+        }),
+      );
+      expect(response.status).toBe(401);
+    }
+
+    const fifthId = fabricatedIds[4];
+    await pool.query(
+      `INSERT INTO guest_credentials
+         (id,clinic_id,session_id,queue_entry_id,bearer_verifier,issued_at,expires_at)
+       VALUES($1,$2,$3,$4,$5,now(),now()+interval '1 hour')`,
+      [
+        fifthId,
+        ids.clinic,
+        ids.session,
+        ids.entry,
+        createHash('sha256').update('fabricated-secret').digest('hex'),
+      ],
+    );
+
+    const blockedBeforeLookup = await GET(
+      new Request('http://localhost/api/guest/status', {
+        headers: {
+          cookie: `__Host-tabibi_guest=${fifthId}.fabricated-secret`,
+        },
+      }),
+    );
+
+    expect(blockedBeforeLookup.status).toBe(429);
+    expect(blockedBeforeLookup.headers.get('retry-after')).toBe('60');
+
+    const lookupFuse = await pool.query<{ request_count: string }>(
+      `SELECT request_count::text
+         FROM guest_status_rate_limit_buckets
+        WHERE bucket_key=$1`,
+      [
+        createHash('sha256')
+          .update('guest-status:credential-lookup-fuse')
+          .digest('hex'),
+      ],
+    );
+    expect(lookupFuse.rows[0]?.request_count).toBe('4');
   });
 });
