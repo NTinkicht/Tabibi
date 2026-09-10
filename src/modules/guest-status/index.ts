@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Pool } from 'pg';
 import {
+  authenticatedGuestCredentialId,
   GuestAccessRejectedError,
   GuestAccessService,
   type GuestTarget,
@@ -46,11 +47,11 @@ export type GuestQueueStatusSnapshot =
 function parseBearer(
   bearer: string,
 ): { credentialId: string; secret: string } | null {
-  const separator = bearer.indexOf('.');
-  if (separator <= 0 || separator === bearer.length - 1) return null;
-  const credentialId = bearer.slice(0, separator);
-  const secret = bearer.slice(separator + 1);
-  if (!UUID_PATTERN.test(credentialId) || !secret) return null;
+  const credentialId = authenticatedGuestCredentialId(bearer);
+  if (!credentialId || !UUID_PATTERN.test(credentialId)) return null;
+  const parts = bearer.split('.');
+  const secret = parts[1];
+  if (parts.length !== 3 || !secret) return null;
   return { credentialId, secret };
 }
 
