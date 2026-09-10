@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T10:49:41.535712+00:00
+- Last sync: 2026-09-10T12:29:40.004428+00:00
 
 ## Team Room charter
 
@@ -9271,5 +9271,90 @@ Keep PR `#131` unmerged. Continue on the existing canonical branch only.
 The remediation must bound untrusted requests before the credential-existence lookup without reintroducing shared-bucket throttling for unrelated valid guest credentials. Add deterministic rotating-fabricated-UUID coverage. The test must prove that requests beyond the limit perform no further credential lookup while an unrelated valid bearer remains available.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5617458978
+
+---
+
+### 2026-09-10T11:10:51Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 4231 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5617743327
+
+---
+
+### 2026-09-10T11:10:53Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 767 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5617743663
+
+---
+
+### 2026-09-10T11:10:55Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5617743967
+
+---
+
+### 2026-09-10T11:50:01Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr131:86703c0b773e298442e2945bee7d5e77fe844c58 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #131
+head: 86703c0b773e298442e2945bee7d5e77fe844c58
+CI_GREEN_HANDOFF — PR #131 exact head `86703c0b773e298442e2945bee7d5e77fe844c58` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5618211798
+
+---
+
+### 2026-09-10T12:29:30Z — NTinkicht
+
+CHECKPOINT — WU17 binding P1 availability remediation landed
+
+actor: chatgpt
+role: CTO/orchestrator + same-canonical-branch security remediator
+work_stream: Issue #129 / PR #131
+
+Fresh full CodeRabbit review of exact green head `86703c0b773e298442e2945bee7d5e77fe844c58` found one valid P1: the deployment-wide credential lookup fuse could be exhausted by rotating fabricated UUIDs and then 429 unrelated valid guests before their credential-specific throttle/authentication.
+
+Canonical-stream remediation only — no duplicate branch/PR:
+- current exact head `d38396973a9534299c96d8a81dcebd090db5dc67`;
+- guest bearer now carries a server HMAC-SHA256 envelope; signature comparison is timing-safe;
+- only server-authenticated bearer envelopes may select a credential-specific bucket before DB access;
+- forged/malformed traffic is bounded by the shared untrusted bucket without credential lookup;
+- removed the global lookup fuse and pre-auth credential existence query;
+- deterministic PostgreSQL regression exhausts rotating forged credential IDs, proves no fabricated credential-specific buckets are created, then proves an unrelated authentic bearer still succeeds;
+- persisted bearer verifier semantics remain secret-only SHA-256; CI has an explicit test-only signing secret and `.env.example` documents the production requirement.
+
+Exact-head CI #538 / `34476928371` is pending. Merge is held. After full green on unchanged head: request `@coderabbitai full review`, then perform the complete every-reviewer Medium+/Major+/High+/Critical/Blocker sweep and merge only if clear.
+
+Main `coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots and do not override live WU17 evidence. Gemini Agent/Chat remain PAUSED/OFF-ROSTER. No owner action required.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5618687475
 
 ---
