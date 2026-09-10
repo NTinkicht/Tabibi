@@ -42,6 +42,11 @@ beforeEach(async () => {
     [ids.clinic, ids.otherClinic],
   );
   await pool.query(
+    `INSERT INTO clinic_memberships(clinic_id,user_id,role)
+     VALUES($1,$2,'receptionist')`,
+    [ids.clinic, ids.actor],
+  );
+  await pool.query(
     `INSERT INTO doctor_profiles(id,user_id,display_name) VALUES($1,$2,'Doctor')`,
     [ids.doctor, ids.doctorUser],
   );
@@ -120,6 +125,78 @@ describe('guest exchange credentials', () => {
     );
     expect(audit).not.toContain(issued.exchangeId);
     expect(audit).not.toContain(consumed.bearer);
+  });
+
+  it('authorizes issuance against the target clinic membership', async () => {
+    const outsider = randomUUID();
+    const otherClinicActor = randomUUID();
+    await pool.query(
+      `INSERT INTO users(id,auth_subject,display_name) VALUES
+       ($1,'guest-outsider','Outsider'),($2,'guest-other-clinic','Other Clinic')`,
+      [outsider, otherClinicActor],
+    );
+    await pool.query(
+      `INSERT INTO clinic_memberships(clinic_id,user_id,role)
+       VALUES($1,$2,'receptionist')`,
+      [ids.otherClinic, otherClinicActor],
+    );
+
+    await expect(
+      new GuestAccessService(pool).issue(target, outsider),
+    ).rejects.toThrow();
+    await expect(
+      new GuestAccessService(pool).issue(target, otherClinicActor),
+    ).rejects.toThrow();
+    expect(
+      (await pool.query('SELECT * FROM guest_exchange_ids')).rowCount,
+    ).toBe(0);
+    expect(
+      (await pool.query("SELECT * FROM audit_events WHERE action='guest_exchange_issued'"))
+        .rowCount,
+    ).toBe(0);
+  });
+
+  it('rejects a second exchange consumption while a live credential already exists', async () => {
+    const service = new GuestAccessService(pool);
+    const first = await service.issue(
+      target,
+      ids.actor,
+      new Date('2026-09-09T09:00:00Z'),
+    );
+    const second = await service.issue(
+      target,
+      ids.actor,
+      new Date('2026-09-09T09:00:30Z'),
+    );
+
+    await service.consume(
+      first.exchangeId,
+      target,
+      new Date('2026-09-09T09:01:00Z'),
+    );
+    await expect(
+      service.consume(
+        second.exchangeId,
+        target,
+        new Date('2026-09-09T09:01:30Z'),
+      ),
+    ).rejects.toBeInstanceOf(GuestAccessRejectedError);
+
+    expect((await pool.query('SELECT * FROM guest_credentials')).rowCount).toBe(
+      1,
+    );
+    const secondState = await pool.query<{ consumed_at: Date | null }>(
+      'SELECT consumed_at FROM guest_exchange_ids WHERE exchange_verifier=$1',
+      [createHash('sha256').update(second.exchangeId).digest('hex')],
+    );
+    expect(secondState.rows[0].consumed_at).toBeNull();
+    expect(
+      (
+        await pool.query(
+          "SELECT * FROM audit_events WHERE action='guest_exchange_consumed'",
+        )
+      ).rowCount,
+    ).toBe(1);
   });
 
   it('rejects a queue entry from another same-clinic session', async () => {
