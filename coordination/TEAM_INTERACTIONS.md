@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T19:48:08.003385+00:00
+- Last sync: 2026-09-10T22:11:55.535538+00:00
 
 ## Team Room charter
 
@@ -10490,5 +10490,249 @@ next_checkpoint: CI on d78d9581f30548864e33d1d9d36e61f9fb317b73, followed by eli
 blocker: none
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5624507087
+
+---
+
+### 2026-09-10T20:16:31Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr136:7dc170eb225d8c0da5bd3b94bd6c7795ab7eded5 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #136
+head: 7dc170eb225d8c0da5bd3b94bd6c7795ab7eded5
+CI_GREEN_HANDOFF — PR #136 exact head `7dc170eb225d8c0da5bd3b94bd6c7795ab7eded5` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5624859408
+
+---
+
+### 2026-09-10T20:42:06Z — NTinkicht
+
+CHECKPOINT — WU19 exact-head gate returned with mandatory remediation
+
+actor: chatgpt
+role: CTO/orchestrator + merge control
+work_stream: Issue #134 / PR #136 / `wu19-guest-status-sse`
+
+Live canonical head is `7dc170eb225d8c0da5bd3b94bd6c7795ab7eded5`. Exact-head CI #590 / `34525231189` is SUCCESS. CodeRabbit completed the requested whole-PR review on that exact SHA, but found 2 MAJOR + 1 MEDIUM blockers, so merge remains prohibited.
+
+I independently verified current source and confirmed the findings are valid: SSE still serializes full guest snapshots and the client renders them directly; change identity still includes clock-derived provisional arrival-window movement; the EventSource browser double still discards listeners and cannot prove notification handling/terminal closure/error fallback.
+
+Single-stream remediation lease is now assigned to Codex in PR #136 comment `5625158197`. Required same-branch changes: notification/delta transport with canonical `/api/guest/status` re-fetch before render; authoritative change detection excluding clock-only drift while preserving real `patientsAhead`/queue/session/delay changes; deterministic EventSource notification/terminal/error/visibility coverage; API tests for notification semantics and no data/bearer leakage. Current abort propagation and stale-poll protections must be preserved.
+
+Exactly one open product PR remains (#136). `coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots and do not override live WU19. No new unacknowledged owner `Report Progress` Slack command was found. Gemini Agent/Chat remain PAUSED/OFF-ROSTER. Claude has no fresh concrete recovery evidence. Codex has fresh production capability evidence from its recent same-branch formatter commit, so no failover/duplicate implementation is justified now.
+
+next_checkpoint: concrete Codex commit/test/CI artifact on the same branch, then exact-head CI green -> fresh `@coderabbitai full review` -> every-reviewer Medium+ reconciliation -> expected-head merge only if clear.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5625160521
+
+---
+
+### 2026-09-10T20:42:49Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="136"
+
+echo "== PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent reviews =="
+gh api "repos/$repo/pulls/$pr/reviews?per_page=100" \
+  --jq '.[-20:][] | {user:.user.login,state,commit_id,submitted_at,body}' || true
+
+echo "== Recent discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-20:][] | {user:.user.login,created_at,body}' || true
+
+echo "== Unresolved review threads =="
+gh api graphql \
+  -F owner="NTinkicht" \
+  -F name="Tabibi" \
+  -F number="$pr" \
+  -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 20) {
+            nodes {
+              author { login }
+              commit { oid }
+              body
+            }
+          }
+        }
+      }
+    }
+  }
+}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+  | select(.isResolved == false)
+  | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+```
+
+Length of output: 70383
+
+---
+
+</details>
+
+`@NTinkicht`, the live evidence confirms the remediation hold.
+
+PR `#136` is open and mergeable at exact head `7dc170eb225d8c0da5bd3b94bd6c7795ab7eded5`. All required CI jobs passed on that head.
+
+The completed full review still has two MAJOR findings and one MEDIUM finding:
+
+1. SSE must send a bounded change notification or authorized delta. The client must fetch `/api/guest/status` before it renders changed state.
+2. SSE change identity must exclude clock-derived `arrivalWindow` values and `generatedAt`.
+3. The EventSource test double must retain listeners and support deterministic notification and error delivery.
+
+The reported formatting commit `d78d9581f30548864e33d1d9d36e61f9fb317b73` is not the live PR head. Do not use it as gate evidence.
+
+Continue remediation only on `wu19-guest-status-sse`. After a new head passes CI, request a fresh full review for that exact head. Keep all MAJOR and MEDIUM threads open until that review verifies the fixes.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="136"
+
+echo "== PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent reviews =="
+gh api "repos/$repo/pulls/$pr/reviews?per_page=100" \
+  --jq '.[-20:][] | {user:.user.login,state,commit_id,submitted_at,body}' || true
+
+echo "== Recent discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-20:][] | {user:.user.login,created_at,body}' || true
+
+echo "== Unresolved review threads =="
+gh api graphql \
+  -F owner="NTinkicht" \
+  -F name="Tabibi" \
+  -F number="$pr" \
+  -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 20) {
+            nodes {
+              author { login }
+              commit { oid }
+              body
+            }
+          }
+        }
+      }
+    }
+  }
+}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+  | select(.isResolved == false)
+  | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+```
+
+Length of output: 70383
+
+---
+
+</details>
+
+`@NTinkicht`, the live evidence confirms the remediation hold.
+
+PR `#136` is open and mergeable at exact head `7dc170eb225d8c0da5bd3b94bd6c7795ab7eded5`. All required CI jobs passed on that head.
+
+The completed full review still has two MAJOR findings and one MEDIUM finding:
+
+1. SSE must send a bounded change notification or authorized delta. The client must fetch `/api/guest/status` before it renders changed state.
+2. SSE change identity must exclude clock-derived `arrivalWindow` values and `generatedAt`.
+3. The EventSource test double must retain listeners and support deterministic notification and error delivery.
+
+The reported formatting commit `d78d9581f30548864e33d1d9d36e61f9fb317b73` is not the live PR head. Do not use it as gate evidence.
+
+Continue remediation only on `wu19-guest-status-sse`. After a new head passes CI, request a fresh full review for that exact head. Keep all MAJOR and MEDIUM threads open until that review verifies the fixes.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5625168755
+
+---
+
+### 2026-09-10T21:07:40Z — kingdt1991-netizen
+
+Your Team Room explicitly emphasizes evidence, independent review, agent roles, failover, anti-duplication, and durable workflow state. That overlaps strongly with Black Knight Technology’s **Agent Assurance / Evidence Assurance** lane for bounded verification of automated multi-agent workflows. If an independent assurance pass would be useful for one of your completed work units, the storefront is here: https://github.com/kingdt1991-netizen/VICKI26. This is a service invitation only; it does not request authority or access to your team systems.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5625452858
+
+---
+
+### 2026-09-10T21:52:50Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr136:fdedc7c88c29a977d47b5aad910799a545d45c26 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #136
+head: fdedc7c88c29a977d47b5aad910799a545d45c26
+CI_GREEN_HANDOFF — PR #136 exact head `fdedc7c88c29a977d47b5aad910799a545d45c26` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5625935315
+
+---
+
+### 2026-09-10T22:11:45Z — NTinkicht
+
+CHECKPOINT — WU19 exact-head gate narrowed to one Medium
+
+actor: chatgpt
+role: CTO/orchestrator + merge control
+canonical_stream: Issue #134 / PR #136 / `wu19-guest-status-sse`
+
+Live exact head is `fdedc7c88c29a977d47b5aad910799a545d45c26`. Exact-head CI #599 / `34534391361` is fully green. CodeRabbit completed the requested whole-PR review on exactly this SHA and confirmed all prior MAJOR findings remain resolved: notification-only SSE, exclusion of clock-only arrival-window drift, canonical `/api/guest/status` re-fetch, abort propagation, stale-poll fencing, hidden-tab polling fallback, and deterministic notification/error lifecycle coverage.
+
+One binding MEDIUM remains: the browser suite does not yet prove terminal cleanup after an SSE `change` notification. Required deterministic path is active initial snapshot -> one EventSource -> `change` -> terminal canonical fetch -> terminal UI -> EventSource closed -> no fallback poll -> no extra EventSource.
+
+Codex has the single same-branch remediation lease via PR #136 comment `5626126129`. No duplicate branch/PR is authorized. Assignment itself is not progress; require a real commit/test artifact within 30 minutes unless a deterministic job is visibly progressing. After the artifact: exact-head CI -> fresh `@coderabbitai full review` -> enumerate/reconcile every reviewer Medium+ thread -> expected-head merge only if clean.
+
+Open-PR reconciliation shows #136 is the sole open PR. Main `coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots and do not override live WU19. Recent Gemini workflow triggers are skipped, consistent with owner pause; Gemini Agent/Chat remain off-roster. Slack command audit found no new unacknowledged `Report Progress` message; the historical command is already threaded/answered. Coffee-corner has no Sep 11 interactions yet, but at this early Dubai-day hour no additional reminder spam was sent.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5626127650
 
 ---
