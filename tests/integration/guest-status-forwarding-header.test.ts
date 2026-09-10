@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { GET } from '@/app/api/guest/status/route';
 import { migrate } from '../../scripts/db/lib';
 
@@ -73,6 +73,7 @@ beforeEach(async () => {
     ],
   );
 });
+afterAll(async () => pool.end());
 
 describe('WU17 guest status trusted ingress boundary', () => {
   it('does not let spoofed forwarding headers create independent pre-auth buckets', async () => {
