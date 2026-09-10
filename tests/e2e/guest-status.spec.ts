@@ -234,3 +234,53 @@ test('guest status formats arrival times in the clinic timezone', async ({
   await page.goto('/guest/status');
   await expect(page.getByText(/10:30.*10:45/)).toBeVisible();
 });
+
+test('guest status closes SSE while hidden and performs a canonical poll when visible again', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    let hidden = false;
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => (hidden ? 'hidden' : 'visible'),
+    });
+    Object.defineProperty(window, '__setGuestStatusHiddenForTest', {
+      configurable: true,
+      value: (value: boolean) => {
+        hidden = value;
+        document.dispatchEvent(new Event('visibilitychange'));
+      },
+    });
+  });
+
+  let polls = 0;
+  await page.route('**/api/guest/status', async (route) => {
+    polls += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(activeEligible),
+    });
+  });
+
+  await page.goto('/guest/status');
+  await expect(page.getByText('Patients ahead: 2')).toBeVisible();
+  expect(polls).toBe(1);
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setGuestStatusHiddenForTest: (value: boolean) => void;
+      }
+    ).__setGuestStatusHiddenForTest(true);
+  });
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setGuestStatusHiddenForTest: (value: boolean) => void;
+      }
+    ).__setGuestStatusHiddenForTest(false);
+  });
+
+  await expect.poll(() => polls).toBe(2);
+});
