@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T05:25:14.221637+00:00
+- Last sync: 2026-09-10T08:29:54.179725+00:00
 
 ## Team Room charter
 
@@ -8508,5 +8508,497 @@ After the three MAJOR findings and formatting failure are resolved on the same c
 4. Use an eligible non-author exact-SHA gate under the governing policy before merge.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5613628383
+
+---
+
+### 2026-09-10T05:51:55Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-changes-required-remediation-pr131:f68c9a2a2d5ab8e3cd06d0f949a6ce0798412c0d -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #131
+head: f68c9a2a2d5ab8e3cd06d0f949a6ce0798412c0d
+HANDOFF_TO_IMPLEMENTER — PR #131 exact head `f68c9a2a2d5ab8e3cd06d0f949a6ce0798412c0d` has CHANGES_REQUIRED. Continue the existing canonical branch/PR only; resolve the concrete findings and rerun CI. The orchestrator must reconcile the current implementer lease before any edit.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5613849124
+
+---
+
+### 2026-09-10T05:54:38Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 3914 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5613870944
+
+---
+
+### 2026-09-10T05:54:39Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 451 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5613871128
+
+---
+
+### 2026-09-10T05:54:40Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5613871298
+
+---
+
+### 2026-09-10T05:56:37Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr131:b803521ab59bcf8facce8c27d9567002557ae564 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #131
+head: b803521ab59bcf8facce8c27d9567002557ae564
+CI_GREEN_HANDOFF — PR #131 exact head `b803521ab59bcf8facce8c27d9567002557ae564` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5613888141
+
+---
+
+### 2026-09-10T06:35:11Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr131:0a6a0880127716602f8c94c869a3c4727a98f456 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #131
+head: 0a6a0880127716602f8c94c869a3c4727a98f456
+CI_GREEN_HANDOFF — PR #131 exact head `0a6a0880127716602f8c94c869a3c4727a98f456` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5614242139
+
+---
+
+### 2026-09-10T07:35:27Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr131:41be1ef7878e8cb3ed2936424cc648240d4b1c80 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #131
+head: 41be1ef7878e8cb3ed2936424cc648240d4b1c80
+CI_GREEN_HANDOFF — PR #131 exact head `41be1ef7878e8cb3ed2936424cc648240d4b1c80` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5614887951
+
+---
+
+### 2026-09-10T08:09:25Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr131:3d02219fe56bf16df1601ecc2a6b16978f239561 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #131
+head: 3d02219fe56bf16df1601ecc2a6b16978f239561
+CI_GREEN_HANDOFF — PR #131 exact head `3d02219fe56bf16df1601ecc2a6b16978f239561` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5615301826
+
+---
+
+### 2026-09-10T08:28:35Z — NTinkicht
+
+CHECKPOINT — WU17 High/P1 race remediated on canonical PR #131
+
+actor: chatgpt
+role: CTO/orchestrator + same-branch bounded remediator
+work_stream: Issue #129 / PR #131
+
+Fresh binding full CodeRabbit review of prior green exact head `3d02219fe56bf16df1601ecc2a6b16978f239561` found a valid High/P1 credential-rotation TOCTOU: authorization validated one bearer credential, but the subsequent active projection could join a replacement active credential for the same target after revocation/rotation.
+
+Canonical-stream remediation only — no duplicate branch/PR:
+- active projection now binds the exact credential UUID from the presented bearer in addition to clinic/session/queue target and active lifetime;
+- deterministic PostgreSQL race regression revokes that exact credential after authorization, inserts a replacement credential for the same target, and verifies the old bearer is rejected;
+- CI #508 confirmed the security regression itself passes. Its two failures were mechanical in the new fixture only: Prettier and teardown ordering against audit FK; Browser smoke passed;
+- both mechanical issues are corrected on current exact head `97897d485b17638a8e96846323ad8760a6e89800`;
+- fresh CI #509 / `34455308008` is running on that exact head.
+
+Merge held. After exact-head green: `@coderabbitai full review`, then enumerate/reconcile every reviewer source and every Medium+/Major+/High+/Critical/Blocker thread before expected-head merge. ChatGPT authored this head and is recused from independent gating.
+
+Slack command audit: no new unacknowledged owner `Report Progress`; Gemini Agent/Chat remain paused. Main STATE/WORK_QUEUE remain stale WU14 snapshots and do not override live GitHub.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5615564468
+
+---
+
+### 2026-09-10T08:29:32Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr131:97897d485b17638a8e96846323ad8760a6e89800 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #131
+head: 97897d485b17638a8e96846323ad8760a6e89800
+CI_GREEN_HANDOFF — PR #131 exact head `97897d485b17638a8e96846323ad8760a6e89800` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5615576341
+
+---
+
+### 2026-09-10T08:29:44Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="131"
+
+echo "== Required collaboration guidance =="
+for file in \
+  AGENTS.md \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  if [[ -f "$file" ]]; then
+    echo "--- $file ---"
+    sed -n '1,180p' "$file"
+  fi
+done
+
+echo "== PR metadata and checks =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,mergeable,reviewDecision,title,url
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Changed files =="
+gh pr diff "$pr" --repo "$repo" --name-only
+
+echo "== Recent discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-25:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+
+echo "== CodeRabbit review comments =="
+gh api "repos/$repo/pulls/$pr/comments?per_page=100" \
+  --jq '.[] | select(.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai") | {commit_id,path,line,body,created_at}' || true
+
+head_sha="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+echo "== Relevant files at current head: $head_sha =="
+for file in \
+  src/modules/guest-status/index.ts \
+  src/modules/guest-access/index.ts \
+  src/app/api/guest/status/route.ts \
+  tests/integration/guest-status.test.ts
+do
+  echo "--- $file ---"
+  gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' \
+    | base64 -d > "/tmp/$(basename "$file")"
+  case "$file" in
+    *.ts)
+      ast-grep outline "/tmp/$(basename "$file")" --items all || true
+      sed -n '1,360p' "/tmp/$(basename "$file")"
+      ;;
+    *) cat "/tmp/$(basename "$file")" ;;
+  esac
+done
+```
+
+Length of output: 129735
+
+---
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="131"
+expected="97897d485b17638a8e96846323ad8760a6e89800"
+
+actual="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+printf '== Head ==\nexpected=%s\nactual=%s\n' "$expected" "$actual"
+
+echo "== Required CI =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Current PR patch =="
+gh api "repos/$repo/pulls/$pr/files?per_page=100" --paginate \
+  --jq '.[] | "===== \(.filename) =====\n\(.patch // "[patch unavailable]")"'
+
+echo "== Credential rotation regression =="
+gh api "repos/$repo/contents/tests/integration/guest-status-credential-rotation.test.ts?ref=$actual" \
+  --jq '.content' | base64 -d > /tmp/guest-status-credential-rotation.test.ts
+ast-grep outline /tmp/guest-status-credential-rotation.test.ts --items all || true
+cat -n /tmp/guest-status-credential-rotation.test.ts
+
+echo "== Rate-limit migration =="
+gh api "repos/$repo/contents/db/migrations/0015_guest_status_rate_limit.sql?ref=$actual" \
+  --jq '.content' | base64 -d | cat -n
+
+echo "== Applicable current contracts =="
+for file in PRODUCT.md ARCHITECTURE.md SECURITY.md; do
+  echo "--- $file ---"
+  gh api "repos/$repo/contents/$file?ref=$actual" --jq '.content' | base64 -d \
+    | rg -n -i -C 5 'guest|credential|revok|terminal summary|arrival window|rate limit|enumeration'
+done
+
+echo "== Current review decision and unresolved threads =="
+gh pr view "$pr" --repo "$repo" --json reviewDecision,mergeable,state,headRefOid
+gh api graphql -F owner="NTinkicht" -F name="Tabibi" -F number="$pr" -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 20) {
+            nodes { author { login } commit { oid } body }
+          }
+        }
+      }
+    }
+  }
+}' --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+  | select(.isResolved == false)
+  | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+```
+
+Length of output: 93727
+
+---
+
+</details>
+
+`@NTinkicht`, **CHANGES_REQUIRED** for PR `#131` at exact head `97897d485b17638a8e96846323ad8760a6e89800`.
+
+All required CI jobs are green on this head.
+
+The credential-rotation remediation is correct. `GuestStatusService.getActiveSnapshot()` binds the projection to the bearer credential UUID. The deterministic regression revokes that exact credential, adds a replacement for the same target, and rejects the old bearer.
+
+## High: Do not rate-limit all guest-status traffic through one shared 30-request bucket
+
+`src/app/api/guest/status/route.ts` consumes `guest-status:untrusted-ingress` before it validates the bearer. The bucket permits only 30 requests per 60 seconds for the entire deployment.
+
+An attacker can send 30 malformed or invalid-cookie requests. The next valid guest-status request then receives `429`. The attacker does not need a valid credential or forwarding-header control.
+
+This design also conflicts with the required 30-second polling fallback. More than 15 normal guests polling concurrently can exceed the shared 30-per-minute deployment limit.
+
+The forwarding-header change correctly removes caller-controlled IP inputs. However, it replaces that bypass with a deployment-wide availability bottleneck.
+
+### Required resolution
+
+Use a platform-authenticated client-address source with an explicit trusted-proxy contract. Apply the pre-authorization abuse limit to that trusted identity.
+
+If the runtime cannot provide a trusted client address, do not use a small global bucket that throttles valid guest polling. Use a bounded design that controls malformed-request abuse without making unrelated valid credentials share one attacker-exhaustible limit.
+
+Add deterministic coverage that proves:
+
+- Invalid traffic from one trusted client identity is throttled.
+- An exhausted invalid-request bucket does not block a valid guest from a different trusted client identity.
+- Normal 30-second polling for multiple valid guest credentials does not exceed the ingress limit.
+- Caller-supplied `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, and `CF-Connecting-IP` values cannot select the trusted identity.
+
+Merge must remain blocked until this High finding is resolved on a new exact head, CI is green, and a new full review completes.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="131"
+
+echo "== Required collaboration guidance =="
+for file in \
+  AGENTS.md \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  if [[ -f "$file" ]]; then
+    echo "--- $file ---"
+    sed -n '1,180p' "$file"
+  fi
+done
+
+echo "== PR metadata and checks =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,mergeable,reviewDecision,title,url
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Changed files =="
+gh pr diff "$pr" --repo "$repo" --name-only
+
+echo "== Recent discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-25:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+
+echo "== CodeRabbit review comments =="
+gh api "repos/$repo/pulls/$pr/comments?per_page=100" \
+  --jq '.[] | select(.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai") | {commit_id,path,line,body,created_at}' || true
+
+head_sha="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+echo "== Relevant files at current head: $head_sha =="
+for file in \
+  src/modules/guest-status/index.ts \
+  src/modules/guest-access/index.ts \
+  src/app/api/guest/status/route.ts \
+  tests/integration/guest-status.test.ts
+do
+  echo "--- $file ---"
+  gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' \
+    | base64 -d > "/tmp/$(basename "$file")"
+  case "$file" in
+    *.ts)
+      ast-grep outline "/tmp/$(basename "$file")" --items all || true
+      sed -n '1,360p' "/tmp/$(basename "$file")"
+      ;;
+    *) cat "/tmp/$(basename "$file")" ;;
+  esac
+done
+```
+
+Length of output: 129735
+
+---
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="131"
+expected="97897d485b17638a8e96846323ad8760a6e89800"
+
+actual="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+printf '== Head ==\nexpected=%s\nactual=%s\n' "$expected" "$actual"
+
+echo "== Required CI =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Current PR patch =="
+gh api "repos/$repo/pulls/$pr/files?per_page=100" --paginate \
+  --jq '.[] | "===== \(.filename) =====\n\(.patch // "[patch unavailable]")"'
+
+echo "== Credential rotation regression =="
+gh api "repos/$repo/contents/tests/integration/guest-status-credential-rotation.test.ts?ref=$actual" \
+  --jq '.content' | base64 -d > /tmp/guest-status-credential-rotation.test.ts
+ast-grep outline /tmp/guest-status-credential-rotation.test.ts --items all || true
+cat -n /tmp/guest-status-credential-rotation.test.ts
+
+echo "== Rate-limit migration =="
+gh api "repos/$repo/contents/db/migrations/0015_guest_status_rate_limit.sql?ref=$actual" \
+  --jq '.content' | base64 -d | cat -n
+
+echo "== Applicable current contracts =="
+for file in PRODUCT.md ARCHITECTURE.md SECURITY.md; do
+  echo "--- $file ---"
+  gh api "repos/$repo/contents/$file?ref=$actual" --jq '.content' | base64 -d \
+    | rg -n -i -C 5 'guest|credential|revok|terminal summary|arrival window|rate limit|enumeration'
+done
+
+echo "== Current review decision and unresolved threads =="
+gh pr view "$pr" --repo "$repo" --json reviewDecision,mergeable,state,headRefOid
+gh api graphql -F owner="NTinkicht" -F name="Tabibi" -F number="$pr" -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 20) {
+            nodes { author { login } commit { oid } body }
+          }
+        }
+      }
+    }
+  }
+}' --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+  | select(.isResolved == false)
+  | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+```
+
+Length of output: 93727
+
+---
+
+</details>
+
+`@NTinkicht`, **CHANGES_REQUIRED** for PR `#131` at exact head `97897d485b17638a8e96846323ad8760a6e89800`.
+
+All required CI jobs are green on this head.
+
+The credential-rotation remediation is correct. `GuestStatusService.getActiveSnapshot()` binds the projection to the bearer credential UUID. The deterministic regression revokes that exact credential, adds a replacement for the same target, and rejects the old bearer.
+
+## High: Do not rate-limit all guest-status traffic through one shared 30-request bucket
+
+`src/app/api/guest/status/route.ts` consumes `guest-status:untrusted-ingress` before it validates the bearer. The bucket permits only 30 requests per 60 seconds for the entire deployment.
+
+An attacker can send 30 malformed or invalid-cookie requests. The next valid guest-status request then receives `429`. The attacker does not need a valid credential or forwarding-header control.
+
+This design also conflicts with the required 30-second polling fallback. More than 15 normal guests polling concurrently can exceed the shared 30-per-minute deployment limit.
+
+The forwarding-header change correctly removes caller-controlled IP inputs. However, it replaces that bypass with a deployment-wide availability bottleneck.
+
+### Required resolution
+
+Use a platform-authenticated client-address source with an explicit trusted-proxy contract. Apply the pre-authorization abuse limit to that trusted identity.
+
+If the runtime cannot provide a trusted client address, do not use a small global bucket that throttles valid guest polling. Use a bounded design that controls malformed-request abuse without making unrelated valid credentials share one attacker-exhaustible limit.
+
+Add deterministic coverage that proves:
+
+- Invalid traffic from one trusted client identity is throttled.
+- An exhausted invalid-request bucket does not block a valid guest from a different trusted client identity.
+- Normal 30-second polling for multiple valid guest credentials does not exceed the ingress limit.
+- Caller-supplied `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, and `CF-Connecting-IP` values cannot select the trusted identity.
+
+Merge must remain blocked until this High finding is resolved on a new exact head, CI is green, and a new full review completes.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5615578879
 
 ---
