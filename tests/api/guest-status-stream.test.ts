@@ -142,7 +142,11 @@ describe('GET /api/guest/status/stream', () => {
     expect(body).toContain(JSON.stringify(terminalSnapshot));
     expect(body).not.toContain(bearer);
     expect(getSnapshot).toHaveBeenCalledTimes(1);
-    expect(getSnapshot).toHaveBeenCalledWith(bearer);
+    expect(getSnapshot).toHaveBeenCalledWith(
+      bearer,
+      expect.any(Date),
+      expect.any(AbortSignal),
+    );
   });
 
   it('suppresses timestamp-only refreshes but emits guest-visible projection changes even when session versions are unchanged', async () => {
@@ -194,6 +198,41 @@ describe('GET /api/guest/status/stream', () => {
     const end = await reader!.read();
     expect(end.done).toBe(true);
     expect(getSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts a refresh lookup that is already pending when the client disconnects', async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    let refreshSignal: AbortSignal | undefined;
+    getSnapshot
+      .mockResolvedValueOnce(activeSnapshot)
+      .mockImplementationOnce(
+        (_bearer: string, _now: Date, signal: AbortSignal) =>
+          new Promise((_, reject) => {
+            refreshSignal = signal;
+            signal.addEventListener(
+              'abort',
+              () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError')),
+              { once: true },
+            );
+          }),
+      );
+
+    const response = await GET(requestWithBearer(controller.signal));
+    const reader = response.body!.getReader();
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain(
+      'event: status',
+    );
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(getSnapshot).toHaveBeenCalledTimes(2);
+    expect(refreshSignal).toBe(controller.signal);
+    expect(refreshSignal?.aborted).toBe(false);
+
+    controller.abort();
+    const end = await reader.read();
+    expect(end.done).toBe(true);
+    expect(refreshSignal?.aborted).toBe(true);
   });
 
   it('closes without leaking details when authorization is revoked during refresh', async () => {
