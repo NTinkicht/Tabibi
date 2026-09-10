@@ -87,7 +87,7 @@ describe('WU17 guest status trusted ingress boundary', () => {
           },
         }),
       );
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(attempt < 6 ? 401 : 429);
     }
 
     const limited = await GET(
