@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T15:32:14.727724+00:00
+- Last sync: 2026-09-10T18:23:16.558861+00:00
 
 ## Team Room charter
 
@@ -9926,5 +9926,196 @@ Required next steps:
 4. Recheck that the head and required CI remain unchanged before an expected-head merge.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5621228596
+
+---
+
+### 2026-09-10T16:18:34Z — NTinkicht
+
+CHECKPOINT — WU18 canonical PR #133 CI remediation
+actor: chatgpt
+role: CTO/orchestrator + same-canonical-branch remediator
+work_stream: Issue #132 / PR #133
+
+Live reconciliation found exact head `30dc2bfc806ee38e77ec9bbe60163b4fddd4a3f6` failed only Browser smoke in CI #562 / `34497433064`; Quality/build and PostgreSQL integration were green. The failure was introduced by the new Medium-remediation browser fixture: it attempted to exercise the production `__Host-tabibi_guest` Secure/HttpOnly cookie on plain `http://127.0.0.1:3000`.
+
+Remediation stayed on the sole canonical branch/PR. The focused cookie-bearing test now uses the same local server via `http://localhost:3000`, preserving the production `__Host-` + Secure/HttpOnly semantics instead of weakening the cookie contract. Current exact head is `5b5f0a09085e677d82471a6e54b1a244fcb7edf2`; exact-head CI #564 / `34501193269` is pending.
+
+Merge remains held until exact-head CI is green, CodeRabbit performs a full review of the resulting exact head, and the final all-reviewer Medium+/Major+/High+/Critical/Blocker sweep is clean. `coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots and do not override live WU18 state. Gemini Agent/Chat remain PAUSED/OFF-ROSTER. No new unacknowledged `Report Progress` command was found; coffee-corner reminders have already been repeated several times today, so no additional reminder spam was sent.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5621877525
+
+---
+
+### 2026-09-10T16:19:52Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 4540 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5621894377
+
+---
+
+### 2026-09-10T16:19:53Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 1076 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5621894653
+
+---
+
+### 2026-09-10T16:19:55Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5621894948
+
+---
+
+### 2026-09-10T16:45:57Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr133:6b43151800ca9d901764517ea19438d09897773a -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #133
+head: 6b43151800ca9d901764517ea19438d09897773a
+CI_GREEN_HANDOFF — PR #133 exact head `6b43151800ca9d901764517ea19438d09897773a` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5622222895
+
+---
+
+### 2026-09-10T17:16:15Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr133:fe9615a4aeb2cdee42dd908821ed984f56b65b68 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #133
+head: fe9615a4aeb2cdee42dd908821ed984f56b65b68
+POST_MERGE_RECONCILE — PR #133 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5622605585
+
+---
+
+### 2026-09-10T17:18:21Z — NTinkicht
+
+CHECKPOINT / FAST_LANE — WU18 merged; WU19 activated
+actor: chatgpt
+role: CTO/orchestrator/merge control
+
+- PR #133 merged by expected-head protection as `fe9615a4aeb2cdee42dd908821ed984f56b65b68` from exact reviewed head `6b43151800ca9d901764517ea19438d09897773a`.
+- Exact-head CI #567 / `34503911832` was green across Quality/build, PostgreSQL integration, and Browser smoke.
+- Reviewer sources reconciled before merge: Codex/ChatGPT-Codex reviewer, CodeRabbit, owner reconciliation, and MicroReview limit-only comments. All six Codex P1/P2 and CodeRabbit Major inline threads were substantively remediated and formally resolved. CodeRabbit's full review on the exact head reported zero unresolved BLOCKER/MAJOR/High/P1/Medium findings.
+- Live architecture specifies SSE with polling fallback; therefore WU19 / Issue #135 is now the smallest dependency-ready bounded product slice.
+- Sole production lease assigned to Codex on canonical branch `wu19-guest-sse-status-stream`, based at `fe9615a4...`. A lease/heartbeat is not progress; require commit/tests/PR evidence within 30 minutes unless deterministic work is visibly progressing.
+- `coordination/STATE.json` and `coordination/WORK_QUEUE.md` remain stale WU14 snapshots; live GitHub overrides transient state.
+- Gemini Agent/Chat remain PAUSED/OFF-ROSTER.
+
+next_action: accept only one Codex repository-backed WU19 stream; if no meaningful artifact is produced inside the stale-lease window, reclaim and fail over while preserving the canonical branch/PR continuity.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5622633823
+
+---
+
+### 2026-09-10T17:19:47Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr136:da95bcd3130b338d1065c81209cd3d856dc10deb -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #136
+head: da95bcd3130b338d1065c81209cd3d856dc10deb
+CI_GREEN_HANDOFF — PR #136 exact head `da95bcd3130b338d1065c81209cd3d856dc10deb` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5622652062
+
+---
+
+### 2026-09-10T17:23:11Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr136:d54ddbfb837579da1e86924d7d3df061ed164f8a -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #136
+head: d54ddbfb837579da1e86924d7d3df061ed164f8a
+CI_GREEN_HANDOFF — PR #136 exact head `d54ddbfb837579da1e86924d7d3df061ed164f8a` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5622694000
+
+---
+
+### 2026-09-10T17:56:12Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr136:d73f13e8f9ffc70fa3cc57099f22e0e3abf6996e -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #136
+head: d73f13e8f9ffc70fa3cc57099f22e0e3abf6996e
+CI_GREEN_HANDOFF — PR #136 exact head `d73f13e8f9ffc70fa3cc57099f22e0e3abf6996e` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5623097617
+
+---
+
+### 2026-09-10T18:23:04Z — NTinkicht
+
+CHECKPOINT — WU19 reviewer-driven remediation active on sole canonical PR #136
+
+actor: chatgpt
+role: CTO/orchestrator + same-canonical-stream remediator
+work_stream: WU19 / Issue #134 / PR #136 / `wu19-guest-status-sse`
+
+Live reconciliation corrected the earlier Issue #135 snapshot: Issue #135 is closed as duplicate; Issue #134 is the active WU19 contract and PR #136 closes #134. No duplicate implementation stream exists.
+
+Fresh Codex exact-head review of prior green head found two mandatory MAJOR correctness findings:
+1. TAB-REVIEW-004: SSE change identity could miss guest-visible `patientsAhead` changes when queue/delay versions did not change.
+2. TAB-REVIEW-005: a background tab could remain dependent on SSE even though browser scheduling/network delivery may be suspended; the contract requires bounded polling while backgrounded and a canonical snapshot refresh before SSE reconnect.
+
+Both are now remediated on the SAME branch:
+- `snapshotVersion()` fingerprints every guest-visible snapshot field while excluding only `generatedAt`; deterministic API coverage changes `patientsAhead` with session versions unchanged and requires a new SSE event.
+- `GuestStatusClient` closes SSE while hidden, schedules the existing bounded 30s poll, and on visibility return performs an immediate canonical `/api/guest/status` refresh before reconnecting SSE.
+- deterministic browser coverage toggles visibility and verifies the canonical re-poll on return.
+- both MAJOR threads were individually replied to as addressed-pending-CI and intentionally remain unresolved until validation/re-review.
+
+Current exact head: `cd9deb727c99ffc737461acfda3a251c3d11ba81`.
+Exact-head CI #577 / `34513705452` is in progress. A superseded earlier run was cancelled by the workflow's `cancel-in-progress` concurrency after the head advanced; that is not treated as a product failure.
+
+Merge remains blocked. Next: exact-head CI fully green -> `@coderabbitai full review` on the unchanged SHA -> final every-reviewer Medium+/Major+/High+/Critical/Blocker sweep -> expected-head merge only if clear.
+
+`coordination/STATE.json` and `coordination/WORK_QUEUE.md` remain stale WU14 snapshots; live GitHub is authoritative. No new Slack `Report Progress` command was found. Gemini Agent/Chat remain PAUSED/OFF-ROSTER. Coffee reminders have already been repeated today, so no additional reminder spam.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5623431038
+
+---
+
+### 2026-09-10T18:23:08Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr136:cd9deb727c99ffc737461acfda3a251c3d11ba81 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #136
+head: cd9deb727c99ffc737461acfda3a251c3d11ba81
+CI_GREEN_HANDOFF — PR #136 exact head `cd9deb727c99ffc737461acfda3a251c3d11ba81` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5623431769
 
 ---
