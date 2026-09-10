@@ -153,6 +153,10 @@ describe('WU17 guest status trusted ingress boundary', () => {
 
     const fifthId = fabricatedIds[4];
     await pool.query(
+      'UPDATE guest_credentials SET revoked_at=now() WHERE queue_entry_id=$1',
+      [ids.entry],
+    );
+    await pool.query(
       `INSERT INTO guest_credentials
          (id,clinic_id,session_id,queue_entry_id,bearer_verifier,issued_at,expires_at)
        VALUES($1,$2,$3,$4,$5,now(),now()+interval '1 hour')`,
