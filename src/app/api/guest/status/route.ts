@@ -15,7 +15,9 @@ const SECURITY_HEADERS = {
 const RATE_WINDOW_MS = 60_000;
 const UNTRUSTED_INGRESS_LIMIT = 6;
 const CREDENTIAL_LIMIT = 6;
+const DEFAULT_CREDENTIAL_LOOKUP_LIMIT = 1_200;
 const UNTRUSTED_INGRESS_BUCKET = 'guest-status:untrusted-ingress';
+const CREDENTIAL_LOOKUP_BUCKET = 'guest-status:credential-lookup-fuse';
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -37,6 +39,13 @@ function credentialIdForRateLimit(bearer: string): string | null {
   if (separator <= 0) return null;
   const credentialId = bearer.slice(0, separator);
   return UUID_PATTERN.test(credentialId) ? credentialId.toLowerCase() : null;
+}
+
+function credentialLookupLimit(): number {
+  const configured = Number(process.env.GUEST_STATUS_CREDENTIAL_LOOKUP_LIMIT);
+  return Number.isSafeInteger(configured) && configured > 0
+    ? configured
+    : DEFAULT_CREDENTIAL_LOOKUP_LIMIT;
 }
 
 async function consumeBucket(
@@ -78,28 +87,46 @@ async function consumeBucket(
 
 /**
  * Apply shared throttling without trusting caller-controlled forwarding headers.
- * Only credential IDs that actually exist may select a credential-specific bucket;
- * fabricated or malformed identifiers share the bounded untrusted-ingress bucket.
+ * Malformed identifiers take the small untrusted bucket immediately. Valid-format
+ * identifiers first pass a high-capacity deployment safety fuse before any
+ * credential lookup, which bounds database work even when attackers rotate UUIDs.
+ * Only IDs that actually exist may then select a credential-specific polling bucket.
  */
 async function withinRateLimit(
   pool: Pool,
   bearer: string | null,
 ): Promise<boolean> {
   const credentialId = bearer ? credentialIdForRateLimit(bearer) : null;
-  if (credentialId) {
-    const knownCredential = await pool.query<{ exists: boolean }>(
-      'SELECT EXISTS(SELECT 1 FROM guest_credentials WHERE id=$1) AS exists',
-      [credentialId],
+  if (!credentialId) {
+    return consumeBucket(
+      pool,
+      UNTRUSTED_INGRESS_BUCKET,
+      UNTRUSTED_INGRESS_LIMIT,
     );
-    if (knownCredential.rows[0]?.exists === true) {
-      return consumeBucket(
-        pool,
-        `credential:${credentialId}`,
-        CREDENTIAL_LIMIT,
-      );
-    }
   }
-  return consumeBucket(pool, UNTRUSTED_INGRESS_BUCKET, UNTRUSTED_INGRESS_LIMIT);
+
+  if (
+    !(await consumeBucket(
+      pool,
+      CREDENTIAL_LOOKUP_BUCKET,
+      credentialLookupLimit(),
+    ))
+  ) {
+    return false;
+  }
+
+  const knownCredential = await pool.query<{ exists: boolean }>(
+    'SELECT EXISTS(SELECT 1 FROM guest_credentials WHERE id=$1) AS exists',
+    [credentialId],
+  );
+  if (knownCredential.rows[0]?.exists === true) {
+    return consumeBucket(pool, `credential:${credentialId}`, CREDENTIAL_LIMIT);
+  }
+  return consumeBucket(
+    pool,
+    UNTRUSTED_INGRESS_BUCKET,
+    UNTRUSTED_INGRESS_LIMIT,
+  );
 }
 
 export async function GET(request: Request): Promise<Response> {
