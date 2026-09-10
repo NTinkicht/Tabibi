@@ -70,7 +70,12 @@ beforeAll(async () => {
   await pool.query(
     `INSERT INTO users(id,auth_subject,display_name) VALUES
      ($1,$3,'WU17 Race Reception'),($2,$4,'WU17 Race Doctor')`,
-    [ids.actor, ids.doctorUser, `wu17-race-${ids.actor}`, `wu17-race-${ids.doctorUser}`],
+    [
+      ids.actor,
+      ids.doctorUser,
+      `wu17-race-${ids.actor}`,
+      `wu17-race-${ids.doctorUser}`,
+    ],
   );
   await pool.query(
     `INSERT INTO clinics(id,tenant_key,name) VALUES($1,$2,'WU17 Race Clinic')`,
@@ -110,10 +115,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await pool.query('DELETE FROM clinics WHERE id=$1', [ids.clinic]);
-  await pool.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [
-    [ids.actor, ids.doctorUser],
-  ]);
   await pool.end();
 });
 
