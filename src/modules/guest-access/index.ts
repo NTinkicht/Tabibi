@@ -41,7 +41,9 @@ function verifier(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
-function parseBearer(bearer: string): { credentialId: string; secret: string } | null {
+function parseBearer(
+  bearer: string,
+): { credentialId: string; secret: string } | null {
   const separator = bearer.indexOf('.');
   if (separator <= 0 || separator === bearer.length - 1) return null;
   const credentialId = bearer.slice(0, separator);
@@ -54,7 +56,9 @@ function verifierMatches(storedVerifier: string, bearerSecret: string): boolean 
   if (!/^[0-9a-f]{64}$/i.test(storedVerifier)) return false;
   const stored = Buffer.from(storedVerifier, 'hex');
   const candidate = Buffer.from(verifier(bearerSecret), 'hex');
-  return stored.length === candidate.length && timingSafeEqual(stored, candidate);
+  return (
+    stored.length === candidate.length && timingSafeEqual(stored, candidate)
+  );
 }
 
 /** PostgreSQL-backed guest credential primitive. Raw secrets never cross a query boundary. */
