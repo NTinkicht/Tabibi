@@ -145,22 +145,21 @@ describe('GET /api/guest/status/stream', () => {
     expect(getSnapshot).toHaveBeenCalledWith(bearer);
   });
 
-  it('does not emit duplicate status events when authoritative versions are unchanged', async () => {
+  it('suppresses timestamp-only refreshes but emits guest-visible projection changes even when session versions are unchanged', async () => {
     vi.useFakeTimers();
-    const sameVersion = {
+    const sameProjection = {
       ...activeSnapshot,
       generatedAt: '2026-09-10T17:30:15Z',
     };
-    const changedVersion = {
+    const changedProjection = {
       ...activeSnapshot,
       generatedAt: '2026-09-10T17:30:30Z',
       patientsAhead: 0,
-      session: { ...activeSnapshot.session, queueOrderVersion: 8 },
     };
     getSnapshot
       .mockResolvedValueOnce(activeSnapshot)
-      .mockResolvedValueOnce(sameVersion)
-      .mockResolvedValueOnce(changedVersion);
+      .mockResolvedValueOnce(sameProjection)
+      .mockResolvedValueOnce(changedProjection);
 
     const response = await GET(requestWithBearer());
     const reader = response.body!.getReader();
@@ -171,8 +170,11 @@ describe('GET /api/guest/status/stream', () => {
     await vi.advanceTimersByTimeAsync(15_000);
 
     const second = new TextDecoder().decode((await reader.read()).value);
-    expect(second).toContain(JSON.stringify(changedVersion));
-    expect(second).not.toContain(JSON.stringify(sameVersion));
+    expect(second).toContain(JSON.stringify(changedProjection));
+    expect(second).not.toContain(JSON.stringify(sameProjection));
+    expect(changedProjection.session.queueOrderVersion).toBe(
+      activeSnapshot.session.queueOrderVersion,
+    );
     expect(getSnapshot).toHaveBeenCalledTimes(3);
     await reader.cancel();
   });
