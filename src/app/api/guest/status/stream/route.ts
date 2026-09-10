@@ -141,18 +141,11 @@ function encodeStatusEvent(snapshot: GuestQueueStatusSnapshot): Uint8Array {
   );
 }
 
-/** Build a stable state identity that deliberately excludes generatedAt. */
+/** Build a stable identity from every guest-visible field except generatedAt. */
 function snapshotVersion(snapshot: GuestQueueStatusSnapshot): string {
-  if (snapshot.terminal) return `terminal:${snapshot.finalStatus}`;
-  return [
-    snapshot.target.clinicId,
-    snapshot.target.sessionId,
-    snapshot.target.queueEntryId,
-    snapshot.queueState,
-    snapshot.session.status,
-    snapshot.session.queueOrderVersion,
-    snapshot.session.delayVersion,
-  ].join(':');
+  return JSON.stringify(snapshot, (key, value) =>
+    key === 'generatedAt' ? undefined : value,
+  );
 }
 
 /** Serve a bounded, change-driven, credential-safe guest status event stream. */
