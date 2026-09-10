@@ -26,7 +26,9 @@ export type GuestQueueStatusSnapshot =
         earliestAt: string;
         latestAt: string;
         uncertaintyMinutes: number;
-        basis: 'appointment_schedule_plus_declared_delay' | 'session_start_plus_declared_delay';
+        basis:
+          | 'appointment_schedule_plus_declared_delay'
+          | 'session_start_plus_declared_delay';
       } | null;
       session: {
         status: string;
