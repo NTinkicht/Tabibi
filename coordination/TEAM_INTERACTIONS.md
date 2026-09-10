@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T05:24:08.005762+00:00
+- Last sync: 2026-09-10T05:25:14.221637+00:00
 
 ## Team Room charter
 
@@ -8218,5 +8218,295 @@ Slack audit: no new unacknowledged owner `Report Progress` command exists; the 2
 `coordination/STATE.json` and `coordination/WORK_QUEUE.md` on main remain stale WU14 snapshots; live GitHub is authoritative during active PR #131, so main is not being advanced solely for bookkeeping underneath the product PR.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5613619296
+
+---
+
+### 2026-09-10T05:25:01Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+
+echo "== Required coordination guidance =="
+for file in \
+  AGENTS.md \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  if [[ -f "$file" ]]; then
+    echo "--- $file ---"
+    sed -n '1,260p' "$file"
+  fi
+done
+
+echo "== Pull request `#130` =="
+gh pr view 130 --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,mergedAt,closedAt,title,url || true
+
+echo "== Pull request `#131` =="
+gh pr view 131 --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,baseRefName,mergeable,reviewDecision,title,url,body
+
+echo "== Pull request `#131` checks =="
+gh pr checks 131 --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Pull request `#131` changed files =="
+gh pr diff 131 --repo "$repo" --name-only || true
+
+echo "== Pull request `#131` discussion and review comments =="
+gh api "repos/$repo/issues/131/comments?per_page=100" \
+  --jq '.[-30:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+gh api "repos/$repo/pulls/131/comments?per_page=100" \
+  --jq '.[] | {user:.user.login,commit_id:.commit_id,path:.path,line:.line,body:.body}' || true
+```
+
+Length of output: 83534
+
+---
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="131"
+sha="740e4487f023e2da08a24d402f5396579046d55c"
+
+fetch() {
+  gh api "repos/$repo/contents/$1?ref=$sha" --jq '.content' | base64 -d
+}
+
+echo "== Verify live head =="
+gh pr view "$pr" --repo "$repo" --json headRefOid,state,mergeable,reviewDecision,url
+
+echo "== PR patch =="
+gh pr diff "$pr" --repo "$repo" --patch
+
+echo "== Guest status route =="
+fetch "src/app/api/guest/status/route.ts" | nl -ba
+
+echo "== Guest status service outline and implementation =="
+fetch "src/modules/guest-status/index.ts" > /tmp/guest-status.ts
+ast-grep outline /tmp/guest-status.ts --items all
+nl -ba /tmp/guest-status.ts | sed -n '1,280p'
+
+echo "== Guest access service =="
+fetch "src/modules/guest-access/index.ts" > /tmp/guest-access.ts
+ast-grep outline /tmp/guest-access.ts --items all
+nl -ba /tmp/guest-access.ts | sed -n '1,360p'
+
+echo "== Applicable contract excerpts =="
+for file in PRODUCT.md ARCHITECTURE.md SECURITY.md; do
+  echo "--- $file ---"
+  fetch "$file" | nl -ba | grep -i -E -C 4 \
+    'guest|terminal|grace|waiting|arrival|position|rate.limit|poll|public display|privacy'
+done
+
+echo "== Quality-and-build failure log =="
+gh run view 34440856569 --repo "$repo" --job 102755419281 --log-failed || true
+```
+
+Length of output: 86431
+
+---
+
+</details>
+
+`@NTinkicht`, the duplicate-stream reconciliation is correct.
+
+- PR `#130` is closed and unmerged.
+- PR `#131` is the sole open WU17 PR.
+- The current exact head is `740e4487f023e2da08a24d402f5396579046d55c`.
+
+PR `#131` must remain blocked.
+
+## Required CI correction
+
+`Quality and build` failed because Prettier reports both:
+
+- `src/app/api/guest/status/route.ts`
+- `tests/integration/guest-status.test.ts`
+
+`PostgreSQL integration` and `Browser smoke` were still in progress during verification.
+
+## MAJOR contract findings
+
+1. **Do not return an exact position for a `waiting` guest.**  
+   `GuestStatusService.getSnapshot()` returns `patientsAhead` for every active state. `PRODUCT.md` Line 61 and `ARCHITECTURE.md` Line 195 require a provisional arrival window with uncertainty for `waiting` entries. Exact work-ahead applies only after check-in.
+
+2. **Preserve the terminal-summary grace response.**  
+   `GuestAccessService.authorize()` rejects terminal queue and session states. The snapshot query also excludes terminal entries. This returns `401` immediately after completion, cancellation, no-show, closure, or session cancellation. `PRODUCT.md` Line 58, `ARCHITECTURE.md` Line 210, and `SECURITY.md` Lines 42-43 require a minimal terminal summary for up to 15 minutes before final rejection.
+
+3. **Rate-limit `GET /api/guest/status`.**  
+   The route executes bearer authorization and a PostgreSQL query for arbitrary cookie values. No outer rate limit is present in this route. `SECURITY.md` Lines 35 and 89 require rate limiting and enumeration protection for guest endpoints. The limiter must support normal polling while rejecting invalid-cookie floods.
+
+The MicroReview non-null-assertion warnings do not apply to the inspected lines. The route has explicit missing-cookie handling, and `GuestAccessService.authorize()` exists with the invoked signature.
+
+After the three MAJOR findings and formatting failure are resolved on the same canonical PR:
+
+1. Verify all required CI jobs on the new exact head.
+2. Request `@coderabbitai full review`.
+3. Reconcile all unresolved Medium-or-higher findings.
+4. Use an eligible non-author exact-SHA gate under the governing policy before merge.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+
+echo "== Required coordination guidance =="
+for file in \
+  AGENTS.md \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  if [[ -f "$file" ]]; then
+    echo "--- $file ---"
+    sed -n '1,260p' "$file"
+  fi
+done
+
+echo "== Pull request `#130` =="
+gh pr view 130 --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,mergedAt,closedAt,title,url || true
+
+echo "== Pull request `#131` =="
+gh pr view 131 --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,baseRefName,mergeable,reviewDecision,title,url,body
+
+echo "== Pull request `#131` checks =="
+gh pr checks 131 --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Pull request `#131` changed files =="
+gh pr diff 131 --repo "$repo" --name-only || true
+
+echo "== Pull request `#131` discussion and review comments =="
+gh api "repos/$repo/issues/131/comments?per_page=100" \
+  --jq '.[-30:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+gh api "repos/$repo/pulls/131/comments?per_page=100" \
+  --jq '.[] | {user:.user.login,commit_id:.commit_id,path:.path,line:.line,body:.body}' || true
+```
+
+Length of output: 83534
+
+---
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="131"
+sha="740e4487f023e2da08a24d402f5396579046d55c"
+
+fetch() {
+  gh api "repos/$repo/contents/$1?ref=$sha" --jq '.content' | base64 -d
+}
+
+echo "== Verify live head =="
+gh pr view "$pr" --repo "$repo" --json headRefOid,state,mergeable,reviewDecision,url
+
+echo "== PR patch =="
+gh pr diff "$pr" --repo "$repo" --patch
+
+echo "== Guest status route =="
+fetch "src/app/api/guest/status/route.ts" | nl -ba
+
+echo "== Guest status service outline and implementation =="
+fetch "src/modules/guest-status/index.ts" > /tmp/guest-status.ts
+ast-grep outline /tmp/guest-status.ts --items all
+nl -ba /tmp/guest-status.ts | sed -n '1,280p'
+
+echo "== Guest access service =="
+fetch "src/modules/guest-access/index.ts" > /tmp/guest-access.ts
+ast-grep outline /tmp/guest-access.ts --items all
+nl -ba /tmp/guest-access.ts | sed -n '1,360p'
+
+echo "== Applicable contract excerpts =="
+for file in PRODUCT.md ARCHITECTURE.md SECURITY.md; do
+  echo "--- $file ---"
+  fetch "$file" | nl -ba | grep -i -E -C 4 \
+    'guest|terminal|grace|waiting|arrival|position|rate.limit|poll|public display|privacy'
+done
+
+echo "== Quality-and-build failure log =="
+gh run view 34440856569 --repo "$repo" --job 102755419281 --log-failed || true
+```
+
+Length of output: 86431
+
+---
+
+</details>
+
+`@NTinkicht`, the duplicate-stream reconciliation is correct.
+
+- PR `#130` is closed and unmerged.
+- PR `#131` is the sole open WU17 PR.
+- The current exact head is `740e4487f023e2da08a24d402f5396579046d55c`.
+
+PR `#131` must remain blocked.
+
+## Required CI correction
+
+`Quality and build` failed because Prettier reports both:
+
+- `src/app/api/guest/status/route.ts`
+- `tests/integration/guest-status.test.ts`
+
+`PostgreSQL integration` and `Browser smoke` were still in progress during verification.
+
+## MAJOR contract findings
+
+1. **Do not return an exact position for a `waiting` guest.**  
+   `GuestStatusService.getSnapshot()` returns `patientsAhead` for every active state. `PRODUCT.md` Line 61 and `ARCHITECTURE.md` Line 195 require a provisional arrival window with uncertainty for `waiting` entries. Exact work-ahead applies only after check-in.
+
+2. **Preserve the terminal-summary grace response.**  
+   `GuestAccessService.authorize()` rejects terminal queue and session states. The snapshot query also excludes terminal entries. This returns `401` immediately after completion, cancellation, no-show, closure, or session cancellation. `PRODUCT.md` Line 58, `ARCHITECTURE.md` Line 210, and `SECURITY.md` Lines 42-43 require a minimal terminal summary for up to 15 minutes before final rejection.
+
+3. **Rate-limit `GET /api/guest/status`.**  
+   The route executes bearer authorization and a PostgreSQL query for arbitrary cookie values. No outer rate limit is present in this route. `SECURITY.md` Lines 35 and 89 require rate limiting and enumeration protection for guest endpoints. The limiter must support normal polling while rejecting invalid-cookie floods.
+
+The MicroReview non-null-assertion warnings do not apply to the inspected lines. The route has explicit missing-cookie handling, and `GuestAccessService.authorize()` exists with the invoked signature.
+
+After the three MAJOR findings and formatting failure are resolved on the same canonical PR:
+
+1. Verify all required CI jobs on the new exact head.
+2. Request `@coderabbitai full review`.
+3. Reconcile all unresolved Medium-or-higher findings.
+4. Use an eligible non-author exact-SHA gate under the governing policy before merge.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5613628383
 
 ---
