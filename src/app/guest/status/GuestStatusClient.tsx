@@ -216,7 +216,7 @@ function subscribeToGuestLocale(): () => void {
 /** Poll and render guest-safe queue status without exposing credential material. */
 export function GuestStatusClient() {
   const [state, setState] = useState<ViewState>({ kind: 'loading' });
-  const locale = useSyncExternalStore(
+  const locale = useSyncExternalStore<SupportedLocale>(
     subscribeToGuestLocale,
     detectGuestLocale,
     () => 'en',
