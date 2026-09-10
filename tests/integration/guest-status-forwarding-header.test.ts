@@ -1,10 +1,14 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { GET } from '@/app/api/guest/status/route';
 import { migrate } from '../../scripts/db/lib';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const signingSecret = process.env.GUEST_BEARER_SIGNING_SECRET;
+if (!signingSecret || signingSecret.length < 32) {
+  throw new Error('GUEST_BEARER_SIGNING_SECRET is required for guest status tests');
+}
 const ids = {
   clinic: randomUUID(),
   doctorUser: randomUUID(),
@@ -15,11 +19,18 @@ const ids = {
   credential: randomUUID(),
 };
 const secret = 'wu17-forwarding-valid-secret';
-const bearer = `${ids.credential}.${secret}`;
+
+function signedBearer(credentialId: string, bearerSecret: string): string {
+  const signature = createHmac('sha256', signingSecret)
+    .update(`${credentialId}.${bearerSecret}`, 'utf8')
+    .digest('base64url');
+  return `${credentialId}.${bearerSecret}.${signature}`;
+}
+
+const bearer = signedBearer(ids.credential, secret);
 
 beforeAll(async () => migrate());
 beforeEach(async () => {
-  delete process.env.GUEST_STATUS_CREDENTIAL_LOOKUP_LIMIT;
   await pool.query(`TRUNCATE guest_status_rate_limit_buckets,guest_credentials,
     guest_exchange_ids,appointment_recovery_receipts,appointment_lifecycle_receipts,
     appointment_booking_receipts,appointments,audit_events,queue_command_receipts,
@@ -74,10 +85,7 @@ beforeEach(async () => {
     ],
   );
 });
-afterAll(async () => {
-  delete process.env.GUEST_STATUS_CREDENTIAL_LOOKUP_LIMIT;
-  await pool.end();
-});
+afterAll(async () => pool.end());
 
 describe('WU17 guest status trusted ingress boundary', () => {
   it('does not let spoofed forwarding headers create independent pre-auth buckets', async () => {
@@ -136,60 +144,38 @@ describe('WU17 guest status trusted ingress boundary', () => {
     });
   });
 
-  it('bounds rotating fabricated credential ids before any credential lookup', async () => {
-    process.env.GUEST_STATUS_CREDENTIAL_LOOKUP_LIMIT = '4';
-    const fabricatedIds = Array.from({ length: 5 }, () => randomUUID());
+  it('rejects rotating forged credential ids before lookup without throttling a valid bearer', async () => {
+    const fabricatedIds = Array.from({ length: 8 }, () => randomUUID());
 
-    for (const fabricatedId of fabricatedIds.slice(0, 4)) {
+    for (let attempt = 0; attempt < fabricatedIds.length; attempt++) {
+      const fabricatedId = fabricatedIds[attempt];
+      const forgedBearer = `${fabricatedId}.fabricated-secret.${'A'.repeat(43)}`;
       const response = await GET(
         new Request('http://localhost/api/guest/status', {
-          headers: {
-            cookie: `__Host-tabibi_guest=${fabricatedId}.fabricated-secret`,
-          },
+          headers: { cookie: `__Host-tabibi_guest=${forgedBearer}` },
         }),
       );
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(attempt < 6 ? 401 : 429);
     }
 
-    const fifthId = fabricatedIds[4];
-    await pool.query(
-      'UPDATE guest_credentials SET revoked_at=now() WHERE queue_entry_id=$1',
-      [ids.entry],
-    );
-    await pool.query(
-      `INSERT INTO guest_credentials
-         (id,clinic_id,session_id,queue_entry_id,bearer_verifier,issued_at,expires_at)
-       VALUES($1,$2,$3,$4,$5,now(),now()+interval '1 hour')`,
-      [
-        fifthId,
-        ids.clinic,
-        ids.session,
-        ids.entry,
-        createHash('sha256').update('fabricated-secret').digest('hex'),
-      ],
-    );
-
-    const blockedBeforeLookup = await GET(
+    const valid = await GET(
       new Request('http://localhost/api/guest/status', {
-        headers: {
-          cookie: `__Host-tabibi_guest=${fifthId}.fabricated-secret`,
-        },
+        headers: { cookie: `__Host-tabibi_guest=${bearer}` },
       }),
     );
+    expect(valid.status).toBe(200);
 
-    expect(blockedBeforeLookup.status).toBe(429);
-    expect(blockedBeforeLookup.headers.get('retry-after')).toBe('60');
-
-    const lookupFuse = await pool.query<{ request_count: string }>(
-      `SELECT request_count::text
-         FROM guest_status_rate_limit_buckets
-        WHERE bucket_key=$1`,
-      [
-        createHash('sha256')
-          .update('guest-status:credential-lookup-fuse')
-          .digest('hex'),
-      ],
+    const fabricatedBucketHashes = fabricatedIds.map((credentialId) =>
+      createHash('sha256')
+        .update(`credential:${credentialId}`)
+        .digest('hex'),
     );
-    expect(lookupFuse.rows[0]?.request_count).toBe('4');
+    const fabricatedBuckets = await pool.query<{ count: string }>(
+      `SELECT count(*)::text count
+         FROM guest_status_rate_limit_buckets
+        WHERE bucket_key = ANY($1::text[])`,
+      [fabricatedBucketHashes],
+    );
+    expect(fabricatedBuckets.rows[0]?.count).toBe('0');
   });
 });
