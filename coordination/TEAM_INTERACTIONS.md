@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T08:59:35.647762+00:00
+- Last sync: 2026-09-10T09:57:10.310722+00:00
 
 ## Team Room charter
 
@@ -9025,5 +9025,26 @@ Exact-head CI #513 is queued. The Critical thread has been explicitly reconciled
 `coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots, so live GitHub continues to govern transient execution state. Gemini Agent/Chat remain paused.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5615964236
+
+---
+
+### 2026-09-10T09:30:18Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr131:0d0268b501f0a90f62e2ee3dde7629d5e5355ea0 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #131
+head: 0d0268b501f0a90f62e2ee3dde7629d5e5355ea0
+CI_GREEN_HANDOFF — PR #131 exact head `0d0268b501f0a90f62e2ee3dde7629d5e5355ea0` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5616359034
+
+---
+
+### 2026-09-10T09:57:01Z — NTinkicht
+
+CHECKPOINT — WU17 CI remediation on canonical PR #131. Live head advanced through the fabricated-credential-ID throttle remediation, then exact-head CI #518 exposed two mechanical regressions: route Prettier layout and a stale trusted-ingress assertion that still expected 401 after the six-request shared untrusted bucket was exhausted. Repaired both on the same branch only. Current exact head: `840944200dc3fbfa5c3e1c19487b980c6b1e0eca`. Exact-head CI run `34463401493` is in progress across Quality/build, PostgreSQL integration, and Browser smoke. No merge and no full CodeRabbit re-gate until this exact SHA is green. Gemini Agent/Chat remain paused.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5616712762
 
 ---
