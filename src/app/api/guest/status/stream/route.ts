@@ -4,7 +4,10 @@ import {
   authenticatedGuestCredentialId,
   GuestAccessRejectedError,
 } from '@/modules/guest-access';
-import { GuestStatusService } from '@/modules/guest-status';
+import {
+  GuestStatusService,
+  type GuestQueueStatusSnapshot,
+} from '@/modules/guest-status';
 import { getPool } from '@/platform/database/pool';
 import { getLogger } from '@/platform/observability/logger';
 
@@ -33,8 +36,9 @@ const UNTRUSTED_INGRESS_LIMIT = 6;
 const CREDENTIAL_CONNECT_LIMIT = 3;
 const UNTRUSTED_INGRESS_BUCKET = 'guest-status-stream:untrusted-ingress';
 const STREAM_INTERVAL_MS = 15_000;
-const MAX_STREAM_EMISSIONS = 8;
+const MAX_STREAM_TICKS = 8;
 
+/** Extract the HttpOnly guest bearer from the request cookie header. */
 function guestBearer(request: Request): string | null {
   const cookieHeader = request.headers.get('cookie');
   if (!cookieHeader) return null;
@@ -50,6 +54,7 @@ function guestBearer(request: Request): string | null {
   return null;
 }
 
+/** Atomically consume one bounded connection-rate bucket. */
 async function consumeBucket(
   pool: Pool,
   key: string,
@@ -88,6 +93,7 @@ async function consumeBucket(
   return result.rows[0]?.allowed === true;
 }
 
+/** Apply the shared ingress bucket or the authenticated credential bucket. */
 async function withinConnectionRateLimit(
   pool: Pool,
   bearer: string | null,
@@ -108,7 +114,8 @@ async function withinConnectionRateLimit(
   );
 }
 
-function waitForNextEmission(signal: AbortSignal): Promise<boolean> {
+/** Wait for the next bounded refresh tick, stopping immediately on abort. */
+function waitForNextTick(signal: AbortSignal): Promise<boolean> {
   if (signal.aborted) return Promise.resolve(false);
 
   return new Promise((resolve) => {
@@ -127,35 +134,54 @@ function waitForNextEmission(signal: AbortSignal): Promise<boolean> {
   });
 }
 
-function encodeStatusEvent(snapshot: unknown): Uint8Array {
+/** Encode one guest-safe status snapshot as an SSE status event. */
+function encodeStatusEvent(snapshot: GuestQueueStatusSnapshot): Uint8Array {
   return new TextEncoder().encode(
     `event: status\ndata: ${JSON.stringify(snapshot)}\n\n`,
   );
 }
 
+/** Build a stable state identity that deliberately excludes generatedAt. */
+function snapshotVersion(snapshot: GuestQueueStatusSnapshot): string {
+  if (snapshot.terminal) return `terminal:${snapshot.finalStatus}`;
+  return [
+    snapshot.target.clinicId,
+    snapshot.target.sessionId,
+    snapshot.target.queueEntryId,
+    snapshot.queueState,
+    snapshot.session.status,
+    snapshot.session.queueOrderVersion,
+    snapshot.session.delayVersion,
+  ].join(':');
+}
+
+/** Serve a bounded, change-driven, credential-safe guest status event stream. */
 export async function GET(request: Request): Promise<Response> {
   const bearer = guestBearer(request);
-  const pool = getPool();
-
-  if (!(await withinConnectionRateLimit(pool, bearer))) {
-    return Response.json(
-      { error: 'Too many requests' },
-      {
-        status: 429,
-        headers: { ...REJECT_HEADERS, 'retry-after': '60' },
-      },
-    );
-  }
-
-  if (!bearer) {
-    return Response.json(
-      { error: 'Guest access rejected' },
-      { status: 401, headers: REJECT_HEADERS },
-    );
-  }
+  let pool: Pool;
+  let initialSnapshot: GuestQueueStatusSnapshot;
 
   try {
-    await new GuestStatusService(pool).getSnapshot(bearer);
+    pool = getPool();
+
+    if (!(await withinConnectionRateLimit(pool, bearer))) {
+      return Response.json(
+        { error: 'Too many requests' },
+        {
+          status: 429,
+          headers: { ...REJECT_HEADERS, 'retry-after': '60' },
+        },
+      );
+    }
+
+    if (!bearer) {
+      return Response.json(
+        { error: 'Guest access rejected' },
+        { status: 401, headers: REJECT_HEADERS },
+      );
+    }
+
+    initialSnapshot = await new GuestStatusService(pool).getSnapshot(bearer);
   } catch (error) {
     const rejected = error instanceof GuestAccessRejectedError;
     if (!rejected) getLogger().error('guest status stream bootstrap failed');
@@ -168,13 +194,24 @@ export async function GET(request: Request): Promise<Response> {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const statusService = new GuestStatusService(pool);
+      let lastVersion = snapshotVersion(initialSnapshot);
+      controller.enqueue(encodeStatusEvent(initialSnapshot));
 
-      for (let emission = 0; emission < MAX_STREAM_EMISSIONS; emission += 1) {
-        if (request.signal.aborted) break;
+      if (initialSnapshot.terminal) {
+        controller.close();
+        return;
+      }
+
+      for (let tick = 1; tick < MAX_STREAM_TICKS; tick += 1) {
+        if (!(await waitForNextTick(request.signal))) break;
 
         try {
           const snapshot = await statusService.getSnapshot(bearer);
-          controller.enqueue(encodeStatusEvent(snapshot));
+          const nextVersion = snapshotVersion(snapshot);
+          if (nextVersion !== lastVersion) {
+            controller.enqueue(encodeStatusEvent(snapshot));
+            lastVersion = nextVersion;
+          }
 
           if (snapshot.terminal) break;
         } catch (error) {
@@ -183,9 +220,6 @@ export async function GET(request: Request): Promise<Response> {
           }
           break;
         }
-
-        if (emission === MAX_STREAM_EMISSIONS - 1) break;
-        if (!(await waitForNextEmission(request.signal))) break;
       }
 
       controller.close();
