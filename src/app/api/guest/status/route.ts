@@ -122,11 +122,7 @@ async function withinRateLimit(
   if (knownCredential.rows[0]?.exists === true) {
     return consumeBucket(pool, `credential:${credentialId}`, CREDENTIAL_LIMIT);
   }
-  return consumeBucket(
-    pool,
-    UNTRUSTED_INGRESS_BUCKET,
-    UNTRUSTED_INGRESS_LIMIT,
-  );
+  return consumeBucket(pool, UNTRUSTED_INGRESS_BUCKET, UNTRUSTED_INGRESS_LIMIT);
 }
 
 export async function GET(request: Request): Promise<Response> {
