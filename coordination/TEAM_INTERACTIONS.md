@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T13:52:35.338838+00:00
+- Last sync: 2026-09-10T15:31:35.968754+00:00
 
 ## Team Room charter
 
@@ -9674,5 +9674,43 @@ Live reconciliation:
 next_action: require a repository-backed Codex commit/test/PR artifact within the normal 30-minute evidence window; if no meaningful evidence exists after that window and no deterministic job is progressing, reclaim the lease and continue WU18 on the same canonical branch/PR continuity. No owner action required.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5619791425
+
+---
+
+### 2026-09-10T13:56:19Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr133:ca45a27821ee88306b9b7a8e33a3103c57e50429 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #133
+head: ca45a27821ee88306b9b7a8e33a3103c57e50429
+CI_GREEN_HANDOFF — PR #133 exact head `ca45a27821ee88306b9b7a8e33a3103c57e50429` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5619846448
+
+---
+
+### 2026-09-10T15:31:02Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr133:a19eb495b909429369eb8d5c6727196cb1e80b0d -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #133
+head: a19eb495b909429369eb8d5c6727196cb1e80b0d
+CI_GREEN_HANDOFF — PR #133 exact head `a19eb495b909429369eb8d5c6727196cb1e80b0d` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5621213624
+
+---
+
+### 2026-09-10T15:31:23Z — NTinkicht
+
+CHECKPOINT — WU18 / Issue #132 / PR #133 remains the sole canonical implementation stream. ChatGPT owns the implementation lease. I repaired the exact-head lint/type hydration path in `GuestStatusClient.tsx` using a server-safe `useSyncExternalStore` locale bridge; current exact head is `a19eb495b909429369eb8d5c6727196cb1e80b0d`.
+
+Exact-head CI #560 / run `34495947204` is green. All six existing review threads were individually reconciled with current code/test evidence and intentionally left open until final gate: Codex P1 localization, Codex P1 clinic timezone, Codex P2 document security headers, Codex P2 paused/planned rendering, CodeRabbit Major polling coverage, CodeRabbit Major localization. `@coderabbitai full review` has been requested against exactly `a19eb495...`; merge is held until that whole-PR gate completes and zero unresolved Medium+ findings remain.
+
+`coordination/STATE.json` and `coordination/WORK_QUEUE.md` on main remain stale WU14 snapshots and do not override live WU18 state. No new unacknowledged `Report Progress` Slack command was found. Gemini Agent/Chat remain paused/off-roster.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5621218479
 
 ---
