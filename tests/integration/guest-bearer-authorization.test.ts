@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -8,6 +8,18 @@ import {
 import { migrate } from '../../scripts/db/lib';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+function requireSigningSecret(): string {
+  const value = process.env.GUEST_BEARER_SIGNING_SECRET;
+  if (!value || value.length < 32) {
+    throw new Error(
+      'GUEST_BEARER_SIGNING_SECRET is required for guest bearer tests',
+    );
+  }
+  return value;
+}
+
+const signingSecret = requireSigningSecret();
 const ids = {
   clinic: randomUUID(),
   actor: randomUUID(),
@@ -22,6 +34,13 @@ const target = {
   sessionId: ids.session,
   queueEntryId: ids.entry,
 };
+
+function signedBearer(credentialId: string, bearerSecret: string): string {
+  const signature = createHmac('sha256', signingSecret)
+    .update(`${credentialId}.${bearerSecret}`, 'utf8')
+    .digest('base64url');
+  return `${credentialId}.${bearerSecret}.${signature}`;
+}
 
 beforeAll(async () => migrate());
 beforeEach(async () => {
@@ -123,13 +142,14 @@ describe('WU16 guest bearer authorization', () => {
   it('rejects an equal-length invalid bearer verifier without exposing the raw secret to SQL', async () => {
     const service = new GuestAccessService(pool);
     const credential = await liveBearer();
-    const separator = credential.bearer.indexOf('.');
-    const credentialId = credential.bearer.slice(0, separator);
-    const bearerSecret = credential.bearer.slice(separator + 1);
+    const [credentialId, bearerSecret] = credential.bearer.split('.');
+    if (!credentialId || !bearerSecret)
+      throw new Error('Expected signed bearer');
     const replacement = bearerSecret.endsWith('A') ? 'B' : 'A';
-    const invalidBearer = `${credentialId}.${bearerSecret.slice(0, -1)}${replacement}`;
+    const invalidSecret = `${bearerSecret.slice(0, -1)}${replacement}`;
+    const invalidBearer = signedBearer(credentialId, invalidSecret);
 
-    expect(invalidBearer).toHaveLength(credential.bearer.length);
+    expect(invalidSecret).toHaveLength(bearerSecret.length);
     await expect(
       service.authorize(
         invalidBearer,
@@ -142,13 +162,29 @@ describe('WU16 guest bearer authorization', () => {
   it('rejects an unknown credential id generically', async () => {
     const service = new GuestAccessService(pool);
     const credential = await liveBearer();
-    const separator = credential.bearer.indexOf('.');
-    const bearerSecret = credential.bearer.slice(separator + 1);
-    const unknownBearer = `${randomUUID()}.${bearerSecret}`;
+    const bearerSecret = credential.bearer.split('.')[1];
+    if (!bearerSecret) throw new Error('Expected signed bearer');
+    const unknownBearer = signedBearer(randomUUID(), bearerSecret);
 
     await expect(
       service.authorize(
         unknownBearer,
+        target,
+        new Date('2026-09-10T09:02:00Z'),
+      ),
+    ).rejects.toBeInstanceOf(GuestAccessRejectedError);
+  });
+
+  it('rejects a forged bearer envelope before credential verification', async () => {
+    const service = new GuestAccessService(pool);
+    const credential = await liveBearer();
+    const [credentialId, bearerSecret] = credential.bearer.split('.');
+    if (!credentialId || !bearerSecret)
+      throw new Error('Expected signed bearer');
+
+    await expect(
+      service.authorize(
+        `${credentialId}.${bearerSecret}.${'A'.repeat(43)}`,
         target,
         new Date('2026-09-10T09:02:00Z'),
       ),

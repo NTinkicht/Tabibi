@@ -19,6 +19,7 @@ concurrency:
 env:
   NODE_VERSION: '20'
   DATABASE_URL: postgresql://tabibi:tabibi_test@127.0.0.1:5432/tabibi_test
+  GUEST_BEARER_SIGNING_SECRET: ci-only-guest-bearer-signing-secret-replace-in-production
 
 jobs:
   quality:

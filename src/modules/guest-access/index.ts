@@ -1,5 +1,6 @@
 import {
   createHash,
+  createHmac,
   randomBytes,
   randomUUID,
   timingSafeEqual,
@@ -20,6 +21,7 @@ const ACTIVE_ENTRY_STATES = [
 const ACTIVE_SESSION_STATES = ['planned', 'open', 'paused'];
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const BEARER_SIGNATURE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 export class GuestAccessRejectedError extends Error {
   constructor() {
@@ -33,6 +35,12 @@ export type GuestTarget = {
   queueEntryId: string;
 };
 
+type ParsedBearer = {
+  credentialId: string;
+  secret: string;
+  signature: string;
+};
+
 function secret(): string {
   return randomBytes(32).toString('base64url');
 }
@@ -41,15 +49,56 @@ function verifier(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
-function parseBearer(
-  bearer: string,
-): { credentialId: string; secret: string } | null {
-  const separator = bearer.indexOf('.');
-  if (separator <= 0 || separator === bearer.length - 1) return null;
-  const credentialId = bearer.slice(0, separator);
-  const bearerSecret = bearer.slice(separator + 1);
-  if (!UUID_PATTERN.test(credentialId) || !bearerSecret) return null;
-  return { credentialId, secret: bearerSecret };
+function guestBearerSigningSecret(): string {
+  const signingSecret = process.env.GUEST_BEARER_SIGNING_SECRET;
+  if (!signingSecret || signingSecret.length < 32) {
+    throw new Error(
+      'GUEST_BEARER_SIGNING_SECRET must contain at least 32 characters',
+    );
+  }
+  return signingSecret;
+}
+
+function bearerSignature(credentialId: string, bearerSecret: string): string {
+  return createHmac('sha256', guestBearerSigningSecret())
+    .update(`${credentialId}.${bearerSecret}`, 'utf8')
+    .digest('base64url');
+}
+
+function parseBearer(bearer: string): ParsedBearer | null {
+  const parts = bearer.split('.');
+  if (parts.length !== 3) return null;
+  const [credentialId, bearerSecret, signature] = parts;
+  if (
+    !credentialId ||
+    !bearerSecret ||
+    !signature ||
+    !UUID_PATTERN.test(credentialId) ||
+    !BEARER_SIGNATURE_PATTERN.test(signature)
+  )
+    return null;
+  return { credentialId, secret: bearerSecret, signature };
+}
+
+function authenticatedBearer(bearer: string): ParsedBearer | null {
+  const parsed = parseBearer(bearer);
+  if (!parsed) return null;
+  const expected = Buffer.from(
+    bearerSignature(parsed.credentialId, parsed.secret),
+    'utf8',
+  );
+  const provided = Buffer.from(parsed.signature, 'utf8');
+  if (
+    expected.length !== provided.length ||
+    !timingSafeEqual(expected, provided)
+  )
+    return null;
+  return parsed;
+}
+
+/** Verify the server-authenticated bearer envelope without querying credential storage. */
+export function authenticatedGuestCredentialId(bearer: string): string | null {
+  return authenticatedBearer(bearer)?.credentialId.toLowerCase() ?? null;
 }
 
 function verifierMatches(
@@ -208,7 +257,7 @@ export class GuestAccessService {
 
       const credentialId = randomUUID();
       const bearerSecret = secret();
-      const bearer = `${credentialId}.${bearerSecret}`;
+      const bearer = `${credentialId}.${bearerSecret}.${bearerSignature(credentialId, bearerSecret)}`;
       const expiresAt = new Date(now.getTime() + BEARER_TTL_MS);
       await client.query(
         'UPDATE guest_exchange_ids SET consumed_at=$2 WHERE id=$1',
@@ -250,7 +299,7 @@ export class GuestAccessService {
     expectedTarget?: GuestTarget,
     now = new Date(),
   ): Promise<GuestTarget> {
-    const parsed = parseBearer(bearer);
+    const parsed = authenticatedBearer(bearer);
     if (!parsed) throw new GuestAccessRejectedError();
 
     const result = await this.pool.query<{
