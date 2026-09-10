@@ -129,7 +129,7 @@ describe('GET /api/guest/status/stream', () => {
     expect(getSnapshot).not.toHaveBeenCalled();
   });
 
-  it('streams an authorized terminal snapshot once and never emits bearer material', async () => {
+  it('closes an already-terminal stream without transporting the snapshot or bearer', async () => {
     getSnapshot.mockResolvedValue(terminalSnapshot);
 
     const response = await GET(requestWithBearer());
@@ -138,8 +138,8 @@ describe('GET /api/guest/status/stream', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('text/event-stream');
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(body).toContain('event: status');
-    expect(body).toContain(JSON.stringify(terminalSnapshot));
+    expect(body).toBe('');
+    expect(body).not.toContain(JSON.stringify(terminalSnapshot));
     expect(body).not.toContain(bearer);
     expect(getSnapshot).toHaveBeenCalledTimes(1);
     expect(getSnapshot).toHaveBeenCalledWith(
@@ -149,7 +149,7 @@ describe('GET /api/guest/status/stream', () => {
     );
   });
 
-  it('suppresses timestamp-only refreshes but emits guest-visible projection changes even when session versions are unchanged', async () => {
+  it('emits only a change notification for authoritative projection changes', async () => {
     vi.useFakeTimers();
     const sameProjection = {
       ...activeSnapshot,
@@ -167,15 +167,14 @@ describe('GET /api/guest/status/stream', () => {
 
     const response = await GET(requestWithBearer());
     const reader = response.body!.getReader();
-    const first = new TextDecoder().decode((await reader.read()).value);
-    expect(first).toContain(JSON.stringify(activeSnapshot));
 
     await vi.advanceTimersByTimeAsync(15_000);
     await vi.advanceTimersByTimeAsync(15_000);
 
-    const second = new TextDecoder().decode((await reader.read()).value);
-    expect(second).toContain(JSON.stringify(changedProjection));
-    expect(second).not.toContain(JSON.stringify(sameProjection));
+    const event = new TextDecoder().decode((await reader.read()).value);
+    expect(event).toBe('event: change\ndata: {}\n\n');
+    expect(event).not.toContain(JSON.stringify(changedProjection));
+    expect(event).not.toContain(bearer);
     expect(changedProjection.session.queueOrderVersion).toBe(
       activeSnapshot.session.queueOrderVersion,
     );
@@ -183,7 +182,49 @@ describe('GET /api/guest/status/stream', () => {
     await reader.cancel();
   });
 
-  it('closes promptly when the client aborts after the first active event', async () => {
+  it('does not treat clock-derived provisional arrival-window movement as an SSE change', async () => {
+    vi.useFakeTimers();
+    const waiting = {
+      ...activeSnapshot,
+      queueState: 'waiting',
+      patientsAhead: null,
+      positionKind: 'provisional' as const,
+      arrivalWindow: {
+        earliestAt: '2026-09-10T17:30:00Z',
+        latestAt: '2026-09-10T17:45:00Z',
+        uncertaintyMinutes: 15,
+      },
+    };
+    const clockOnly = {
+      ...waiting,
+      generatedAt: '2026-09-10T17:30:15Z',
+      arrivalWindow: {
+        ...waiting.arrivalWindow,
+        earliestAt: '2026-09-10T17:30:15Z',
+        latestAt: '2026-09-10T17:45:15Z',
+      },
+    };
+    const changed = {
+      ...clockOnly,
+      session: { ...clockOnly.session, declaredDelayMinutes: 10 },
+    };
+    getSnapshot
+      .mockResolvedValueOnce(waiting)
+      .mockResolvedValueOnce(clockOnly)
+      .mockResolvedValueOnce(changed);
+
+    const response = await GET(requestWithBearer());
+    const reader = response.body!.getReader();
+    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    const event = new TextDecoder().decode((await reader.read()).value);
+    expect(event).toBe('event: change\ndata: {}\n\n');
+    expect(getSnapshot).toHaveBeenCalledTimes(3);
+    await reader.cancel();
+  });
+
+  it('closes promptly when the client aborts an active stream', async () => {
     const controller = new AbortController();
     getSnapshot.mockResolvedValue(activeSnapshot);
 
@@ -191,10 +232,7 @@ describe('GET /api/guest/status/stream', () => {
     const reader = response.body?.getReader();
     expect(reader).toBeDefined();
 
-    const first = await reader!.read();
-    expect(new TextDecoder().decode(first.value)).toContain('event: status');
     controller.abort();
-
     const end = await reader!.read();
     expect(end.done).toBe(true);
     expect(getSnapshot).toHaveBeenCalledTimes(1);
@@ -222,9 +260,6 @@ describe('GET /api/guest/status/stream', () => {
     const request = requestWithBearer(controller.signal);
     const response = await GET(request);
     const reader = response.body!.getReader();
-    expect(new TextDecoder().decode((await reader.read()).value)).toContain(
-      'event: status',
-    );
 
     await vi.advanceTimersByTimeAsync(15_000);
     expect(getSnapshot).toHaveBeenCalledTimes(2);
@@ -245,8 +280,6 @@ describe('GET /api/guest/status/stream', () => {
 
     const response = await GET(requestWithBearer());
     const reader = response.body!.getReader();
-    const first = new TextDecoder().decode((await reader.read()).value);
-    expect(first).toContain('event: status');
 
     await vi.advanceTimersByTimeAsync(15_000);
     const end = await reader.read();
