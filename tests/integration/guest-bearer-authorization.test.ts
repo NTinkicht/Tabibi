@@ -120,6 +120,25 @@ describe('WU16 guest bearer authorization', () => {
     ).toBe(auditsBefore.rows[0].count);
   });
 
+  it('rejects an equal-length invalid bearer verifier without exposing the raw secret to SQL', async () => {
+    const service = new GuestAccessService(pool);
+    const credential = await liveBearer();
+    const separator = credential.bearer.indexOf('.');
+    const credentialId = credential.bearer.slice(0, separator);
+    const bearerSecret = credential.bearer.slice(separator + 1);
+    const replacement = bearerSecret.endsWith('A') ? 'B' : 'A';
+    const invalidBearer = `${credentialId}.${bearerSecret.slice(0, -1)}${replacement}`;
+
+    expect(invalidBearer).toHaveLength(credential.bearer.length);
+    await expect(
+      service.authorize(
+        invalidBearer,
+        target,
+        new Date('2026-09-10T09:02:00Z'),
+      ),
+    ).rejects.toBeInstanceOf(GuestAccessRejectedError);
+  });
+
   it('rejects wrong target, revocation, expiry, and terminal queue state generically', async () => {
     const service = new GuestAccessService(pool);
     const credential = await liveBearer();
