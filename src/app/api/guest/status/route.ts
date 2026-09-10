@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { Pool } from 'pg';
 import { GuestAccessRejectedError } from '@/modules/guest-access';
 import { GuestStatusService } from '@/modules/guest-status';
 import { getPool } from '@/platform/database/pool';
@@ -14,10 +15,6 @@ const SECURITY_HEADERS = {
 const RATE_WINDOW_MS = 60_000;
 const IP_LIMIT = 30;
 const CREDENTIAL_LIMIT = 6;
-const rateBuckets = new Map<
-  string,
-  { windowStartedAt: number; count: number }
->();
 
 function guestBearer(request: Request): string | null {
   const cookieHeader = request.headers.get('cookie');
@@ -33,44 +30,74 @@ function guestBearer(request: Request): string | null {
 }
 
 function requestIp(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0]?.trim() || 'unknown';
-  return request.headers.get('cf-connecting-ip')?.trim() || 'unknown';
+  return (
+    request.headers.get('cf-connecting-ip')?.trim() ||
+    request.headers.get('x-real-ip')?.trim() ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'unknown'
+  );
 }
 
-function consumeBucket(key: string, limit: number, now: number): boolean {
-  const current = rateBuckets.get(key);
-  if (!current || now - current.windowStartedAt >= RATE_WINDOW_MS) {
-    rateBuckets.set(key, { windowStartedAt: now, count: 1 });
-    return true;
-  }
-  if (current.count >= limit) return false;
-  current.count += 1;
-  return true;
+async function consumeBucket(
+  pool: Pool,
+  key: string,
+  limit: number,
+): Promise<boolean> {
+  const bucketKey = createHash('sha256').update(key).digest('hex');
+  const result = await pool.query<{ allowed: boolean }>(
+    `WITH cleanup AS (
+       DELETE FROM guest_status_rate_limit_buckets
+        WHERE window_started_at < now() - ($3::bigint * interval '1 millisecond')
+     ), upserted AS (
+       INSERT INTO guest_status_rate_limit_buckets
+         (bucket_key,window_started_at,request_count,updated_at)
+       VALUES ($1,now(),1,now())
+       ON CONFLICT (bucket_key) DO UPDATE
+         SET window_started_at = CASE
+               WHEN guest_status_rate_limit_buckets.window_started_at < now() - ($3::bigint * interval '1 millisecond')
+                 THEN now()
+               ELSE guest_status_rate_limit_buckets.window_started_at
+             END,
+             request_count = CASE
+               WHEN guest_status_rate_limit_buckets.window_started_at < now() - ($3::bigint * interval '1 millisecond')
+                 THEN 1
+               ELSE guest_status_rate_limit_buckets.request_count + 1
+             END,
+             updated_at=now()
+         WHERE guest_status_rate_limit_buckets.window_started_at < now() - ($3::bigint * interval '1 millisecond')
+            OR guest_status_rate_limit_buckets.request_count < $2
+       RETURNING true AS allowed
+     )
+     SELECT EXISTS(SELECT 1 FROM upserted) AS allowed`,
+    [bucketKey, limit, RATE_WINDOW_MS],
+  );
+  return result.rows[0]?.allowed === true;
 }
 
-function withinRateLimit(request: Request, bearer: string | null): boolean {
-  const now = Date.now();
+async function withinRateLimit(
+  pool: Pool,
+  request: Request,
+  bearer: string | null,
+): Promise<boolean> {
   const ip = requestIp(request);
-  if (!consumeBucket(`ip:${ip}`, IP_LIMIT, now)) return false;
+  if (!(await consumeBucket(pool, `ip:${ip}`, IP_LIMIT))) return false;
   if (!bearer) return true;
   const credentialKey = createHash('sha256').update(bearer).digest('hex');
-  return consumeBucket(`credential:${credentialKey}`, CREDENTIAL_LIMIT, now);
+  return consumeBucket(pool, `credential:${credentialKey}`, CREDENTIAL_LIMIT);
 }
 
 export async function GET(request: Request): Promise<Response> {
   try {
     const bearer = guestBearer(request);
-    if (!withinRateLimit(request, bearer)) {
+    const pool = getPool();
+    if (!(await withinRateLimit(pool, request, bearer))) {
       return Response.json(
         { error: 'Too many requests' },
         { status: 429, headers: { ...SECURITY_HEADERS, 'retry-after': '60' } },
       );
     }
     if (!bearer) throw new GuestAccessRejectedError();
-    const snapshot = await new GuestStatusService(getPool()).getSnapshot(
-      bearer,
-    );
+    const snapshot = await new GuestStatusService(pool).getSnapshot(bearer);
     return Response.json(snapshot, { status: 200, headers: SECURITY_HEADERS });
   } catch (error) {
     const rejected = error instanceof GuestAccessRejectedError;
