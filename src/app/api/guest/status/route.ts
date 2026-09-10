@@ -77,25 +77,41 @@ async function consumeBucket(
 }
 
 /**
- * Apply deployment-wide throttling without trusting caller-controlled forwarding headers.
- * Until the runtime supplies a platform-authenticated client address, all traffic shares
- * one ingress bucket; a valid credential receives an additional tighter per-credential cap.
+ * Apply shared throttling without trusting caller-controlled forwarding headers.
+ * Malformed or unknown credential IDs share the untrusted ingress bucket. A credential
+ * ID that exists in the credential store receives its own tighter bucket, so unrelated
+ * invalid traffic cannot exhaust the allowance for legitimate guests.
  */
 async function withinRateLimit(
   pool: Pool,
   bearer: string | null,
 ): Promise<boolean> {
-  if (
-    !(await consumeBucket(
+  if (!bearer)
+    return consumeBucket(
       pool,
       UNTRUSTED_INGRESS_BUCKET,
       UNTRUSTED_INGRESS_LIMIT,
-    ))
-  )
-    return false;
-  if (!bearer) return true;
+    );
+
   const credentialId = credentialIdForRateLimit(bearer);
-  if (!credentialId) return true;
+  if (!credentialId)
+    return consumeBucket(
+      pool,
+      UNTRUSTED_INGRESS_BUCKET,
+      UNTRUSTED_INGRESS_LIMIT,
+    );
+
+  const known = await pool.query<{ exists: boolean }>(
+    'SELECT EXISTS(SELECT 1 FROM guest_credentials WHERE id=$1) AS exists',
+    [credentialId],
+  );
+  if (!known.rows[0]?.exists)
+    return consumeBucket(
+      pool,
+      UNTRUSTED_INGRESS_BUCKET,
+      UNTRUSTED_INGRESS_LIMIT,
+    );
+
   return consumeBucket(pool, `credential:${credentialId}`, CREDENTIAL_LIMIT);
 }
 
