@@ -23,6 +23,8 @@ type ActiveSnapshot = {
   session: {
     status: string;
     declaredDelayMinutes: number | null;
+    delayVersion?: number;
+    queueOrderVersion?: number;
   };
 };
 
@@ -145,7 +147,7 @@ const COPY: Record<SupportedLocale, Copy> = {
     accessUnavailable: 'وصول الضيف غير متاح',
     accessUnavailableBody: 'انتهت جلسة الضيف الآمنة أو لم تعد صالحة.',
     statusUnavailable: 'الحالة غير متاحة مؤقتًا',
-    statusUnavailableBody: 'سنحاول مرة أخرى تلقائيًا. لا يلزم اتخاذ أي إجراء.',
+    statusUnavailableBody: 'سنحاول مرة أخرى تلقائيًا. لا يلزم اتخاذ إجراء.',
     visitStatus: 'حالة الزيارة',
     yourLabel: 'رقمك:',
     status: 'الحالة:',
@@ -201,6 +203,7 @@ function formatTime(
   }).format(new Date(value));
 }
 
+/** Detect one of the guest UI locales supported by this bounded status view. */
 function detectGuestLocale(): SupportedLocale {
   if (typeof navigator === 'undefined') return 'en';
   const locale = navigator.language.toLowerCase();
@@ -209,11 +212,12 @@ function detectGuestLocale(): SupportedLocale {
   return 'en';
 }
 
+/** Locale is stable for a mounted guest status page. */
 function subscribeToGuestLocale(): () => void {
   return () => undefined;
 }
 
-/** Poll and render guest-safe queue status without exposing credential material. */
+/** Render SSE-first guest status while retaining bounded polling as fallback. */
 export function GuestStatusClient() {
   const [state, setState] = useState<ViewState>({ kind: 'loading' });
   const locale = useSyncExternalStore<SupportedLocale>(
@@ -222,15 +226,40 @@ export function GuestStatusClient() {
     () => 'en',
   );
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
   const copy = COPY[locale];
   const direction = locale === 'ar' ? 'rtl' : 'ltr';
 
   useEffect(() => {
     let cancelled = false;
+    let pollGeneration = 0;
+    let pollAbortController: AbortController | null = null;
 
     const clearScheduledPoll = () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
+    };
+
+    const invalidatePoll = () => {
+      pollGeneration += 1;
+      pollAbortController?.abort();
+      pollAbortController = null;
+    };
+
+    const closeStream = () => {
+      eventSourceRef.current?.close();
+      eventSourceRef.current = null;
+    };
+
+    const applySnapshot = (snapshot: GuestStatusSnapshot): boolean => {
+      if (snapshot.terminal) {
+        setState({ kind: 'terminal', snapshot });
+        clearScheduledPoll();
+        closeStream();
+        return true;
+      }
+      setState({ kind: 'active', snapshot });
+      return false;
     };
 
     const schedule = (delay: number, poll: () => Promise<void>) => {
@@ -238,19 +267,58 @@ export function GuestStatusClient() {
       timeoutRef.current = setTimeout(() => void poll(), delay);
     };
 
+    const connectStream = (poll: () => Promise<void>) => {
+      if (
+        cancelled ||
+        typeof EventSource === 'undefined' ||
+        document.visibilityState === 'hidden'
+      ) {
+        schedule(NORMAL_POLL_MS, poll);
+        return;
+      }
+
+      closeStream();
+      const source = new EventSource('/api/guest/status/stream');
+      eventSourceRef.current = source;
+
+      source.addEventListener('change', () => {
+        if (cancelled || eventSourceRef.current !== source) return;
+        closeStream();
+        void poll();
+      });
+
+      source.onerror = () => {
+        if (cancelled || eventSourceRef.current !== source) return;
+        closeStream();
+        schedule(NORMAL_POLL_MS, poll);
+      };
+    };
+
     const poll = async () => {
+      clearScheduledPoll();
+      invalidatePoll();
+      const generation = pollGeneration;
+      const controller = new AbortController();
+      pollAbortController = controller;
+      const isCurrent = () =>
+        !cancelled &&
+        generation === pollGeneration &&
+        !controller.signal.aborted;
+
       try {
         const response = await fetch('/api/guest/status', {
           method: 'GET',
           cache: 'no-store',
           credentials: 'same-origin',
           headers: { accept: 'application/json' },
+          signal: controller.signal,
         });
-        if (cancelled) return;
+        if (!isCurrent()) return;
 
         if (response.status === 401) {
           setState({ kind: 'signed_out' });
           clearScheduledPoll();
+          closeStream();
           return;
         }
         if (response.status === 429) {
@@ -264,25 +332,46 @@ export function GuestStatusClient() {
         }
 
         const snapshot = (await response.json()) as GuestStatusSnapshot;
-        if (snapshot.terminal) {
-          setState({ kind: 'terminal', snapshot });
-          clearScheduledPoll();
+        if (!isCurrent()) return;
+        if (applySnapshot(snapshot)) return;
+        if (!isCurrent()) return;
+        connectStream(poll);
+      } catch (error) {
+        if (
+          !isCurrent() ||
+          (error instanceof DOMException && error.name === 'AbortError')
+        ) {
           return;
         }
-
-        setState({ kind: 'active', snapshot });
-        schedule(NORMAL_POLL_MS, poll);
-      } catch {
-        if (cancelled) return;
         setState({ kind: 'error' });
         schedule(NORMAL_POLL_MS, poll);
+      } finally {
+        if (pollAbortController === controller) pollAbortController = null;
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (cancelled) return;
+      invalidatePoll();
+      if (document.visibilityState === 'hidden') {
+        closeStream();
+        schedule(NORMAL_POLL_MS, poll);
+        return;
+      }
+
+      clearScheduledPoll();
+      closeStream();
+      void poll();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     void poll();
     return () => {
       cancelled = true;
+      invalidatePoll();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearScheduledPoll();
+      closeStream();
     };
   }, []);
 

@@ -6,6 +6,7 @@ import {
   GuestAccessService,
   type GuestTarget,
 } from '@/modules/guest-access';
+import { abortableQuery } from '@/platform/database/abortable-query';
 
 const TERMINAL_GRACE_MS = 15 * 60 * 1_000;
 const PROVISIONAL_UNCERTAINTY_MINUTES = 15;
@@ -102,15 +103,29 @@ export class GuestStatusService {
   async getSnapshot(
     bearer: string,
     now = new Date(),
+    signal?: AbortSignal,
   ): Promise<GuestQueueStatusSnapshot> {
     try {
+      signal?.throwIfAborted();
       const parsed = parseBearer(bearer);
       if (!parsed) throw new GuestAccessRejectedError();
-      const target = await this.guestAccess.authorize(bearer, undefined, now);
-      return await this.getActiveSnapshot(target, parsed.credentialId, now);
+      const target = await this.guestAccess.authorize(
+        bearer,
+        undefined,
+        now,
+        signal,
+      );
+      signal?.throwIfAborted();
+      return await this.getActiveSnapshot(
+        target,
+        parsed.credentialId,
+        now,
+        signal,
+      );
     } catch (error) {
+      if (signal?.aborted) throw error;
       if (!(error instanceof GuestAccessRejectedError)) throw error;
-      return this.getTerminalSummary(bearer, now);
+      return this.getTerminalSummary(bearer, now, signal);
     }
   }
 
@@ -118,8 +133,9 @@ export class GuestStatusService {
     target: GuestTarget,
     credentialId: string,
     now: Date,
+    signal?: AbortSignal,
   ): Promise<GuestQueueStatusSnapshot> {
-    const result = await this.pool.query<{
+    const result = await abortableQuery<{
       public_display_label: string;
       queue_state: string;
       service_position: string;
@@ -131,6 +147,7 @@ export class GuestStatusService {
       queue_order_version: string;
       clinic_timezone: string;
     }>(
+      this.pool,
       `WITH ordered AS (
          SELECT entry.id,
                 entry.public_display_label,
@@ -189,6 +206,7 @@ export class GuestStatusService {
         now,
         credentialId,
       ],
+      signal,
     );
     const row = result.rows[0];
     if (!row) throw new GuestAccessRejectedError();
@@ -227,11 +245,12 @@ export class GuestStatusService {
   private async getTerminalSummary(
     bearer: string,
     now: Date,
+    signal?: AbortSignal,
   ): Promise<GuestQueueStatusSnapshot> {
     const parsed = parseBearer(bearer);
     if (!parsed) throw new GuestAccessRejectedError();
 
-    const result = await this.pool.query<{
+    const result = await abortableQuery<{
       bearer_verifier: string;
       expires_at: Date;
       revoked_at: Date | null;
@@ -242,6 +261,7 @@ export class GuestStatusService {
       session_closed_at: Date | null;
       session_updated_at: Date;
     }>(
+      this.pool,
       `SELECT credential.bearer_verifier,credential.expires_at,credential.revoked_at,
               entry.state::text AS entry_state,entry.updated_at AS entry_updated_at,
               entry.completed_at,
@@ -255,6 +275,7 @@ export class GuestStatusService {
            AND session.clinic_id=credential.clinic_id
         WHERE credential.id=$1`,
       [parsed.credentialId],
+      signal,
     );
     const row = result.rows[0];
     if (

@@ -234,3 +234,133 @@ test('guest status formats arrival times in the clinic timezone', async ({
   await page.goto('/guest/status');
   await expect(page.getByText(/10:30.*10:45/)).toBeVisible();
 });
+
+test('guest status closes SSE while hidden and performs a canonical poll when visible again', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    let hidden = false;
+    const streamState = {
+      created: 0,
+      closed: 0,
+      urls: [] as string[],
+    };
+
+    class TestEventSource {
+      onerror: ((this: EventSource, ev: Event) => unknown) | null = null;
+
+      constructor(url: string | URL) {
+        streamState.created += 1;
+        streamState.urls.push(String(url));
+      }
+
+      addEventListener() {}
+
+      close() {
+        streamState.closed += 1;
+      }
+    }
+
+    Object.defineProperty(window, 'EventSource', {
+      configurable: true,
+      value: TestEventSource,
+    });
+    Object.defineProperty(window, '__guestStatusStreamStateForTest', {
+      configurable: true,
+      value: streamState,
+    });
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => (hidden ? 'hidden' : 'visible'),
+    });
+    Object.defineProperty(window, '__setGuestStatusHiddenForTest', {
+      configurable: true,
+      value: (value: boolean) => {
+        hidden = value;
+        document.dispatchEvent(new Event('visibilitychange'));
+      },
+    });
+  });
+
+  let polls = 0;
+  await page.route('**/api/guest/status', async (route) => {
+    polls += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(activeEligible),
+    });
+  });
+
+  await page.goto('/guest/status');
+  await expect(page.getByText('Patients ahead: 2')).toBeVisible();
+  expect(polls).toBe(1);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __guestStatusStreamStateForTest: {
+                created: number;
+                closed: number;
+                urls: string[];
+              };
+            }
+          ).__guestStatusStreamStateForTest.created,
+      ),
+    )
+    .toBe(1);
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __guestStatusStreamStateForTest: { urls: string[] };
+          }
+        ).__guestStatusStreamStateForTest.urls[0],
+    ),
+  ).toBe('/api/guest/status/stream');
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setGuestStatusHiddenForTest: (value: boolean) => void;
+      }
+    ).__setGuestStatusHiddenForTest(true);
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __guestStatusStreamStateForTest: { closed: number };
+            }
+          ).__guestStatusStreamStateForTest.closed,
+      ),
+    )
+    .toBe(1);
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setGuestStatusHiddenForTest: (value: boolean) => void;
+      }
+    ).__setGuestStatusHiddenForTest(false);
+  });
+
+  await expect.poll(() => polls).toBe(2);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __guestStatusStreamStateForTest: { created: number };
+            }
+          ).__guestStatusStreamStateForTest.created,
+      ),
+    )
+    .toBe(2);
+});
