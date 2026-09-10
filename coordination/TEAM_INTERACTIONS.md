@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T19:46:36.037903+00:00
+- Last sync: 2026-09-10T19:47:29.318030+00:00
 
 ## Team Room charter
 
@@ -10312,5 +10312,167 @@ Owner-review hold remains: all historical Medium+/Major threads across Codex and
 Exactly one open PR exists (#136). Main `coordination/STATE.json` and `coordination/WORK_QUEUE.md` remain stale WU14 snapshots and do not override live WU19 state. Control room #17 has no newer concrete Codex/Claude recovery marker; Gemini Agent/Chat remain PAUSED/OFF-ROSTER. Slack audit found no new unacknowledged owner `Report Progress` command. Coffee reminders are not repeated because they have already been issued several times today.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5624492787
+
+---
+
+### 2026-09-10T19:47:16Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="136"
+
+echo "== Live PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent PR discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-20:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+
+echo "== Recent CodeRabbit review comments =="
+gh api "repos/$repo/pulls/$pr/comments?per_page=100" \
+  --jq '.[] | select(.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai")
+    | {commit_id,path,line,body,created_at}' || true
+
+echo "== Changed files =="
+gh pr diff "$pr" --repo "$repo" --name-only
+
+head_sha="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+echo "== Relevant policy at current head: $head_sha =="
+for file in \
+  AGENTS.md \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  echo "--- $file ---"
+  gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' \
+    | base64 -d | sed -n '1,220p'
+done
+
+echo "== Formatting-related diff details =="
+gh api "repos/$repo/pulls/$pr/files?per_page=100" --paginate \
+  --jq '.[] | select(.filename | test("guest-status|GuestStatus|\\.tsx$|\\.ts$"))
+    | {filename,status,additions,deletions,patch}' || true
+```
+
+Length of output: 140618
+
+---
+
+</details>
+
+`@NTinkicht`, the live PR head remains `aa5ddf5d1074aff40935a9d233d1499afb444b6e`.
+
+The formatting-only remediation is appropriate for the reported `Quality and build` failure. However, it is not sufficient to clear PR `#136`.
+
+A completed CodeRabbit full review already exists for that exact head. It found these unresolved items:
+
+1. **MAJOR:** The SSE route sends full `GuestQueueStatusSnapshot` payloads. `ARCHITECTURE.md` requires change notifications or authorized deltas. The client must fetch `/api/guest/status` before rendering updated canonical state.
+
+2. **MAJOR:** `snapshotVersion()` includes the time-derived provisional `arrivalWindow`. Clock movement can create SSE updates without an authoritative queue, session, delay, or credential change.
+
+3. **MEDIUM:** The browser `EventSource` test double does not retain listeners. It cannot prove status-event rendering, terminal closure, or error-triggered polling fallback.
+
+The PR discussion also describes follow-up functional work in commit `e6dc75f0e145add1952354c76f9092bc6efcbae1`, but that commit is not the current PR head. Do not treat that summary as validation evidence.
+
+Continue on the existing canonical branch only. First commit the actual formatting delta. Then remediate the two MAJOR findings and the MEDIUM test gap. After a new exact head has green required CI, request a new `@coderabbitai full review` for that exact head.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="136"
+
+echo "== Live PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent PR discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-20:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+
+echo "== Recent CodeRabbit review comments =="
+gh api "repos/$repo/pulls/$pr/comments?per_page=100" \
+  --jq '.[] | select(.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai")
+    | {commit_id,path,line,body,created_at}' || true
+
+echo "== Changed files =="
+gh pr diff "$pr" --repo "$repo" --name-only
+
+head_sha="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+echo "== Relevant policy at current head: $head_sha =="
+for file in \
+  AGENTS.md \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  echo "--- $file ---"
+  gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' \
+    | base64 -d | sed -n '1,220p'
+done
+
+echo "== Formatting-related diff details =="
+gh api "repos/$repo/pulls/$pr/files?per_page=100" --paginate \
+  --jq '.[] | select(.filename | test("guest-status|GuestStatus|\\.tsx$|\\.ts$"))
+    | {filename,status,additions,deletions,patch}' || true
+```
+
+Length of output: 140618
+
+---
+
+</details>
+
+`@NTinkicht`, the live PR head remains `aa5ddf5d1074aff40935a9d233d1499afb444b6e`.
+
+The formatting-only remediation is appropriate for the reported `Quality and build` failure. However, it is not sufficient to clear PR `#136`.
+
+A completed CodeRabbit full review already exists for that exact head. It found these unresolved items:
+
+1. **MAJOR:** The SSE route sends full `GuestQueueStatusSnapshot` payloads. `ARCHITECTURE.md` requires change notifications or authorized deltas. The client must fetch `/api/guest/status` before rendering updated canonical state.
+
+2. **MAJOR:** `snapshotVersion()` includes the time-derived provisional `arrivalWindow`. Clock movement can create SSE updates without an authoritative queue, session, delay, or credential change.
+
+3. **MEDIUM:** The browser `EventSource` test double does not retain listeners. It cannot prove status-event rendering, terminal closure, or error-triggered polling fallback.
+
+The PR discussion also describes follow-up functional work in commit `e6dc75f0e145add1952354c76f9092bc6efcbae1`, but that commit is not the current PR head. Do not treat that summary as validation evidence.
+
+Continue on the existing canonical branch only. First commit the actual formatting delta. Then remediate the two MAJOR findings and the MEDIUM test gap. After a new exact head has green required CI, request a new `@coderabbitai full review` for that exact head.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5624503171
 
 ---
