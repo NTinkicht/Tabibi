@@ -232,10 +232,18 @@ export function GuestStatusClient() {
 
   useEffect(() => {
     let cancelled = false;
+    let pollGeneration = 0;
+    let pollAbortController: AbortController | null = null;
 
     const clearScheduledPoll = () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
+    };
+
+    const invalidatePoll = () => {
+      pollGeneration += 1;
+      pollAbortController?.abort();
+      pollAbortController = null;
     };
 
     const closeStream = () => {
@@ -295,14 +303,24 @@ export function GuestStatusClient() {
 
     const poll = async () => {
       clearScheduledPoll();
+      invalidatePoll();
+      const generation = pollGeneration;
+      const controller = new AbortController();
+      pollAbortController = controller;
+      const isCurrent = () =>
+        !cancelled &&
+        generation === pollGeneration &&
+        !controller.signal.aborted;
+
       try {
         const response = await fetch('/api/guest/status', {
           method: 'GET',
           cache: 'no-store',
           credentials: 'same-origin',
           headers: { accept: 'application/json' },
+          signal: controller.signal,
         });
-        if (cancelled) return;
+        if (!isCurrent()) return;
 
         if (response.status === 401) {
           setState({ kind: 'signed_out' });
@@ -321,17 +339,24 @@ export function GuestStatusClient() {
         }
 
         const snapshot = (await response.json()) as GuestStatusSnapshot;
+        if (!isCurrent()) return;
         if (applySnapshot(snapshot)) return;
+        if (!isCurrent()) return;
         connectStream(poll);
-      } catch {
-        if (cancelled) return;
+      } catch (error) {
+        if (!isCurrent() || (error instanceof DOMException && error.name === 'AbortError')) {
+          return;
+        }
         setState({ kind: 'error' });
         schedule(NORMAL_POLL_MS, poll);
+      } finally {
+        if (pollAbortController === controller) pollAbortController = null;
       }
     };
 
     const handleVisibilityChange = () => {
       if (cancelled) return;
+      invalidatePoll();
       if (document.visibilityState === 'hidden') {
         closeStream();
         schedule(NORMAL_POLL_MS, poll);
@@ -347,6 +372,7 @@ export function GuestStatusClient() {
     void poll();
     return () => {
       cancelled = true;
+      invalidatePoll();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearScheduledPoll();
       closeStream();
