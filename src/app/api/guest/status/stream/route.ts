@@ -134,18 +134,33 @@ function waitForNextTick(signal: AbortSignal): Promise<boolean> {
   });
 }
 
-/** Encode one guest-safe status snapshot as an SSE status event. */
-function encodeStatusEvent(snapshot: GuestQueueStatusSnapshot): Uint8Array {
-  return new TextEncoder().encode(
-    `event: status\ndata: ${JSON.stringify(snapshot)}\n\n`,
-  );
+/** Encode a guest-safe change notification without transporting a snapshot. */
+function encodeChangeEvent(): Uint8Array {
+  return new TextEncoder().encode('event: change\ndata: {}\n\n');
 }
 
-/** Build a stable identity from every guest-visible field except generatedAt. */
+/**
+ * Build an authoritative projection identity for SSE change detection.
+ * Clock-derived display fields such as generatedAt/arrivalWindow are excluded;
+ * the client refreshes those through the canonical status endpoint.
+ */
 function snapshotVersion(snapshot: GuestQueueStatusSnapshot): string {
-  return JSON.stringify(snapshot, (key, value) =>
-    key === 'generatedAt' ? undefined : value,
-  );
+  if (snapshot.terminal) {
+    return JSON.stringify({ terminal: true, finalStatus: snapshot.finalStatus });
+  }
+
+  return JSON.stringify({
+    terminal: false,
+    publicDisplayLabel: snapshot.publicDisplayLabel,
+    queueState: snapshot.queueState,
+    patientsAhead: snapshot.patientsAhead,
+    positionKind: snapshot.positionKind,
+    clinicTimezone: snapshot.clinicTimezone,
+    sessionStatus: snapshot.session.status,
+    declaredDelayMinutes: snapshot.session.declaredDelayMinutes,
+    delayVersion: snapshot.session.delayVersion,
+    queueOrderVersion: snapshot.session.queueOrderVersion,
+  });
 }
 
 /** Serve a bounded, change-driven, credential-safe guest status event stream. */
@@ -194,7 +209,6 @@ export async function GET(request: Request): Promise<Response> {
     async start(controller) {
       const statusService = new GuestStatusService(pool);
       let lastVersion = snapshotVersion(initialSnapshot);
-      controller.enqueue(encodeStatusEvent(initialSnapshot));
 
       if (initialSnapshot.terminal) {
         controller.close();
@@ -214,7 +228,7 @@ export async function GET(request: Request): Promise<Response> {
 
           const nextVersion = snapshotVersion(snapshot);
           if (nextVersion !== lastVersion) {
-            controller.enqueue(encodeStatusEvent(snapshot));
+            controller.enqueue(encodeChangeEvent());
             lastVersion = nextVersion;
           }
 
