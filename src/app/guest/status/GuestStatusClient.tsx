@@ -260,7 +260,11 @@ export function GuestStatusClient() {
     };
 
     const connectStream = (poll: () => Promise<void>) => {
-      if (cancelled || typeof EventSource === 'undefined') {
+      if (
+        cancelled ||
+        typeof EventSource === 'undefined' ||
+        document.visibilityState === 'hidden'
+      ) {
         schedule(NORMAL_POLL_MS, poll);
         return;
       }
@@ -326,9 +330,24 @@ export function GuestStatusClient() {
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (cancelled) return;
+      if (document.visibilityState === 'hidden') {
+        closeStream();
+        schedule(NORMAL_POLL_MS, poll);
+        return;
+      }
+
+      clearScheduledPoll();
+      closeStream();
+      void poll();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     void poll();
     return () => {
       cancelled = true;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearScheduledPoll();
       closeStream();
     };
