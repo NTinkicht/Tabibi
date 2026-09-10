@@ -23,6 +23,8 @@ type ActiveSnapshot = {
   session: {
     status: string;
     declaredDelayMinutes: number | null;
+    delayVersion?: number;
+    queueOrderVersion?: number;
   };
 };
 
@@ -201,6 +203,7 @@ function formatTime(
   }).format(new Date(value));
 }
 
+/** Detect one of the guest UI locales supported by this bounded status view. */
 function detectGuestLocale(): SupportedLocale {
   if (typeof navigator === 'undefined') return 'en';
   const locale = navigator.language.toLowerCase();
@@ -209,11 +212,12 @@ function detectGuestLocale(): SupportedLocale {
   return 'en';
 }
 
+/** Locale is stable for a mounted guest status page. */
 function subscribeToGuestLocale(): () => void {
   return () => undefined;
 }
 
-/** Poll and render guest-safe queue status without exposing credential material. */
+/** Render SSE-first guest status while retaining bounded polling as fallback. */
 export function GuestStatusClient() {
   const [state, setState] = useState<ViewState>({ kind: 'loading' });
   const locale = useSyncExternalStore<SupportedLocale>(
@@ -222,6 +226,7 @@ export function GuestStatusClient() {
     () => 'en',
   );
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
   const copy = COPY[locale];
   const direction = locale === 'ar' ? 'rtl' : 'ltr';
 
@@ -233,12 +238,59 @@ export function GuestStatusClient() {
       timeoutRef.current = null;
     };
 
+    const closeStream = () => {
+      eventSourceRef.current?.close();
+      eventSourceRef.current = null;
+    };
+
+    const applySnapshot = (snapshot: GuestStatusSnapshot): boolean => {
+      if (snapshot.terminal) {
+        setState({ kind: 'terminal', snapshot });
+        clearScheduledPoll();
+        closeStream();
+        return true;
+      }
+      setState({ kind: 'active', snapshot });
+      return false;
+    };
+
     const schedule = (delay: number, poll: () => Promise<void>) => {
       clearScheduledPoll();
       timeoutRef.current = setTimeout(() => void poll(), delay);
     };
 
+    const connectStream = (poll: () => Promise<void>) => {
+      if (cancelled || typeof EventSource === 'undefined') {
+        schedule(NORMAL_POLL_MS, poll);
+        return;
+      }
+
+      closeStream();
+      const source = new EventSource('/api/guest/status/stream');
+      eventSourceRef.current = source;
+
+      source.addEventListener('status', (event) => {
+        if (cancelled) return;
+        try {
+          const snapshot = JSON.parse(
+            (event as MessageEvent<string>).data,
+          ) as GuestStatusSnapshot;
+          applySnapshot(snapshot);
+        } catch {
+          closeStream();
+          schedule(NORMAL_POLL_MS, poll);
+        }
+      });
+
+      source.onerror = () => {
+        if (cancelled || eventSourceRef.current !== source) return;
+        closeStream();
+        schedule(NORMAL_POLL_MS, poll);
+      };
+    };
+
     const poll = async () => {
+      clearScheduledPoll();
       try {
         const response = await fetch('/api/guest/status', {
           method: 'GET',
@@ -251,6 +303,7 @@ export function GuestStatusClient() {
         if (response.status === 401) {
           setState({ kind: 'signed_out' });
           clearScheduledPoll();
+          closeStream();
           return;
         }
         if (response.status === 429) {
@@ -264,14 +317,8 @@ export function GuestStatusClient() {
         }
 
         const snapshot = (await response.json()) as GuestStatusSnapshot;
-        if (snapshot.terminal) {
-          setState({ kind: 'terminal', snapshot });
-          clearScheduledPoll();
-          return;
-        }
-
-        setState({ kind: 'active', snapshot });
-        schedule(NORMAL_POLL_MS, poll);
+        if (applySnapshot(snapshot)) return;
+        connectStream(poll);
       } catch {
         if (cancelled) return;
         setState({ kind: 'error' });
@@ -283,6 +330,7 @@ export function GuestStatusClient() {
     return () => {
       cancelled = true;
       clearScheduledPoll();
+      closeStream();
     };
   }, []);
 
