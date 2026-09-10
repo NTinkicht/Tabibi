@@ -242,20 +242,22 @@ describe('GET /api/guest/status/stream', () => {
     vi.useFakeTimers();
     const controller = new AbortController();
     let refreshSignal: AbortSignal | undefined;
-    getSnapshot.mockResolvedValueOnce(activeSnapshot).mockImplementationOnce(
-      (_bearer: string, _now: Date, signal: AbortSignal) =>
-        new Promise((_, reject) => {
-          refreshSignal = signal;
-          signal.addEventListener(
-            'abort',
-            () =>
-              reject(
-                signal.reason ?? new DOMException('Aborted', 'AbortError'),
-              ),
-            { once: true },
-          );
-        }),
-    );
+    getSnapshot
+      .mockResolvedValueOnce(activeSnapshot)
+      .mockImplementationOnce(
+        (_bearer: string, _now: Date, signal: AbortSignal) =>
+          new Promise((_, reject) => {
+            refreshSignal = signal;
+            signal.addEventListener(
+              'abort',
+              () =>
+                reject(
+                  signal.reason ?? new DOMException('Aborted', 'AbortError'),
+                ),
+              { once: true },
+            );
+          }),
+      );
 
     const request = requestWithBearer(controller.signal);
     const response = await GET(request);
