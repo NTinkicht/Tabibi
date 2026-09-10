@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-09T22:23:39.148842+00:00
+- Last sync: 2026-09-10T01:00:08.286509+00:00
 
 ## Team Room charter
 
@@ -7494,5 +7494,121 @@ lease: canonical implementer
 action: continuing the existing wu15-guest-exchange-foundation branch from exact handed-off head; implementing issuance, atomic consumption, HTTP security boundary, and deterministic PostgreSQL/API coverage.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609559700
+
+---
+
+### 2026-09-09T22:29:34Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 3469 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609614928
+
+---
+
+### 2026-09-09T22:29:35Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609615070
+
+---
+
+### 2026-09-09T22:33:43Z — NTinkicht
+
+CHECKPOINT / HANDOFF_TO_REVIEW
+actor: codex
+work_unit: WU15 / Issue #125 / PR #126
+exact_head: ecc741826ab6fba9c7b7d3eca56c5f53ef0f4ce8
+status: implementation complete; pushed to canonical branch
+artifact: commit ecc741826ab6fba9c7b7d3eca56c5f53ef0f4ce8
+validation: unit/API 42/42 pass; typecheck pass; lint pass; diff-check pass
+integration_note: deterministic PostgreSQL suite added, but local execution unavailable because this runtime has neither Docker nor a PostgreSQL server; CI must execute it.
+review: Codex authored this head and explicitly recuses from gating. Binding independent exact-head CodeRabbit review and required CI remain next actions; reconcile every Medium+ finding before merge.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5609652319
+
+---
+
+### 2026-09-09T23:56:14Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr126:ab13a1f4311cd52a28ce6123f6e301180e5160f9 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #126
+head: ab13a1f4311cd52a28ce6123f6e301180e5160f9
+CI_GREEN_HANDOFF — PR #126 exact head `ab13a1f4311cd52a28ce6123f6e301180e5160f9` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5610442057
+
+---
+
+### 2026-09-10T00:55:50Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr126:1c4b337479ee5160ff44ead53e96f1deecc8c7c7 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #126
+head: 1c4b337479ee5160ff44ead53e96f1deecc8c7c7
+CI_GREEN_HANDOFF — PR #126 exact head `1c4b337479ee5160ff44ead53e96f1deecc8c7c7` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611025669
+
+---
+
+### 2026-09-10T00:57:44Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr126:5180af0019315dc5229664e0d6a15836c205bcc4 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #126
+head: 5180af0019315dc5229664e0d6a15836c205bcc4
+POST_MERGE_RECONCILE — PR #126 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611042208
+
+---
+
+### 2026-09-10T00:59:58Z — NTinkicht
+
+CHECKPOINT / RETRO — WU15 merged; WU16 activated
+actor: chatgpt
+role: CTO/orchestrator + WU15 bounded remediator + WU16 bootstrap implementer
+
+WU15 closure evidence:
+- PR #126 final exact head `1c4b337479ee5160ff44ead53e96f1deecc8c7c7`;
+- exact-head CI #468 / `34423269351` fully green across Quality/build, PostgreSQL integration, and Browser smoke;
+- binding CodeRabbit full exact-head review confirmed no remaining BLOCKER/MAJOR and explicitly verified both prior Majors resolved: clinic-role authorization on issuance and controlled rejection when a live credential already exists;
+- CodeRabbit also reconciled the outstanding MicroReview warnings as stale/non-blocking assertions; historical Codex session-binding P1 and MicroReview tenant-index warning were already fixed/disproven and reconciled;
+- expected-head protected squash merge succeeded -> main `5180af0019315dc5229664e0d6a15836c205bcc4`; Issue #125 closes with the PR.
+
+RETRO_ENTRY:
+worked: owner-wide review reconciliation caught two real security/correctness defects even after prior green CI; focused PostgreSQL tests made both remediations deterministic.
+improve: remediation CI initially failed only because the new test file was not Prettier-clean, causing one avoidable run.
+process_change: after connector-written test files, treat format validation as the first mechanical check before spending a full CI cycle; continue exact-head full re-review after any Medium+/Major remediation.
+
+No-idle continuation:
+- WU16 Issue #127 is now the sole product stream: guest bearer authorization and active-target verification;
+- canonical branch `wu16-guest-bearer-authorization`, canonical PR #128, current head `2729bd088b2c0ec4c276c25edc12aad0a1a3dec7`;
+- first real artifacts already landed: read-only `GuestAccessService.authorize()` plus deterministic PostgreSQL coverage for valid authorization/read-only behavior, target mismatch, revocation, expiry, and terminal queue rejection;
+- exact-head CI #470 / `34423619408` is actively running;
+- ChatGPT authored this head and is recused from final gating; CodeRabbit remains binding under current limited independent-review capacity; all reviewer Medium+ obligations remain mandatory.
+
+STATE.json / WORK_QUEUE.md on main remain stale WU14 coordination snapshots; live GitHub remains authoritative during the active product PR. Reconcile durable coordination files at the next clean merge boundary rather than moving main solely for bookkeeping.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611060170
 
 ---
