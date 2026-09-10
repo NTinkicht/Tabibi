@@ -102,8 +102,10 @@ export class GuestStatusService {
     now = new Date(),
   ): Promise<GuestQueueStatusSnapshot> {
     try {
+      const parsed = parseBearer(bearer);
+      if (!parsed) throw new GuestAccessRejectedError();
       const target = await this.guestAccess.authorize(bearer, undefined, now);
-      return await this.getActiveSnapshot(target, now);
+      return await this.getActiveSnapshot(target, parsed.credentialId, now);
     } catch (error) {
       if (!(error instanceof GuestAccessRejectedError)) throw error;
       return this.getTerminalSummary(bearer, now);
@@ -112,6 +114,7 @@ export class GuestStatusService {
 
   private async getActiveSnapshot(
     target: GuestTarget,
+    credentialId: string,
     now: Date,
   ): Promise<GuestQueueStatusSnapshot> {
     const result = await this.pool.query<{
@@ -162,7 +165,8 @@ export class GuestStatusService {
          JOIN consultation_sessions session
            ON session.id=$2 AND session.clinic_id=$1
          JOIN guest_credentials credential
-           ON credential.queue_entry_id=$3
+           ON credential.id=$5
+          AND credential.queue_entry_id=$3
           AND credential.session_id=$2
           AND credential.clinic_id=$1
           AND credential.revoked_at IS NULL
@@ -173,7 +177,13 @@ export class GuestStatusService {
           AND appointment.clinic_id=$1
         WHERE ordered.id=$3
           AND session.status IN ('planned','open','paused')`,
-      [target.clinicId, target.sessionId, target.queueEntryId, now],
+      [
+        target.clinicId,
+        target.sessionId,
+        target.queueEntryId,
+        now,
+        credentialId,
+      ],
     );
     const row = result.rows[0];
     if (!row) throw new GuestAccessRejectedError();
