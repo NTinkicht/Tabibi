@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Pool } from 'pg';
 import {
   GuestAccessRejectedError,
@@ -5,18 +6,55 @@ import {
   type GuestTarget,
 } from '@/modules/guest-access';
 
-export interface GuestQueueStatusSnapshot {
-  generatedAt: string;
-  target: GuestTarget;
-  publicDisplayLabel: string;
-  queueState: string;
-  patientsAhead: number;
-  session: {
-    status: string;
-    declaredDelayMinutes: number | null;
-    delayVersion: number;
-    queueOrderVersion: number;
-  };
+const TERMINAL_GRACE_MS = 15 * 60 * 1_000;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TERMINAL_ENTRY_STATES = ['completed', 'cancelled', 'no_show'];
+const TERMINAL_SESSION_STATES = ['closed', 'cancelled'];
+
+export type GuestQueueStatusSnapshot =
+  | {
+      generatedAt: string;
+      terminal: false;
+      target: GuestTarget;
+      publicDisplayLabel: string;
+      queueState: string;
+      patientsAhead: number | null;
+      positionKind: 'live' | 'provisional';
+      session: {
+        status: string;
+        declaredDelayMinutes: number | null;
+        delayVersion: number;
+        queueOrderVersion: number;
+      };
+    }
+  | {
+      generatedAt: string;
+      terminal: true;
+      finalStatus: string;
+    };
+
+function parseBearer(
+  bearer: string,
+): { credentialId: string; secret: string } | null {
+  const separator = bearer.indexOf('.');
+  if (separator <= 0 || separator === bearer.length - 1) return null;
+  const credentialId = bearer.slice(0, separator);
+  const secret = bearer.slice(separator + 1);
+  if (!UUID_PATTERN.test(credentialId) || !secret) return null;
+  return { credentialId, secret };
+}
+
+function verifierMatches(storedVerifier: string, secret: string): boolean {
+  if (!/^[0-9a-f]{64}$/i.test(storedVerifier)) return false;
+  const stored = Buffer.from(storedVerifier, 'hex');
+  const candidate = Buffer.from(
+    createHash('sha256').update(secret, 'utf8').digest('hex'),
+    'hex',
+  );
+  return (
+    stored.length === candidate.length && timingSafeEqual(stored, candidate)
+  );
 }
 
 /** Read-only, credential-free guest projection for one authorized queue target. */
@@ -30,7 +68,19 @@ export class GuestStatusService {
     bearer: string,
     now = new Date(),
   ): Promise<GuestQueueStatusSnapshot> {
-    const target = await this.guestAccess.authorize(bearer, undefined, now);
+    try {
+      const target = await this.guestAccess.authorize(bearer, undefined, now);
+      return await this.getActiveSnapshot(target, now);
+    } catch (error) {
+      if (!(error instanceof GuestAccessRejectedError)) throw error;
+      return this.getTerminalSummary(bearer, now);
+    }
+  }
+
+  private async getActiveSnapshot(
+    target: GuestTarget,
+    now: Date,
+  ): Promise<GuestQueueStatusSnapshot> {
     const result = await this.pool.query<{
       public_display_label: string;
       queue_state: string;
@@ -87,18 +137,81 @@ export class GuestStatusService {
     const row = result.rows[0];
     if (!row) throw new GuestAccessRejectedError();
 
+    const livePosition = row.queue_state !== 'waiting';
     return {
       generatedAt: now.toISOString(),
+      terminal: false,
       target,
       publicDisplayLabel: row.public_display_label,
       queueState: row.queue_state,
-      patientsAhead: Math.max(0, Number(row.service_position) - 1),
+      patientsAhead: livePosition
+        ? Math.max(0, Number(row.service_position) - 1)
+        : null,
+      positionKind: livePosition ? 'live' : 'provisional',
       session: {
         status: row.session_status,
         declaredDelayMinutes: row.declared_delay_minutes,
         delayVersion: row.delay_version,
         queueOrderVersion: Number(row.queue_order_version),
       },
+    };
+  }
+
+  private async getTerminalSummary(
+    bearer: string,
+    now: Date,
+  ): Promise<GuestQueueStatusSnapshot> {
+    const parsed = parseBearer(bearer);
+    if (!parsed) throw new GuestAccessRejectedError();
+
+    const result = await this.pool.query<{
+      bearer_verifier: string;
+      expires_at: Date;
+      revoked_at: Date | null;
+      entry_state: string;
+      entry_updated_at: Date;
+      completed_at: Date | null;
+      session_status: string;
+      session_closed_at: Date | null;
+      session_updated_at: Date;
+    }>(
+      `SELECT credential.bearer_verifier,credential.expires_at,credential.revoked_at,
+              entry.state::text AS entry_state,entry.updated_at AS entry_updated_at,
+              entry.completed_at,
+              session.status::text AS session_status,session.closed_at AS session_closed_at,
+              session.updated_at AS session_updated_at
+         FROM guest_credentials credential
+         JOIN queue_entries entry ON entry.id=credential.queue_entry_id
+           AND entry.clinic_id=credential.clinic_id
+           AND entry.session_id=credential.session_id
+         JOIN consultation_sessions session ON session.id=credential.session_id
+           AND session.clinic_id=credential.clinic_id
+        WHERE credential.id=$1`,
+      [parsed.credentialId],
+    );
+    const row = result.rows[0];
+    if (
+      !row ||
+      row.revoked_at ||
+      row.expires_at <= now ||
+      !verifierMatches(row.bearer_verifier, parsed.secret)
+    )
+      throw new GuestAccessRejectedError();
+
+    const entryTerminal = TERMINAL_ENTRY_STATES.includes(row.entry_state);
+    const sessionTerminal = TERMINAL_SESSION_STATES.includes(row.session_status);
+    if (!entryTerminal && !sessionTerminal) throw new GuestAccessRejectedError();
+
+    const terminalAt = entryTerminal
+      ? row.completed_at ?? row.entry_updated_at
+      : row.session_closed_at ?? row.session_updated_at;
+    if (now.getTime() - terminalAt.getTime() > TERMINAL_GRACE_MS)
+      throw new GuestAccessRejectedError();
+
+    return {
+      generatedAt: now.toISOString(),
+      terminal: true,
+      finalStatus: entryTerminal ? row.entry_state : row.session_status,
     };
   }
 }
