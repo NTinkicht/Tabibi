@@ -102,15 +102,29 @@ export class GuestStatusService {
   async getSnapshot(
     bearer: string,
     now = new Date(),
+    signal?: AbortSignal,
   ): Promise<GuestQueueStatusSnapshot> {
     try {
+      signal?.throwIfAborted();
       const parsed = parseBearer(bearer);
       if (!parsed) throw new GuestAccessRejectedError();
-      const target = await this.guestAccess.authorize(bearer, undefined, now);
-      return await this.getActiveSnapshot(target, parsed.credentialId, now);
+      const target = await this.guestAccess.authorize(
+        bearer,
+        undefined,
+        now,
+        signal,
+      );
+      signal?.throwIfAborted();
+      return await this.getActiveSnapshot(
+        target,
+        parsed.credentialId,
+        now,
+        signal,
+      );
     } catch (error) {
+      if (signal?.aborted) throw error;
       if (!(error instanceof GuestAccessRejectedError)) throw error;
-      return this.getTerminalSummary(bearer, now);
+      return this.getTerminalSummary(bearer, now, signal);
     }
   }
 
@@ -118,7 +132,9 @@ export class GuestStatusService {
     target: GuestTarget,
     credentialId: string,
     now: Date,
+    signal?: AbortSignal,
   ): Promise<GuestQueueStatusSnapshot> {
+    signal?.throwIfAborted();
     const result = await this.pool.query<{
       public_display_label: string;
       queue_state: string;
@@ -130,8 +146,8 @@ export class GuestStatusService {
       delay_version: number;
       queue_order_version: string;
       clinic_timezone: string;
-    }>(
-      `WITH ordered AS (
+    }>({
+      text: `WITH ordered AS (
          SELECT entry.id,
                 entry.public_display_label,
                 entry.state::text AS queue_state,
@@ -182,14 +198,16 @@ export class GuestStatusService {
           AND appointment.clinic_id=$1
         WHERE ordered.id=$3
           AND session.status IN ('planned','open','paused')`,
-      [
+      values: [
         target.clinicId,
         target.sessionId,
         target.queueEntryId,
         now,
         credentialId,
       ],
-    );
+      signal,
+    });
+    signal?.throwIfAborted();
     const row = result.rows[0];
     if (!row) throw new GuestAccessRejectedError();
 
@@ -227,7 +245,9 @@ export class GuestStatusService {
   private async getTerminalSummary(
     bearer: string,
     now: Date,
+    signal?: AbortSignal,
   ): Promise<GuestQueueStatusSnapshot> {
+    signal?.throwIfAborted();
     const parsed = parseBearer(bearer);
     if (!parsed) throw new GuestAccessRejectedError();
 
@@ -241,8 +261,8 @@ export class GuestStatusService {
       session_status: string;
       session_closed_at: Date | null;
       session_updated_at: Date;
-    }>(
-      `SELECT credential.bearer_verifier,credential.expires_at,credential.revoked_at,
+    }>({
+      text: `SELECT credential.bearer_verifier,credential.expires_at,credential.revoked_at,
               entry.state::text AS entry_state,entry.updated_at AS entry_updated_at,
               entry.completed_at,
               session.status::text AS session_status,session.closed_at AS session_closed_at,
@@ -254,8 +274,10 @@ export class GuestStatusService {
          JOIN consultation_sessions session ON session.id=credential.session_id
            AND session.clinic_id=credential.clinic_id
         WHERE credential.id=$1`,
-      [parsed.credentialId],
-    );
+      values: [parsed.credentialId],
+      signal,
+    });
+    signal?.throwIfAborted();
     const row = result.rows[0];
     if (
       !row ||
