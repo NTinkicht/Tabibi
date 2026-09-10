@@ -111,7 +111,7 @@ async function targetPublicDisplayLabel() {
 }
 
 describe('WU17 guest queue-status read', () => {
-  it('returns only the authorized active target with deterministic position and no mutation', async () => {
+  it('returns provisional status for waiting guests without exposing an exact live position', async () => {
     const credential = await liveBearer();
     const expectedPublicDisplayLabel = await targetPublicDisplayLabel();
     const service = new GuestStatusService(pool);
@@ -128,10 +128,12 @@ describe('WU17 guest queue-status read', () => {
     );
 
     expect(snapshot).toMatchObject({
+      terminal: false,
       target,
       publicDisplayLabel: expectedPublicDisplayLabel,
       queueState: 'waiting',
-      patientsAhead: 1,
+      patientsAhead: null,
+      positionKind: 'provisional',
       session: { status: 'open', declaredDelayMinutes: 15 },
     });
     expect(JSON.stringify(snapshot)).not.toContain('0555000000');
@@ -150,7 +152,7 @@ describe('WU17 guest queue-status read', () => {
     ).toBe(beforeAudit.rows[0].count);
   });
 
-  it('rejects revoked, expired, and terminal targets generically', async () => {
+  it('rejects revoked and expired credentials but preserves only a bounded terminal summary', async () => {
     const credential = await liveBearer();
     const service = new GuestStatusService(pool);
 
@@ -178,13 +180,24 @@ describe('WU17 guest queue-status read', () => {
     await pool.query('UPDATE guest_credentials SET expires_at=$1', [
       new Date('2026-09-11T09:00:00Z'),
     ]);
-    await pool.query("UPDATE queue_entries SET state='cancelled' WHERE id=$1", [
-      ids.targetEntry,
-    ]);
+    await pool.query(
+      "UPDATE queue_entries SET state='cancelled',updated_at=$2 WHERE id=$1",
+      [ids.targetEntry, new Date('2026-09-10T09:04:00Z')],
+    );
     await expect(
       service.getSnapshot(
         credential.bearer,
         new Date('2026-09-10T09:05:00Z'),
+      ),
+    ).resolves.toEqual({
+      generatedAt: '2026-09-10T09:05:00.000Z',
+      terminal: true,
+      finalStatus: 'cancelled',
+    });
+    await expect(
+      service.getSnapshot(
+        credential.bearer,
+        new Date('2026-09-10T09:19:00.001Z'),
       ),
     ).rejects.toBeInstanceOf(GuestAccessRejectedError);
   });
@@ -194,7 +207,10 @@ describe('WU17 guest queue-status read', () => {
     const expectedPublicDisplayLabel = await targetPublicDisplayLabel();
     const ok = await GET(
       new Request('http://localhost/api/guest/status', {
-        headers: { cookie: `__Host-tabibi_guest=${credential.bearer}` },
+        headers: {
+          cookie: `__Host-tabibi_guest=${credential.bearer}`,
+          'x-forwarded-for': '203.0.113.17',
+        },
       }),
     );
     expect(ok.status).toBe(200);
@@ -202,15 +218,39 @@ describe('WU17 guest queue-status read', () => {
     const body = await ok.json();
     expect(body.target).toEqual(target);
     expect(body.publicDisplayLabel).toBe(expectedPublicDisplayLabel);
+    expect(body.positionKind).toBe('provisional');
+    expect(body.patientsAhead).toBeNull();
     expect(JSON.stringify(body)).not.toContain('0555000000');
 
     const rejected = await GET(
-      new Request('http://localhost/api/guest/status'),
+      new Request('http://localhost/api/guest/status', {
+        headers: { 'x-forwarded-for': '203.0.113.18' },
+      }),
     );
     expect(rejected.status).toBe(401);
     expect(rejected.headers.get('cache-control')).toBe('no-store');
     await expect(rejected.json()).resolves.toEqual({
       error: 'Guest access rejected',
     });
+  });
+
+  it('rate-limits repeated credential polling while permitting normal polling cadence', async () => {
+    const credential = await liveBearer();
+    const request = () =>
+      GET(
+        new Request('http://localhost/api/guest/status', {
+          headers: {
+            cookie: `__Host-tabibi_guest=${credential.bearer}`,
+            'x-forwarded-for': '203.0.113.19',
+          },
+        }),
+      );
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await expect(request()).resolves.toMatchObject({ status: 200 });
+    }
+    const limited = await request();
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('retry-after')).toBe('60');
   });
 });
