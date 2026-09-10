@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T08:29:54.179725+00:00
+- Last sync: 2026-09-10T08:59:35.647762+00:00
 
 ## Team Room charter
 
@@ -9000,5 +9000,30 @@ Add deterministic coverage that proves:
 Merge must remain blocked until this High finding is resolved on a new exact head, CI is green, and a new full review completes.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5615578879
+
+---
+
+### 2026-09-10T08:59:23Z — NTinkicht
+
+CHECKPOINT — WU17 binding gate regression remediated on canonical PR #131
+actor: chatgpt
+role: CTO/orchestrator + same-branch bounded remediator
+work_stream: Issue #129 / PR #131
+
+Live reconciliation found the latest full CodeRabbit gate is not clean: exact-head review raised a Critical availability defect because the shared pre-auth ingress bucket could be exhausted by unauthenticated traffic and block valid guests. The subsequent regression-test head `8e3d52f65dabe15527b19d8847f99d9b05a15929` also failed PostgreSQL integration CI #511 while Quality/build and Browser smoke passed.
+
+Canonical-stream repair only — no duplicate branch/PR:
+- parseable credential IDs now consume only their credential-specific PostgreSQL bucket;
+- missing/malformed bearers continue to use the bounded untrusted-ingress bucket;
+- removed the pre-auth `guest_credentials` existence lookup so invalid traffic cannot consume a legitimate guest's shared allowance before credential-specific enforcement;
+- preserved the deterministic regression proving 31 unauthenticated requests cannot throttle an unrelated valid bearer;
+- added deterministic `afterAll(pool.end())` cleanup requested by CodeRabbit's Minor stability finding.
+
+Current exact head: `192fddc6e1cd33928f0af2eec0f7cfdc55c71bec`.
+Exact-head CI #513 is queued. The Critical thread has been explicitly reconciled as addressed-pending-CI and remains unresolved until exact-head validation. No merge until CI is green, fresh full CodeRabbit coverage reaches this exact head, and the all-reviewer Medium+ sweep is clean.
+
+`coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots, so live GitHub continues to govern transient execution state. Gemini Agent/Chat remain paused.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5615964236
 
 ---
