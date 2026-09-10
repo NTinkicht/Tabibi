@@ -13,8 +13,9 @@ const SECURITY_HEADERS = {
     "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
 };
 const RATE_WINDOW_MS = 60_000;
-const IP_LIMIT = 30;
+const UNTRUSTED_INGRESS_LIMIT = 30;
 const CREDENTIAL_LIMIT = 6;
+const UNTRUSTED_INGRESS_BUCKET = 'guest-status:untrusted-ingress';
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -36,15 +37,6 @@ function credentialIdForRateLimit(bearer: string): string | null {
   if (separator <= 0) return null;
   const credentialId = bearer.slice(0, separator);
   return UUID_PATTERN.test(credentialId) ? credentialId.toLowerCase() : null;
-}
-
-function requestIp(request: Request): string {
-  return (
-    request.headers.get('cf-connecting-ip')?.trim() ||
-    request.headers.get('x-real-ip')?.trim() ||
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown'
-  );
 }
 
 async function consumeBucket(
@@ -84,13 +76,23 @@ async function consumeBucket(
   return result.rows[0]?.allowed === true;
 }
 
+/**
+ * Apply deployment-wide throttling without trusting caller-controlled forwarding headers.
+ * Until the runtime supplies a platform-authenticated client address, all traffic shares
+ * one ingress bucket; a valid credential receives an additional tighter per-credential cap.
+ */
 async function withinRateLimit(
   pool: Pool,
-  request: Request,
   bearer: string | null,
 ): Promise<boolean> {
-  const ip = requestIp(request);
-  if (!(await consumeBucket(pool, `ip:${ip}`, IP_LIMIT))) return false;
+  if (
+    !(await consumeBucket(
+      pool,
+      UNTRUSTED_INGRESS_BUCKET,
+      UNTRUSTED_INGRESS_LIMIT,
+    ))
+  )
+    return false;
   if (!bearer) return true;
   const credentialId = credentialIdForRateLimit(bearer);
   if (!credentialId) return true;
@@ -101,7 +103,7 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const bearer = guestBearer(request);
     const pool = getPool();
-    if (!(await withinRateLimit(pool, request, bearer))) {
+    if (!(await withinRateLimit(pool, bearer))) {
       return Response.json(
         { error: 'Too many requests' },
         { status: 429, headers: { ...SECURITY_HEADERS, 'retry-after': '60' } },
