@@ -219,7 +219,8 @@ describe('GET /api/guest/status/stream', () => {
         }),
     );
 
-    const response = await GET(requestWithBearer(controller.signal));
+    const request = requestWithBearer(controller.signal);
+    const response = await GET(request);
     const reader = response.body!.getReader();
     expect(new TextDecoder().decode((await reader.read()).value)).toContain(
       'event: status',
@@ -227,7 +228,7 @@ describe('GET /api/guest/status/stream', () => {
 
     await vi.advanceTimersByTimeAsync(15_000);
     expect(getSnapshot).toHaveBeenCalledTimes(2);
-    expect(refreshSignal).toBe(controller.signal);
+    expect(refreshSignal).toBe(request.signal);
     expect(refreshSignal?.aborted).toBe(false);
 
     controller.abort();
