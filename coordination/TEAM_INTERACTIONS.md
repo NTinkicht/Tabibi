@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T18:24:15.777029+00:00
+- Last sync: 2026-09-10T18:42:13.199234+00:00
 
 ## Team Room charter
 
@@ -10193,5 +10193,27 @@ Length of output: 1700
 Do not merge yet. Wait for the full review result on `cd9deb727...`. When it completes, the result will post as a new comment on this thread.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5623443203
+
+---
+
+### 2026-09-10T18:42:03Z — NTinkicht
+
+CHECKPOINT — WU19 CodeRabbit Major remediation active on sole canonical PR #136
+
+actor: chatgpt
+role: CTO/orchestrator + same-canonical-stream remediator
+work_stream: Issue #134 / PR #136 / `wu19-guest-status-sse`
+
+Fresh binding CodeRabbit full review of prior exact green `cd9deb727c99ffc737461acfda3a251c3d11ba81` raised three Major obligations: (1) disconnect abort did not cancel in-flight PostgreSQL status work, (2) overlapping polls could let a stale completion overwrite fresher UI/stream state, and (3) the visibility regression did not directly assert EventSource creation/close lifecycle.
+
+All three are being remediated on the SAME canonical branch only. Current exact head is `9dae02e0e69246dcb0847a6b92e0a408faae65f2` after replacing unsupported pg QueryConfig AbortSignal usage with a bounded `abortableQuery` helper that checks out a dedicated pooled client and destroys/releases it on abort; GuestAccess/GuestStatus propagate the request signal through authorization and projection reads. Client polling now uses generation + AbortController stale-response invalidation. Playwright now installs a deterministic EventSource double and asserts initial stream URL, close while hidden, canonical poll on visibility return, and fresh reconnect. API coverage aborts after a refresh lookup has actually started.
+
+CI #583 on an earlier remediation head exposed formatting plus build/type incompatibility from pg's unsupported query-config signal; that implementation was not rerun unchanged and has been replaced. Fresh exact-head CI #586 / `34515898038` is pending on `9dae02e...`.
+
+Each of the three CodeRabbit Major threads has been individually replied to as addressed-pending-exact-head-validation and remains unresolved until CI + fresh full re-review. Merge stays blocked. After exact-head full green: `@coderabbitai full review` on unchanged SHA -> final every-reviewer Medium+/Major+/High+/Critical/Blocker sweep -> expected-head merge only if clear.
+
+Live GitHub remains authoritative; `coordination/STATE.json` and `coordination/WORK_QUEUE.md` still describe stale WU14 state. Control room #17 has no fresh current-day Codex/Claude capacity artifact. No new unacknowledged Slack `Report Progress` command was found. Coffee-corner has already received repeated reminders today, so no reminder spam. Gemini Agent/Chat remain PAUSED/OFF-ROSTER.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5623699879
 
 ---
