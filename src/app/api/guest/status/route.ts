@@ -14,7 +14,10 @@ const SECURITY_HEADERS = {
 const RATE_WINDOW_MS = 60_000;
 const IP_LIMIT = 30;
 const CREDENTIAL_LIMIT = 6;
-const rateBuckets = new Map<string, { windowStartedAt: number; count: number }>();
+const rateBuckets = new Map<
+  string,
+  { windowStartedAt: number; count: number }
+>();
 
 function guestBearer(request: Request): string | null {
   const cookieHeader = request.headers.get('cookie');

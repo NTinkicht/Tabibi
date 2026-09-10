@@ -160,10 +160,7 @@ describe('WU17 guest queue-status read', () => {
       new Date('2026-09-10T09:02:00Z'),
     ]);
     await expect(
-      service.getSnapshot(
-        credential.bearer,
-        new Date('2026-09-10T09:03:00Z'),
-      ),
+      service.getSnapshot(credential.bearer, new Date('2026-09-10T09:03:00Z')),
     ).rejects.toBeInstanceOf(GuestAccessRejectedError);
 
     await pool.query(
@@ -171,10 +168,7 @@ describe('WU17 guest queue-status read', () => {
       [new Date('2026-09-10T09:03:30Z')],
     );
     await expect(
-      service.getSnapshot(
-        credential.bearer,
-        new Date('2026-09-10T09:04:00Z'),
-      ),
+      service.getSnapshot(credential.bearer, new Date('2026-09-10T09:04:00Z')),
     ).rejects.toBeInstanceOf(GuestAccessRejectedError);
 
     await pool.query('UPDATE guest_credentials SET expires_at=$1', [
@@ -185,10 +179,7 @@ describe('WU17 guest queue-status read', () => {
       [ids.targetEntry, new Date('2026-09-10T09:04:00Z')],
     );
     await expect(
-      service.getSnapshot(
-        credential.bearer,
-        new Date('2026-09-10T09:05:00Z'),
-      ),
+      service.getSnapshot(credential.bearer, new Date('2026-09-10T09:05:00Z')),
     ).resolves.toEqual({
       generatedAt: '2026-09-10T09:05:00.000Z',
       terminal: true,

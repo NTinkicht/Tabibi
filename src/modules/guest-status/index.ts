@@ -199,12 +199,15 @@ export class GuestStatusService {
       throw new GuestAccessRejectedError();
 
     const entryTerminal = TERMINAL_ENTRY_STATES.includes(row.entry_state);
-    const sessionTerminal = TERMINAL_SESSION_STATES.includes(row.session_status);
-    if (!entryTerminal && !sessionTerminal) throw new GuestAccessRejectedError();
+    const sessionTerminal = TERMINAL_SESSION_STATES.includes(
+      row.session_status,
+    );
+    if (!entryTerminal && !sessionTerminal)
+      throw new GuestAccessRejectedError();
 
     const terminalAt = entryTerminal
-      ? row.completed_at ?? row.entry_updated_at
-      : row.session_closed_at ?? row.session_updated_at;
+      ? (row.completed_at ?? row.entry_updated_at)
+      : (row.session_closed_at ?? row.session_updated_at);
     if (now.getTime() - terminalAt.getTime() > TERMINAL_GRACE_MS)
       throw new GuestAccessRejectedError();
 
