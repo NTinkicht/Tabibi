@@ -74,8 +74,15 @@ export class GuestStatusService {
          FROM ordered
          JOIN consultation_sessions session
            ON session.id=$2 AND session.clinic_id=$1
-        WHERE ordered.id=$3`,
-      [target.clinicId, target.sessionId, target.queueEntryId],
+         JOIN guest_credentials credential
+           ON credential.queue_entry_id=$3
+          AND credential.session_id=$2
+          AND credential.clinic_id=$1
+          AND credential.revoked_at IS NULL
+          AND credential.expires_at>$4
+        WHERE ordered.id=$3
+          AND session.status IN ('planned','open','paused')`,
+      [target.clinicId, target.sessionId, target.queueEntryId, now],
     );
     const row = result.rows[0];
     if (!row) throw new GuestAccessRejectedError();
