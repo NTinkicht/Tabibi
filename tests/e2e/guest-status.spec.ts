@@ -27,8 +27,7 @@ const activeEligible = {
 test('guest status renders provisional waiting state without leaking bearer material', async ({
   page,
 }) => {
-  const rawBearer =
-    '00000000-0000-4000-8000-000000000018.test-guest-bearer';
+  const rawBearer = '00000000-0000-4000-8000-000000000018.test-guest-bearer';
   await page.context().addCookies([
     {
       name: '__Host-tabibi_guest',
