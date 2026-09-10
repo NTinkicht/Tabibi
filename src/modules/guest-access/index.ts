@@ -56,9 +56,7 @@ function verifierMatches(storedVerifier: string, bearerSecret: string): boolean 
   if (!/^[0-9a-f]{64}$/i.test(storedVerifier)) return false;
   const stored = Buffer.from(storedVerifier, 'hex');
   const candidate = Buffer.from(verifier(bearerSecret), 'hex');
-  return (
-    stored.length === candidate.length && timingSafeEqual(stored, candidate)
-  );
+  return stored.length === candidate.length && timingSafeEqual(stored, candidate);
 }
 
 /** PostgreSQL-backed guest credential primitive. Raw secrets never cross a query boundary. */
