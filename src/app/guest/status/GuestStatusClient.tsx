@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 const NORMAL_POLL_MS = 30_000;
 const MAX_RETRY_AFTER_SECONDS = 300;
@@ -209,17 +209,21 @@ function detectGuestLocale(): SupportedLocale {
   return 'en';
 }
 
+function subscribeToGuestLocale(): () => void {
+  return () => undefined;
+}
+
 /** Poll and render guest-safe queue status without exposing credential material. */
 export function GuestStatusClient() {
   const [state, setState] = useState<ViewState>({ kind: 'loading' });
-  const [locale, setLocale] = useState<SupportedLocale>('en');
+  const locale = useSyncExternalStore(
+    subscribeToGuestLocale,
+    detectGuestLocale,
+    () => 'en',
+  );
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copy = COPY[locale];
   const direction = locale === 'ar' ? 'rtl' : 'ltr';
-
-  useEffect(() => {
-    setLocale(detectGuestLocale());
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
