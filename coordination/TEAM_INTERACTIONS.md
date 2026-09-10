@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T01:57:12.749457+00:00
+- Last sync: 2026-09-10T02:46:28.569819+00:00
 
 ## Team Room charter
 
@@ -7853,5 +7853,26 @@ Do not treat the current CodeRabbit status as a completed full review. The PR di
 First resolve the `Quality and build` failure. Then wait for all required jobs to pass on the unchanged head. After that, request `@coderabbitai full review` on this exact SHA and reconcile all unresolved Medium-or-higher findings before merge.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611506984
+
+---
+
+### 2026-09-10T02:46:16Z — NTinkicht
+
+CHECKPOINT — WU16 CI remediation on canonical PR #128
+actor: chatgpt
+role: CTO/orchestrator + current canonical implementer
+work_stream: Issue #127 / PR #128
+
+Exact-head CI #474 on `44f55f5f0d6c2fa495f9e53c000f7c9f4b87ee2b` completed with two concrete failures: (1) Prettier on `src/modules/guest-access/index.ts`; (2) the existing WU15 persistence regression still expected `bearer_verifier = sha256(full bearer)`, but WU16 intentionally changed the credential format to `<credentialId>.<secret>` and persists only `sha256(secret)`. Browser smoke passed, and the new WU16 authorization integration suite passed.
+
+Canonical-stream remediation only — no duplicate PR:
+- `f0cbfbac9ecd9dd11f077bf42b61137e40b84267`: Prettier-compatible timing-safe comparison formatting;
+- `7e2bf08e061d53f06b0f1cdd0369e69b1545afcc`: update the WU15 verifier-persistence assertion to hash only the bearer secret component, preserving the new security contract.
+
+PR #128 is now mergeable at exact head `7e2bf08e061d53f06b0f1cdd0369e69b1545afcc`. CI #476 / `34430691551` is running on this exact head. ChatGPT remains an author and cannot self-gate. After full green CI: reconcile/resolve the historical Codex P1 timing-safe thread with exact-head evidence, request `@coderabbitai full review`, enumerate every reviewer source for zero unresolved Medium+/Major+/High+/Critical/Blocker findings, then expected-head merge if unchanged and clear.
+
+`coordination/STATE.json` and `WORK_QUEUE.md` on main remain stale WU14 snapshots; live GitHub is authoritative and main will not be moved solely for bookkeeping underneath an active product PR. No new unacknowledged owner `Report Progress` command exists. Gemini actors remain paused/off-roster.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611881419
 
 ---
