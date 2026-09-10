@@ -78,41 +78,23 @@ async function consumeBucket(
 
 /**
  * Apply shared throttling without trusting caller-controlled forwarding headers.
- * Malformed or unknown credential IDs share the untrusted ingress bucket. A credential
- * ID that exists in the credential store receives its own tighter bucket, so unrelated
- * invalid traffic cannot exhaust the allowance for legitimate guests.
+ * Parseable credential IDs use only their credential-specific bucket so unrelated
+ * unauthenticated traffic cannot exhaust a valid guest's allowance. Missing or
+ * malformed credentials share the bounded untrusted-ingress bucket.
  */
 async function withinRateLimit(
   pool: Pool,
   bearer: string | null,
 ): Promise<boolean> {
-  if (!bearer)
-    return consumeBucket(
-      pool,
-      UNTRUSTED_INGRESS_BUCKET,
-      UNTRUSTED_INGRESS_LIMIT,
-    );
-
-  const credentialId = credentialIdForRateLimit(bearer);
-  if (!credentialId)
-    return consumeBucket(
-      pool,
-      UNTRUSTED_INGRESS_BUCKET,
-      UNTRUSTED_INGRESS_LIMIT,
-    );
-
-  const known = await pool.query<{ exists: boolean }>(
-    'SELECT EXISTS(SELECT 1 FROM guest_credentials WHERE id=$1) AS exists',
-    [credentialId],
+  const credentialId = bearer ? credentialIdForRateLimit(bearer) : null;
+  if (credentialId) {
+    return consumeBucket(pool, `credential:${credentialId}`, CREDENTIAL_LIMIT);
+  }
+  return consumeBucket(
+    pool,
+    UNTRUSTED_INGRESS_BUCKET,
+    UNTRUSTED_INGRESS_LIMIT,
   );
-  if (!known.rows[0]?.exists)
-    return consumeBucket(
-      pool,
-      UNTRUSTED_INGRESS_BUCKET,
-      UNTRUSTED_INGRESS_LIMIT,
-    );
-
-  return consumeBucket(pool, `credential:${credentialId}`, CREDENTIAL_LIMIT);
 }
 
 export async function GET(request: Request): Promise<Response> {
