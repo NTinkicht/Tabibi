@@ -211,4 +211,53 @@ export class GuestAccessService {
       return { bearer, expiresAt, target: target! };
     });
   }
+
+  async authorize(
+    bearer: string,
+    expectedTarget?: GuestTarget,
+    now = new Date(),
+  ): Promise<GuestTarget> {
+    const result = await this.pool.query<{
+      clinic_id: string;
+      session_id: string;
+      queue_entry_id: string;
+      expires_at: Date;
+      revoked_at: Date | null;
+      entry_state: string;
+      session_status: string;
+    }>(
+      `SELECT credential.clinic_id,credential.session_id,credential.queue_entry_id,
+              credential.expires_at,credential.revoked_at,
+              entry.state AS entry_state,session.status AS session_status
+         FROM guest_credentials credential
+         JOIN queue_entries entry ON entry.id=credential.queue_entry_id
+           AND entry.clinic_id=credential.clinic_id
+           AND entry.session_id=credential.session_id
+         JOIN consultation_sessions session ON session.id=credential.session_id
+           AND session.clinic_id=credential.clinic_id
+        WHERE credential.bearer_verifier=$1`,
+      [verifier(bearer)],
+    );
+    const row = result.rows[0];
+    const target: GuestTarget | undefined = row
+      ? {
+          clinicId: row.clinic_id,
+          sessionId: row.session_id,
+          queueEntryId: row.queue_entry_id,
+        }
+      : undefined;
+    if (
+      !row ||
+      row.revoked_at ||
+      row.expires_at <= now ||
+      !ACTIVE_ENTRY_STATES.includes(row.entry_state) ||
+      !ACTIVE_SESSION_STATES.includes(row.session_status) ||
+      (expectedTarget &&
+        (expectedTarget.clinicId !== target?.clinicId ||
+          expectedTarget.sessionId !== target?.sessionId ||
+          expectedTarget.queueEntryId !== target?.queueEntryId))
+    )
+      throw new GuestAccessRejectedError();
+    return target!;
+  }
 }
