@@ -159,7 +159,7 @@ describe('WU17 guest queue-status read', () => {
     ).toBe(beforeAudit.rows[0].count);
   });
 
-  it('rejects revoked and expired credentials but preserves only a bounded terminal summary', async () => {
+  it('rejects revoked, expired, and tampered signed credentials but preserves only a bounded terminal summary', async () => {
     const credential = await liveBearer();
     const service = new GuestStatusService(pool);
 
@@ -185,6 +185,14 @@ describe('WU17 guest queue-status read', () => {
       "UPDATE queue_entries SET state='cancelled',updated_at=$2 WHERE id=$1",
       [ids.targetEntry, new Date('2026-09-10T09:04:00Z')],
     );
+
+    const bearerParts = credential.bearer.split('.');
+    expect(bearerParts).toHaveLength(3);
+    const tamperedBearer = `${bearerParts[0]}.${bearerParts[1]}.invalid-signature`;
+    await expect(
+      service.getSnapshot(tamperedBearer, new Date('2026-09-10T09:05:00Z')),
+    ).rejects.toBeInstanceOf(GuestAccessRejectedError);
+
     await expect(
       service.getSnapshot(credential.bearer, new Date('2026-09-10T09:05:00Z')),
     ).resolves.toEqual({
