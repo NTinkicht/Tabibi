@@ -103,10 +103,13 @@ describe('guest exchange credentials', () => {
       target,
       new Date('2026-09-09T09:01:00Z'),
     );
+    const bearerSecret = consumed.bearer.slice(
+      consumed.bearer.indexOf('.') + 1,
+    );
     const persisted = await pool.query('SELECT * FROM guest_credentials');
     expect(persisted.rowCount).toBe(1);
     expect(persisted.rows[0].bearer_verifier).toBe(
-      createHash('sha256').update(consumed.bearer).digest('hex'),
+      createHash('sha256').update(bearerSecret).digest('hex'),
     );
     expect(JSON.stringify(persisted.rows)).not.toContain(consumed.bearer);
     await expect(

@@ -1,4 +1,9 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import {
+  createHash,
+  randomBytes,
+  randomUUID,
+  timingSafeEqual,
+} from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
 import { requireClinicRole } from '@/modules/identity';
@@ -13,6 +18,8 @@ const ACTIVE_ENTRY_STATES = [
   'in_consultation',
 ];
 const ACTIVE_SESSION_STATES = ['planned', 'open', 'paused'];
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class GuestAccessRejectedError extends Error {
   constructor() {
@@ -32,6 +39,29 @@ function secret(): string {
 
 function verifier(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function parseBearer(
+  bearer: string,
+): { credentialId: string; secret: string } | null {
+  const separator = bearer.indexOf('.');
+  if (separator <= 0 || separator === bearer.length - 1) return null;
+  const credentialId = bearer.slice(0, separator);
+  const bearerSecret = bearer.slice(separator + 1);
+  if (!UUID_PATTERN.test(credentialId) || !bearerSecret) return null;
+  return { credentialId, secret: bearerSecret };
+}
+
+function verifierMatches(
+  storedVerifier: string,
+  bearerSecret: string,
+): boolean {
+  if (!/^[0-9a-f]{64}$/i.test(storedVerifier)) return false;
+  const stored = Buffer.from(storedVerifier, 'hex');
+  const candidate = Buffer.from(verifier(bearerSecret), 'hex');
+  return (
+    stored.length === candidate.length && timingSafeEqual(stored, candidate)
+  );
 }
 
 /** PostgreSQL-backed guest credential primitive. Raw secrets never cross a query boundary. */
@@ -176,7 +206,9 @@ export class GuestAccessService {
       );
       if (liveCredential.rows[0]) throw new GuestAccessRejectedError();
 
-      const bearer = secret();
+      const credentialId = randomUUID();
+      const bearerSecret = secret();
+      const bearer = `${credentialId}.${bearerSecret}`;
       const expiresAt = new Date(now.getTime() + BEARER_TTL_MS);
       await client.query(
         'UPDATE guest_exchange_ids SET consumed_at=$2 WHERE id=$1',
@@ -188,11 +220,11 @@ export class GuestAccessService {
            (id,clinic_id,session_id,queue_entry_id,bearer_verifier,issued_at,expires_at)
          VALUES($1,$2,$3,$4,$5,$6,$7)`,
         [
-          randomUUID(),
+          credentialId,
           row.clinic_id,
           row.session_id,
           row.queue_entry_id,
-          verifier(bearer),
+          verifier(bearerSecret),
           now,
           expiresAt,
         ],
@@ -208,7 +240,61 @@ export class GuestAccessService {
           credentialExpiresAt: expiresAt.toISOString(),
         },
       });
-      return { bearer, expiresAt, target: target! };
+      if (!target) throw new GuestAccessRejectedError();
+      return { bearer, expiresAt, target };
     });
+  }
+
+  async authorize(
+    bearer: string,
+    expectedTarget?: GuestTarget,
+    now = new Date(),
+  ): Promise<GuestTarget> {
+    const parsed = parseBearer(bearer);
+    if (!parsed) throw new GuestAccessRejectedError();
+
+    const result = await this.pool.query<{
+      bearer_verifier: string;
+      clinic_id: string;
+      session_id: string;
+      queue_entry_id: string;
+      expires_at: Date;
+      revoked_at: Date | null;
+      entry_state: string;
+      session_status: string;
+    }>(
+      `SELECT credential.bearer_verifier,credential.clinic_id,credential.session_id,
+              credential.queue_entry_id,credential.expires_at,credential.revoked_at,
+              entry.state AS entry_state,session.status AS session_status
+         FROM guest_credentials credential
+         JOIN queue_entries entry ON entry.id=credential.queue_entry_id
+           AND entry.clinic_id=credential.clinic_id
+           AND entry.session_id=credential.session_id
+         JOIN consultation_sessions session ON session.id=credential.session_id
+           AND session.clinic_id=credential.clinic_id
+        WHERE credential.id=$1`,
+      [parsed.credentialId],
+    );
+    const row = result.rows[0];
+    if (!row || !verifierMatches(row.bearer_verifier, parsed.secret))
+      throw new GuestAccessRejectedError();
+
+    const target: GuestTarget = {
+      clinicId: row.clinic_id,
+      sessionId: row.session_id,
+      queueEntryId: row.queue_entry_id,
+    };
+    if (
+      row.revoked_at ||
+      row.expires_at <= now ||
+      !ACTIVE_ENTRY_STATES.includes(row.entry_state) ||
+      !ACTIVE_SESSION_STATES.includes(row.session_status) ||
+      (expectedTarget &&
+        (expectedTarget.clinicId !== target.clinicId ||
+          expectedTarget.sessionId !== target.sessionId ||
+          expectedTarget.queueEntryId !== target.queueEntryId))
+    )
+      throw new GuestAccessRejectedError();
+    return target;
   }
 }
