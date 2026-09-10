@@ -1,6 +1,4 @@
-import {
-  GuestAccessRejectedError,
-} from '@/modules/guest-access';
+import { GuestAccessRejectedError } from '@/modules/guest-access';
 import { GuestStatusService } from '@/modules/guest-status';
 import { getPool } from '@/platform/database/pool';
 import { getLogger } from '@/platform/observability/logger';
