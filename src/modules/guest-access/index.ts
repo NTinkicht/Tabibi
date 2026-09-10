@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
+import { requireClinicRole } from '@/modules/identity';
 import { inTransaction } from '@/platform/database/transaction';
 
 const EXCHANGE_TTL_MS = 10 * 60 * 1_000;
@@ -50,6 +51,11 @@ export class GuestAccessService {
     const exchangeId = secret();
     const expiresAt = new Date(now.getTime() + EXCHANGE_TTL_MS);
     await inTransaction(this.pool, async (client) => {
+      await requireClinicRole(
+        client,
+        { clinicId: target.clinicId, actorUserId },
+        ['receptionist', 'clinic_admin'],
+      );
       const result = await client.query<{
         state: string;
         session_status: string;
@@ -160,6 +166,15 @@ export class GuestAccessService {
             expectedTarget.queueEntryId !== target?.queueEntryId))
       )
         throw new GuestAccessRejectedError();
+
+      const liveCredential = await client.query<{ id: string }>(
+        `SELECT id
+           FROM guest_credentials
+          WHERE queue_entry_id=$1 AND revoked_at IS NULL
+          FOR UPDATE`,
+        [row.queue_entry_id],
+      );
+      if (liveCredential.rows[0]) throw new GuestAccessRejectedError();
 
       const bearer = secret();
       const expiresAt = new Date(now.getTime() + BEARER_TTL_MS);
