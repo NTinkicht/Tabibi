@@ -29,11 +29,12 @@ const target = {
 
 beforeAll(async () => migrate());
 beforeEach(async () => {
-  await pool.query(`TRUNCATE guest_credentials,guest_exchange_ids,appointment_recovery_receipts,
-    appointment_lifecycle_receipts,appointment_booking_receipts,appointments,audit_events,
-    queue_command_receipts,queue_reorder_receipts,queue_registration_receipts,queue_entries,
-    patient_operational_records,session_command_receipts,consultation_sessions,schedule_templates,
-    doctor_clinics,doctor_profiles,clinic_memberships,clinics,users CASCADE`);
+  await pool.query(`TRUNCATE guest_status_rate_limit_buckets,guest_credentials,guest_exchange_ids,
+    appointment_recovery_receipts,appointment_lifecycle_receipts,appointment_booking_receipts,
+    appointments,audit_events,queue_command_receipts,queue_reorder_receipts,
+    queue_registration_receipts,queue_entries,patient_operational_records,
+    session_command_receipts,consultation_sessions,schedule_templates,doctor_clinics,
+    doctor_profiles,clinic_memberships,clinics,users CASCADE`);
   await pool.query(
     `INSERT INTO users(id,auth_subject,display_name) VALUES
      ($1,'wu17-reception','Reception'),($2,'wu17-doctor','Doctor')`,
@@ -111,7 +112,7 @@ async function targetPublicDisplayLabel() {
 }
 
 describe('WU17 guest queue-status read', () => {
-  it('returns provisional status for waiting guests without exposing an exact live position', async () => {
+  it('returns a bounded provisional arrival window for waiting guests without exposing an exact live position', async () => {
     const credential = await liveBearer();
     const expectedPublicDisplayLabel = await targetPublicDisplayLabel();
     const service = new GuestStatusService(pool);
@@ -134,6 +135,12 @@ describe('WU17 guest queue-status read', () => {
       queueState: 'waiting',
       patientsAhead: null,
       positionKind: 'provisional',
+      arrivalWindow: {
+        earliestAt: '2026-09-10T09:02:00.000Z',
+        latestAt: '2026-09-10T09:30:00.000Z',
+        uncertaintyMinutes: 15,
+        basis: 'session_start_plus_declared_delay',
+      },
       session: { status: 'open', declaredDelayMinutes: 15 },
     });
     expect(JSON.stringify(snapshot)).not.toContain('0555000000');
@@ -211,6 +218,10 @@ describe('WU17 guest queue-status read', () => {
     expect(body.publicDisplayLabel).toBe(expectedPublicDisplayLabel);
     expect(body.positionKind).toBe('provisional');
     expect(body.patientsAhead).toBeNull();
+    expect(body.arrivalWindow).toMatchObject({
+      uncertaintyMinutes: 15,
+      basis: 'session_start_plus_declared_delay',
+    });
     expect(JSON.stringify(body)).not.toContain('0555000000');
 
     const rejected = await GET(
@@ -225,14 +236,14 @@ describe('WU17 guest queue-status read', () => {
     });
   });
 
-  it('rate-limits repeated credential polling while permitting normal polling cadence', async () => {
+  it('shares credential polling limits through PostgreSQL across route invocations', async () => {
     const credential = await liveBearer();
-    const request = () =>
+    const request = (ip = '203.0.113.19') =>
       GET(
         new Request('http://localhost/api/guest/status', {
           headers: {
             cookie: `__Host-tabibi_guest=${credential.bearer}`,
-            'x-forwarded-for': '203.0.113.19',
+            'x-forwarded-for': ip,
           },
         }),
       );
@@ -240,8 +251,46 @@ describe('WU17 guest queue-status read', () => {
     for (let attempt = 0; attempt < 6; attempt++) {
       await expect(request()).resolves.toMatchObject({ status: 200 });
     }
-    const limited = await request();
+    const limited = await request('203.0.113.20');
     expect(limited.status).toBe(429);
     expect(limited.headers.get('retry-after')).toBe('60');
+
+    const buckets = await pool.query<{ count: string }>(
+      'SELECT count(*)::text count FROM guest_status_rate_limit_buckets',
+    );
+    expect(Number(buckets.rows[0]?.count)).toBeGreaterThan(0);
+  });
+
+  it('bounds invalid-cookie floods by IP and evicts expired shared buckets', async () => {
+    const invalidCookie = `${randomUUID()}.invalid-secret`;
+    const request = () =>
+      GET(
+        new Request('http://localhost/api/guest/status', {
+          headers: {
+            cookie: `__Host-tabibi_guest=${invalidCookie}`,
+            'x-forwarded-for': '203.0.113.21',
+          },
+        }),
+      );
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await expect(request()).resolves.toMatchObject({ status: 401 });
+    }
+    await expect(request()).resolves.toMatchObject({ status: 429 });
+
+    await pool.query(
+      `INSERT INTO guest_status_rate_limit_buckets
+       (bucket_key,window_started_at,request_count)
+       VALUES('expired-probe',now() - interval '10 minutes',1)`,
+    );
+    await GET(
+      new Request('http://localhost/api/guest/status', {
+        headers: { 'x-forwarded-for': '203.0.113.22' },
+      }),
+    );
+    const expired = await pool.query<{ count: string }>(
+      "SELECT count(*)::text count FROM guest_status_rate_limit_buckets WHERE bucket_key='expired-probe'",
+    );
+    expect(expired.rows[0]?.count).toBe('0');
   });
 });
