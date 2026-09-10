@@ -112,8 +112,11 @@ describe('WU16 guest bearer authorization', () => {
       ),
     ).toMatchObject({ rows: before.rows });
     expect(
-      (await pool.query<{ count: string }>('SELECT count(*)::text count FROM audit_events'))
-        .rows[0].count,
+      (
+        await pool.query<{ count: string }>(
+          'SELECT count(*)::text count FROM audit_events',
+        )
+      ).rows[0].count,
     ).toBe(auditsBefore.rows[0].count);
   });
 
@@ -133,14 +136,23 @@ describe('WU16 guest bearer authorization', () => {
       new Date('2026-09-10T09:03:00Z'),
     ]);
     await expect(
-      service.authorize(credential.bearer, target, new Date('2026-09-10T09:04:00Z')),
+      service.authorize(
+        credential.bearer,
+        target,
+        new Date('2026-09-10T09:04:00Z'),
+      ),
     ).rejects.toBeInstanceOf(GuestAccessRejectedError);
 
-    await pool.query('UPDATE guest_credentials SET revoked_at=NULL,expires_at=$1', [
-      new Date('2026-09-10T09:04:30Z'),
-    ]);
+    await pool.query(
+      'UPDATE guest_credentials SET revoked_at=NULL,expires_at=$1',
+      [new Date('2026-09-10T09:04:30Z')],
+    );
     await expect(
-      service.authorize(credential.bearer, target, new Date('2026-09-10T09:05:00Z')),
+      service.authorize(
+        credential.bearer,
+        target,
+        new Date('2026-09-10T09:05:00Z'),
+      ),
     ).rejects.toBeInstanceOf(GuestAccessRejectedError);
 
     await pool.query('UPDATE guest_credentials SET expires_at=$1', [
@@ -150,7 +162,11 @@ describe('WU16 guest bearer authorization', () => {
       ids.entry,
     ]);
     await expect(
-      service.authorize(credential.bearer, target, new Date('2026-09-10T09:06:00Z')),
+      service.authorize(
+        credential.bearer,
+        target,
+        new Date('2026-09-10T09:06:00Z'),
+      ),
     ).rejects.toBeInstanceOf(GuestAccessRejectedError);
   });
 });
