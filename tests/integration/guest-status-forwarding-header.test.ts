@@ -7,7 +7,9 @@ import { migrate } from '../../scripts/db/lib';
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const signingSecret = process.env.GUEST_BEARER_SIGNING_SECRET;
 if (!signingSecret || signingSecret.length < 32) {
-  throw new Error('GUEST_BEARER_SIGNING_SECRET is required for guest status tests');
+  throw new Error(
+    'GUEST_BEARER_SIGNING_SECRET is required for guest status tests',
+  );
 }
 const ids = {
   clinic: randomUUID(),
@@ -166,9 +168,7 @@ describe('WU17 guest status trusted ingress boundary', () => {
     expect(valid.status).toBe(200);
 
     const fabricatedBucketHashes = fabricatedIds.map((credentialId) =>
-      createHash('sha256')
-        .update(`credential:${credentialId}`)
-        .digest('hex'),
+      createHash('sha256').update(`credential:${credentialId}`).digest('hex'),
     );
     const fabricatedBuckets = await pool.query<{ count: string }>(
       `SELECT count(*)::text count

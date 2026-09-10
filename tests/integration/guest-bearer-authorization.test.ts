@@ -10,7 +10,9 @@ import { migrate } from '../../scripts/db/lib';
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const signingSecret = process.env.GUEST_BEARER_SIGNING_SECRET;
 if (!signingSecret || signingSecret.length < 32) {
-  throw new Error('GUEST_BEARER_SIGNING_SECRET is required for guest bearer tests');
+  throw new Error(
+    'GUEST_BEARER_SIGNING_SECRET is required for guest bearer tests',
+  );
 }
 const ids = {
   clinic: randomUUID(),
@@ -135,7 +137,8 @@ describe('WU16 guest bearer authorization', () => {
     const service = new GuestAccessService(pool);
     const credential = await liveBearer();
     const [credentialId, bearerSecret] = credential.bearer.split('.');
-    if (!credentialId || !bearerSecret) throw new Error('Expected signed bearer');
+    if (!credentialId || !bearerSecret)
+      throw new Error('Expected signed bearer');
     const replacement = bearerSecret.endsWith('A') ? 'B' : 'A';
     const invalidSecret = `${bearerSecret.slice(0, -1)}${replacement}`;
     const invalidBearer = signedBearer(credentialId, invalidSecret);
@@ -170,7 +173,8 @@ describe('WU16 guest bearer authorization', () => {
     const service = new GuestAccessService(pool);
     const credential = await liveBearer();
     const [credentialId, bearerSecret] = credential.bearer.split('.');
-    if (!credentialId || !bearerSecret) throw new Error('Expected signed bearer');
+    if (!credentialId || !bearerSecret)
+      throw new Error('Expected signed bearer');
 
     await expect(
       service.authorize(
