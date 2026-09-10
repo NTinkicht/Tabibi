@@ -344,7 +344,10 @@ export function GuestStatusClient() {
         if (!isCurrent()) return;
         connectStream(poll);
       } catch (error) {
-        if (!isCurrent() || (error instanceof DOMException && error.name === 'AbortError')) {
+        if (
+          !isCurrent() ||
+          (error instanceof DOMException && error.name === 'AbortError')
+        ) {
           return;
         }
         setState({ kind: 'error' });
