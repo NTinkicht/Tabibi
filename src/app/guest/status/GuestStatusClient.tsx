@@ -147,7 +147,7 @@ const COPY: Record<SupportedLocale, Copy> = {
     accessUnavailable: 'وصول الضيف غير متاح',
     accessUnavailableBody: 'انتهت جلسة الضيف الآمنة أو لم تعد صالحة.',
     statusUnavailable: 'الحالة غير متاحة مؤقتًا',
-    statusUnavailableBody: 'سنحاول مرة أخرى تلقائيًا. لا يلزم اتخاذ أي إجراء.',
+    statusUnavailableBody: 'سنحاول مرة أخرى تلقائيًا. لا يلزم اتخاذ إجراء.',
     visitStatus: 'حالة الزيارة',
     yourLabel: 'رقمك:',
     status: 'الحالة:',
@@ -281,17 +281,10 @@ export function GuestStatusClient() {
       const source = new EventSource('/api/guest/status/stream');
       eventSourceRef.current = source;
 
-      source.addEventListener('status', (event) => {
-        if (cancelled) return;
-        try {
-          const snapshot = JSON.parse(
-            (event as MessageEvent<string>).data,
-          ) as GuestStatusSnapshot;
-          applySnapshot(snapshot);
-        } catch {
-          closeStream();
-          schedule(NORMAL_POLL_MS, poll);
-        }
+      source.addEventListener('change', () => {
+        if (cancelled || eventSourceRef.current !== source) return;
+        closeStream();
+        void poll();
       });
 
       source.onerror = () => {
