@@ -240,6 +240,35 @@ test('guest status closes SSE while hidden and performs a canonical poll when vi
 }) => {
   await page.addInitScript(() => {
     let hidden = false;
+    const streamState = {
+      created: 0,
+      closed: 0,
+      urls: [] as string[],
+    };
+
+    class TestEventSource {
+      onerror: ((this: EventSource, ev: Event) => unknown) | null = null;
+
+      constructor(url: string | URL) {
+        streamState.created += 1;
+        streamState.urls.push(String(url));
+      }
+
+      addEventListener() {}
+
+      close() {
+        streamState.closed += 1;
+      }
+    }
+
+    Object.defineProperty(window, 'EventSource', {
+      configurable: true,
+      value: TestEventSource,
+    });
+    Object.defineProperty(window, '__guestStatusStreamStateForTest', {
+      configurable: true,
+      value: streamState,
+    });
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
       get: () => (hidden ? 'hidden' : 'visible'),
@@ -266,6 +295,32 @@ test('guest status closes SSE while hidden and performs a canonical poll when vi
   await page.goto('/guest/status');
   await expect(page.getByText('Patients ahead: 2')).toBeVisible();
   expect(polls).toBe(1);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __guestStatusStreamStateForTest: {
+                created: number;
+                closed: number;
+                urls: string[];
+              };
+            }
+          ).__guestStatusStreamStateForTest.created,
+      ),
+    )
+    .toBe(1);
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __guestStatusStreamStateForTest: { urls: string[] };
+          }
+        ).__guestStatusStreamStateForTest.urls[0],
+    ),
+  ).toBe('/api/guest/status/stream');
 
   await page.evaluate(() => {
     (
@@ -274,6 +329,19 @@ test('guest status closes SSE while hidden and performs a canonical poll when vi
       }
     ).__setGuestStatusHiddenForTest(true);
   });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __guestStatusStreamStateForTest: { closed: number };
+            }
+          ).__guestStatusStreamStateForTest.closed,
+      ),
+    )
+    .toBe(1);
+
   await page.evaluate(() => {
     (
       window as typeof window & {
@@ -283,4 +351,16 @@ test('guest status closes SSE while hidden and performs a canonical poll when vi
   });
 
   await expect.poll(() => polls).toBe(2);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __guestStatusStreamStateForTest: { created: number };
+            }
+          ).__guestStatusStreamStateForTest.created,
+      ),
+    )
+    .toBe(2);
 });
