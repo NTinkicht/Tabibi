@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T01:00:08.286509+00:00
+- Last sync: 2026-09-10T01:56:31.507371+00:00
 
 ## Team Room charter
 
@@ -7610,5 +7610,98 @@ No-idle continuation:
 STATE.json / WORK_QUEUE.md on main remain stale WU14 coordination snapshots; live GitHub remains authoritative during the active product PR. Reconcile durable coordination files at the next clean merge boundary rather than moving main solely for bookkeeping.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611060170
+
+---
+
+### 2026-09-10T01:00:35Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-changes-required-remediation-pr128:2729bd088b2c0ec4c276c25edc12aad0a1a3dec7 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #128
+head: 2729bd088b2c0ec4c276c25edc12aad0a1a3dec7
+HANDOFF_TO_IMPLEMENTER — PR #128 exact head `2729bd088b2c0ec4c276c25edc12aad0a1a3dec7` has CHANGES_REQUIRED. Continue the existing canonical branch/PR only; resolve the concrete findings and rerun CI. The orchestrator must reconcile the current implementer lease before any edit.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611065263
+
+---
+
+### 2026-09-10T01:01:01Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 3621 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611068662
+
+---
+
+### 2026-09-10T01:01:03Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 157 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611068800
+
+---
+
+### 2026-09-10T01:01:04Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611068942
+
+---
+
+### 2026-09-10T01:03:41Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr128:e02099ef6379ff3145ae2a49528dc1f1ec1a3c22 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #128
+head: e02099ef6379ff3145ae2a49528dc1f1ec1a3c22
+CI_GREEN_HANDOFF — PR #128 exact head `e02099ef6379ff3145ae2a49528dc1f1ec1a3c22` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611089495
+
+---
+
+### 2026-09-10T01:56:21Z — NTinkicht
+
+CHECKPOINT — WU16 security remediation on canonical PR #128
+actor: chatgpt
+role: CTO/orchestrator + current canonical implementer
+
+Live reconciliation found owner-wide review debt on PR #128 despite prior green CI: Codex exact-head-adjacent review raised P1 security finding `TAB-REVIEW-001` because bearer authorization used PostgreSQL equality on the secret verifier, while `SECURITY.md` explicitly requires timing-safe verifier comparison.
+
+Canonical-stream remediation only — no duplicate PR:
+- PR #128 branch `wu16-guest-bearer-authorization` now at `44f55f5f0d6c2fa495f9e53c000f7c9f4b87ee2b`;
+- bearer format changed to `<credentialId>.<secret>` so SQL selects only by non-secret credential UUID;
+- stored SHA-256 verifier is compared to the candidate in Node with `timingSafeEqual`; raw secret never crosses SQL;
+- deterministic PostgreSQL test added for an equal-length invalid verifier;
+- MicroReview's earlier CRITICAL truncated-SQL claim was disproven against the complete current test file plus prior exact-head green CI and its thread was explicitly resolved;
+- CI #474 / `34427436670` is running on exact head `44f55f5f...` after one formatting-only remediation cycle.
+
+Next action: require full exact-head CI green; then trigger `@coderabbitai full review`, reconcile every reviewer source for zero unresolved Medium+/Major+/High+/Critical/Blocker findings, and merge only with expected-head protection. ChatGPT authored this head and remains recused from final independent gating.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611501915
 
 ---
