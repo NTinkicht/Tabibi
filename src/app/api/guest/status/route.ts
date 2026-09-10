@@ -15,6 +15,8 @@ const SECURITY_HEADERS = {
 const RATE_WINDOW_MS = 60_000;
 const IP_LIMIT = 30;
 const CREDENTIAL_LIMIT = 6;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function guestBearer(request: Request): string | null {
   const cookieHeader = request.headers.get('cookie');
@@ -27,6 +29,13 @@ function guestBearer(request: Request): string | null {
     }
   }
   return null;
+}
+
+function credentialIdForRateLimit(bearer: string): string | null {
+  const separator = bearer.indexOf('.');
+  if (separator <= 0) return null;
+  const credentialId = bearer.slice(0, separator);
+  return UUID_PATTERN.test(credentialId) ? credentialId.toLowerCase() : null;
 }
 
 function requestIp(request: Request): string {
@@ -47,7 +56,8 @@ async function consumeBucket(
   const result = await pool.query<{ allowed: boolean }>(
     `WITH cleanup AS (
        DELETE FROM guest_status_rate_limit_buckets
-        WHERE window_started_at < now() - ($3::bigint * interval '1 millisecond')
+        WHERE bucket_key <> $1
+          AND window_started_at < now() - ($3::bigint * interval '1 millisecond')
      ), upserted AS (
        INSERT INTO guest_status_rate_limit_buckets
          (bucket_key,window_started_at,request_count,updated_at)
@@ -82,8 +92,9 @@ async function withinRateLimit(
   const ip = requestIp(request);
   if (!(await consumeBucket(pool, `ip:${ip}`, IP_LIMIT))) return false;
   if (!bearer) return true;
-  const credentialKey = createHash('sha256').update(bearer).digest('hex');
-  return consumeBucket(pool, `credential:${credentialKey}`, CREDENTIAL_LIMIT);
+  const credentialId = credentialIdForRateLimit(bearer);
+  if (!credentialId) return true;
+  return consumeBucket(pool, `credential:${credentialId}`, CREDENTIAL_LIMIT);
 }
 
 export async function GET(request: Request): Promise<Response> {
