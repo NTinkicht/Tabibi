@@ -8,6 +8,7 @@ import {
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
 import { requireClinicRole } from '@/modules/identity';
+import { abortableQuery } from '@/platform/database/abortable-query';
 import { inTransaction } from '@/platform/database/transaction';
 
 const EXCHANGE_TTL_MS = 10 * 60 * 1_000;
@@ -302,9 +303,8 @@ export class GuestAccessService {
   ): Promise<GuestTarget> {
     const parsed = authenticatedBearer(bearer);
     if (!parsed) throw new GuestAccessRejectedError();
-    signal?.throwIfAborted();
 
-    const result = await this.pool.query<{
+    const result = await abortableQuery<{
       bearer_verifier: string;
       clinic_id: string;
       session_id: string;
@@ -313,8 +313,9 @@ export class GuestAccessService {
       revoked_at: Date | null;
       entry_state: string;
       session_status: string;
-    }>({
-      text: `SELECT credential.bearer_verifier,credential.clinic_id,credential.session_id,
+    }>(
+      this.pool,
+      `SELECT credential.bearer_verifier,credential.clinic_id,credential.session_id,
               credential.queue_entry_id,credential.expires_at,credential.revoked_at,
               entry.state AS entry_state,session.status AS session_status
          FROM guest_credentials credential
@@ -324,10 +325,9 @@ export class GuestAccessService {
          JOIN consultation_sessions session ON session.id=credential.session_id
            AND session.clinic_id=credential.clinic_id
         WHERE credential.id=$1`,
-      values: [parsed.credentialId],
+      [parsed.credentialId],
       signal,
-    });
-    signal?.throwIfAborted();
+    );
     const row = result.rows[0];
     if (!row || !verifierMatches(row.bearer_verifier, parsed.secret))
       throw new GuestAccessRejectedError();
