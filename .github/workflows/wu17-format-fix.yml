@@ -1,0 +1,39 @@
+name: WU17 format fix
+
+on:
+  push:
+    branches:
+      - wu17-guest-queue-status-read
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: wu17-guest-queue-status-read
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Format failing file
+        run: npx prettier --write src/app/api/guest/status/route.ts
+      - name: Commit formatting if needed
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes needed"
+            exit 0
+          fi
+          git config user.name "tabibi-ci[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/api/guest/status/route.ts
+          git commit -m "style: format WU17 guest status route"
+          git push origin HEAD:wu17-guest-queue-status-read
