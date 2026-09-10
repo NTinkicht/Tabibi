@@ -151,8 +151,11 @@ describe('guest exchange credentials', () => {
       (await pool.query('SELECT * FROM guest_exchange_ids')).rowCount,
     ).toBe(0);
     expect(
-      (await pool.query("SELECT * FROM audit_events WHERE action='guest_exchange_issued'"))
-        .rowCount,
+      (
+        await pool.query(
+          "SELECT * FROM audit_events WHERE action='guest_exchange_issued'",
+        )
+      ).rowCount,
     ).toBe(0);
   });
 
