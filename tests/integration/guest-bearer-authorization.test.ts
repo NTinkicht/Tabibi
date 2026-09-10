@@ -139,6 +139,52 @@ describe('WU16 guest bearer authorization', () => {
     ).rejects.toBeInstanceOf(GuestAccessRejectedError);
   });
 
+  it('rejects an unknown credential id generically', async () => {
+    const service = new GuestAccessService(pool);
+    const credential = await liveBearer();
+    const separator = credential.bearer.indexOf('.');
+    const bearerSecret = credential.bearer.slice(separator + 1);
+    const unknownBearer = `${randomUUID()}.${bearerSecret}`;
+
+    await expect(
+      service.authorize(
+        unknownBearer,
+        target,
+        new Date('2026-09-10T09:02:00Z'),
+      ),
+    ).rejects.toBeInstanceOf(GuestAccessRejectedError);
+  });
+
+  it('rejects a cross-clinic expected target generically', async () => {
+    const service = new GuestAccessService(pool);
+    const credential = await liveBearer();
+
+    await expect(
+      service.authorize(
+        credential.bearer,
+        { ...target, clinicId: randomUUID() },
+        new Date('2026-09-10T09:02:00Z'),
+      ),
+    ).rejects.toBeInstanceOf(GuestAccessRejectedError);
+  });
+
+  it('rejects a cancelled consultation session generically', async () => {
+    const service = new GuestAccessService(pool);
+    const credential = await liveBearer();
+    await pool.query(
+      "UPDATE consultation_sessions SET status='cancelled' WHERE id=$1",
+      [ids.session],
+    );
+
+    await expect(
+      service.authorize(
+        credential.bearer,
+        target,
+        new Date('2026-09-10T09:02:00Z'),
+      ),
+    ).rejects.toBeInstanceOf(GuestAccessRejectedError);
+  });
+
   it('rejects wrong target, revocation, expiry, and terminal queue state generically', async () => {
     const service = new GuestAccessService(pool);
     const credential = await liveBearer();
