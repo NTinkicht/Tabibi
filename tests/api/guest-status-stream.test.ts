@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getSnapshot = vi.fn();
 const authenticatedGuestCredentialId = vi.fn();
 const query = vi.fn();
+const loggerError = vi.fn();
 
 vi.mock('@/modules/guest-access', () => ({
   authenticatedGuestCredentialId: (...args: unknown[]) =>
@@ -23,17 +24,39 @@ vi.mock('@/platform/database/pool', () => ({
 }));
 
 vi.mock('@/platform/observability/logger', () => ({
-  getLogger: () => ({ error: vi.fn() }),
+  getLogger: () => ({ error: loggerError }),
 }));
 
 import { GET } from '@/app/api/guest/status/stream/route';
 import { GuestAccessRejectedError } from '@/modules/guest-access';
 
 const bearer = '00000000-0000-4000-8000-000000000019.super-secret.signature';
+const target = {
+  clinicId: '00000000-0000-4000-8000-000000000001',
+  sessionId: '00000000-0000-4000-8000-000000000002',
+  queueEntryId: '00000000-0000-4000-8000-000000000003',
+};
 const terminalSnapshot = {
   generatedAt: '2026-09-10T17:30:00Z',
-  terminal: true,
+  terminal: true as const,
   finalStatus: 'completed',
+};
+const activeSnapshot = {
+  generatedAt: '2026-09-10T17:30:00Z',
+  terminal: false as const,
+  target,
+  publicDisplayLabel: 'G-019',
+  queueState: 'checked_in',
+  clinicTimezone: 'Africa/Algiers',
+  patientsAhead: 1,
+  positionKind: 'live' as const,
+  arrivalWindow: null,
+  session: {
+    status: 'open',
+    declaredDelayMinutes: null,
+    delayVersion: 4,
+    queueOrderVersion: 7,
+  },
 };
 
 function allowedBucket() {
@@ -52,10 +75,15 @@ describe('GET /api/guest/status/stream', () => {
     getSnapshot.mockReset();
     authenticatedGuestCredentialId.mockReset();
     query.mockReset();
+    loggerError.mockReset();
     authenticatedGuestCredentialId.mockReturnValue(
       '00000000-0000-4000-8000-000000000019',
     );
     allowedBucket();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('rejects a missing guest credential with hardened no-store headers', async () => {
@@ -82,7 +110,26 @@ describe('GET /api/guest/status/stream', () => {
     expect(getSnapshot).not.toHaveBeenCalled();
   });
 
-  it('streams an authorized terminal snapshot and never emits bearer material', async () => {
+  it('hardens a rate-limit storage failure instead of exposing a default framework response', async () => {
+    query.mockRejectedValue(new Error('postgres unavailable'));
+
+    const response = await GET(requestWithBearer());
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(response.headers.get('content-security-policy')).toContain(
+      "default-src 'none'",
+    );
+    expect(await response.json()).toEqual({ error: 'Guest access rejected' });
+    expect(loggerError).toHaveBeenCalledWith(
+      'guest status stream bootstrap failed',
+    );
+    expect(getSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('streams an authorized terminal snapshot once and never emits bearer material', async () => {
     getSnapshot.mockResolvedValue(terminalSnapshot);
 
     const response = await GET(requestWithBearer());
@@ -94,47 +141,44 @@ describe('GET /api/guest/status/stream', () => {
     expect(body).toContain('event: status');
     expect(body).toContain(JSON.stringify(terminalSnapshot));
     expect(body).not.toContain(bearer);
-    expect(getSnapshot).toHaveBeenCalledTimes(2);
-    expect(getSnapshot).toHaveBeenNthCalledWith(1, bearer);
-    expect(getSnapshot).toHaveBeenNthCalledWith(2, bearer);
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
+    expect(getSnapshot).toHaveBeenCalledWith(bearer);
   });
 
-  it('closes without an event when authorization is revoked after bootstrap', async () => {
+  it('does not emit duplicate status events when authoritative versions are unchanged', async () => {
+    vi.useFakeTimers();
+    const sameVersion = {
+      ...activeSnapshot,
+      generatedAt: '2026-09-10T17:30:15Z',
+    };
+    const changedVersion = {
+      ...activeSnapshot,
+      generatedAt: '2026-09-10T17:30:30Z',
+      patientsAhead: 0,
+      session: { ...activeSnapshot.session, queueOrderVersion: 8 },
+    };
     getSnapshot
-      .mockResolvedValueOnce({
-        generatedAt: '2026-09-10T17:30:00Z',
-        terminal: false,
-        publicDisplayLabel: 'G-019',
-        queueState: 'waiting',
-        clinicTimezone: 'Africa/Algiers',
-        patientsAhead: null,
-        positionKind: 'provisional',
-        arrivalWindow: null,
-        session: { status: 'open', declaredDelayMinutes: null },
-      })
-      .mockRejectedValueOnce(new GuestAccessRejectedError());
+      .mockResolvedValueOnce(activeSnapshot)
+      .mockResolvedValueOnce(sameVersion)
+      .mockResolvedValueOnce(changedVersion);
 
     const response = await GET(requestWithBearer());
-    const body = await response.text();
+    const reader = response.body!.getReader();
+    const first = new TextDecoder().decode((await reader.read()).value);
+    expect(first).toContain(JSON.stringify(activeSnapshot));
 
-    expect(response.status).toBe(200);
-    expect(body).toBe('');
-    expect(getSnapshot).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    const second = new TextDecoder().decode((await reader.read()).value);
+    expect(second).toContain(JSON.stringify(changedVersion));
+    expect(second).not.toContain(JSON.stringify(sameVersion));
+    expect(getSnapshot).toHaveBeenCalledTimes(3);
+    await reader.cancel();
   });
 
-  it('stops promptly when the client aborts after the first active event', async () => {
+  it('closes promptly when the client aborts after the first active event', async () => {
     const controller = new AbortController();
-    const activeSnapshot = {
-      generatedAt: '2026-09-10T17:30:00Z',
-      terminal: false,
-      publicDisplayLabel: 'G-019',
-      queueState: 'checked_in',
-      clinicTimezone: 'Africa/Algiers',
-      patientsAhead: 1,
-      positionKind: 'live',
-      arrivalWindow: null,
-      session: { status: 'open', declaredDelayMinutes: null },
-    };
     getSnapshot.mockResolvedValue(activeSnapshot);
 
     const response = await GET(requestWithBearer(controller.signal));
@@ -146,6 +190,23 @@ describe('GET /api/guest/status/stream', () => {
     controller.abort();
 
     const end = await reader!.read();
+    expect(end.done).toBe(true);
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes without leaking details when authorization is revoked during refresh', async () => {
+    vi.useFakeTimers();
+    getSnapshot
+      .mockResolvedValueOnce(activeSnapshot)
+      .mockRejectedValueOnce(new GuestAccessRejectedError());
+
+    const response = await GET(requestWithBearer());
+    const reader = response.body!.getReader();
+    const first = new TextDecoder().decode((await reader.read()).value);
+    expect(first).toContain('event: status');
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    const end = await reader.read();
     expect(end.done).toBe(true);
     expect(getSnapshot).toHaveBeenCalledTimes(2);
   });
