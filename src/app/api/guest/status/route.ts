@@ -13,7 +13,7 @@ const SECURITY_HEADERS = {
     "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
 };
 const RATE_WINDOW_MS = 60_000;
-const UNTRUSTED_INGRESS_LIMIT = 30;
+const UNTRUSTED_INGRESS_LIMIT = 6;
 const CREDENTIAL_LIMIT = 6;
 const UNTRUSTED_INGRESS_BUCKET = 'guest-status:untrusted-ingress';
 const UUID_PATTERN =
