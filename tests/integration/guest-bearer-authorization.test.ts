@@ -8,12 +8,18 @@ import {
 import { migrate } from '../../scripts/db/lib';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const signingSecret = process.env.GUEST_BEARER_SIGNING_SECRET;
-if (!signingSecret || signingSecret.length < 32) {
-  throw new Error(
-    'GUEST_BEARER_SIGNING_SECRET is required for guest bearer tests',
-  );
+
+function requireSigningSecret(): string {
+  const value = process.env.GUEST_BEARER_SIGNING_SECRET;
+  if (!value || value.length < 32) {
+    throw new Error(
+      'GUEST_BEARER_SIGNING_SECRET is required for guest bearer tests',
+    );
+  }
+  return value;
 }
+
+const signingSecret = requireSigningSecret();
 const ids = {
   clinic: randomUUID(),
   actor: randomUUID(),
