@@ -28,7 +28,9 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const bearer = guestBearer(request);
     if (!bearer) throw new GuestAccessRejectedError();
-    const snapshot = await new GuestStatusService(getPool()).getSnapshot(bearer);
+    const snapshot = await new GuestStatusService(getPool()).getSnapshot(
+      bearer,
+    );
     return Response.json(snapshot, { status: 200, headers: SECURITY_HEADERS });
   } catch (error) {
     const rejected = error instanceof GuestAccessRejectedError;
