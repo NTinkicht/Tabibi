@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T02:47:07.237543+00:00
+- Last sync: 2026-09-10T03:33:51.361556+00:00
 
 ## Team Room charter
 
@@ -8010,5 +8010,54 @@ There is also a gate-policy conflict. `AGENTS.md`, `coordination/WORK_QUEUE.md`,
 First resolve `Quality and build`. Then wait for `Browser smoke` to complete on the unchanged exact head. After all required checks pass, request `@coderabbitai full review` and reconcile every unresolved Medium-or-higher finding before merge.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611886353
+
+---
+
+### 2026-09-10T02:51:08Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr128:bf49d3311cc0db10378ea7e783e9efce0ecd49ed -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #128
+head: bf49d3311cc0db10378ea7e783e9efce0ecd49ed
+CI_GREEN_HANDOFF — PR #128 exact head `bf49d3311cc0db10378ea7e783e9efce0ecd49ed` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611918070
+
+---
+
+### 2026-09-10T03:33:18Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr128:398cff0e28146390ebffc2493dc3ed647f8f7740 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #128
+head: 398cff0e28146390ebffc2493dc3ed647f8f7740
+CI_GREEN_HANDOFF — PR #128 exact head `398cff0e28146390ebffc2493dc3ed647f8f7740` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5612306434
+
+---
+
+### 2026-09-10T03:33:40Z — NTinkicht
+
+CHECKPOINT — WU16 CodeRabbit Major remediated; exact-head re-gate active
+actor: chatgpt
+role: CTO/orchestrator + canonical bounded remediator
+work_stream: Issue #127 / PR #128
+
+Live reconciliation:
+- sole open implementation PR remains #128 on `wu16-guest-bearer-authorization`; no duplicate stream;
+- previous exact head `bf49d331...` had CI #478 fully green, but binding full CodeRabbit review found one Major coverage gap: separate rejection cases were missing for unknown credential ID, cross-clinic expected target, and terminal/cancelled consultation session;
+- remediation landed narrowly on the same branch as `398cff0e28146390ebffc2493dc3ed647f8f7740`, adding isolated deterministic PostgreSQL tests for all three cases while preserving existing wrong-entry/revocation/expiry/terminal-queue assertions;
+- exact-head CI #479 / `34433685381` is now fully green across Quality/build, PostgreSQL integration, and Browser smoke;
+- CodeRabbit verified the remediation content and the Major thread is explicitly resolved;
+- fresh binding `@coderabbitai full review` requested on exact head `398cff0e...` in PR comment 5612308097.
+
+Owner-wide review status: historical MicroReview CRITICAL truncated-SQL finding is resolved as false/stale; historical Codex P1 timing-safe-verifier finding is fixed and resolved with current exact-head evidence; remaining unresolved MicroReview items are WARNING-level only and below mandatory Medium+ threshold. Final merge remains blocked until the new full CodeRabbit exact-head review completes and the complete reviewer-source sweep remains zero unresolved Medium+/Major+/High+/Critical/Blocker.
+
+Coordination note: main `STATE.json` / `WORK_QUEUE.md` remain stale WU14 snapshots; live GitHub is authoritative during the active product PR, so main is not being moved solely for bookkeeping underneath #128. Gemini Agent/Chat remain paused/off-roster. Slack audit found no new unacknowledged owner `Report Progress` command. No owner action required.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5612313193
 
 ---
