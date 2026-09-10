@@ -100,9 +100,20 @@ async function liveBearer() {
   );
 }
 
+async function targetPublicDisplayLabel() {
+  const result = await pool.query<{ public_display_label: string }>(
+    'SELECT public_display_label FROM queue_entries WHERE id=$1',
+    [ids.targetEntry],
+  );
+  const row = result.rows[0];
+  if (!row) throw new Error('Expected target queue entry to exist');
+  return row.public_display_label;
+}
+
 describe('WU17 guest queue-status read', () => {
   it('returns only the authorized active target with deterministic position and no mutation', async () => {
     const credential = await liveBearer();
+    const expectedPublicDisplayLabel = await targetPublicDisplayLabel();
     const service = new GuestStatusService(pool);
     const beforeCredential = await pool.query(
       'SELECT issued_at,expires_at,revoked_at FROM guest_credentials',
@@ -118,7 +129,7 @@ describe('WU17 guest queue-status read', () => {
 
     expect(snapshot).toMatchObject({
       target,
-      publicDisplayLabel: 'G-017',
+      publicDisplayLabel: expectedPublicDisplayLabel,
       queueState: 'waiting',
       patientsAhead: 1,
       session: { status: 'open', declaredDelayMinutes: 15 },
@@ -180,6 +191,7 @@ describe('WU17 guest queue-status read', () => {
 
   it('serves the cookie-authenticated API as no-store and rejects missing credentials generically', async () => {
     const credential = await liveBearer();
+    const expectedPublicDisplayLabel = await targetPublicDisplayLabel();
     const ok = await GET(
       new Request('http://localhost/api/guest/status', {
         headers: { cookie: `__Host-tabibi_guest=${credential.bearer}` },
@@ -189,7 +201,7 @@ describe('WU17 guest queue-status read', () => {
     expect(ok.headers.get('cache-control')).toBe('no-store');
     const body = await ok.json();
     expect(body.target).toEqual(target);
-    expect(body.publicDisplayLabel).toBe('G-017');
+    expect(body.publicDisplayLabel).toBe(expectedPublicDisplayLabel);
     expect(JSON.stringify(body)).not.toContain('0555000000');
 
     const rejected = await GET(
