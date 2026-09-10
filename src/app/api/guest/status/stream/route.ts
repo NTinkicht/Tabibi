@@ -146,7 +146,10 @@ function encodeChangeEvent(): Uint8Array {
  */
 function snapshotVersion(snapshot: GuestQueueStatusSnapshot): string {
   if (snapshot.terminal) {
-    return JSON.stringify({ terminal: true, finalStatus: snapshot.finalStatus });
+    return JSON.stringify({
+      terminal: true,
+      finalStatus: snapshot.finalStatus,
+    });
   }
 
   return JSON.stringify({
