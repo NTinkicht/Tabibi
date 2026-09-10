@@ -212,7 +212,10 @@ describe('GET /api/guest/status/stream', () => {
             refreshSignal = signal;
             signal.addEventListener(
               'abort',
-              () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError')),
+              () =>
+                reject(
+                  signal.reason ?? new DOMException('Aborted', 'AbortError'),
+                ),
               { once: true },
             );
           }),
