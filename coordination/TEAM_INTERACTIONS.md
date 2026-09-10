@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-10T02:46:28.569819+00:00
+- Last sync: 2026-09-10T02:47:07.237543+00:00
 
 ## Team Room charter
 
@@ -7874,5 +7874,141 @@ PR #128 is now mergeable at exact head `7e2bf08e061d53f06b0f1cdd0369e69b1545afcc
 `coordination/STATE.json` and `WORK_QUEUE.md` on main remain stale WU14 snapshots; live GitHub is authoritative and main will not be moved solely for bookkeeping underneath an active product PR. No new unacknowledged owner `Report Progress` command exists. Gemini actors remain paused/off-roster.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611881419
+
+---
+
+### 2026-09-10T02:46:56Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+echo '== Required coordination guidance =='
+for file in \
+  AGENTS.md \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  if [ -f "$file" ]; then
+    echo "--- $file ---"
+    sed -n '1,240p' "$file"
+  fi
+done
+
+echo '== PR `#128` live state =='
+gh pr view 128 --repo NTinkicht/Tabibi \
+  --json number,state,isDraft,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo '== PR `#128` required checks =='
+gh pr checks 128 --repo NTinkicht/Tabibi \
+  --json name,state,workflow,link
+
+echo '== Recent PR `#128` discussion =='
+gh api 'repos/NTinkicht/Tabibi/issues/128/comments?per_page=30' \
+  --jq '.[] | {user:.user.login, created_at, body}' || true
+
+echo '== Recent CodeRabbit review comments on PR `#128` =='
+gh api 'repos/NTinkicht/Tabibi/pulls/128/comments?per_page=100' \
+  --jq '.[] | select(.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai") | {commit_id,path,line,body}' || true
+```
+
+Length of output: 74721
+
+---
+
+</details>
+
+`@NTinkicht`, the remediation head is correct: PR `#128` is at `7e2bf08e061d53f06b0f1cdd0369e69b1545afcc`.
+
+The required CI is not green yet.
+
+- `Quality and build` is `FAILURE`.
+- `PostgreSQL integration` is `SUCCESS`.
+- `Browser smoke` is `IN_PROGRESS`.
+
+Do not request or treat a CodeRabbit review as a completed full review yet. The PR discussion states that automatic CodeRabbit review was skipped pending an explicit trigger. The successful CodeRabbit check does not prove full-review coverage.
+
+There is also a gate-policy conflict. `AGENTS.md`, `coordination/WORK_QUEUE.md`, and `coordination/STATE.json` currently define CodeRabbit as supplemental only. They require an eligible non-author exact-SHA gate. The stated “CodeRabbit is binding” policy must be reconciled consistently in those governing files before it is used as the binding gate.
+
+First resolve `Quality and build`. Then wait for `Browser smoke` to complete on the unchanged exact head. After all required checks pass, request `@coderabbitai full review` and reconcile every unresolved Medium-or-higher finding before merge.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+echo '== Required coordination guidance =='
+for file in \
+  AGENTS.md \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  if [ -f "$file" ]; then
+    echo "--- $file ---"
+    sed -n '1,240p' "$file"
+  fi
+done
+
+echo '== PR `#128` live state =='
+gh pr view 128 --repo NTinkicht/Tabibi \
+  --json number,state,isDraft,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo '== PR `#128` required checks =='
+gh pr checks 128 --repo NTinkicht/Tabibi \
+  --json name,state,workflow,link
+
+echo '== Recent PR `#128` discussion =='
+gh api 'repos/NTinkicht/Tabibi/issues/128/comments?per_page=30' \
+  --jq '.[] | {user:.user.login, created_at, body}' || true
+
+echo '== Recent CodeRabbit review comments on PR `#128` =='
+gh api 'repos/NTinkicht/Tabibi/pulls/128/comments?per_page=100' \
+  --jq '.[] | select(.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai") | {commit_id,path,line,body}' || true
+```
+
+Length of output: 74721
+
+---
+
+</details>
+
+`@NTinkicht`, the remediation head is correct: PR `#128` is at `7e2bf08e061d53f06b0f1cdd0369e69b1545afcc`.
+
+The required CI is not green yet.
+
+- `Quality and build` is `FAILURE`.
+- `PostgreSQL integration` is `SUCCESS`.
+- `Browser smoke` is `IN_PROGRESS`.
+
+Do not request or treat a CodeRabbit review as a completed full review yet. The PR discussion states that automatic CodeRabbit review was skipped pending an explicit trigger. The successful CodeRabbit check does not prove full-review coverage.
+
+There is also a gate-policy conflict. `AGENTS.md`, `coordination/WORK_QUEUE.md`, and `coordination/STATE.json` currently define CodeRabbit as supplemental only. They require an eligible non-author exact-SHA gate. The stated “CodeRabbit is binding” policy must be reconciled consistently in those governing files before it is used as the binding gate.
+
+First resolve `Quality and build`. Then wait for `Browser smoke` to complete on the unchanged exact head. After all required checks pass, request `@coderabbitai full review` and reconcile every unresolved Medium-or-higher finding before merge.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5611886353
 
 ---
