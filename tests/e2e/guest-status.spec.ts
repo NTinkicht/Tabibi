@@ -31,13 +31,17 @@ test('guest status renders provisional waiting state without leaking bearer mate
     '00000000-0000-4000-8000-000000000018.super-secret-guest-bearer';
   await page.context().addCookies([
     {
-      name: 'tabibi_guest_bearer',
+      name: '__Host-tabibi_guest',
       value: rawBearer,
       url: 'http://127.0.0.1:3000',
+      path: '/',
+      secure: true,
       httpOnly: true,
     },
   ]);
+  let statusRequestCookie = '';
   await page.route('**/api/guest/status', async (route) => {
+    statusRequestCookie = route.request().headers()['cookie'] ?? '';
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -49,6 +53,7 @@ test('guest status renders provisional waiting state without leaking bearer mate
   await expect(page.getByText('G-018')).toBeVisible();
   await expect(page.getByText(/Expected arrival window:/)).toBeVisible();
   await expect(page.getByText(/Declared clinic delay:/)).toBeVisible();
+  expect(statusRequestCookie).toContain(`__Host-tabibi_guest=${rawBearer}`);
   expect(await page.locator('body').innerText()).not.toContain(rawBearer);
   expect(page.url()).not.toContain(rawBearer);
   expect(
