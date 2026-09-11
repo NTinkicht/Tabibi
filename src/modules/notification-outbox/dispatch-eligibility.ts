@@ -1,7 +1,5 @@
 import type { Pool } from 'pg';
-import {
-  NotificationOutboxValidationError,
-} from '@/modules/notification-outbox';
+import { NotificationOutboxValidationError } from '@/modules/notification-outbox';
 
 export const MAX_NOTIFICATION_DISPATCH_BATCH_SIZE = 100;
 
