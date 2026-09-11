@@ -557,6 +557,7 @@ export class NotificationOutboxRepository {
         WHERE clinic_id=$1
           AND id=$2
           AND dispatch_claim_token=$3
+          AND dispatch_claim_expires_at > now()
           AND state IN ('pending', 'failed', 'unknown')
         RETURNING id, clinic_id, queue_entry_id, logical_target_key, event_key,
                   intent_version, idempotency_key, state, payload,
