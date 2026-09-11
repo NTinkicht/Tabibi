@@ -16,10 +16,11 @@ CREATE TABLE notification_outbox (
   superseded_by_id uuid,
   created_at timestamptz NOT NULL DEFAULT now(),
   superseded_at timestamptz,
+  UNIQUE (id, clinic_id),
   FOREIGN KEY (queue_entry_id, clinic_id)
     REFERENCES queue_entries(id, clinic_id) ON DELETE RESTRICT,
-  FOREIGN KEY (superseded_by_id)
-    REFERENCES notification_outbox(id) ON DELETE RESTRICT,
+  FOREIGN KEY (superseded_by_id, clinic_id)
+    REFERENCES notification_outbox(id, clinic_id) ON DELETE RESTRICT,
   UNIQUE (clinic_id, idempotency_key),
   UNIQUE (clinic_id, logical_target_key, event_key, intent_version),
   CHECK (
