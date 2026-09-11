@@ -51,14 +51,20 @@ const sensitivePayloadKey =
   /(password|passcode|secret|token|credential|diagnosis|medication|clinical|medical_record|access_key|api_key)/i;
 
 function assertPrivacyMinimalPayload(value: unknown, path = 'payload'): void {
-  if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return;
+  if (
+    value === null ||
+    ['string', 'number', 'boolean'].includes(typeof value)
+  )
+    return;
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1)
       assertPrivacyMinimalPayload(value[index], `${path}[${index}]`);
     return;
   }
   if (typeof value !== 'object')
-    throw new NotificationOutboxValidationError(`${path} contains an unsupported value`);
+    throw new NotificationOutboxValidationError(
+      `${path} contains an unsupported value`,
+    );
 
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     if (sensitivePayloadKey.test(key))
@@ -93,8 +99,14 @@ function normalizeInput(input: EnqueueNotificationIntentInput) {
     throw new NotificationOutboxValidationError(
       'Idempotency key is required and must be at most 128 characters',
     );
-  if (!input.payload || Array.isArray(input.payload) || typeof input.payload !== 'object')
-    throw new NotificationOutboxValidationError('Payload must be a JSON object');
+  if (
+    !input.payload ||
+    Array.isArray(input.payload) ||
+    typeof input.payload !== 'object'
+  )
+    throw new NotificationOutboxValidationError(
+      'Payload must be a JSON object',
+    );
   assertPrivacyMinimalPayload(input.payload);
 
   return {
@@ -123,7 +135,10 @@ function toIntent(row: IntentRow): NotificationIntent {
   };
 }
 
-function sameIntent(row: IntentRow, input: ReturnType<typeof normalizeInput>) {
+function sameIntent(
+  row: IntentRow,
+  input: ReturnType<typeof normalizeInput>,
+) {
   return (
     row.logical_target_key === input.logicalTargetKey &&
     row.event_key === input.eventKey &&
@@ -153,7 +168,9 @@ async function loadByIdempotencyKey(
 export class NotificationOutboxRepository {
   constructor(private readonly pool: Pool) {}
 
-  async enqueue(rawInput: EnqueueNotificationIntentInput): Promise<NotificationIntent> {
+  async enqueue(
+    rawInput: EnqueueNotificationIntentInput,
+  ): Promise<NotificationIntent> {
     const input = normalizeInput(rawInput);
 
     return inTransaction(this.pool, async (client) => {
