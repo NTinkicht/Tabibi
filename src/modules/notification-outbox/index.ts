@@ -415,7 +415,8 @@ export class NotificationOutboxRepository {
                 dispatch_claim_expires_at=NULL
           WHERE clinic_id=$1
             AND id=$2
-            AND state='pending'
+            AND state IN ('pending', 'failed', 'unknown')
+            AND dispatch_attempt_count < dispatch_max_attempts
             AND dispatch_claim_token IS NOT NULL
             AND dispatch_claim_expires_at <= now()`,
         [input.clinicId, input.intentId],
@@ -486,9 +487,10 @@ export class NotificationOutboxRepository {
 
     const result = await this.pool.query(
       `UPDATE notification_outbox
-          SET dispatch_attempt_count=CASE
-                WHEN state='pending' THEN GREATEST(dispatch_attempt_count - 1, 0)
-                ELSE dispatch_attempt_count
+          SET dispatch_attempt_count=GREATEST(dispatch_attempt_count - 1, 0),
+              next_attempt_at=CASE
+                WHEN state IN ('failed', 'unknown') THEN now()
+                ELSE next_attempt_at
               END,
               dispatch_claim_token=NULL,
               dispatch_claimed_at=NULL,
