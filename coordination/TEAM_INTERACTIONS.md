@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T14:43:42.594027+00:00
+- Last sync: 2026-09-11T14:56:44.571769+00:00
 
 ## Team Room charter
 
@@ -12930,5 +12930,62 @@ Fresh binding CodeRabbit review on prior exact head `6db0dd57a5749ea05b8473180b3
 CI run #665 / `34611696904` is now in progress on that exact head. Merge remains blocked pending exact-head green CI, fresh CodeRabbit whole-PR coverage, and all-reviewer Medium+ reconciliation. The prior #147/Codex WU24 lease references are superseded by this live reconciliation. Gemini Agent/Chat remain PAUSED/OFF-ROSTER.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5636175940
+
+---
+
+### 2026-09-11T14:47:40Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr146:5c801c90dab7f32e70610e56e0765ee29ad22e93 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #146
+head: 5c801c90dab7f32e70610e56e0765ee29ad22e93
+CI_GREEN_HANDOFF — PR #146 exact head `5c801c90dab7f32e70610e56e0765ee29ad22e93` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5636230553
+
+---
+
+### 2026-09-11T14:52:28Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr146:400c5cd4d11e64f4613bba26e7ecf1bb1d7a47ae -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #146
+head: 400c5cd4d11e64f4613bba26e7ecf1bb1d7a47ae
+CI_GREEN_HANDOFF — PR #146 exact head `400c5cd4d11e64f4613bba26e7ecf1bb1d7a47ae` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5636301720
+
+---
+
+### 2026-09-11T14:54:56Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr146:23c71dd991051ba3b4fcdef31d906ea16f71d0ce -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #146
+head: 23c71dd991051ba3b4fcdef31d906ea16f71d0ce
+POST_MERGE_RECONCILE — PR #146 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5636332733
+
+---
+
+### 2026-09-11T14:56:32Z — NTinkicht
+
+WU24 MERGE / WU25 ACTIVATION CHECKPOINT
+
+WU24 canonical Issue #145 / PR #146 is complete. PR #146 merged from exact reviewed head `400c5cd4d11e64f4613bba26e7ecf1bb1d7a47ae` into `main` as merge commit `23c71dd991051ba3b4fcdef31d906ea16f71d0ce` after CI #669 was fully green and the binding CodeRabbit whole-PR exact-head review returned PASS with zero Medium/Major/High/Critical/Blocker findings. `CR-WU24-002` and `CR-WU24-003` were individually remediated/reconciled; the older inline CodeRabbit Major idempotency-key thread is resolved. Codex and MicroReview participated only with quota-limit notices and supplied no substantive Medium+ finding.
+
+ROLE_LEASE_RELEASED: chatgpt -> WU24-IMPLEMENT-001
+
+No-idle continuation is now WU25 / Issue #148: deterministic notification dispatch eligibility scan and bounded batch runner. The old Issue #147 was a duplicate WU24 issue and remains closed as duplicate; it is not an active stream.
+
+ROLE_LEASE_ASSIGNED: codex -> WU25-IMPLEMENT-001
+Canonical branch required: `wu25-notification-dispatch-batch`.
+Codex must produce repository-backed commit/test/PR evidence within 30 minutes unless a visible deterministic job is progressing. One canonical implementation stream only; no dummy or duplicate PR. ChatGPT retains CTO/orchestration/failover/merge control. Gemini Agent/Chat remain PAUSED/OFF-ROSTER.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5636352505
 
 ---
