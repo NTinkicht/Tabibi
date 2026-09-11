@@ -138,13 +138,16 @@ describe('notification outbox repository', () => {
     expect(count.rows[0]?.count).toBe('1');
   });
 
-  it('rejects unsupported non-JSON payload values before persistence', async () => {
+  it('rejects unsupported non-JSON and sensitive camelCase payload values before persistence', async () => {
     const repository = new NotificationOutboxRepository(pool);
     const invalidPayloads: Array<Record<string, unknown>> = [
       { occurredAt: new Date('2026-09-11T00:00:00Z') },
       { minutes: Number.NaN },
       { minutes: Number.POSITIVE_INFINITY },
       { nested: { optional: undefined } },
+      { medicalRecord: 'must-not-persist' },
+      { accessKey: 'must-not-persist' },
+      { nested: { apiKey: 'must-not-persist' } },
     ];
 
     for (const [index, payload] of invalidPayloads.entries()) {
