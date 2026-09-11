@@ -32,9 +32,8 @@ describe('NotificationDispatchBatchRunner', () => {
       { dispatchOne } satisfies NotificationDispatchExecutor,
     );
 
-    await expect(
-      runner.run({ clinicId: ' clinic-1 ', limit: 3 }),
-    ).resolves.toEqual({
+    const summary = await runner.run({ clinicId: ' clinic-1 ', limit: 3 });
+    expect(summary).toEqual({
       selected: 3,
       completed: 1,
       notClaimed: 1,
@@ -46,9 +45,7 @@ describe('NotificationDispatchBatchRunner', () => {
       'intent-2',
       'intent-3',
     ]);
-    expect(JSON.stringify(await runner.run({ clinicId: 'clinic-1', limit: 3 }))).not.toContain(
-      'providerResult',
-    );
+    expect(JSON.stringify(summary)).not.toContain('providerResult');
   });
 
   it('returns an empty deterministic summary when no intent is eligible', async () => {
