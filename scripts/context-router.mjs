@@ -209,7 +209,18 @@ function compress(question, specs) {
 
   const result = spawnSync(
     'copilot',
-    ['-p', prompt, '-s', '--no-ask-user', '--model', 'gpt-5.6-luna'],
+    [
+      '-p',
+      prompt,
+      '-s',
+      '--no-ask-user',
+      '--no-custom-instructions',
+      '--no-auto-update',
+      '--no-remote',
+      '--no-remote-export',
+      '--model',
+      'gpt-5.6-luna',
+    ],
     { cwd: ROOT, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 },
   );
   if (result.error?.code === 'ENOENT') {
