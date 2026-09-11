@@ -1,0 +1,134 @@
+import { randomUUID } from 'node:crypto';
+import { Pool } from 'pg';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { migrate } from '../../scripts/db/lib';
+import { NotificationDispatchBatchRunner } from '@/modules/notification-domain/dispatch-batch';
+import {
+  NotificationDispatchService,
+  type NotificationProviderAdapter,
+} from '@/modules/notification-domain';
+import { NotificationOutboxRepository } from '@/modules/notification-outbox';
+import {
+  MAX_NOTIFICATION_DISPATCH_BATCH_SIZE,
+  NotificationDispatchEligibilityRepository,
+} from '@/modules/notification-outbox/dispatch-eligibility';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
+const clinicA = randomUUID();
+const clinicB = randomUUID();
+
+beforeAll(migrate);
+beforeEach(async () => {
+  await pool.query('TRUNCATE notification_outbox, clinics CASCADE');
+  await pool.query(
+    `INSERT INTO clinics (id, tenant_key, name)
+     VALUES ($1, 'dispatch-batch-a', 'Dispatch Batch A'),
+            ($2, 'dispatch-batch-b', 'Dispatch Batch B')`,
+    [clinicA, clinicB],
+  );
+});
+afterAll(async () => pool.end());
+
+function input(clinicId: string, key: string, version = 1) {
+  return {
+    clinicId,
+    logicalTargetKey: `queue-entry:${key}`,
+    eventKey: 'turn_approaching',
+    intentVersion: version,
+    idempotencyKey: `dispatch-batch:${key}:${version}`,
+    payload: { locale: 'en', places: 2 },
+  };
+}
+
+describe('notification dispatch eligibility and bounded batch', () => {
+  it('selects only clinic-scoped due unclaimed intents and enforces bounds', async () => {
+    const outbox = new NotificationOutboxRepository(pool);
+    const scanner = new NotificationDispatchEligibilityRepository(pool);
+    const duePending = await outbox.enqueue(input(clinicA, 'due-pending'));
+    const notDue = await outbox.enqueue(input(clinicA, 'not-due'));
+    const notDueClaim = await outbox.claimPendingIntent({
+      clinicId: clinicA,
+      intentId: notDue.id,
+      leaseMs: 60_000,
+    });
+    await outbox.completeDispatchAttempt({
+      clinicId: clinicA,
+      intentId: notDue.id,
+      claimToken: notDueClaim!.claimToken,
+      outcome: 'failed',
+    });
+
+    const active = await outbox.enqueue(input(clinicA, 'active-claim'));
+    await outbox.claimPendingIntent({
+      clinicId: clinicA,
+      intentId: active.id,
+      leaseMs: 60_000,
+    });
+    await outbox.enqueue(input(clinicB, 'other-clinic'));
+
+    await expect(scanner.listEligible({ clinicId: clinicA, limit: 10 })).resolves.toEqual([
+      expect.objectContaining({ intentId: duePending.id }),
+    ]);
+    await expect(scanner.listEligible({ clinicId: clinicA, limit: 0 })).rejects.toThrow(
+      'Dispatch batch size must be between 1 and',
+    );
+    await expect(
+      scanner.listEligible({
+        clinicId: clinicA,
+        limit: MAX_NOTIFICATION_DISPATCH_BATCH_SIZE + 1,
+      }),
+    ).rejects.toThrow('Dispatch batch size must be between 1 and');
+  });
+
+  it('orders by due time with stable tie breakers and applies the requested limit', async () => {
+    const outbox = new NotificationOutboxRepository(pool);
+    const scanner = new NotificationDispatchEligibilityRepository(pool);
+    const first = await outbox.enqueue(input(clinicA, 'first'));
+    const second = await outbox.enqueue(input(clinicA, 'second'));
+    const third = await outbox.enqueue(input(clinicA, 'third'));
+
+    await pool.query(
+      `UPDATE notification_outbox
+          SET created_at = CASE id
+            WHEN $1 THEN TIMESTAMPTZ '2026-09-11 00:00:03+00'
+            WHEN $2 THEN TIMESTAMPTZ '2026-09-11 00:00:01+00'
+            ELSE TIMESTAMPTZ '2026-09-11 00:00:02+00'
+          END
+        WHERE id = ANY($4::uuid[])`,
+      [first.id, second.id, third.id, [first.id, second.id, third.id]],
+    );
+
+    const selected = await scanner.listEligible({ clinicId: clinicA, limit: 2 });
+    expect(selected.map((candidate) => candidate.intentId)).toEqual([
+      second.id,
+      third.id,
+    ]);
+  });
+
+  it('lets concurrent runners race through the existing atomic claim fence without duplicate provider ownership', async () => {
+    const outbox = new NotificationOutboxRepository(pool);
+    const scanner = new NotificationDispatchEligibilityRepository(pool);
+    const intent = await outbox.enqueue(input(clinicA, 'concurrent'));
+    const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(async () => ({
+      kind: 'delivered',
+      code: 'accepted',
+    }));
+    const service = new NotificationDispatchService(outbox, { dispatch });
+    const runnerA = new NotificationDispatchBatchRunner(scanner, service);
+    const runnerB = new NotificationDispatchBatchRunner(scanner, service);
+
+    const summaries = await Promise.all([
+      runnerA.run({ clinicId: clinicA, limit: 1 }),
+      runnerB.run({ clinicId: clinicA, limit: 1 }),
+    ]);
+
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(summaries.reduce((sum, item) => sum + item.completed, 0)).toBe(1);
+    expect(summaries.reduce((sum, item) => sum + item.notClaimed, 0)).toBeLessThanOrEqual(1);
+    const persisted = await pool.query<{ state: string }>(
+      'SELECT state FROM notification_outbox WHERE id=$1',
+      [intent.id],
+    );
+    expect(persisted.rows[0]?.state).toBe('delivered');
+  });
+});
