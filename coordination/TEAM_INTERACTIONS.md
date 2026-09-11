@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T13:12:16.820926+00:00
+- Last sync: 2026-09-11T13:14:12.056663+00:00
 
 ## Team Room charter
 
@@ -12631,5 +12631,209 @@ Next sequence: repository-backed Codex commit/tests -> exact-head CI green -> fr
 `coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots; live GitHub governs. Gemini Agent/Chat remain PAUSED/OFF-ROSTER.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5634930334
+
+---
+
+### 2026-09-11T13:13:57Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="144"
+expected="4426fb440e677372d859d486bfd0e48dfa93faf8"
+
+echo "== PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo "== Expected vs actual head =="
+actual="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+printf 'expected=%s\nactual=%s\n' "$expected" "$actual"
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Unresolved review threads =="
+gh api graphql \
+  -F owner="NTinkicht" -F name="Tabibi" -F number="$pr" \
+  -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 10) {
+            nodes { author { login } commit { oid } body }
+          }
+        }
+      }
+    }
+  }
+}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+    | select(.isResolved == false)
+    | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body:(.body[:150])}]}' || true
+
+echo "== Recent PR discussion (last 8) =="
+gh api "repos/$repo/issues/$pr/comments?per_page=8" \
+  --jq '.[-8:][] | {user:.user.login,created_at,body:(.body[:200])}' || true
+```
+
+Length of output: 10105
+
+---
+
+</details>
+
+`@NTinkicht`, live evidence supports this checkpoint.
+
+PR `#144` is open at head `4426fb440e677372d859d486bfd0e48dfa93faf8`. This value matches your reported head.
+
+GitHub reports `mergeable: MERGEABLE`. GitHub reports no formal review decision yet.
+
+All three required CI jobs are green on this head:
+- Quality and build: SUCCESS
+- PostgreSQL integration: SUCCESS
+- Browser smoke: SUCCESS
+
+The query for unresolved review threads returns six open threads. This matches your inventory. The threads are:
+1. WU23-RETRY-004 (Codex P1, supersession deadline clearing) — reply claims remediation at head `4e91133f...`.
+2. WU23-RETRY-005 (Codex P2, pending-claim release) — reply claims remediation at head `4e91133f...`.
+3. Legacy-backfill delay (CodeRabbit Major) — reply claims remediation at head `9644ebc6...`.
+4. Release-eligibility restoration (CodeRabbit Major) — reply claims remediation at head `ad02beec...`.
+5. Migration-order coverage (CodeRabbit Major) — reply claims remediation at head `ad02beec...`.
+6. WU23-RETRY-006 (Codex P1, expired active-claim recovery) — reply claims remediation at head `ad02beec...`.
+
+A seventh finding (Prettier issue in `tests/integration/notification-retry-recovery.test.ts`, CodeRabbit Minor) also remains open.
+
+Each remediation reply points to a head that is older than the current head `4426fb44...`. This is consistent with your rule: a reply claim does not close a thread. Each thread needs verification against the current exact head before you mark it resolved.
+
+I do not see a separate comment in the recent discussion that states the completed full-review result for exactly `4426fb44...`. Do not treat the `CodeRabbit` check mark as proof of a completed full review. A completed full review posts as a distinct comment with its own findings.
+
+Required next steps:
+1. Keep all work on branch `wu23-notification-retry-eligibility`.
+2. Wait for Codex to push a new head that fixes the new P1 finding.
+3. Confirm all three required CI jobs pass on that new head.
+4. Request `@coderabbitai full review` on that exact new head.
+5. Reconcile each of the six open threads against the new head, one by one. Do not apply a blanket waiver.
+6. Merge only after every Medium-or-higher finding is resolved on the current head.
+
+MicroReview remains at its monthly free-tier limit. Do not count its silence as a clean result for the reviewer-source sweep.
+
+<!-- <review_comment_addressed> -->
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="144"
+expected="4426fb440e677372d859d486bfd0e48dfa93faf8"
+
+echo "== PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo "== Expected vs actual head =="
+actual="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+printf 'expected=%s\nactual=%s\n' "$expected" "$actual"
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Unresolved review threads =="
+gh api graphql \
+  -F owner="NTinkicht" -F name="Tabibi" -F number="$pr" \
+  -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 10) {
+            nodes { author { login } commit { oid } body }
+          }
+        }
+      }
+    }
+  }
+}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+    | select(.isResolved == false)
+    | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body:(.body[:150])}]}' || true
+
+echo "== Recent PR discussion (last 8) =="
+gh api "repos/$repo/issues/$pr/comments?per_page=8" \
+  --jq '.[-8:][] | {user:.user.login,created_at,body:(.body[:200])}' || true
+```
+
+Length of output: 10105
+
+---
+
+</details>
+
+`@NTinkicht`, live evidence supports this checkpoint.
+
+PR `#144` is open at head `4426fb440e677372d859d486bfd0e48dfa93faf8`. This value matches your reported head.
+
+GitHub reports `mergeable: MERGEABLE`. GitHub reports no formal review decision yet.
+
+All three required CI jobs are green on this head:
+- Quality and build: SUCCESS
+- PostgreSQL integration: SUCCESS
+- Browser smoke: SUCCESS
+
+The query for unresolved review threads returns six open threads. This matches your inventory. The threads are:
+1. WU23-RETRY-004 (Codex P1, supersession deadline clearing) — reply claims remediation at head `4e91133f...`.
+2. WU23-RETRY-005 (Codex P2, pending-claim release) — reply claims remediation at head `4e91133f...`.
+3. Legacy-backfill delay (CodeRabbit Major) — reply claims remediation at head `9644ebc6...`.
+4. Release-eligibility restoration (CodeRabbit Major) — reply claims remediation at head `ad02beec...`.
+5. Migration-order coverage (CodeRabbit Major) — reply claims remediation at head `ad02beec...`.
+6. WU23-RETRY-006 (Codex P1, expired active-claim recovery) — reply claims remediation at head `ad02beec...`.
+
+A seventh finding (Prettier issue in `tests/integration/notification-retry-recovery.test.ts`, CodeRabbit Minor) also remains open.
+
+Each remediation reply points to a head that is older than the current head `4426fb44...`. This is consistent with your rule: a reply claim does not close a thread. Each thread needs verification against the current exact head before you mark it resolved.
+
+I do not see a separate comment in the recent discussion that states the completed full-review result for exactly `4426fb44...`. Do not treat the `CodeRabbit` check mark as proof of a completed full review. A completed full review posts as a distinct comment with its own findings.
+
+Required next steps:
+1. Keep all work on branch `wu23-notification-retry-eligibility`.
+2. Wait for Codex to push a new head that fixes the new P1 finding.
+3. Confirm all three required CI jobs pass on that new head.
+4. Request `@coderabbitai full review` on that exact new head.
+5. Reconcile each of the six open threads against the new head, one by one. Do not apply a blanket waiver.
+6. Merge only after every Medium-or-higher finding is resolved on the current head.
+
+MicroReview remains at its monthly free-tier limit. Do not count its silence as a clean result for the reviewer-source sweep.
+
+&lt;!-- <review_comment_addressed> --&gt;</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5634953512
 
 ---
