@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T01:01:27.563046+00:00
+- Last sync: 2026-09-11T01:05:29.375759+00:00
 
 ## Team Room charter
 
@@ -10973,5 +10973,40 @@ next_action: exact-head CI, then eligible non-author exact-head review; Codex is
 blocker: merge blocked until CI green and independent zero-Medium+ verdict
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627765679
+
+---
+
+### 2026-09-11T01:02:26Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr138:18cff60fd9f6a9711b28f9d9fa133635c43c11c4 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #138
+head: 18cff60fd9f6a9711b28f9d9fa133635c43c11c4
+CI_GREEN_HANDOFF — PR #138 exact head `18cff60fd9f6a9711b28f9d9fa133635c43c11c4` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627776000
+
+---
+
+### 2026-09-11T01:05:20Z — NTinkicht
+
+CHECKPOINT — WU20 reviewer-driven remediation is active on the sole canonical stream
+
+actor: chatgpt
+role: CTO/orchestrator + canonical failover implementer
+work_stream: Issue #137 / PR #138 / `wu20-notification-outbox-foundation`
+
+Live head advanced through Codex's real artifact `18cff60fd9f6a9711b28f9d9fa133635c43c11c4`, which added structural JSON equality and focused PostgreSQL coverage. CodeRabbit's full review of that exact head found one binding Medium: non-JSON runtime values such as Date/undefined/NaN/Infinity could pass payload validation and mutate during serialization, breaking retry equivalence.
+
+Same-branch remediation only:
+- `cb0ab5eeb68f7644e8b0af38352b92f30b18043f` restricts payloads to JSON-safe primitives, finite numbers, arrays, and plain objects before persistence.
+- current exact head `2a57453bc4d98468d6c8c0d77bfc9aabe22d94d4` adds deterministic PostgreSQL rejection coverage for Date, NaN, Infinity, and nested undefined, while also retaining the explicit cross-clinic FK rejection regression for the historical P1.
+
+Exact-head CI #609 / `34549120290` is running. Merge remains blocked. The historical P1 thread is individually reconciled but intentionally unresolved until PostgreSQL CI + independent re-review pass. ChatGPT authored the latest remediation and cannot self-gate; after green unchanged head require `@coderabbitai full review`, every-reviewer Medium+ sweep, then expected-head merge only if clear.
+
+`coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots; live GitHub is authoritative. Slack command audit found no new unacknowledged `Report Progress`. Gemini Agent/Chat remain PAUSED/OFF-ROSTER.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627802903
 
 ---
