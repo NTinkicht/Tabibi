@@ -72,11 +72,65 @@ describe('notification dispatch eligibility and bounded batch', () => {
       intentId: active.id,
       leaseMs: 60_000,
     });
+
+    const delivered = await outbox.enqueue(input(clinicA, 'delivered'));
+    const deliveredClaim = await outbox.claimPendingIntent({
+      clinicId: clinicA,
+      intentId: delivered.id,
+      leaseMs: 60_000,
+    });
+    await outbox.completeDispatchAttempt({
+      clinicId: clinicA,
+      intentId: delivered.id,
+      claimToken: deliveredClaim!.claimToken,
+      outcome: 'delivered',
+    });
+
+    const exhausted = await outbox.enqueue(input(clinicA, 'exhausted'));
+    await pool.query(
+      `UPDATE notification_outbox
+          SET dispatch_max_attempts = 1
+        WHERE id=$1`,
+      [exhausted.id],
+    );
+    await outbox.claimPendingIntent({
+      clinicId: clinicA,
+      intentId: exhausted.id,
+      leaseMs: 60_000,
+    });
+    await pool.query(
+      `UPDATE notification_outbox
+          SET dispatch_claim_token = NULL,
+              dispatch_claimed_at = NULL,
+              dispatch_claim_expires_at = NULL
+        WHERE id=$1`,
+      [exhausted.id],
+    );
+
+    const superseded = await outbox.enqueue(input(clinicA, 'superseded'));
+    const superseding = await outbox.enqueue(input(clinicA, 'superseded', 2));
+    await outbox.claimPendingIntent({
+      clinicId: clinicA,
+      intentId: superseding.id,
+      leaseMs: 60_000,
+    });
+
     await outbox.enqueue(input(clinicB, 'other-clinic'));
 
-    await expect(
-      scanner.listEligible({ clinicId: clinicA, limit: 10 }),
-    ).resolves.toEqual([expect.objectContaining({ intentId: duePending.id })]);
+    const eligible = await scanner.listEligible({ clinicId: clinicA, limit: 10 });
+    expect(eligible).toEqual([
+      expect.objectContaining({ intentId: duePending.id }),
+    ]);
+    expect(eligible.map((candidate) => candidate.intentId)).not.toContain(
+      delivered.id,
+    );
+    expect(eligible.map((candidate) => candidate.intentId)).not.toContain(
+      exhausted.id,
+    );
+    expect(eligible.map((candidate) => candidate.intentId)).not.toContain(
+      superseded.id,
+    );
+
     await expect(
       scanner.listEligible({ clinicId: clinicA, limit: 0 }),
     ).rejects.toThrow('Dispatch batch size must be between 1 and');
@@ -122,7 +176,8 @@ describe('notification dispatch eligibility and bounded batch', () => {
 
     await pool.query(
       `UPDATE notification_outbox
-          SET dispatch_claim_expires_at = now() - interval '1 second'
+          SET dispatch_claimed_at = now() - interval '2 minutes',
+              dispatch_claim_expires_at = now() - interval '1 minute'
         WHERE id=$1`,
       [retry.id],
     );
