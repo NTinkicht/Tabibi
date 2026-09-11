@@ -24,6 +24,7 @@ const committedMigrations = [
   '0016_notification_outbox_foundation.sql',
   '0017_notification_dispatch_claim.sql',
   '0018_notification_dispatch_outcomes.sql',
+  '0019_notification_retry_eligibility.sql',
 ];
 
 beforeAll(async () => {
