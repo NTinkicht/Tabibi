@@ -43,6 +43,7 @@ jobs:
           team_issue = 21
           state = json.loads(Path('coordination/STATE.json').read_text(encoding='utf-8'))
           threshold = int(state.get('team_room', {}).get('stale_active_lease_minutes', 30))
+          active_roster = {'chatgpt', 'codex', 'claude', 'copilot'}
 
           def request_json(method, url, payload=None):
               data = None
@@ -75,7 +76,7 @@ jobs:
 
           comments = get_all_comments(team_issue)
           latest = {}
-          actor_re = re.compile(r'(?mi)^actor:\s*(chatgpt|codex|claude|gemini)\s*$')
+          actor_re = re.compile(r'(?mi)^actor:\s*(chatgpt|codex|claude|copilot)\s*$')
           heartbeat_re = re.compile(r'(?mi)^HEARTBEAT\s*$')
           for comment in comments:
               body = comment.get('body') or ''
@@ -90,6 +91,8 @@ jobs:
           for role, lease in (state.get('role_leases') or {}).items():
               actor = lease.get('actor')
               status = str(lease.get('status', '')).lower()
+              if actor not in active_roster:
+                  continue
               if actor and ('active' in status or status.startswith('waiting_for_green') or status.startswith('waiting_for_')):
                   # Waiting reviewer/merge roles are not active execution leases unless explicitly marked active.
                   if 'active' not in status:
