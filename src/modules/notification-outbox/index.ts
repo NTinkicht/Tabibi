@@ -33,6 +33,8 @@ export interface NotificationIntent {
   dispatchLastAttemptAt: string | null;
   dispatchOutcomeAt: string | null;
   dispatchOutcomeCode: string | null;
+  nextAttemptAt: string | null;
+  dispatchMaxAttempts: number;
 }
 
 export interface EnqueueNotificationIntentInput {
@@ -86,6 +88,8 @@ interface IntentRow {
   dispatch_last_attempt_at: Date | null;
   dispatch_outcome_at: Date | null;
   dispatch_outcome_code: string | null;
+  next_attempt_at: Date | null;
+  dispatch_max_attempts: number;
 }
 
 interface ClaimRow extends IntentRow {
@@ -222,6 +226,8 @@ function toIntent(row: IntentRow): NotificationIntent {
     dispatchLastAttemptAt: row.dispatch_last_attempt_at?.toISOString() ?? null,
     dispatchOutcomeAt: row.dispatch_outcome_at?.toISOString() ?? null,
     dispatchOutcomeCode: row.dispatch_outcome_code,
+    nextAttemptAt: row.next_attempt_at?.toISOString() ?? null,
+    dispatchMaxAttempts: row.dispatch_max_attempts,
   };
 }
 
@@ -280,7 +286,8 @@ async function loadByIdempotencyKey(
     `SELECT id, clinic_id, queue_entry_id, logical_target_key, event_key,
             intent_version, idempotency_key, state, payload, superseded_by_id,
             created_at, superseded_at, dispatch_attempt_count,
-            dispatch_last_attempt_at, dispatch_outcome_at, dispatch_outcome_code
+            dispatch_last_attempt_at, dispatch_outcome_at, dispatch_outcome_code,
+            next_attempt_at, dispatch_max_attempts
        FROM notification_outbox
       WHERE clinic_id=$1 AND idempotency_key=$2`,
     [clinicId, idempotencyKey],
@@ -345,7 +352,8 @@ export class NotificationOutboxRepository {
                    intent_version, idempotency_key, state, payload,
                    superseded_by_id, created_at, superseded_at,
                    dispatch_attempt_count, dispatch_last_attempt_at,
-                   dispatch_outcome_at, dispatch_outcome_code`,
+                   dispatch_outcome_at, dispatch_outcome_code,
+                   next_attempt_at, dispatch_max_attempts`,
         [
           id,
           input.clinicId,
@@ -388,8 +396,24 @@ export class NotificationOutboxRepository {
   ): Promise<NotificationDispatchClaim | null> {
     const input = normalizeClaimInput(rawInput);
     const claimToken = randomUUID();
-    const result = await this.pool.query<ClaimRow>(
-      `UPDATE notification_outbox
+    return inTransaction(this.pool, async (client) => {
+      await client.query(
+        `UPDATE notification_outbox
+            SET state='dead_letter',
+                next_attempt_at=NULL,
+                dispatch_outcome_at=COALESCE(dispatch_outcome_at, now()),
+                dispatch_outcome_code=COALESCE(dispatch_outcome_code, 'retry_exhausted'),
+                dispatch_claim_token=NULL,
+                dispatch_claimed_at=NULL,
+                dispatch_claim_expires_at=NULL
+          WHERE clinic_id=$1
+            AND id=$2
+            AND state IN ('failed', 'unknown')
+            AND dispatch_attempt_count >= dispatch_max_attempts`,
+        [input.clinicId, input.intentId],
+      );
+      const result = await client.query<ClaimRow>(
+        `UPDATE notification_outbox
           SET dispatch_claim_token=$3,
               dispatch_claimed_at=now(),
               dispatch_claim_expires_at=now() + ($4::double precision * interval '1 millisecond'),
@@ -398,6 +422,8 @@ export class NotificationOutboxRepository {
         WHERE clinic_id=$1
           AND id=$2
           AND state IN ('pending', 'failed', 'unknown')
+          AND dispatch_attempt_count < dispatch_max_attempts
+          AND (state = 'pending' OR next_attempt_at <= now())
           AND (
             dispatch_claim_token IS NULL
             OR dispatch_claim_expires_at <= now()
@@ -407,12 +433,14 @@ export class NotificationOutboxRepository {
                   superseded_by_id, created_at, superseded_at,
                   dispatch_attempt_count, dispatch_last_attempt_at,
                   dispatch_outcome_at, dispatch_outcome_code,
+                  next_attempt_at, dispatch_max_attempts,
                   dispatch_claim_token, dispatch_claimed_at,
                   dispatch_claim_expires_at`,
-      [input.clinicId, input.intentId, claimToken, input.leaseMs],
-    );
-    const row = result.rows[0];
-    return row ? toClaim(row) : null;
+        [input.clinicId, input.intentId, claimToken, input.leaseMs],
+      );
+      const row = result.rows[0];
+      return row ? toClaim(row) : null;
+    });
   }
 
   async releaseDispatchClaim(
@@ -469,9 +497,26 @@ export class NotificationOutboxRepository {
 
     const result = await this.pool.query<IntentRow>(
       `UPDATE notification_outbox
-          SET state=$4,
+          SET state=CASE
+                WHEN $4::notification_outbox_state IN ('failed', 'unknown')
+                     AND dispatch_attempt_count >= dispatch_max_attempts
+                  THEN 'dead_letter'::notification_outbox_state
+                ELSE $4::notification_outbox_state
+              END,
               dispatch_outcome_at=now(),
               dispatch_outcome_code=$5,
+              next_attempt_at=CASE
+                WHEN $4::notification_outbox_state IN ('failed', 'unknown')
+                     AND dispatch_attempt_count < dispatch_max_attempts
+                  THEN now() + CASE dispatch_attempt_count
+                    WHEN 1 THEN interval '1 minute'
+                    WHEN 2 THEN interval '5 minutes'
+                    WHEN 3 THEN interval '15 minutes'
+                    WHEN 4 THEN interval '1 hour'
+                    ELSE interval '4 hours'
+                  END
+                ELSE NULL
+              END,
               dispatch_claim_token=NULL,
               dispatch_claimed_at=NULL,
               dispatch_claim_expires_at=NULL
@@ -483,7 +528,8 @@ export class NotificationOutboxRepository {
                   intent_version, idempotency_key, state, payload,
                   superseded_by_id, created_at, superseded_at,
                   dispatch_attempt_count, dispatch_last_attempt_at,
-                  dispatch_outcome_at, dispatch_outcome_code`,
+                  dispatch_outcome_at, dispatch_outcome_code,
+                  next_attempt_at, dispatch_max_attempts`,
       [clinicId, intentId, claimToken, rawInput.outcome, outcomeCode],
     );
     const row = result.rows[0];
