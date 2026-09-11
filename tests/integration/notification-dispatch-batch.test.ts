@@ -117,7 +117,10 @@ describe('notification dispatch eligibility and bounded batch', () => {
 
     await outbox.enqueue(input(clinicB, 'other-clinic'));
 
-    const eligible = await scanner.listEligible({ clinicId: clinicA, limit: 10 });
+    const eligible = await scanner.listEligible({
+      clinicId: clinicA,
+      limit: 10,
+    });
     expect(eligible).toEqual([
       expect.objectContaining({ intentId: duePending.id }),
     ]);
