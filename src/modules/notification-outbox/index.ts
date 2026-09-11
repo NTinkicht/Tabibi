@@ -50,6 +50,13 @@ interface IntentRow {
 const sensitivePayloadKey =
   /(password|passcode|secret|token|credential|diagnosis|medication|clinical|medical_record|access_key|api_key)/i;
 
+function normalizePayloadKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[^a-z0-9]+/gi, '_')
+    .toLowerCase();
+}
+
 function isPlainJsonObject(value: object): boolean {
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
@@ -80,7 +87,7 @@ function assertPrivacyMinimalPayload(value: unknown, path = 'payload'): void {
     );
 
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    if (sensitivePayloadKey.test(key))
+    if (sensitivePayloadKey.test(normalizePayloadKey(key)))
       throw new NotificationOutboxValidationError(
         `Notification payload may not persist sensitive field: ${key}`,
       );
