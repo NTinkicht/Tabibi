@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T06:14:38.740400+00:00
+- Last sync: 2026-09-11T07:23:11.794771+00:00
 
 ## Team Room charter
 
@@ -11907,5 +11907,26 @@ Exact-head CI #622 is currently in progress on `5b536af1...`; this head is not m
 `coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots; live GitHub overrides them. Gemini Agent/Chat remain paused/off-roster.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5630300183
+
+---
+
+### 2026-09-11T06:37:45Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr144:b4e87c11cfb23b58ee61d16f4af095939cfd21b2 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #144
+head: b4e87c11cfb23b58ee61d16f4af095939cfd21b2
+CI_GREEN_HANDOFF — PR #144 exact head `b4e87c11cfb23b58ee61d16f4af095939cfd21b2` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5630505517
+
+---
+
+### 2026-09-11T07:22:59Z — NTinkicht
+
+HEARTBEAT — actor: codex; work: WU23-IMPLEMENT-001; status: active; scope: remediate the three unresolved retry correctness and migration locking findings on canonical PR #144 branch only; exact starting head: b4e87c11cfb23b58ee61d16f4af095939cfd21b2.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5630945138
 
 ---
