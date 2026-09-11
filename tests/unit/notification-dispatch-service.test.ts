@@ -100,7 +100,7 @@ describe('NotificationDispatchService', () => {
       clinicId: 'clinic-1',
       intentId: 'intent-1',
       payload: { locale: 'fr', places: 2 },
-      providerIdempotencyKey: 'notification:intent-1:attempt:2',
+      providerIdempotencyKey: 'notification:intent-1',
     });
     expect(dispatchStore.completeDispatchAttempt).toHaveBeenCalledWith({
       clinicId: 'clinic-1',
@@ -166,34 +166,49 @@ describe('NotificationDispatchService', () => {
     ).resolves.toEqual({
       status: 'claim_lost',
       claimToken: 'claim-token-1',
-      providerIdempotencyKey: 'notification:intent-1:attempt:2',
+      providerIdempotencyKey: 'notification:intent-1',
       providerResult: { kind: 'delivered', code: 'accepted' },
     });
     expect(notificationProvider.dispatch).toHaveBeenCalledTimes(1);
   });
 
-  it('uses a stable non-payload provider idempotency key for the claimed attempt', async () => {
-    const claimed = claim();
-    claimed.intent.payload = {
+  it('uses a stable non-payload provider idempotency key across retries', async () => {
+    const firstClaim = claim();
+    firstClaim.intent.payload = {
       locale: 'ar',
       places: 1,
       displayLabel: 'A-42',
     };
-    const dispatchStore = store({ claimed });
-    const notificationProvider = provider({ kind: 'delivered' });
-    const service = new NotificationDispatchService(
-      dispatchStore.value,
-      notificationProvider.value,
-    );
+    const retryClaim = claim();
+    retryClaim.intent.dispatchAttemptCount = 3;
+    retryClaim.claimToken = 'claim-token-2';
+    retryClaim.intent.payload = {
+      locale: 'fr',
+      places: 1,
+      displayLabel: 'B-43',
+    };
 
-    const result = await service.dispatchOne({
-      clinicId: 'clinic-1',
-      intentId: 'intent-1',
-    });
+    const firstStore = store({ claimed: firstClaim });
+    const retryStore = store({ claimed: retryClaim });
+    const firstProvider = provider({ kind: 'unknown' });
+    const retryProvider = provider({ kind: 'delivered' });
 
-    expect(result).toMatchObject({
-      providerIdempotencyKey: 'notification:intent-1:attempt:2',
+    const firstResult = await new NotificationDispatchService(
+      firstStore.value,
+      firstProvider.value,
+    ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
+    const retryResult = await new NotificationDispatchService(
+      retryStore.value,
+      retryProvider.value,
+    ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
+
+    expect(firstResult).toMatchObject({
+      providerIdempotencyKey: 'notification:intent-1',
     });
-    expect(JSON.stringify(result)).not.toContain('A-42');
+    expect(retryResult).toMatchObject({
+      providerIdempotencyKey: 'notification:intent-1',
+    });
+    expect(JSON.stringify(firstResult)).not.toContain('A-42');
+    expect(JSON.stringify(retryResult)).not.toContain('B-43');
   });
 });
