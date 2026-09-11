@@ -11,7 +11,9 @@ import {
   type NotificationProviderResult,
 } from '@/modules/notification-domain';
 
-function intent(overrides: Partial<NotificationIntent> = {}): NotificationIntent {
+function intent(
+  overrides: Partial<NotificationIntent> = {},
+): NotificationIntent {
   return {
     id: 'intent-1',
     clinicId: 'clinic-1',
@@ -50,7 +52,9 @@ function store(options?: {
 }) {
   const claimed = options?.claimed === undefined ? claim() : options.claimed;
   const completed =
-    options?.completed === undefined ? intent({ state: 'delivered' }) : options.completed;
+    options?.completed === undefined
+      ? intent({ state: 'delivered' })
+      : options.completed;
   const claimPendingIntent = vi.fn(async () => claimed);
   const completeDispatchAttempt = vi.fn(
     async (_input: CompleteNotificationDispatchInput) => completed,
@@ -148,7 +152,10 @@ describe('NotificationDispatchService', () => {
 
   it('reports claim loss when completion is fenced after provider execution', async () => {
     const dispatchStore = store({ completed: null });
-    const notificationProvider = provider({ kind: 'delivered', code: 'accepted' });
+    const notificationProvider = provider({
+      kind: 'delivered',
+      code: 'accepted',
+    });
     const service = new NotificationDispatchService(
       dispatchStore.value,
       notificationProvider.value,
@@ -167,7 +174,11 @@ describe('NotificationDispatchService', () => {
 
   it('uses a stable non-payload provider idempotency key for the claimed attempt', async () => {
     const claimed = claim();
-    claimed.intent.payload = { locale: 'ar', places: 1, displayLabel: 'A-42' };
+    claimed.intent.payload = {
+      locale: 'ar',
+      places: 1,
+      displayLabel: 'A-42',
+    };
     const dispatchStore = store({ claimed });
     const notificationProvider = provider({ kind: 'delivered' });
     const service = new NotificationDispatchService(
