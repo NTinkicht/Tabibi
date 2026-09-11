@@ -2,7 +2,19 @@ import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { inTransaction } from '@/platform/database/transaction';
 
-export type NotificationIntentState = 'pending' | 'superseded';
+export type NotificationIntentState =
+  | 'pending'
+  | 'failed'
+  | 'unknown'
+  | 'delivered'
+  | 'dead_letter'
+  | 'superseded';
+
+export type NotificationDispatchOutcome =
+  | 'delivered'
+  | 'failed'
+  | 'unknown'
+  | 'dead_letter';
 
 export interface NotificationIntent {
   id: string;
@@ -17,6 +29,10 @@ export interface NotificationIntent {
   supersededById: string | null;
   createdAt: string;
   supersededAt: string | null;
+  dispatchAttemptCount: number;
+  dispatchLastAttemptAt: string | null;
+  dispatchOutcomeAt: string | null;
+  dispatchOutcomeCode: string | null;
 }
 
 export interface EnqueueNotificationIntentInput {
@@ -42,6 +58,14 @@ export interface NotificationDispatchClaim {
   expiresAt: string;
 }
 
+export interface CompleteNotificationDispatchInput {
+  clinicId: string;
+  intentId: string;
+  claimToken: string;
+  outcome: NotificationDispatchOutcome;
+  outcomeCode?: string | null;
+}
+
 export class NotificationOutboxValidationError extends Error {}
 export class NotificationOutboxConflictError extends Error {}
 
@@ -58,6 +82,10 @@ interface IntentRow {
   superseded_by_id: string | null;
   created_at: Date;
   superseded_at: Date | null;
+  dispatch_attempt_count: number;
+  dispatch_last_attempt_at: Date | null;
+  dispatch_outcome_at: Date | null;
+  dispatch_outcome_code: string | null;
 }
 
 interface ClaimRow extends IntentRow {
@@ -190,6 +218,10 @@ function toIntent(row: IntentRow): NotificationIntent {
     supersededById: row.superseded_by_id,
     createdAt: row.created_at.toISOString(),
     supersededAt: row.superseded_at?.toISOString() ?? null,
+    dispatchAttemptCount: row.dispatch_attempt_count,
+    dispatchLastAttemptAt: row.dispatch_last_attempt_at?.toISOString() ?? null,
+    dispatchOutcomeAt: row.dispatch_outcome_at?.toISOString() ?? null,
+    dispatchOutcomeCode: row.dispatch_outcome_code,
   };
 }
 
@@ -247,7 +279,8 @@ async function loadByIdempotencyKey(
   const result = await client.query<IntentRow>(
     `SELECT id, clinic_id, queue_entry_id, logical_target_key, event_key,
             intent_version, idempotency_key, state, payload, superseded_by_id,
-            created_at, superseded_at
+            created_at, superseded_at, dispatch_attempt_count,
+            dispatch_last_attempt_at, dispatch_outcome_at, dispatch_outcome_code
        FROM notification_outbox
       WHERE clinic_id=$1 AND idempotency_key=$2`,
     [clinicId, idempotencyKey],
@@ -310,7 +343,9 @@ export class NotificationOutboxRepository {
          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
          RETURNING id, clinic_id, queue_entry_id, logical_target_key, event_key,
                    intent_version, idempotency_key, state, payload,
-                   superseded_by_id, created_at, superseded_at`,
+                   superseded_by_id, created_at, superseded_at,
+                   dispatch_attempt_count, dispatch_last_attempt_at,
+                   dispatch_outcome_at, dispatch_outcome_code`,
         [
           id,
           input.clinicId,
@@ -335,7 +370,7 @@ export class NotificationOutboxRepository {
             AND logical_target_key=$2
             AND event_key=$3
             AND id<>$4
-            AND state='pending'`,
+            AND state IN ('pending', 'failed', 'unknown')`,
         [input.clinicId, input.logicalTargetKey, input.eventKey, id],
       );
 
@@ -357,10 +392,12 @@ export class NotificationOutboxRepository {
       `UPDATE notification_outbox
           SET dispatch_claim_token=$3,
               dispatch_claimed_at=now(),
-              dispatch_claim_expires_at=now() + ($4::double precision * interval '1 millisecond')
+              dispatch_claim_expires_at=now() + ($4::double precision * interval '1 millisecond'),
+              dispatch_attempt_count=dispatch_attempt_count + 1,
+              dispatch_last_attempt_at=now()
         WHERE clinic_id=$1
           AND id=$2
-          AND state='pending'
+          AND state IN ('pending', 'failed', 'unknown')
           AND (
             dispatch_claim_token IS NULL
             OR dispatch_claim_expires_at <= now()
@@ -368,6 +405,8 @@ export class NotificationOutboxRepository {
         RETURNING id, clinic_id, queue_entry_id, logical_target_key, event_key,
                   intent_version, idempotency_key, state, payload,
                   superseded_by_id, created_at, superseded_at,
+                  dispatch_attempt_count, dispatch_last_attempt_at,
+                  dispatch_outcome_at, dispatch_outcome_code,
                   dispatch_claim_token, dispatch_claimed_at,
                   dispatch_claim_expires_at`,
       [input.clinicId, input.intentId, claimToken, input.leaseMs],
@@ -396,10 +435,58 @@ export class NotificationOutboxRepository {
               dispatch_claim_expires_at=NULL
         WHERE clinic_id=$1
           AND id=$2
-          AND state='pending'
+          AND state IN ('pending', 'failed', 'unknown')
           AND dispatch_claim_token=$3`,
       [normalizedClinicId, normalizedIntentId, normalizedClaimToken],
     );
     return (result.rowCount ?? 0) === 1;
+  }
+
+  /** Records the result of only the currently fenced dispatch attempt. */
+  async completeDispatchAttempt(
+    rawInput: CompleteNotificationDispatchInput,
+  ): Promise<NotificationIntent | null> {
+    const clinicId = rawInput.clinicId.trim();
+    const intentId = rawInput.intentId.trim();
+    const claimToken = rawInput.claimToken.trim();
+    const outcomeCode = rawInput.outcomeCode?.trim() || null;
+    if (!clinicId || !intentId || !claimToken)
+      throw new NotificationOutboxValidationError(
+        'Clinic id, intent id and claim token are required',
+      );
+    if (
+      !['delivered', 'failed', 'unknown', 'dead_letter'].includes(
+        rawInput.outcome,
+      )
+    )
+      throw new NotificationOutboxValidationError(
+        'Dispatch outcome is not supported',
+      );
+    if (outcomeCode && outcomeCode.length > 160)
+      throw new NotificationOutboxValidationError(
+        'Dispatch outcome code must be at most 160 characters',
+      );
+
+    const result = await this.pool.query<IntentRow>(
+      `UPDATE notification_outbox
+          SET state=$4,
+              dispatch_outcome_at=now(),
+              dispatch_outcome_code=$5,
+              dispatch_claim_token=NULL,
+              dispatch_claimed_at=NULL,
+              dispatch_claim_expires_at=NULL
+        WHERE clinic_id=$1
+          AND id=$2
+          AND dispatch_claim_token=$3
+          AND state IN ('pending', 'failed', 'unknown')
+        RETURNING id, clinic_id, queue_entry_id, logical_target_key, event_key,
+                  intent_version, idempotency_key, state, payload,
+                  superseded_by_id, created_at, superseded_at,
+                  dispatch_attempt_count, dispatch_last_attempt_at,
+                  dispatch_outcome_at, dispatch_outcome_code`,
+      [clinicId, intentId, claimToken, rawInput.outcome, outcomeCode],
+    );
+    const row = result.rows[0];
+    return row ? toIntent(row) : null;
   }
 }
