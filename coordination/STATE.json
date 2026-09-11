@@ -1,27 +1,45 @@
 {
   "project": "Tabibi",
   "phase": "clinic_operations_foundation",
-  "round": 36,
-  "state": "wu14_active",
+  "round": 37,
+  "state": "post_wu25_context_efficiency_rollout",
   "current_pr": null,
-  "current_issue": 122,
+  "current_issue": 150,
+  "last_completed_work": {
+    "id": "WU25",
+    "issue": 148,
+    "pr": 149,
+    "reviewed_head": "99d3cfebfe7655321b6aa2fdab07e8d21d5422e5",
+    "ci_run": 34623450232,
+    "merge_commit": "9fe303f11aeb14f443660b185fae8d053032ffb7"
+  },
   "last_actor": "chatgpt",
-  "next_actor": "codex",
-  "next_action": "Implement WU14 on exactly one canonical branch and PR from current main; first acceptable progress is a repository-backed commit/PR/test artifact or a precise capability failure.",
-  "operating_model": "four-active-actor-mesh-v7-copilot-qa-gemini-paused-role-failover-with-heartbeats-retrospectives",
+  "next_actor": "chatgpt",
+  "next_action": "Complete owner-directed Issue #150 on the single canonical infra/zero-extra-cost-context-router branch, run exact-head CI, and hand the unchanged head to an eligible independent non-author reviewer before merge.",
+  "operating_model": "four-active-actor-mesh-zero-extra-cost-deterministic-first-context-routing",
   "binding_protocols": [
     "AGENTS.md",
+    "coordination/BOOTSTRAP.md",
     "coordination/AUTONOMY_PROTOCOL.md",
     "coordination/ROLE_FAILOVER_PROTOCOL.md",
     "coordination/COLLABORATION_PROTOCOL.md",
-    "coordination/COMPANY_OPERATING_SYSTEM.md"
+    "coordination/COMPANY_OPERATING_SYSTEM.md",
+    "coordination/AI_CAPACITY_POLICY.md",
+    "coordination/CONTEXT_ROUTER.md"
   ],
+  "financial_policy": {
+    "additional_paid_ai_usage": "forbidden",
+    "openai_api": "forbidden",
+    "anthropic_api_or_usage_credits": "forbidden",
+    "openrouter_or_metered_fallback": "forbidden",
+    "copilot_paid_overage": "forbidden",
+    "automatic_topups": "forbidden"
+  },
   "team_room": {
     "issue": 21,
     "heartbeat_target_minutes": 15,
     "stale_active_lease_minutes": 30,
-    "active_actors": ["chatgpt", "codex", "copilot"],
-    "limited_actors": ["claude"],
+    "active_roster": ["chatgpt", "codex", "claude", "copilot"],
     "paused_actors": {
       "gemini_agent": "paused by owner decision; do not invoke until explicit re-activation",
       "gemini_chat": "paused by owner decision; do not invoke until explicit re-activation"
@@ -33,103 +51,80 @@
         "orchestration": "available",
         "architecture": "available",
         "implementation": "available",
-        "review": "available_when_non_author",
-        "merge_execution": "available"
+        "review": "unavailable_for_self_authored_issue_150_head",
+        "merge_execution": "available_after_independent_gate"
       },
-      "current_activity": "CTO/orchestrator and merge control for WU14; not the WU14 production implementer."
+      "current_activity": "sole Issue #150 infrastructure implementer/orchestrator on the canonical context-router branch"
     },
     "codex": {
       "capability_status": {
-        "implementation": "available_pending_repository_artifact",
-        "ci_remediation": "available",
-        "merge_execution": "available",
-        "review": "available_when_non_author"
+        "implementation": "reconcile_before_assignment",
+        "ci_remediation": "reconcile_before_assignment",
+        "review": "limited_by_recent_code_review_quota_evidence"
       },
-      "current_activity": "sole WU14 implementation lease; must produce one canonical repository-backed branch/PR artifact or report precise capability degradation."
+      "current_activity": "no active Issue #150 implementation lease; preserve included capacity for product implementation/CI"
     },
     "claude": {
       "capability_status": {
-        "review": "limited",
-        "adversarial_security_review": "limited"
+        "review": "reconcile_current_pro_capacity_before_assignment",
+        "adversarial_security_review": "reconcile_current_pro_capacity_before_assignment"
       },
-      "current_activity": "preferred independent adversarial gate if concrete capacity returns and Claude is non-author."
+      "current_activity": "preferred independent Issue #150 exact-head gate if concretely available and non-author"
     },
     "copilot": {
       "capability_status": {
-        "qa_test_automation": "available",
-        "implementation": "available",
-        "review": "available_when_non_author"
+        "qa_test_automation": "available_subject_to_included_entitlement",
+        "review": "available_when_non_author_subject_to_included_entitlement",
+        "context_compression": "disabled_by_default_local_opt_in_only"
       },
-      "current_activity": "complementary WU14 QA/Test Automation lane and eligible exact-head Code Review only if non-author."
-    },
-    "coderabbit": {
-      "capability_status": {
-        "review": "available"
-      },
-      "current_activity": "supplemental review evidence only; never binding under current owner policy."
-    },
-    "microreview": {
-      "capability_status": {
-        "review": "available"
-      },
-      "current_activity": "supplemental for future PRs pending a separate governance decision; WU13-specific owner substitution is complete and not generalized."
+      "current_activity": "eligible independent Issue #150 review/QA; no production authorship on current infra head"
     },
     "gemini_agent": {
-      "capability_status": {
-        "all": "paused"
-      },
+      "capability_status": { "all": "paused" },
       "current_activity": "paused/off-roster by owner decision"
     },
     "gemini_chat": {
-      "capability_status": {
-        "all": "paused"
-      },
+      "capability_status": { "all": "paused" },
       "current_activity": "paused/off-roster by owner decision"
     }
   },
   "role_leases": {
-    "orchestrator": {
-      "actor": "chatgpt",
-      "status": "active"
-    },
+    "orchestrator": { "actor": "chatgpt", "status": "active" },
     "implementer": {
-      "actor": "codex",
+      "actor": "chatgpt",
       "status": "active",
-      "note": "Exactly one WU14 production stream; no competing branch or PR."
+      "note": "Issue #150 infrastructure/docs only; one canonical branch/PR."
     },
     "gating_reviewer": {
       "actor": "claude_or_copilot_non_author",
       "status": "reserved_for_exact_head",
-      "note": "Use one eligible independent non-author exact-SHA gate after required CI is green; preserve reviewer independence from the eventual WU14 authors."
-    },
-    "secondary_verifier": {
-      "actor": "copilot",
-      "status": "qa_active_non_conflicting"
+      "note": "ChatGPT authors this head and cannot self-gate it."
     },
     "merge_executor": {
       "actor": "chatgpt",
       "status": "mechanical_after_gates",
-      "note": "Use expected-head protection only after required exact-head CI is green and an eligible independent non-author gate is clear."
+      "note": "Expected-head merge only after green exact-head CI and independent review obligations are satisfied."
     }
   },
   "current_work": {
-    "id": "WU14-IMPLEMENT-001",
+    "id": "INFRA-CONTEXT-001",
     "status": "active",
-    "actor": "codex",
-    "scope": "Issue #122 appointment restore and transfer re-link synchronization, exactly within the published contract and exclusions."
+    "actor": "chatgpt",
+    "scope": "Issue #150 zero-extra-cost AI capacity governor, deterministic-first context router, compact bootstrap, Claude read guard, safe opt-in Copilot/Luna compression, and stale-state reconciliation."
   },
   "next_work": {
-    "id": "WU14-GATE-001",
-    "status": "blocked_pending_implementation_and_ci",
+    "id": "INFRA-CONTEXT-GATE-001",
+    "status": "blocked_pending_pr_ci",
     "actor": "claude_or_copilot_non_author",
-    "scope": "Independent exact-head correctness/concurrency/data-integrity gate after green required CI."
+    "scope": "Independent exact-head governance/security/fail-closed budget review after required CI is green."
   },
+  "deferred_minor_followups": [
+    "WU25-FOLLOWUP-ORDER-001",
+    "WU25-FOLLOWUP-TEST-001"
+  ],
   "product_architect": "chatgpt",
   "deterministic_referee": "ci",
   "open_blockers": 0,
   "open_majors": 0,
-  "open_minors": 0,
-  "human_decision_required": false,
-  "pending_findings": [],
-  "review_pending_findings": []
+  "human_decision_required": false
 }
