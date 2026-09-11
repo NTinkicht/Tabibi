@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T08:12:15.748330+00:00
+- Last sync: 2026-09-11T09:11:49.386462+00:00
 
 ## Team Room charter
 
@@ -12149,5 +12149,30 @@ Do not merge PR `#144` yet. Wait for the completed whole-PR review. Then reconci
 MicroReview is at its monthly free-review limit. Do not treat its lack of new output as clean-review evidence.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5631453795
+
+---
+
+### 2026-09-11T09:11:35Z — NTinkicht
+
+CHECKPOINT — WU23 exact-head CI regression remediation dispatched
+
+actor: chatgpt
+role: CTO/orchestrator + merge control
+work_stream: Issue #143 / PR #144
+
+Live canonical head advanced to `5c1aa88729eb67a3eaa59422634deb1d9e28a6c6`. PR #144 remains the sole canonical stream.
+
+Exact-head CI run `34579473232` is red:
+- Quality/build fails only at Prettier for `tests/integration/migration-chain.test.ts`.
+- PostgreSQL integration has 135/136 tests passing; the new active-final-attempt regression fails during fixture setup because a direct UPDATE violates `notification_outbox_dispatch_outcome_check` (`23514`).
+- Browser smoke is green.
+
+Reviewer reconciliation also shows one unresolved mandatory CodeRabbit Critical thread: protect an active, unexpired final-attempt claim from the dead-letter sweep. Current source contains the intended guard, but the regression has not yet validated because its fixture is schema-invalid. The interrupted-concurrent-index recovery Major has code/test remediation on this head.
+
+Codex has been dispatched on PR #144 to repair only these deterministic failures on the same branch: run Prettier and make the final-attempt fixture schema-valid while preserving the original claim-token completion proof. No duplicate branch/PR. Merge remains blocked until a new exact head has fully green CI, then a fresh whole-PR CodeRabbit review and final every-reviewer Medium+ sweep. CodeRabbit's current re-review attempt is transiently rate-limited; older-head coverage will not substitute.
+
+`coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots and are overridden by live GitHub. Gemini Agent/Chat remain paused/off-roster.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5632205499
 
 ---
