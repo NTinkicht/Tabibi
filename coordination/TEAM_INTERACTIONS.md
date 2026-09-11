@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T17:31:00.138030+00:00
+- Last sync: 2026-09-11T18:39:49.252693+00:00
 
 ## Team Room charter
 
@@ -13617,5 +13617,108 @@ Length of output: 33903
 Keep PR `#149` blocked. When the exact-head whole-PR review completes, recheck the head, mergeability, and any new Medium-or-higher findings before an expected-head merge.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5638239047
+
+---
+
+### 2026-09-11T17:34:37Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr149:9fe303f11aeb14f443660b185fae8d053032ffb7 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #149
+head: 9fe303f11aeb14f443660b185fae8d053032ffb7
+POST_MERGE_RECONCILE — PR #149 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5638300130
+
+---
+
+### 2026-09-11T17:46:54Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr151:b426c6464265e724568c6cba667472d36bf252c3 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #151
+head: b426c6464265e724568c6cba667472d36bf252c3
+CI_GREEN_HANDOFF — PR #151 exact head `b426c6464265e724568c6cba667472d36bf252c3` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5638489842
+
+---
+
+### 2026-09-11T17:48:32Z — NTinkicht
+
+HANDOFF_TO_CLAUDE
+ROLE_LEASE_ASSIGNED
+actor: claude
+capability: gating_review
+work: Issue #150 / PR #151
+exact_head: b426c6464265e724568c6cba667472d36bf252c3
+ci: CI #695 / run 34629425901 SUCCESS on the exact head
+scope: Independent adversarial gate of the zero-extra-cost AI capacity governor/context router. Verify governance preservation in AGENTS.md/CLAUDE.md, fail-closed no-spend behavior, Claude PreToolUse hook correctness, path/sensitive-data exclusions, and that optional Copilot/Luna is OFF by default with no paid/provider fallback. ChatGPT authored this head and cannot self-gate. Return PASS / PASS_WITH_MINOR_FINDINGS / CHANGES_REQUIRED and MERGE_READY when appropriate. No owner relay is required.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5638514009
+
+---
+
+### 2026-09-11T17:54:28Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr151:0d3586c27e54e3318384692d36b7ca2f062c8e2e -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #151
+head: 0d3586c27e54e3318384692d36b7ca2f062c8e2e
+CI_GREEN_HANDOFF — PR #151 exact head `0d3586c27e54e3318384692d36b7ca2f062c8e2e` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5638580044
+
+---
+
+### 2026-09-11T17:54:38Z — NTinkicht
+
+HANDOFF_TO_CLAUDE
+ROLE_LEASE_ASSIGNED
+actor: claude
+capability: gating_review
+work: Issue #150 / PR #151
+exact_head: 0d3586c27e54e3318384692d36b7ca2f062c8e2e
+ci: CI #697 / run 34630123865 SUCCESS
+scope: Final independent exact-head review of the zero-extra-cost context router/capacity governor. The final head additionally disables Copilot CLI custom-instruction loading, auto-update, remote access and remote export for the optional L2 compression worker. Verify governance preservation, fail-closed no-spend behavior, PreToolUse read guard correctness, sensitive-path/data minimization, and absence of paid/provider fallback. ChatGPT authored this head and cannot self-gate. Return PASS / PASS_WITH_MINOR_FINDINGS / CHANGES_REQUIRED and MERGE_READY when appropriate.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5638581908
+
+---
+
+### 2026-09-11T18:34:23Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr152:b4aa502175b7109032056d6842ab43f611c2e112 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #152
+head: b4aa502175b7109032056d6842ab43f611c2e112
+CI_GREEN_HANDOFF — PR #152 exact head `b4aa502175b7109032056d6842ab43f611c2e112` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639027006
+
+---
+
+### 2026-09-11T18:39:39Z — NTinkicht
+
+HANDOFF_TO_CLAUDE
+ROLE_LEASE_ASSIGNED
+work_unit: WU25-FINALIZE-GATE
+pr: #152
+branch: `wu25-finalize-review-hardening`
+exact_head: `b4aa502175b7109032056d6842ab43f611c2e112`
+role: independent gating reviewer
+ci: exact-head CI run `34633881476` is green
+scope: independently verify the two deferred WU25 MINOR remediations from PR #149 (expired-claim eligibility ordering and deterministic `created_at`/`id` tie-break coverage), then inspect the exact head for any new Medium-or-higher correctness/security/concurrency/data-integrity findings.
+authorship: ChatGPT materially authored this follow-up and is ineligible to self-gate.
+expected_verdict: exact-SHA PASS / MERGE_READY or precise actionable findings.
+fallback: Copilot remains eligible if its requested review becomes available.
+
+Please use the persistent Claude review session path under the current failover protocol; this is not a request for another actor to invoke the stateless `@claude` Action.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639084356
 
 ---
