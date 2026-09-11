@@ -139,6 +139,7 @@ describe('NotificationDispatchService', () => {
     null,
     { kind: 'unexpected' },
     { kind: 'delivered', code: { provider: 'bad-shape' } },
+    { kind: 'delivered', code: 'x'.repeat(161) },
   ])(
     'records malformed fulfilled provider result %# as unknown',
     async (result) => {
@@ -159,6 +160,7 @@ describe('NotificationDispatchService', () => {
           code: 'provider_indeterminate_result',
         },
       });
+      expect(dispatch).toHaveBeenCalledTimes(1);
       expect(dispatchStore.completeDispatchAttempt).toHaveBeenCalledWith(
         expect.objectContaining({
           outcome: 'unknown',
