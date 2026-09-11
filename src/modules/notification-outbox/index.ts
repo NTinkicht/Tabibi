@@ -29,6 +29,19 @@ export interface EnqueueNotificationIntentInput {
   payload: Record<string, unknown>;
 }
 
+export interface ClaimNotificationIntentInput {
+  clinicId: string;
+  intentId: string;
+  leaseMs: number;
+}
+
+export interface NotificationDispatchClaim {
+  intent: NotificationIntent;
+  claimToken: string;
+  claimedAt: string;
+  expiresAt: string;
+}
+
 export class NotificationOutboxValidationError extends Error {}
 export class NotificationOutboxConflictError extends Error {}
 
@@ -45,6 +58,12 @@ interface IntentRow {
   superseded_by_id: string | null;
   created_at: Date;
   superseded_at: Date | null;
+}
+
+interface ClaimRow extends IntentRow {
+  dispatch_claim_token: string;
+  dispatch_claimed_at: Date;
+  dispatch_claim_expires_at: Date;
 }
 
 const sensitivePayloadKey =
@@ -139,6 +158,24 @@ function normalizeInput(input: EnqueueNotificationIntentInput) {
   };
 }
 
+function normalizeClaimInput(input: ClaimNotificationIntentInput) {
+  const clinicId = input.clinicId.trim();
+  const intentId = input.intentId.trim();
+  if (!clinicId)
+    throw new NotificationOutboxValidationError('Clinic id is required');
+  if (!intentId)
+    throw new NotificationOutboxValidationError('Intent id is required');
+  if (
+    !Number.isSafeInteger(input.leaseMs) ||
+    input.leaseMs <= 0 ||
+    input.leaseMs > 86_400_000
+  )
+    throw new NotificationOutboxValidationError(
+      'Dispatch claim lease must be between 1 ms and 24 hours',
+    );
+  return { clinicId, intentId, leaseMs: input.leaseMs };
+}
+
 function toIntent(row: IntentRow): NotificationIntent {
   return {
     id: row.id,
@@ -153,6 +190,15 @@ function toIntent(row: IntentRow): NotificationIntent {
     supersededById: row.superseded_by_id,
     createdAt: row.created_at.toISOString(),
     supersededAt: row.superseded_at?.toISOString() ?? null,
+  };
+}
+
+function toClaim(row: ClaimRow): NotificationDispatchClaim {
+  return {
+    intent: toIntent(row),
+    claimToken: row.dispatch_claim_token,
+    claimedAt: row.dispatch_claimed_at.toISOString(),
+    expiresAt: row.dispatch_claim_expires_at.toISOString(),
   };
 }
 
@@ -279,7 +325,12 @@ export class NotificationOutboxRepository {
 
       await client.query(
         `UPDATE notification_outbox
-            SET state='superseded', superseded_by_id=$4, superseded_at=now()
+            SET state='superseded',
+                superseded_by_id=$4,
+                superseded_at=now(),
+                dispatch_claim_token=NULL,
+                dispatch_claimed_at=NULL,
+                dispatch_claim_expires_at=NULL
           WHERE clinic_id=$1
             AND logical_target_key=$2
             AND event_key=$3
@@ -295,5 +346,60 @@ export class NotificationOutboxRepository {
         );
       return toIntent(row);
     });
+  }
+
+  async claimPendingIntent(
+    rawInput: ClaimNotificationIntentInput,
+  ): Promise<NotificationDispatchClaim | null> {
+    const input = normalizeClaimInput(rawInput);
+    const claimToken = randomUUID();
+    const result = await this.pool.query<ClaimRow>(
+      `UPDATE notification_outbox
+          SET dispatch_claim_token=$3,
+              dispatch_claimed_at=now(),
+              dispatch_claim_expires_at=now() + ($4::double precision * interval '1 millisecond')
+        WHERE clinic_id=$1
+          AND id=$2
+          AND state='pending'
+          AND (
+            dispatch_claim_token IS NULL
+            OR dispatch_claim_expires_at <= now()
+          )
+        RETURNING id, clinic_id, queue_entry_id, logical_target_key, event_key,
+                  intent_version, idempotency_key, state, payload,
+                  superseded_by_id, created_at, superseded_at,
+                  dispatch_claim_token, dispatch_claimed_at,
+                  dispatch_claim_expires_at`,
+      [input.clinicId, input.intentId, claimToken, input.leaseMs],
+    );
+    const row = result.rows[0];
+    return row ? toClaim(row) : null;
+  }
+
+  async releaseDispatchClaim(
+    clinicId: string,
+    intentId: string,
+    claimToken: string,
+  ): Promise<boolean> {
+    const normalizedClinicId = clinicId.trim();
+    const normalizedIntentId = intentId.trim();
+    const normalizedClaimToken = claimToken.trim();
+    if (!normalizedClinicId || !normalizedIntentId || !normalizedClaimToken)
+      throw new NotificationOutboxValidationError(
+        'Clinic id, intent id and claim token are required',
+      );
+
+    const result = await this.pool.query(
+      `UPDATE notification_outbox
+          SET dispatch_claim_token=NULL,
+              dispatch_claimed_at=NULL,
+              dispatch_claim_expires_at=NULL
+        WHERE clinic_id=$1
+          AND id=$2
+          AND state='pending'
+          AND dispatch_claim_token=$3`,
+      [normalizedClinicId, normalizedIntentId, normalizedClaimToken],
+    );
+    return (result.rowCount ?? 0) === 1;
   }
 }

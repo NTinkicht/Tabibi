@@ -22,6 +22,7 @@ const committedMigrations = [
   '0014_guest_exchange_credential_foundation.sql',
   '0015_guest_status_rate_limit.sql',
   '0016_notification_outbox_foundation.sql',
+  '0017_notification_dispatch_claim.sql',
 ];
 
 beforeAll(async () => {
