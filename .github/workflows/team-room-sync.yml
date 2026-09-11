@@ -24,7 +24,7 @@ jobs:
           ref: main
           fetch-depth: 1
 
-      - name: Mirror Team Room and derive status
+      - name: Mirror Team Room and derive current four-actor status
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
@@ -41,6 +41,7 @@ jobs:
           token = os.environ['GH_TOKEN']
           issue_number = 21
           api = f'https://api.github.com/repos/{repo}'
+          active_actors = {'chatgpt', 'codex', 'claude', 'copilot'}
 
           def get_json(url):
               req = urllib.request.Request(
@@ -81,6 +82,8 @@ jobs:
               '',
           ]
 
+          # The raw transcript intentionally preserves all historical participants, including
+          # retired actors, because it is an audit/history record rather than a current roster.
           for comment in comments:
               actor = comment.get('user', {}).get('login', 'unknown')
               created = comment.get('created_at', 'unknown')
@@ -113,9 +116,7 @@ jobs:
                   match = pattern.search(body)
                   parsed[field] = match.group(1).strip() if match else ''
               actor = parsed.get('actor', '').lower()
-              if actor == 'gemini':
-                  actor = 'gemini_agent'
-              if actor not in {'chatgpt', 'codex', 'claude', 'gemini_agent', 'gemini_chat'}:
+              if actor not in active_actors:
                   continue
               parsed['actor'] = actor
               parsed['created_at'] = comment.get('created_at') or ''
@@ -126,11 +127,12 @@ jobs:
           status_lines = [
               '# Tabibi Team Status',
               '',
-              '> Generated from latest `HEARTBEAT` comments in GitHub Issue #21. Do not edit manually except to repair the sync mechanism.',
+              '> Generated from latest active-roster `HEARTBEAT` comments in GitHub Issue #21. Do not edit manually except to repair the sync mechanism.',
               '',
               f'- Last sync: {now.isoformat()}',
+              '- Active roster: `chatgpt`, `codex`, `claude`, `copilot`.',
               '- Stale threshold: 30 minutes for a lease that claims `active`, unless a visible deterministic job is still progressing.',
-              '- `gemini_agent` and `gemini_chat` are distinct actors and are tracked separately.',
+              '- Retired actors remain visible only in the raw historical transcript.',
               '',
               '| Actor | Last heartbeat | Freshness | Role | Work stream | Status | Current action | Last artifact | Next checkpoint | Blocker |',
               '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
@@ -139,7 +141,7 @@ jobs:
           def cell(value):
               return (value or '—').replace('|', '\\|').replace('\n', ' ')
 
-          for actor in ['chatgpt', 'codex', 'claude', 'gemini_agent', 'gemini_chat']:
+          for actor in ['chatgpt', 'codex', 'claude', 'copilot']:
               item = latest.get(actor)
               if not item:
                   status_lines.append(f'| {actor} | — | no heartbeat | — | — | — | — | — | — | — |')
