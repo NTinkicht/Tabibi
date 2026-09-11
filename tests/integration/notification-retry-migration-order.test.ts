@@ -41,81 +41,79 @@ async function applyNonTransactional(client: Client, name: string) {
 }
 
 describe('notification retry migration order', () => {
-  it(
-    'backfills legacy retry deadlines and preserves retry ceilings before claims become eligible',
-    async () => {
-      const client = new Client({ connectionString: process.env.DATABASE_URL });
-      const schema = `retry_migration_${randomUUID().replaceAll('-', '')}`;
-      const clinicId = randomUUID();
-      const failedId = randomUUID();
-      const unknownId = randomUUID();
-      const failedLastAttempt = new Date('2026-01-01T00:00:00.000Z');
-      const unknownLastAttempt = new Date('2026-01-01T01:00:00.000Z');
+  it('backfills legacy retry deadlines and preserves retry ceilings before claims become eligible', async () => {
+    const client = new Client({ connectionString: process.env.DATABASE_URL });
+    const schema = `retry_migration_${randomUUID().replaceAll('-', '')}`;
+    const clinicId = randomUUID();
+    const failedId = randomUUID();
+    const unknownId = randomUUID();
+    const failedLastAttempt = new Date('2026-01-01T00:00:00.000Z');
+    const unknownLastAttempt = new Date('2026-01-01T01:00:00.000Z');
 
-      await client.connect();
-      try {
-        await client.query(`CREATE SCHEMA "${schema}"`);
-        await client.query(`SET search_path TO "${schema}"`);
-        for (const name of migrationsThrough0018) {
-          await client.query(await migration(name));
-        }
+    await client.connect();
+    try {
+      await client.query(`CREATE SCHEMA "${schema}"`);
+      await client.query(`SET search_path TO "${schema}"`);
+      for (const name of migrationsThrough0018) {
+        await client.query(await migration(name));
+      }
 
-        await client.query(
-          `INSERT INTO clinics (id, tenant_key, name)
+      await client.query(
+        `INSERT INTO clinics (id, tenant_key, name)
          VALUES ($1, $2, 'Legacy Retry Clinic')`,
-          [clinicId, `legacy-retry-${clinicId}`],
-        );
-        await client.query(
-          `INSERT INTO notification_outbox (
+        [clinicId, `legacy-retry-${clinicId}`],
+      );
+      await client.query(
+        `INSERT INTO notification_outbox (
            id, clinic_id, logical_target_key, event_key, intent_version,
            idempotency_key, state, payload, dispatch_attempt_count,
            dispatch_last_attempt_at, dispatch_outcome_at, dispatch_outcome_code
          ) VALUES
            ($1,$3,'legacy:failed','turn_approaching',1,'legacy-failed','failed','{}'::jsonb,1,$4,$4,'provider_transient'),
            ($2,$3,'legacy:unknown','turn_approaching',1,'legacy-unknown','unknown','{}'::jsonb,3,$5,$5,'provider_unknown')`,
-          [failedId, unknownId, clinicId, failedLastAttempt, unknownLastAttempt],
-        );
+        [failedId, unknownId, clinicId, failedLastAttempt, unknownLastAttempt],
+      );
 
-        await client.query(
-          await migration('0019_notification_retry_eligibility.sql'),
-        );
-        await client.query(
-          await migration('0020_notification_retry_constraint_validation.sql'),
-        );
-        await applyNonTransactional(
-          client,
-          '0021_notification_retry_claim_index.sql',
-        );
+      await client.query(
+        await migration('0019_notification_retry_eligibility.sql'),
+      );
+      await client.query(
+        await migration('0020_notification_retry_constraint_validation.sql'),
+      );
+      await applyNonTransactional(
+        client,
+        '0021_notification_retry_claim_index.sql',
+      );
 
-        const backfilled = await client.query<{
-          id: string;
-          state: string;
-          dispatch_max_attempts: number;
-          next_attempt_at: Date | null;
-        }>(
-          `SELECT id, state, dispatch_max_attempts, next_attempt_at
+      const backfilled = await client.query<{
+        id: string;
+        state: string;
+        dispatch_max_attempts: number;
+        next_attempt_at: Date | null;
+      }>(
+        `SELECT id, state, dispatch_max_attempts, next_attempt_at
            FROM notification_outbox
           WHERE id IN ($1, $2)
           ORDER BY id`,
-          [failedId, unknownId],
-        );
-        const failed = backfilled.rows.find((row) => row.id === failedId)!;
-        const unknown = backfilled.rows.find((row) => row.id === unknownId)!;
+        [failedId, unknownId],
+      );
+      const failed = backfilled.rows.find((row) => row.id === failedId)!;
+      const unknown = backfilled.rows.find((row) => row.id === unknownId)!;
 
-        expect(failed.state).toBe('failed');
-        expect(failed.dispatch_max_attempts).toBe(5);
-        expect(failed.next_attempt_at?.toISOString()).toBe(
-          '2026-01-01T00:01:00.000Z',
-        );
-        expect(unknown.state).toBe('unknown');
-        expect(unknown.dispatch_max_attempts).toBe(4);
-        expect(unknown.next_attempt_at?.toISOString()).toBe(
-          '2026-01-01T01:15:00.000Z',
-        );
+      expect(failed.state).toBe('failed');
+      expect(failed.dispatch_max_attempts).toBe(5);
+      expect(failed.next_attempt_at?.toISOString()).toBe(
+        '2026-01-01T00:01:00.000Z',
+      );
+      expect(unknown.state).toBe('unknown');
+      expect(unknown.dispatch_max_attempts).toBe(4);
+      expect(unknown.next_attempt_at?.toISOString()).toBe(
+        '2026-01-01T01:15:00.000Z',
+      );
 
-        const claimAt = async (id: string, at: Date) =>
-          client.query<{ id: string }>(
-            `UPDATE notification_outbox
+      const claimAt = async (id: string, at: Date) =>
+        client.query<{ id: string }>(
+          `UPDATE notification_outbox
               SET dispatch_claim_token=$3,
                   dispatch_claimed_at=$4,
                   dispatch_claim_expires_at=$4 + interval '1 minute',
@@ -129,28 +127,27 @@ describe('notification retry migration order', () => {
               AND next_attempt_at <= $4
               AND dispatch_claim_token IS NULL
             RETURNING id`,
-            [clinicId, id, randomUUID(), at],
-          );
-
-        const failedDeadline = failed.next_attempt_at!;
-        const unknownDeadline = unknown.next_attempt_at!;
-        expect(
-          (await claimAt(failedId, new Date(failedDeadline.getTime() - 1)))
-            .rowCount,
-        ).toBe(0);
-        expect((await claimAt(failedId, failedDeadline)).rowCount).toBe(1);
-        expect(
-          (await claimAt(unknownId, new Date(unknownDeadline.getTime() - 1)))
-            .rowCount,
-        ).toBe(0);
-        expect((await claimAt(unknownId, unknownDeadline)).rowCount).toBe(1);
-      } finally {
-        await client.query('RESET search_path').catch(() => undefined);
-        await client.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(
-          () => undefined,
+          [clinicId, id, randomUUID(), at],
         );
-        await client.end();
-      }
-    },
-  );
+
+      const failedDeadline = failed.next_attempt_at!;
+      const unknownDeadline = unknown.next_attempt_at!;
+      expect(
+        (await claimAt(failedId, new Date(failedDeadline.getTime() - 1)))
+          .rowCount,
+      ).toBe(0);
+      expect((await claimAt(failedId, failedDeadline)).rowCount).toBe(1);
+      expect(
+        (await claimAt(unknownId, new Date(unknownDeadline.getTime() - 1)))
+          .rowCount,
+      ).toBe(0);
+      expect((await claimAt(unknownId, unknownDeadline)).rowCount).toBe(1);
+    } finally {
+      await client.query('RESET search_path').catch(() => undefined);
+      await client
+        .query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`)
+        .catch(() => undefined);
+      await client.end();
+    }
+  });
 });
