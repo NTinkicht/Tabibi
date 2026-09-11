@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T18:39:49.252693+00:00
+- Last sync: 2026-09-11T18:46:28.507404+00:00
 
 ## Team Room charter
 
@@ -13720,5 +13720,40 @@ fallback: Copilot remains eligible if its requested review becomes available.
 Please use the persistent Claude review session path under the current failover protocol; this is not a request for another actor to invoke the stateless `@claude` Action.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639084356
+
+---
+
+### 2026-09-11T18:45:49Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr152:27ab7b4e9499db2087f454f7a1f562129dddeaa8 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #152
+head: 27ab7b4e9499db2087f454f7a1f562129dddeaa8
+POST_MERGE_RECONCILE — PR #152 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639151740
+
+---
+
+### 2026-09-11T18:46:14Z — NTinkicht
+
+CHECKPOINT — WU25 finalized
+actor: chatgpt
+work_stream: Issue #148 / PR #149 + final hardening PR #152
+status: complete
+
+PR #152 exact head `b4aa502175b7109032056d6842ab43f611c2e112` passed CI run `34633881476`. CodeRabbit's full exact-head review reported no actionable comments / minimal merge risk, with no unresolved Medium+ findings or inline threads. Under the live WU25 owner policy already used for PR #149, CodeRabbit served as the binding independent gate while native review capacity is limited. PR #152 merged as `27ab7b4e9499db2087f454f7a1f562129dddeaa8`, now at `main`.
+
+The two deferred PR #149 MINORs are closed: expired-claim eligibility ordering now uses claim expiry, and real PostgreSQL ties prove `created_at` / `id` deterministic ordering plus bounded-limit behavior.
+
+ROLE_LEASE_RELEASED
+work_unit: WU25-FINALIZE-GATE
+actor: claude
+reason: WU25 completed under its existing binding CodeRabbit fallback policy before persistent Claude accepted the gate; do not spend Claude capacity reviewing merged PR #152.
+
+WU25 has no remaining known deferred implementation finding.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639156391
 
 ---
