@@ -1,28 +1,30 @@
 {
   "project": "Tabibi",
-  "phase": "clinic_operations_foundation",
-  "round": 36,
-  "state": "wu14_active",
+  "phase": "company_os_v2_restructuring",
+  "state": "company_os_v2_review_pending",
   "current_pr": null,
-  "current_issue": 122,
+  "current_issue": 21,
   "last_actor": "chatgpt",
-  "next_actor": "codex",
-  "next_action": "Implement WU14 on exactly one canonical branch and PR from current main; first acceptable progress is a repository-backed commit/PR/test artifact or a precise capability failure.",
+  "next_actor": "independent_non_author_reviewer",
+  "next_action": "Review the Company OS v2 / Headroom shadow / Gemini retirement change on its exact head, require green CI, then merge mechanically if all governance gates pass. Afterward resume Epic PR #151 against the new main.",
   "operating_model": "four-active-actor-mesh-v8-company-os-v2-headroom-shadow",
   "binding_protocols": [
     "AGENTS.md",
     "coordination/AUTONOMY_PROTOCOL.md",
     "coordination/ROLE_FAILOVER_PROTOCOL.md",
     "coordination/COLLABORATION_PROTOCOL.md",
-    "coordination/COMPANY_OPERATING_SYSTEM.md"
+    "coordination/COMPANY_OPERATING_SYSTEM.md",
+    "coordination/ROLE_OVERLAY_PROTOCOL.md",
+    "coordination/WORK_UNIT_TEMPLATE.md"
   ],
   "team_room": {
     "issue": 21,
     "heartbeat_target_minutes": 15,
     "stale_active_lease_minutes": 30,
-    "active_actors": ["chatgpt", "codex", "copilot"],
-    "limited_actors": ["claude"],
-    "retired_actors": ["gemini_agent", "gemini_chat"]
+    "active_roster": ["chatgpt", "codex", "claude", "copilot"],
+    "retired_actors": ["gemini_agent", "gemini_chat"],
+    "slack_role": "attention_and_culture_only",
+    "coffee_corner": "optional_no_quota_no_reminders"
   },
   "agents": {
     "chatgpt": {
@@ -33,43 +35,43 @@
         "review": "available_when_non_author",
         "merge_execution": "available"
       },
-      "current_activity": "CTO/orchestrator and merge control for WU14; not the WU14 production implementer."
+      "current_activity": "Company OS v2 author/orchestrator; recused from sole independent gating of this exact head."
     },
     "codex": {
       "capability_status": {
-        "implementation": "available_pending_repository_artifact",
-        "ci_remediation": "available",
-        "merge_execution": "available",
-        "review": "available_when_non_author"
+        "implementation": "available_subject_to_plan_capacity",
+        "ci_remediation": "available_subject_to_plan_capacity",
+        "merge_execution": "available_subject_to_plan_capacity",
+        "review": "available_when_non_author_subject_to_plan_capacity"
       },
-      "current_activity": "sole WU14 implementation lease; must produce one canonical repository-backed branch/PR artifact or report precise capability degradation."
+      "current_activity": "Available for bounded implementation/CI/mechanical merge work; not required to duplicate the current governance stream."
     },
     "claude": {
       "capability_status": {
-        "review": "limited",
-        "adversarial_security_review": "limited"
+        "review": "available_subject_to_pro_capacity",
+        "adversarial_security_review": "available_subject_to_pro_capacity"
       },
-      "current_activity": "preferred independent adversarial gate if concrete capacity returns and Claude is non-author."
+      "current_activity": "Preferred independent governance/adversarial reviewer when concretely available and non-author."
     },
     "copilot": {
       "capability_status": {
-        "qa_test_automation": "available",
-        "implementation": "available",
-        "review": "available_when_non_author"
+        "qa_test_automation": "available_subject_to_included_credits",
+        "implementation": "available_subject_to_included_credits",
+        "review": "available_when_non_author_subject_to_included_credits"
       },
-      "current_activity": "complementary WU14 QA/Test Automation lane and eligible exact-head Code Review only if non-author."
+      "current_activity": "QA/Test Automation and eligible non-author exact-head Code Review; also candidate for the Headroom shadow evaluation later."
     },
     "coderabbit": {
       "capability_status": {
-        "review": "available"
+        "review": "supplemental_if_available"
       },
-      "current_activity": "supplemental review evidence only; never binding under current owner policy."
+      "current_activity": "Supplemental review evidence only unless a work-unit owner policy explicitly promotes it."
     },
     "microreview": {
       "capability_status": {
-        "review": "available"
+        "review": "supplemental_if_available"
       },
-      "current_activity": "supplemental for future PRs pending a separate governance decision; WU13-specific owner substitution is complete and not generalized."
+      "current_activity": "Supplemental only; no paid upgrade or credit purchase is authorized."
     }
   },
   "role_leases": {
@@ -78,36 +80,39 @@
       "status": "active"
     },
     "implementer": {
-      "actor": "codex",
-      "status": "active",
-      "note": "Exactly one WU14 production stream; no competing branch or PR."
+      "actor": "chatgpt",
+      "status": "implementation_complete_pending_pr_gate",
+      "note": "One canonical Company OS v2 branch only."
     },
     "gating_reviewer": {
       "actor": "claude_or_copilot_non_author",
       "status": "reserved_for_exact_head",
-      "note": "Use one eligible independent non-author exact-SHA gate after required CI is green; preserve reviewer independence from the eventual WU14 authors."
-    },
-    "secondary_verifier": {
-      "actor": "copilot",
-      "status": "qa_active_non_conflicting"
+      "note": "Governance change requires an eligible independent exact-head review after green CI. ChatGPT is the material author and cannot self-gate."
     },
     "merge_executor": {
-      "actor": "chatgpt",
+      "actor": "codex_or_chatgpt",
       "status": "mechanical_after_gates",
-      "note": "Use expected-head protection only after required exact-head CI is green and an eligible independent non-author gate is clear."
+      "note": "Merge only the unchanged reviewed head after exact-head CI and independent gate are clear."
     }
   },
   "current_work": {
-    "id": "WU14-IMPLEMENT-001",
-    "status": "active",
-    "actor": "codex",
-    "scope": "Issue #122 appointment restore and transfer re-link synchronization, exactly within the published contract and exclusions."
+    "id": "COMPANY-OS-V2-001",
+    "status": "implementation_complete_pending_review",
+    "actor": "chatgpt",
+    "scope": "Simplify Slack/standup/retro behavior, retire Gemini from active/runtime paths, enforce specialist-overlay selection, and add a read-only Headroom shadow-trial path without resuming Epic itself."
   },
   "next_work": {
-    "id": "WU14-GATE-001",
-    "status": "blocked_pending_implementation_and_ci",
-    "actor": "claude_or_copilot_non_author",
-    "scope": "Independent exact-head correctness/concurrency/data-integrity gate after green required CI."
+    "id": "EPIC-RESUME",
+    "status": "blocked_pending_company_os_v2_merge",
+    "actor": "chatgpt",
+    "scope": "Rebase/reconcile and resume Spotify-inspired Epic PR #151 only after Company OS v2 lands."
+  },
+  "headroom": {
+    "mode": "shadow_read_only",
+    "source_repo": "NTinkicht/headroom",
+    "source_head": "97aa9f6d0fc04619e4e821e7d54611eb9d6b9b81",
+    "authoritative": false,
+    "paid_provider_fallback": false
   },
   "product_architect": "chatgpt",
   "deterministic_referee": "ci",
