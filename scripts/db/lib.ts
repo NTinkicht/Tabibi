@@ -5,6 +5,22 @@ import { Client } from 'pg';
 import { getEnvironment } from '../../src/platform/config/env';
 
 const migrationDirectory = resolve(process.cwd(), 'db/migrations');
+const nonTransactionalMarker = '-- tabibi:no-transaction';
+
+function runsWithoutTransaction(sql: string): boolean {
+  return sql.split(/\r?\n/, 1)[0]?.trim() === nonTransactionalMarker;
+}
+
+async function runNonTransactionalMigration(
+  client: Client,
+  sql: string,
+): Promise<void> {
+  const statements = sql
+    .split(';')
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+  for (const statement of statements) await client.query(statement);
+}
 
 export async function migrate(): Promise<void> {
   const client = new Client({
@@ -31,16 +47,18 @@ export async function migrate(): Promise<void> {
           throw new Error(`Applied migration was modified: ${name}`);
         continue;
       }
-      await client.query('BEGIN');
+      const transactional = !runsWithoutTransaction(sql);
+      if (transactional) await client.query('BEGIN');
       try {
-        await client.query(sql);
+        if (transactional) await client.query(sql);
+        else await runNonTransactionalMigration(client, sql);
         await client.query(
           'INSERT INTO schema_migrations (name, checksum) VALUES ($1, $2)',
           [name, checksum],
         );
-        await client.query('COMMIT');
+        if (transactional) await client.query('COMMIT');
       } catch (error) {
-        await client.query('ROLLBACK');
+        if (transactional) await client.query('ROLLBACK');
         throw error;
       }
     }

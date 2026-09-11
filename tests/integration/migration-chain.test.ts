@@ -24,6 +24,9 @@ const committedMigrations = [
   '0016_notification_outbox_foundation.sql',
   '0017_notification_dispatch_claim.sql',
   '0018_notification_dispatch_outcomes.sql',
+  '0019_notification_retry_eligibility.sql',
+  '0020_notification_retry_constraint_validation.sql',
+  '0021_notification_retry_claim_index.sql',
 ];
 
 beforeAll(async () => {
@@ -73,6 +76,8 @@ describe('committed migration chain', () => {
       patient_session_uq: string | null;
       temp_queue_source_constraint: string | null;
       temp_audit_constraint: string | null;
+      retry_constraint_validated: boolean;
+      retry_claim_index_definition: string;
     }>(
       `SELECT
          EXISTS (
@@ -116,7 +121,13 @@ describe('committed migration chain', () => {
            WHERE conname='queue_entries_source_check_wu11_tmp') temp_queue_source_constraint,
          (SELECT conname
             FROM pg_constraint
-           WHERE conname='audit_events_entity_type_check_wu11_tmp') temp_audit_constraint`,
+           WHERE conname='audit_events_entity_type_check_wu11_tmp') temp_audit_constraint,
+         (SELECT convalidated
+            FROM pg_constraint
+           WHERE conname='notification_outbox_retry_schedule_check') retry_constraint_validated,
+         pg_get_indexdef(
+           'notification_outbox_dispatch_claim_eligible_idx'::regclass
+         ) retry_claim_index_definition`,
     );
 
     expect(artifacts.rows[0]).toEqual({
@@ -141,6 +152,8 @@ describe('committed migration chain', () => {
       patient_session_uq: 'appointments_clinic_session_patient_uq',
       temp_queue_source_constraint: null,
       temp_audit_constraint: null,
+      retry_constraint_validated: true,
+      retry_claim_index_definition: expect.stringContaining('next_attempt_at'),
     });
   });
 
@@ -263,5 +276,59 @@ describe('committed migration chain', () => {
       await writer.end();
       await competitor.end();
     }
+  });
+
+  it('runs the retry claim index replacement outside a migration transaction', async () => {
+    const migration = await readFile(
+      resolve(
+        process.cwd(),
+        'db/migrations/0021_notification_retry_claim_index.sql',
+      ),
+      'utf8',
+    );
+    expect(migration.startsWith('-- tabibi:no-transaction\n')).toBe(true);
+    expect(migration).toContain('CREATE INDEX CONCURRENTLY');
+    expect(migration).toContain('DROP INDEX CONCURRENTLY');
+  });
+
+  it('recovers safely when an interrupted concurrent retry-index build leaves the temporary index behind', async () => {
+    const migration = await readFile(
+      resolve(
+        process.cwd(),
+        'db/migrations/0021_notification_retry_claim_index.sql',
+      ),
+      'utf8',
+    );
+    const statements = migration
+      .split(';')
+      .map((statement) =>
+        statement.replace('-- tabibi:no-transaction', '').trim(),
+      )
+      .filter(Boolean);
+
+    await client.query(
+      'DROP INDEX CONCURRENTLY IF EXISTS notification_outbox_dispatch_claim_eligible_idx_wu23',
+    );
+    await client.query(
+      `CREATE INDEX notification_outbox_dispatch_claim_eligible_idx_wu23
+         ON notification_outbox (clinic_id, created_at)`,
+    );
+
+    for (const statement of statements) await client.query(statement);
+
+    const recovered = await client.query<{
+      canonical: string;
+      temporary: string | null;
+    }>(
+      `SELECT
+         pg_get_indexdef(
+           'notification_outbox_dispatch_claim_eligible_idx'::regclass
+         ) canonical,
+         to_regclass(
+           'notification_outbox_dispatch_claim_eligible_idx_wu23'
+         )::text temporary`,
+    );
+    expect(recovered.rows[0]?.canonical).toContain('next_attempt_at');
+    expect(recovered.rows[0]?.temporary).toBeNull();
   });
 });

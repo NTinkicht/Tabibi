@@ -1,0 +1,2 @@
+ALTER TABLE notification_outbox
+  VALIDATE CONSTRAINT notification_outbox_retry_schedule_check;

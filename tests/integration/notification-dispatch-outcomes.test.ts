@@ -75,17 +75,164 @@ describe('notification dispatch outcomes', () => {
       });
       expect(completed?.dispatchLastAttemptAt).not.toBeNull();
       expect(completed?.dispatchOutcomeAt).not.toBeNull();
+      if (eligible) expect(completed?.nextAttemptAt).not.toBeNull();
+      else expect(completed?.nextAttemptAt).toBeNull();
       const retry = await repository.claimPendingIntent({
         clinicId: clinicA,
         intentId: intent.id,
         leaseMs: 60_000,
       });
-      if (eligible) expect(retry).toMatchObject({ intent: { id: intent.id } });
-      else expect(retry).toBeNull();
+      expect(retry).toBeNull();
+      if (eligible) {
+        await pool.query(
+          `UPDATE notification_outbox
+              SET next_attempt_at=now() - interval '1 millisecond'
+            WHERE id=$1`,
+          [intent.id],
+        );
+        await expect(
+          repository.claimPendingIntent({
+            clinicId: clinicA,
+            intentId: intent.id,
+            leaseMs: 60_000,
+          }),
+        ).resolves.toMatchObject({ intent: { id: intent.id } });
+      }
     },
   );
 
-  it('fences wrong, cross-clinic, and replaced attempt tokens', async () => {
+  it.each(['failed', 'unknown'] as const)(
+    'rejects %s before its deterministic retry deadline',
+    async (outcome) => {
+      const repository = new NotificationOutboxRepository(pool);
+      const intent = await repository.enqueue(
+        input(1, `pre-deadline-${outcome}`),
+      );
+      const dispatchClaim = await claim(repository, intent.id);
+      const completed = await repository.completeDispatchAttempt({
+        clinicId: clinicA,
+        intentId: intent.id,
+        claimToken: dispatchClaim.claimToken,
+        outcome,
+      });
+
+      expect(completed).toMatchObject({
+        state: outcome,
+        dispatchAttemptCount: 1,
+        dispatchMaxAttempts: outcome === 'failed' ? 5 : 4,
+      });
+      expect(
+        new Date(completed!.nextAttemptAt!).getTime() -
+          new Date(completed!.dispatchOutcomeAt!).getTime(),
+      ).toBe(60_000);
+      await expect(
+        repository.claimPendingIntent({
+          clinicId: clinicA,
+          intentId: intent.id,
+          leaseMs: 60_000,
+        }),
+      ).resolves.toBeNull();
+    },
+  );
+
+  it.each(['failed', 'unknown'] as const)(
+    'atomically dead-letters %s at the exact maximum-attempt boundary',
+    async (outcome) => {
+      const repository = new NotificationOutboxRepository(pool);
+      const intent = await repository.enqueue(input(1, `exhaust-${outcome}`));
+      await pool.query(
+        `UPDATE notification_outbox
+            SET dispatch_max_attempts=2
+          WHERE id=$1`,
+        [intent.id],
+      );
+
+      const firstClaim = await claim(repository, intent.id);
+      const first = await repository.completeDispatchAttempt({
+        clinicId: clinicA,
+        intentId: intent.id,
+        claimToken: firstClaim.claimToken,
+        outcome,
+      });
+      expect(first).toMatchObject({ state: outcome, dispatchAttemptCount: 1 });
+      await pool.query(
+        `UPDATE notification_outbox SET next_attempt_at=now() WHERE id=$1`,
+        [intent.id],
+      );
+
+      const finalClaim = await claim(repository, intent.id);
+      const exhausted = await repository.completeDispatchAttempt({
+        clinicId: clinicA,
+        intentId: intent.id,
+        claimToken: finalClaim.claimToken,
+        outcome,
+        outcomeCode: 'provider_transient',
+      });
+      expect(exhausted).toMatchObject({
+        state: 'dead_letter',
+        dispatchAttemptCount: 2,
+        dispatchMaxAttempts: 2,
+        dispatchOutcomeCode: 'provider_transient',
+        nextAttemptAt: null,
+      });
+      await expect(
+        repository.claimPendingIntent({
+          clinicId: clinicA,
+          intentId: intent.id,
+          leaseMs: 60_000,
+        }),
+      ).resolves.toBeNull();
+      await expect(
+        repository.completeDispatchAttempt({
+          clinicId: clinicA,
+          intentId: intent.id,
+          claimToken: finalClaim.claimToken,
+          outcome,
+        }),
+      ).resolves.toBeNull();
+    },
+  );
+
+  it('preserves an active final-attempt claim until its owner completes it', async () => {
+    const repository = new NotificationOutboxRepository(pool);
+    const intent = await repository.enqueue(input(1, 'active-final-claim'));
+    await pool.query(
+      `UPDATE notification_outbox
+          SET state='failed',
+              dispatch_attempt_count=1,
+              dispatch_max_attempts=2,
+              dispatch_last_attempt_at=now(),
+              dispatch_outcome_at=now(),
+              next_attempt_at=now()
+        WHERE id=$1`,
+      [intent.id],
+    );
+
+    const finalClaim = await claim(repository, intent.id);
+    expect(finalClaim.intent.dispatchAttemptCount).toBe(2);
+
+    await expect(
+      repository.claimPendingIntent({
+        clinicId: clinicA,
+        intentId: intent.id,
+        leaseMs: 60_000,
+      }),
+    ).resolves.toBeNull();
+
+    await expect(
+      repository.completeDispatchAttempt({
+        clinicId: clinicA,
+        intentId: intent.id,
+        claimToken: finalClaim.claimToken,
+        outcome: 'delivered',
+      }),
+    ).resolves.toMatchObject({
+      state: 'delivered',
+      dispatchAttemptCount: 2,
+    });
+  });
+
+  it('fences wrong, cross-clinic, expired, and replaced attempt tokens', async () => {
     const repository = new NotificationOutboxRepository(pool);
     const intent = await repository.enqueue(input(1, 'fenced-outcome'));
     const first = await claim(repository, intent.id);
@@ -114,7 +261,13 @@ describe('notification dispatch outcomes', () => {
         WHERE id=$1`,
       [intent.id],
     );
-    const replacement = await claim(repository, intent.id);
+    await expect(
+      repository.claimPendingIntent({
+        clinicId: clinicA,
+        intentId: intent.id,
+        leaseMs: 60_000,
+      }),
+    ).resolves.toBeNull();
     await expect(
       repository.completeDispatchAttempt({
         clinicId: clinicA,
@@ -123,6 +276,15 @@ describe('notification dispatch outcomes', () => {
         outcome: 'delivered',
       }),
     ).resolves.toBeNull();
+
+    await pool.query(
+      `UPDATE notification_outbox
+          SET next_attempt_at=now() - interval '1 millisecond'
+        WHERE id=$1`,
+      [intent.id],
+    );
+    const replacement = await claim(repository, intent.id);
+    expect(replacement.claimToken).not.toBe(first.claimToken);
     await expect(
       repository.completeDispatchAttempt({
         clinicId: clinicA,
