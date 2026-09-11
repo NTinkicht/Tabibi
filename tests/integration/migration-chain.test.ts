@@ -25,6 +25,8 @@ const committedMigrations = [
   '0017_notification_dispatch_claim.sql',
   '0018_notification_dispatch_outcomes.sql',
   '0019_notification_retry_eligibility.sql',
+  '0020_notification_retry_constraint_validation.sql',
+  '0021_notification_retry_claim_index.sql',
 ];
 
 beforeAll(async () => {
