@@ -68,6 +68,135 @@ describe('notification retry recovery', () => {
     });
   });
 
+  it('restores retry eligibility when a failed claim is explicitly released', async () => {
+    const repository = new NotificationOutboxRepository(pool);
+    const intent = await repository.enqueue(input(1, 'released-retry'));
+    const firstClaim = await repository.claimPendingIntent({
+      clinicId,
+      intentId: intent.id,
+      leaseMs: 60_000,
+    });
+    expect(firstClaim).not.toBeNull();
+
+    await repository.completeDispatchAttempt({
+      clinicId,
+      intentId: intent.id,
+      claimToken: firstClaim!.claimToken,
+      outcome: 'failed',
+    });
+    await pool.query(
+      'UPDATE notification_outbox SET next_attempt_at=now() WHERE id=$1',
+      [intent.id],
+    );
+
+    const retryClaim = await repository.claimPendingIntent({
+      clinicId,
+      intentId: intent.id,
+      leaseMs: 60_000,
+    });
+    expect(retryClaim?.intent.dispatchAttemptCount).toBe(2);
+    await expect(
+      repository.releaseDispatchClaim(
+        clinicId,
+        intent.id,
+        retryClaim!.claimToken,
+      ),
+    ).resolves.toBe(true);
+
+    const released = await pool.query<{
+      dispatch_attempt_count: number;
+      next_attempt_at: Date | null;
+      dispatch_claim_token: string | null;
+    }>(
+      `SELECT dispatch_attempt_count, next_attempt_at, dispatch_claim_token
+         FROM notification_outbox
+        WHERE id=$1`,
+      [intent.id],
+    );
+    expect(released.rows[0]?.dispatch_attempt_count).toBe(1);
+    expect(released.rows[0]?.next_attempt_at).not.toBeNull();
+    expect(released.rows[0]?.dispatch_claim_token).toBeNull();
+
+    const replacement = await repository.claimPendingIntent({
+      clinicId,
+      intentId: intent.id,
+      leaseMs: 60_000,
+    });
+    expect(replacement?.intent.dispatchAttemptCount).toBe(2);
+    expect(replacement?.claimToken).not.toBe(retryClaim?.claimToken);
+  });
+
+  it('recovers an expired non-final retry claim behind deterministic backoff', async () => {
+    const repository = new NotificationOutboxRepository(pool);
+    const intent = await repository.enqueue(input(1, 'expired-retry'));
+    const firstClaim = await repository.claimPendingIntent({
+      clinicId,
+      intentId: intent.id,
+      leaseMs: 60_000,
+    });
+    expect(firstClaim).not.toBeNull();
+
+    await repository.completeDispatchAttempt({
+      clinicId,
+      intentId: intent.id,
+      claimToken: firstClaim!.claimToken,
+      outcome: 'failed',
+    });
+    await pool.query(
+      'UPDATE notification_outbox SET next_attempt_at=now() WHERE id=$1',
+      [intent.id],
+    );
+
+    const abandoned = await repository.claimPendingIntent({
+      clinicId,
+      intentId: intent.id,
+      leaseMs: 60_000,
+    });
+    expect(abandoned?.intent.dispatchAttemptCount).toBe(2);
+    await pool.query(
+      `UPDATE notification_outbox
+          SET dispatch_claim_expires_at=now() - interval '1 millisecond'
+        WHERE id=$1`,
+      [intent.id],
+    );
+
+    await expect(
+      repository.claimPendingIntent({
+        clinicId,
+        intentId: intent.id,
+        leaseMs: 60_000,
+      }),
+    ).resolves.toBeNull();
+
+    const recovered = await pool.query<{
+      state: string;
+      dispatch_attempt_count: number;
+      next_attempt_at: Date | null;
+      dispatch_claim_token: string | null;
+    }>(
+      `SELECT state, dispatch_attempt_count, next_attempt_at, dispatch_claim_token
+         FROM notification_outbox
+        WHERE id=$1`,
+      [intent.id],
+    );
+    expect(recovered.rows[0]?.state).toBe('unknown');
+    expect(recovered.rows[0]?.dispatch_attempt_count).toBe(2);
+    expect(recovered.rows[0]?.next_attempt_at).not.toBeNull();
+    expect(recovered.rows[0]?.dispatch_claim_token).toBeNull();
+
+    await pool.query(
+      'UPDATE notification_outbox SET next_attempt_at=now() WHERE id=$1',
+      [intent.id],
+    );
+    const replacement = await repository.claimPendingIntent({
+      clinicId,
+      intentId: intent.id,
+      leaseMs: 60_000,
+    });
+    expect(replacement?.intent.dispatchAttemptCount).toBe(3);
+    expect(replacement?.claimToken).not.toBe(abandoned?.claimToken);
+  });
+
   it('does not exhaust pending work on explicit release and terminalizes expired final attempts', async () => {
     const repository = new NotificationOutboxRepository(pool);
     const intent = await repository.enqueue(input(1, 'abandoned-pending'));
