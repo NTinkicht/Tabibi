@@ -1,6 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import { NotificationDispatchBatchRunner } from '@/modules/notification-domain/dispatch-batch';
 import {
@@ -66,12 +74,12 @@ describe('notification dispatch eligibility and bounded batch', () => {
     });
     await outbox.enqueue(input(clinicB, 'other-clinic'));
 
-    await expect(scanner.listEligible({ clinicId: clinicA, limit: 10 })).resolves.toEqual([
-      expect.objectContaining({ intentId: duePending.id }),
-    ]);
-    await expect(scanner.listEligible({ clinicId: clinicA, limit: 0 })).rejects.toThrow(
-      'Dispatch batch size must be between 1 and',
-    );
+    await expect(
+      scanner.listEligible({ clinicId: clinicA, limit: 10 }),
+    ).resolves.toEqual([expect.objectContaining({ intentId: duePending.id })]);
+    await expect(
+      scanner.listEligible({ clinicId: clinicA, limit: 0 }),
+    ).rejects.toThrow('Dispatch batch size must be between 1 and');
     await expect(
       scanner.listEligible({
         clinicId: clinicA,
@@ -98,7 +106,10 @@ describe('notification dispatch eligibility and bounded batch', () => {
       [first.id, second.id, third.id, [first.id, second.id, third.id]],
     );
 
-    const selected = await scanner.listEligible({ clinicId: clinicA, limit: 2 });
+    const selected = await scanner.listEligible({
+      clinicId: clinicA,
+      limit: 2,
+    });
     expect(selected.map((candidate) => candidate.intentId)).toEqual([
       second.id,
       third.id,
@@ -124,7 +135,9 @@ describe('notification dispatch eligibility and bounded batch', () => {
 
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(summaries.reduce((sum, item) => sum + item.completed, 0)).toBe(1);
-    expect(summaries.reduce((sum, item) => sum + item.notClaimed, 0)).toBeLessThanOrEqual(1);
+    expect(
+      summaries.reduce((sum, item) => sum + item.notClaimed, 0),
+    ).toBeLessThanOrEqual(1);
     const persisted = await pool.query<{ state: string }>(
       'SELECT state FROM notification_outbox WHERE id=$1',
       [intent.id],
