@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T16:22:24.593629+00:00
+- Last sync: 2026-09-11T17:31:00.138030+00:00
 
 ## Team Room charter
 
@@ -13377,5 +13377,245 @@ Do these steps in order:
 &lt;!-- <review_comment_addressed> --&gt;</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5637424111
+
+---
+
+### 2026-09-11T16:23:54Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 5984 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5637443963
+
+---
+
+### 2026-09-11T16:23:55Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 1236 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5637444184
+
+---
+
+### 2026-09-11T16:23:56Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5637444406
+
+---
+
+### 2026-09-11T16:43:34Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr149:99d3cfebfe7655321b6aa2fdab07e8d21d5422e5 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #149
+head: 99d3cfebfe7655321b6aa2fdab07e8d21d5422e5
+CI_GREEN_HANDOFF — PR #149 exact head `99d3cfebfe7655321b6aa2fdab07e8d21d5422e5` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5637677790
+
+---
+
+### 2026-09-11T17:30:08Z — NTinkicht
+
+CHECKPOINT — WU25 exact-head CI green; binding gate still processing
+
+actor: chatgpt
+role: CTO/orchestrator + sole failover implementer/merge control
+canonical_stream: Issue #148 / PR #149 / `wu25-notification-dispatch-batch`
+
+Live GitHub reconciliation now shows exact head `99d3cfebfe7655321b6aa2fdab07e8d21d5422e5`. CI #687 / run `34623450232` is fully green. PR #149 is the only open implementation PR. The prior CodeRabbit Major expired-claimed-retry finding is formally resolved after repository-backed remediation and PostgreSQL coverage.
+
+A binding `@coderabbitai review full` has been accepted for exactly `99d3cfeb...`, but the whole-PR review is still processing; the current CodeRabbit summary still carries older reviewed-head risk text from `190044f5...`, so it is not valid final gate evidence for this head. Merge remains prohibited until the fresh exact-head review completes and the every-reviewer Medium+ inventory is zero.
+
+`coordination/STATE.json` and `coordination/WORK_QUEUE.md` remain stale WU14 snapshots and are overridden by live GitHub. Gemini Agent/Chat remain PAUSED/OFF-ROSTER.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5638229113
+
+---
+
+### 2026-09-11T17:30:45Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="149"
+
+echo "== PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,headRefName,headRefOid,mergeable,reviewDecision,title,url,author
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent reviews =="
+gh api "repos/$repo/pulls/$pr/reviews?per_page=100" \
+  --jq '.[] | {user:.user.login,state,commit_id,submitted_at,body}' || true
+
+echo "== Recent PR discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-30:][] | {user:.user.login,created_at,body}' || true
+
+echo "== Unresolved review threads =="
+gh api graphql \
+  -F owner="NTinkicht" \
+  -F name="Tabibi" \
+  -F number="$pr" \
+  -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 20) {
+            nodes {
+              author { login }
+              commit { oid }
+              body
+            }
+          }
+        }
+      }
+    }
+  }
+}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+  | select(.isResolved == false)
+  | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+```
+
+Length of output: 33903
+
+---
+
+</details>
+
+`@NTinkicht`, live evidence confirms the checkpoint.
+
+- PR `#149` remains open at exact head `99d3cfebfe7655321b6aa2fdab07e8d21d5422e5`.
+- Quality and build, PostgreSQL integration, and Browser smoke are successful on this exact head.
+- The unresolved review-thread query returned no threads.
+- The whole-PR review request targets this exact head and CodeRabbit confirmed that it triggered.
+- A completed whole-PR review result is not available yet.
+- The prior substantive CodeRabbit review applies to older head `190044f5...` and cannot serve as the final gate.
+- MicroReview output is limited to its free-tier limit notices. It is not clean-review evidence.
+
+Keep PR `#149` blocked. When the exact-head whole-PR review completes, recheck the head, mergeability, and any new Medium-or-higher findings before an expected-head merge.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="149"
+
+echo "== PR metadata =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,headRefName,headRefOid,mergeable,reviewDecision,title,url,author
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent reviews =="
+gh api "repos/$repo/pulls/$pr/reviews?per_page=100" \
+  --jq '.[] | {user:.user.login,state,commit_id,submitted_at,body}' || true
+
+echo "== Recent PR discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-30:][] | {user:.user.login,created_at,body}' || true
+
+echo "== Unresolved review threads =="
+gh api graphql \
+  -F owner="NTinkicht" \
+  -F name="Tabibi" \
+  -F number="$pr" \
+  -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 20) {
+            nodes {
+              author { login }
+              commit { oid }
+              body
+            }
+          }
+        }
+      }
+    }
+  }
+}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+  | select(.isResolved == false)
+  | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+```
+
+Length of output: 33903
+
+---
+
+</details>
+
+`@NTinkicht`, live evidence confirms the checkpoint.
+
+- PR `#149` remains open at exact head `99d3cfebfe7655321b6aa2fdab07e8d21d5422e5`.
+- Quality and build, PostgreSQL integration, and Browser smoke are successful on this exact head.
+- The unresolved review-thread query returned no threads.
+- The whole-PR review request targets this exact head and CodeRabbit confirmed that it triggered.
+- A completed whole-PR review result is not available yet.
+- The prior substantive CodeRabbit review applies to older head `190044f5...` and cannot serve as the final gate.
+- MicroReview output is limited to its free-tier limit notices. It is not clean-review evidence.
+
+Keep PR `#149` blocked. When the exact-head whole-PR review completes, recheck the head, mergeability, and any new Medium-or-higher findings before an expected-head merge.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5638239047
 
 ---
