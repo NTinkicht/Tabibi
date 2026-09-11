@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T11:51:45.846549+00:00
+- Last sync: 2026-09-11T11:52:27.259022+00:00
 
 ## Team Room charter
 
@@ -12400,5 +12400,201 @@ Codex retains the sole same-branch remediation lease via PR comment #5634002059.
 `coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots; live GitHub governs. Gemini Agent/Chat remain PAUSED/OFF-ROSTER.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5634004207
+
+---
+
+### 2026-09-11T11:52:15Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="144"
+
+echo "== Pull request state =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent reviews =="
+gh api "repos/$repo/pulls/$pr/reviews?per_page=100" \
+  --jq '.[-20:][] | {user:.user.login,state,commit_id,submitted_at,body}' || true
+
+echo "== Unresolved review threads =="
+gh api graphql \
+  -F owner="NTinkicht" -F name="Tabibi" -F number="$pr" \
+  -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 20) {
+            nodes {
+              author { login }
+              commit { oid }
+              body
+            }
+          }
+        }
+      }
+    }
+  }
+}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+    | select(.isResolved == false)
+    | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+
+echo "== Relevant coordination records =="
+for file in \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  if [ -f "$file" ]; then
+    echo "--- $file ---"
+    sed -n '1,180p' "$file"
+  fi
+done
+```
+
+Length of output: 76750
+
+---
+
+</details>
+
+`@NTinkicht`, live PR evidence confirms the checkpoint.
+
+PR `#144` remains open at exact head `04c27c0c76a93ec59535213a54bc860d6b986cd4`.
+
+- `Quality and build` failed.
+- `PostgreSQL integration` passed.
+- `Browser smoke` passed.
+- The failure includes the Prettier issue in `tests/integration/notification-retry-recovery.test.ts`.
+
+The three CodeRabbit Major findings remain open. They require:
+
+1. The migration `0019` backfill to apply the deterministic retry-delay ladder.
+2. `releaseDispatchClaim()` to restore retry budget and retry eligibility for released `failed` and `unknown` claims.
+3. Migration-order tests to stage legacy rows before migration `0019` and verify rejection before, then acceptance at, each calculated deadline.
+
+The Codex threads `WU23-RETRY-004` and `WU23-RETRY-005` also remain unresolved pending exact-head validation.
+
+Continue only on the existing `wu23-notification-retry-eligibility` branch. After Codex pushes a new head, require full green CI, a new exact-head full review, and resolution of each still-valid Medium-or-higher thread before merge.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="144"
+
+echo "== Pull request state =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,headRefName,headRefOid,mergeable,reviewDecision,title,url
+
+echo "== Required checks =="
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent reviews =="
+gh api "repos/$repo/pulls/$pr/reviews?per_page=100" \
+  --jq '.[-20:][] | {user:.user.login,state,commit_id,submitted_at,body}' || true
+
+echo "== Unresolved review threads =="
+gh api graphql \
+  -F owner="NTinkicht" -F name="Tabibi" -F number="$pr" \
+  -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 20) {
+            nodes {
+              author { login }
+              commit { oid }
+              body
+            }
+          }
+        }
+      }
+    }
+  }
+}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+    | select(.isResolved == false)
+    | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+
+echo "== Relevant coordination records =="
+for file in \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  if [ -f "$file" ]; then
+    echo "--- $file ---"
+    sed -n '1,180p' "$file"
+  fi
+done
+```
+
+Length of output: 76750
+
+---
+
+</details>
+
+`@NTinkicht`, live PR evidence confirms the checkpoint.
+
+PR `#144` remains open at exact head `04c27c0c76a93ec59535213a54bc860d6b986cd4`.
+
+- `Quality and build` failed.
+- `PostgreSQL integration` passed.
+- `Browser smoke` passed.
+- The failure includes the Prettier issue in `tests/integration/notification-retry-recovery.test.ts`.
+
+The three CodeRabbit Major findings remain open. They require:
+
+1. The migration `0019` backfill to apply the deterministic retry-delay ladder.
+2. `releaseDispatchClaim()` to restore retry budget and retry eligibility for released `failed` and `unknown` claims.
+3. Migration-order tests to stage legacy rows before migration `0019` and verify rejection before, then acceptance at, each calculated deadline.
+
+The Codex threads `WU23-RETRY-004` and `WU23-RETRY-005` also remain unresolved pending exact-head validation.
+
+Continue only on the existing `wu23-notification-retry-eligibility` branch. After Codex pushes a new head, require full green CI, a new exact-head full review, and resolution of each still-valid Medium-or-higher thread before merge.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5634013400
 
 ---
