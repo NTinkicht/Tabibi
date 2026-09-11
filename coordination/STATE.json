@@ -3,7 +3,7 @@
   "phase": "clinic_operations_foundation",
   "round": 37,
   "state": "post_wu25_context_efficiency_rollout",
-  "current_pr": null,
+  "current_pr": 151,
   "current_issue": 150,
   "last_completed_work": {
     "id": "WU25",
@@ -14,8 +14,8 @@
     "merge_commit": "9fe303f11aeb14f443660b185fae8d053032ffb7"
   },
   "last_actor": "chatgpt",
-  "next_actor": "chatgpt",
-  "next_action": "Complete owner-directed Issue #150 on the single canonical infra/zero-extra-cost-context-router branch, run exact-head CI, and hand the unchanged head to an eligible independent non-author reviewer before merge.",
+  "next_actor": "ci_then_independent_reviewer",
+  "next_action": "Validate PR #151 on its exact head, then hand the unchanged head to an eligible independent non-author reviewer before merge.",
   "operating_model": "four-active-actor-mesh-zero-extra-cost-deterministic-first-context-routing",
   "binding_protocols": [
     "AGENTS.md",
@@ -54,7 +54,7 @@
         "review": "unavailable_for_self_authored_issue_150_head",
         "merge_execution": "available_after_independent_gate"
       },
-      "current_activity": "sole Issue #150 infrastructure implementer/orchestrator on the canonical context-router branch"
+      "current_activity": "sole Issue #150 infrastructure implementer/orchestrator on PR #151; recused from self-gating"
     },
     "codex": {
       "capability_status": {
@@ -62,14 +62,14 @@
         "ci_remediation": "reconcile_before_assignment",
         "review": "limited_by_recent_code_review_quota_evidence"
       },
-      "current_activity": "no active Issue #150 implementation lease; preserve included capacity for product implementation/CI"
+      "current_activity": "no Issue #150 authorship; preserve included capacity for product implementation/CI"
     },
     "claude": {
       "capability_status": {
         "review": "reconcile_current_pro_capacity_before_assignment",
         "adversarial_security_review": "reconcile_current_pro_capacity_before_assignment"
       },
-      "current_activity": "preferred independent Issue #150 exact-head gate if concretely available and non-author"
+      "current_activity": "preferred independent PR #151 exact-head gate if concretely available and non-author"
     },
     "copilot": {
       "capability_status": {
@@ -77,7 +77,7 @@
         "review": "available_when_non_author_subject_to_included_entitlement",
         "context_compression": "disabled_by_default_local_opt_in_only"
       },
-      "current_activity": "eligible independent Issue #150 review/QA; no production authorship on current infra head"
+      "current_activity": "eligible independent PR #151 review/QA; no authorship on current infra head"
     },
     "gemini_agent": {
       "capability_status": { "all": "paused" },
@@ -93,12 +93,12 @@
     "implementer": {
       "actor": "chatgpt",
       "status": "active",
-      "note": "Issue #150 infrastructure/docs only; one canonical branch/PR."
+      "note": "Issue #150 infrastructure/docs only; canonical PR #151."
     },
     "gating_reviewer": {
       "actor": "claude_or_copilot_non_author",
       "status": "reserved_for_exact_head",
-      "note": "ChatGPT authors this head and cannot self-gate it."
+      "note": "ChatGPT authored PR #151 and cannot self-gate it."
     },
     "merge_executor": {
       "actor": "chatgpt",
@@ -110,11 +110,11 @@
     "id": "INFRA-CONTEXT-001",
     "status": "active",
     "actor": "chatgpt",
-    "scope": "Issue #150 zero-extra-cost AI capacity governor, deterministic-first context router, compact bootstrap, Claude read guard, safe opt-in Copilot/Luna compression, and stale-state reconciliation."
+    "scope": "Issue #150 / PR #151 zero-extra-cost AI capacity governor, deterministic-first context router, compact bootstrap, Claude read guard, safe opt-in Copilot/Luna compression, and stale-state reconciliation."
   },
   "next_work": {
     "id": "INFRA-CONTEXT-GATE-001",
-    "status": "blocked_pending_pr_ci",
+    "status": "blocked_pending_exact_head_ci",
     "actor": "claude_or_copilot_non_author",
     "scope": "Independent exact-head governance/security/fail-closed budget review after required CI is green."
   },
