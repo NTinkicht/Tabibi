@@ -232,7 +232,7 @@ describe('notification dispatch outcomes', () => {
     });
   });
 
-  it('fences wrong, cross-clinic, and replaced attempt tokens', async () => {
+  it('fences wrong, cross-clinic, expired, and replaced attempt tokens', async () => {
     const repository = new NotificationOutboxRepository(pool);
     const intent = await repository.enqueue(input(1, 'fenced-outcome'));
     const first = await claim(repository, intent.id);
@@ -261,7 +261,13 @@ describe('notification dispatch outcomes', () => {
         WHERE id=$1`,
       [intent.id],
     );
-    const replacement = await claim(repository, intent.id);
+    await expect(
+      repository.claimPendingIntent({
+        clinicId: clinicA,
+        intentId: intent.id,
+        leaseMs: 60_000,
+      }),
+    ).resolves.toBeNull();
     await expect(
       repository.completeDispatchAttempt({
         clinicId: clinicA,
@@ -270,6 +276,15 @@ describe('notification dispatch outcomes', () => {
         outcome: 'delivered',
       }),
     ).resolves.toBeNull();
+
+    await pool.query(
+      `UPDATE notification_outbox
+          SET next_attempt_at=now() - interval '1 millisecond'
+        WHERE id=$1`,
+      [intent.id],
+    );
+    const replacement = await claim(repository, intent.id);
+    expect(replacement.claimToken).not.toBe(first.claimToken);
     await expect(
       repository.completeDispatchAttempt({
         clinicId: clinicA,
