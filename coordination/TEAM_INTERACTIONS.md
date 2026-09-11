@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T01:05:29.375759+00:00
+- Last sync: 2026-09-11T01:06:19.308043+00:00
 
 ## Team Room charter
 
@@ -11008,5 +11008,208 @@ Exact-head CI #609 / `34549120290` is running. Merge remains blocked. The histor
 `coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots; live GitHub is authoritative. Slack command audit found no new unacknowledged `Report Progress`. Gemini Agent/Chat remain PAUSED/OFF-ROSTER.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627802903
+
+---
+
+### 2026-09-11T01:05:31Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr138:2a57453bc4d98468d6c8c0d77bfc9aabe22d94d4 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #138
+head: 2a57453bc4d98468d6c8c0d77bfc9aabe22d94d4
+CI_GREEN_HANDOFF — PR #138 exact head `2a57453bc4d98468d6c8c0d77bfc9aabe22d94d4` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627804602
+
+---
+
+### 2026-09-11T01:06:09Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="138"
+
+echo "== PR metadata and checks =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,headRefName,headRefOid,mergeable,reviewDecision,title,url
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent PR discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-25:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+
+echo "== CodeRabbit review comments and unresolved threads =="
+gh api "repos/$repo/pulls/$pr/comments?per_page=100" \
+  --jq '.[] | select(.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai") | {commit_id,path,line,body,created_at}' || true
+gh api graphql \
+  -F owner="NTinkicht" -F name="Tabibi" -F number="$pr" \
+  -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 20) {
+            nodes { author { login } commit { oid } body }
+          }
+        }
+      }
+    }
+  }
+}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+    | select(.isResolved == false)
+    | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+
+echo "== Changed files =="
+gh pr diff "$pr" --repo "$repo" --name-only
+
+head_sha="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+echo "== Relevant source and tests at $head_sha =="
+for file in \
+  src/modules/notification-outbox/index.ts \
+  tests/integration/notification-outbox.test.ts \
+  db/migrations/0016_notification_outbox_foundation.sql
+do
+  echo "--- $file ---"
+  gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' \
+    | base64 -d > "/tmp/$(basename "$file")"
+  case "$file" in
+    *.ts)
+      ast-grep outline "/tmp/$(basename "$file")" --items all || true
+      nl -ba "/tmp/$(basename "$file")" | sed -n '1,460p'
+      ;;
+    *) nl -ba "/tmp/$(basename "$file")" | sed -n '1,460p' ;;
+  esac
+done
+```
+
+Length of output: 73151
+
+---
+
+</details>
+
+`@NTinkicht`, the WU20 remediation is present on exact head `2a57453bc4d98468d6c8c0d77bfc9aabe22d94d4`.
+
+- All required CI jobs are green on this head.
+- `NotificationOutboxRepository` now rejects non-JSON runtime values before JSONB serialization.
+- The regression suite covers `Date`, `NaN`, `Infinity`, and nested `undefined`.
+- Each rejected payload leaves `notification_outbox` empty.
+- The clinic-qualified supersession foreign key is present.
+- The cross-clinic supersession test expects PostgreSQL error `23503`.
+
+The fresh `@coderabbitai full review` request is present for this exact head. Its completed result is not yet present in the PR discussion.
+
+Do not merge PR `#138` yet. Wait for that exact-head full review. Then reconcile any remaining Medium-or-higher findings before the expected-head merge.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="138"
+
+echo "== PR metadata and checks =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,headRefName,headRefOid,mergeable,reviewDecision,title,url
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Recent PR discussion =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-25:][] | {user:.user.login,created_at:.created_at,body:.body}' || true
+
+echo "== CodeRabbit review comments and unresolved threads =="
+gh api "repos/$repo/pulls/$pr/comments?per_page=100" \
+  --jq '.[] | select(.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai") | {commit_id,path,line,body,created_at}' || true
+gh api graphql \
+  -F owner="NTinkicht" -F name="Tabibi" -F number="$pr" \
+  -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 20) {
+            nodes { author { login } commit { oid } body }
+          }
+        }
+      }
+    }
+  }
+}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+    | select(.isResolved == false)
+    | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+
+echo "== Changed files =="
+gh pr diff "$pr" --repo "$repo" --name-only
+
+head_sha="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+echo "== Relevant source and tests at $head_sha =="
+for file in \
+  src/modules/notification-outbox/index.ts \
+  tests/integration/notification-outbox.test.ts \
+  db/migrations/0016_notification_outbox_foundation.sql
+do
+  echo "--- $file ---"
+  gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' \
+    | base64 -d > "/tmp/$(basename "$file")"
+  case "$file" in
+    *.ts)
+      ast-grep outline "/tmp/$(basename "$file")" --items all || true
+      nl -ba "/tmp/$(basename "$file")" | sed -n '1,460p'
+      ;;
+    *) nl -ba "/tmp/$(basename "$file")" | sed -n '1,460p' ;;
+  esac
+done
+```
+
+Length of output: 73151
+
+---
+
+</details>
+
+`@NTinkicht`, the WU20 remediation is present on exact head `2a57453bc4d98468d6c8c0d77bfc9aabe22d94d4`.
+
+- All required CI jobs are green on this head.
+- `NotificationOutboxRepository` now rejects non-JSON runtime values before JSONB serialization.
+- The regression suite covers `Date`, `NaN`, `Infinity`, and nested `undefined`.
+- Each rejected payload leaves `notification_outbox` empty.
+- The clinic-qualified supersession foreign key is present.
+- The cross-clinic supersession test expects PostgreSQL error `23503`.
+
+The fresh `@coderabbitai full review` request is present for this exact head. Its completed result is not yet present in the PR discussion.
+
+Do not merge PR `#138` yet. Wait for that exact-head full review. Then reconcile any remaining Medium-or-higher findings before the expected-head merge.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627810512
 
 ---
