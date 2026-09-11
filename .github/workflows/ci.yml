@@ -39,8 +39,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Formatting
-        run: npm run format
+      - name: Formatting diagnostics
+        run: |
+          npx prettier --write .claude/hooks/context-read-guard.mjs scripts/context-router.mjs
+          git diff -- .claude/hooks/context-read-guard.mjs scripts/context-router.mjs
+          exit 1
 
       - name: Lint
         run: npm run lint
