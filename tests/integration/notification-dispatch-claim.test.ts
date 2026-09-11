@@ -22,7 +22,11 @@ beforeEach(async () => {
 
 afterAll(async () => pool.end());
 
-function input(clinicId: string, intentVersion: number, idempotencyKey: string) {
+function input(
+  clinicId: string,
+  intentVersion: number,
+  idempotencyKey: string,
+) {
   return {
     clinicId,
     logicalTargetKey: 'queue-entry:claim-example',
@@ -122,50 +126,53 @@ describe('notification dispatch claim lifecycle', () => {
     expect(reclaimed?.claimToken).not.toBe(claim?.claimToken);
   });
 
-  it('prevents superseded intents from being claimed and clears an active claim on supersession', async () => {
-    const repository = new NotificationOutboxRepository(pool);
-    const first = await repository.enqueue(input(clinicA, 1, 'supersede-v1'));
-    const firstClaim = await repository.claimPendingIntent({
-      clinicId: clinicA,
-      intentId: first.id,
-      leaseMs: 60_000,
-    });
-    expect(firstClaim).not.toBeNull();
-
-    const second = await repository.enqueue(input(clinicA, 2, 'supersede-v2'));
-
-    await expect(
-      repository.claimPendingIntent({
+  it(
+    'prevents superseded intents from being claimed and clears an active claim on supersession',
+    async () => {
+      const repository = new NotificationOutboxRepository(pool);
+      const first = await repository.enqueue(input(clinicA, 1, 'supersede-v1'));
+      const firstClaim = await repository.claimPendingIntent({
         clinicId: clinicA,
         intentId: first.id,
         leaseMs: 60_000,
-      }),
-    ).resolves.toBeNull();
+      });
+      expect(firstClaim).not.toBeNull();
 
-    const persistedFirst = await pool.query<{
-      state: string;
-      dispatch_claim_token: string | null;
-      dispatch_claimed_at: Date | null;
-      dispatch_claim_expires_at: Date | null;
-    }>(
-      `SELECT state, dispatch_claim_token, dispatch_claimed_at, dispatch_claim_expires_at
+      const second = await repository.enqueue(input(clinicA, 2, 'supersede-v2'));
+
+      await expect(
+        repository.claimPendingIntent({
+          clinicId: clinicA,
+          intentId: first.id,
+          leaseMs: 60_000,
+        }),
+      ).resolves.toBeNull();
+
+      const persistedFirst = await pool.query<{
+        state: string;
+        dispatch_claim_token: string | null;
+        dispatch_claimed_at: Date | null;
+        dispatch_claim_expires_at: Date | null;
+      }>(
+        `SELECT state, dispatch_claim_token, dispatch_claimed_at, dispatch_claim_expires_at
          FROM notification_outbox
         WHERE id=$1 AND clinic_id=$2`,
-      [first.id, clinicA],
-    );
-    expect(persistedFirst.rows[0]).toEqual({
-      state: 'superseded',
-      dispatch_claim_token: null,
-      dispatch_claimed_at: null,
-      dispatch_claim_expires_at: null,
-    });
+        [first.id, clinicA],
+      );
+      expect(persistedFirst.rows[0]).toEqual({
+        state: 'superseded',
+        dispatch_claim_token: null,
+        dispatch_claimed_at: null,
+        dispatch_claim_expires_at: null,
+      });
 
-    await expect(
-      repository.claimPendingIntent({
-        clinicId: clinicA,
-        intentId: second.id,
-        leaseMs: 60_000,
-      }),
-    ).resolves.toMatchObject({ intent: { id: second.id, state: 'pending' } });
-  });
+      await expect(
+        repository.claimPendingIntent({
+          clinicId: clinicA,
+          intentId: second.id,
+          leaseMs: 60_000,
+        }),
+      ).resolves.toMatchObject({ intent: { id: second.id, state: 'pending' } });
+    },
+  );
 });
