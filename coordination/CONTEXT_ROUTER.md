@@ -35,6 +35,8 @@ Rules:
 - must require explicit local opt-in (`TABIBI_CONTEXT_ALLOW_COPILOT=1`);
 - source excerpts are assembled by the deterministic helper before the model call;
 - the Copilot call receives no filesystem-write permission and is not trusted as an authority;
+- repository custom instructions are disabled for this worker so `AGENTS.md` and other broad startup material are not silently re-injected into the compression call;
+- Copilot CLI remote/session export and automatic CLI updates are disabled for the compression call;
 - never use `--allow-all`;
 - output must be compact: filenames, symbols, line references, facts, and uncertainty;
 - no automatic retry through another paid provider;
@@ -63,7 +65,7 @@ The hook allows:
 - explicit bounded reads (`offset` + a modest `limit`);
 - current-state/bootstrap files required for safe startup.
 
-For a large unbounded file read, it denies the tool call and points Claude to `scripts/context-router.py` or a bounded `Read`. The hook itself never invokes Copilot or any model, so merely opening Claude Code cannot consume another provider's allowance.
+For a large unbounded file read, it denies the tool call and points Claude to `scripts/context-router.mjs` or a bounded `Read`. The hook itself never invokes Copilot or any model, so merely opening Claude Code cannot consume another provider's allowance.
 
 The guard is a context-efficiency rail, not a security boundary. An actor may deliberately use bounded reads repeatedly when complete evidence is genuinely necessary.
 
