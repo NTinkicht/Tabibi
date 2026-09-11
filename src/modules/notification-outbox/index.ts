@@ -432,7 +432,7 @@ export class NotificationOutboxRepository {
                 dispatch_claim_expires_at=NULL
           WHERE clinic_id=$1
             AND id=$2
-            AND state IN ('failed', 'unknown')
+            AND state IN ('pending', 'failed', 'unknown')
             AND dispatch_attempt_count >= dispatch_max_attempts
             AND (
               dispatch_claim_token IS NULL
