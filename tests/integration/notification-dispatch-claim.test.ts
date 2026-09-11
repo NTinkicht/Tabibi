@@ -58,7 +58,7 @@ describe('notification dispatch claim lifecycle', () => {
     expect(winners[0]?.claimToken).toEqual(expect.any(String));
   });
 
-  it('reclaims an expired stale claim atomically with a new token', async () => {
+  it('recovers an expired stale claim through unknown backoff before issuing a new token', async () => {
     const repository = new NotificationOutboxRepository(pool);
     const intent = await repository.enqueue(input(clinicA, 1, 'stale-claim'));
     const first = await repository.claimPendingIntent({
@@ -76,6 +76,38 @@ describe('notification dispatch claim lifecycle', () => {
       [intent.id, clinicA],
     );
 
+    await expect(
+      repository.claimPendingIntent({
+        clinicId: clinicA,
+        intentId: intent.id,
+        leaseMs: 60_000,
+      }),
+    ).resolves.toBeNull();
+
+    const recoveredState = await pool.query<{
+      state: string;
+      dispatch_attempt_count: number;
+      dispatch_claim_token: string | null;
+      next_attempt_at: Date | null;
+    }>(
+      `SELECT state, dispatch_attempt_count, dispatch_claim_token, next_attempt_at
+         FROM notification_outbox
+        WHERE id=$1 AND clinic_id=$2`,
+      [intent.id, clinicA],
+    );
+    expect(recoveredState.rows[0]).toMatchObject({
+      state: 'unknown',
+      dispatch_attempt_count: 1,
+      dispatch_claim_token: null,
+    });
+    expect(recoveredState.rows[0]?.next_attempt_at).not.toBeNull();
+
+    await pool.query(
+      `UPDATE notification_outbox
+          SET next_attempt_at=now() - interval '1 millisecond'
+        WHERE id=$1 AND clinic_id=$2`,
+      [intent.id, clinicA],
+    );
     const recovered = await repository.claimPendingIntent({
       clinicId: clinicA,
       intentId: intent.id,
@@ -83,6 +115,7 @@ describe('notification dispatch claim lifecycle', () => {
     });
     expect(recovered).not.toBeNull();
     expect(recovered?.claimToken).not.toBe(first?.claimToken);
+    expect(recovered?.intent.dispatchAttemptCount).toBe(2);
     expect(new Date(recovered!.expiresAt).getTime()).toBeGreaterThan(
       new Date(recovered!.claimedAt).getTime(),
     );
