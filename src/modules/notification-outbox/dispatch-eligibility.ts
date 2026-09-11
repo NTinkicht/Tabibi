@@ -51,7 +51,14 @@ export class NotificationDispatchEligibilityRepository {
           AND state IN ('pending', 'failed', 'unknown')
           AND superseded_by_id IS NULL
           AND dispatch_attempt_count < dispatch_max_attempts
-          AND (state = 'pending' OR next_attempt_at <= now())
+          AND (
+            state = 'pending'
+            OR next_attempt_at <= now()
+            OR (
+              dispatch_claim_token IS NOT NULL
+              AND dispatch_claim_expires_at <= now()
+            )
+          )
           AND (
             dispatch_claim_token IS NULL
             OR dispatch_claim_expires_at <= now()
