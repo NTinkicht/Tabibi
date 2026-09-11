@@ -138,7 +138,34 @@ function sameIntent(row: IntentRow, input: ReturnType<typeof normalizeInput>) {
     row.event_key === input.eventKey &&
     Number(row.intent_version) === input.intentVersion &&
     row.queue_entry_id === input.queueEntryId &&
-    JSON.stringify(row.payload) === JSON.stringify(input.payload)
+    equalJsonValues(row.payload, input.payload)
+  );
+}
+
+function equalJsonValues(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (left === null || right === null) return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => equalJsonValues(value, right[index]))
+    );
+  }
+  if (typeof left !== 'object' || typeof right !== 'object') return false;
+
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord);
+  const rightKeys = Object.keys(rightRecord);
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key) =>
+        Object.prototype.hasOwnProperty.call(rightRecord, key) &&
+        equalJsonValues(leftRecord[key], rightRecord[key]),
+    )
   );
 }
 
