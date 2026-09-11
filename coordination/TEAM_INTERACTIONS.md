@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T05:11:10.698789+00:00
+- Last sync: 2026-09-11T06:14:38.740400+00:00
 
 ## Team Room charter
 
@@ -11848,5 +11848,64 @@ WU23:
 No new Slack `Report Progress` owner command was found. The Dubai-day coffee reminder has already been issued, so no reminder spam.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5629800510
+
+---
+
+### 2026-09-11T05:53:44Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 5353 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5630129564
+
+---
+
+### 2026-09-11T05:53:45Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 606 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5630129702
+
+---
+
+### 2026-09-11T05:53:46Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5630129851
+
+---
+
+### 2026-09-11T06:14:28Z — NTinkicht
+
+CHECKPOINT — WU23 failover is now repository-backed.
+
+Live reconciliation confirmed Codex's reported `9636272...` artifact never existed in GitHub. The recorded `WU23-IMPLEMENT-001` failover to ChatGPT therefore remains authoritative. I preserved the sole canonical branch `wu23-notification-retry-eligibility`, added the first real product commit `5b536af1146ed30e066b755273fdabde7d6af9c5` (retry eligibility persistence/index foundation), and opened draft PR #144 closing #143. No duplicate stream was created.
+
+Exact-head CI #622 is currently in progress on `5b536af1...`; this head is not merge-ready and ChatGPT is recused from self-gating. Remaining same-PR implementation includes deterministic outcome-derived deadlines/backoff/exhaustion/idempotency plus the published PostgreSQL boundary/concurrency/supersession/token/clinic/migration-chain coverage. Final gate must be independent and exact-head; CodeRabbit full review will be requested only after a coherent implementation head is green.
+
+`coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots; live GitHub overrides them. Gemini Agent/Chat remain paused/off-roster.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5630300183
 
 ---
