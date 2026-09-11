@@ -23,6 +23,7 @@ const committedMigrations = [
   '0015_guest_status_rate_limit.sql',
   '0016_notification_outbox_foundation.sql',
   '0017_notification_dispatch_claim.sql',
+  '0018_notification_dispatch_outcomes.sql',
 ];
 
 beforeAll(async () => {
