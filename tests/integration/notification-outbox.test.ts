@@ -5,6 +5,7 @@ import { migrate } from '../../scripts/db/lib';
 import {
   NotificationOutboxConflictError,
   NotificationOutboxRepository,
+  NotificationOutboxValidationError,
 } from '@/modules/notification-outbox';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 12 });
@@ -135,6 +136,30 @@ describe('notification outbox repository', () => {
       'SELECT count(*)::text AS count FROM notification_outbox',
     );
     expect(count.rows[0]?.count).toBe('1');
+  });
+
+  it('rejects unsupported non-JSON payload values before persistence', async () => {
+    const repository = new NotificationOutboxRepository(pool);
+    const invalidPayloads: Array<Record<string, unknown>> = [
+      { occurredAt: new Date('2026-09-11T00:00:00Z') },
+      { minutes: Number.NaN },
+      { minutes: Number.POSITIVE_INFINITY },
+      { nested: { optional: undefined } },
+    ];
+
+    for (const [index, payload] of invalidPayloads.entries()) {
+      await expect(
+        repository.enqueue({
+          ...input(clinicA, 1, `invalid-json-${index}`),
+          payload,
+        }),
+      ).rejects.toBeInstanceOf(NotificationOutboxValidationError);
+    }
+
+    const count = await pool.query<{ count: string }>(
+      'SELECT count(*)::text AS count FROM notification_outbox',
+    );
+    expect(count.rows[0]?.count).toBe('0');
   });
 
   it('serializes concurrent retries and competing enqueues deterministically', async () => {
