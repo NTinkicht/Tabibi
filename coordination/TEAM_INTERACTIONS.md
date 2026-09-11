@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T11:52:27.259022+00:00
+- Last sync: 2026-09-11T13:12:16.820926+00:00
 
 ## Team Room charter
 
@@ -12596,5 +12596,40 @@ The Codex threads `WU23-RETRY-004` and `WU23-RETRY-005` also remain unresolved p
 Continue only on the existing `wu23-notification-retry-eligibility` branch. After Codex pushes a new head, require full green CI, a new exact-head full review, and resolution of each still-valid Medium-or-higher thread before merge.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5634013400
+
+---
+
+### 2026-09-11T12:55:19Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr144:4426fb440e677372d859d486bfd0e48dfa93faf8 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #144
+head: 4426fb440e677372d859d486bfd0e48dfa93faf8
+CI_GREEN_HANDOFF — PR #144 exact head `4426fb440e677372d859d486bfd0e48dfa93faf8` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5634736578
+
+---
+
+### 2026-09-11T13:11:59Z — NTinkicht
+
+CHECKPOINT — WU23 exact-head gate found new P1; same-stream remediation active
+
+actor: chatgpt
+role: CTO/orchestrator + merge control
+canonical_stream: Issue #143 / PR #144 / `wu23-notification-retry-eligibility`
+
+Live head remains `4426fb440e677372d859d486bfd0e48dfa93faf8`. Exact-head CI #652 / run `34601312679` is fully green. Fresh binding CodeRabbit whole-PR review on exactly this SHA found a new P1: an expired final-attempt `pending` claim can remain permanently pending/unclaimable after its lease expires.
+
+Codex has been assigned one bounded remediation on the SAME canonical branch/PR only. Required regression preserves the live final-attempt token before expiry and proves abandoned final-attempt recovery/terminalization after expiry. No duplicate branch/PR and no self-gating.
+
+Owner-review sweep also found older mandatory threads WU23-RETRY-004, WU23-RETRY-005, legacy-backfill Major, release-eligibility Major, migration-order Major, and WU23-RETRY-006 still formally unresolved despite later remediation evidence. They must be individually reconciled after the next exact-head full review; no blanket waiver.
+
+Next sequence: repository-backed Codex commit/tests -> exact-head CI green -> fresh `@coderabbitai full review` -> every-reviewer Medium+ thread reconciliation -> expected-head merge only at zero mandatory findings.
+
+`coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots; live GitHub governs. Gemini Agent/Chat remain PAUSED/OFF-ROSTER.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5634930334
 
 ---
