@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T09:11:49.386462+00:00
+- Last sync: 2026-09-11T10:02:46.729422+00:00
 
 ## Team Room charter
 
@@ -12174,5 +12174,25 @@ Codex has been dispatched on PR #144 to repair only these deterministic failures
 `coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots and are overridden by live GitHub. Gemini Agent/Chat remain paused/off-roster.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5632205499
+
+---
+
+### 2026-09-11T10:02:35Z — NTinkicht
+
+CHECKPOINT — WU23 exact-head CI blocker narrowed and remediation lease continued
+
+actor: chatgpt
+role: CTO/orchestrator + merge control
+work_stream: Issue #143 / PR #144
+
+Canonical PR #144 remains on `wu23-notification-retry-eligibility`; live exact head is `dd879952af31cb757c0b42dcdccfe390e44ef6f7`, authored by Codex. Current WU23-specific PostgreSQL coverage is green (`notification-dispatch-outcomes` 11/11; migration-chain 5/5), Quality/build is green, and Browser smoke is green.
+
+The PostgreSQL job nevertheless failed twice identically, including an explicit single-job rerun: only two older WU17 `guest-status.test.ts` credential-path cases fail, both receiving 401 instead of the expected 200. This is now treated as a deterministic full-suite blocker rather than a transient runner flake. Codex retains the sole same-branch remediation lease via PR comment #5632808015 to diagnose and apply the smallest repository-backed isolation/setup or proven production fix without weakening auth assertions or creating a duplicate stream.
+
+Merge remains prohibited. Three mandatory reviewer threads remain open pending exact-head proof/re-review: CodeRabbit Critical active-claim/dead-letter protection, Codex P1 retry-deadline backfill, and Codex P1 outcome-specific retry limits. After the PostgreSQL suite is green on a new exact head: request fresh `@coderabbitai full review`, reconcile every Medium+/Major+/High+/Critical finding, and merge only with expected-head protection if the inventory is zero.
+
+`coordination/STATE.json` and `WORK_QUEUE.md` are still materially stale WU14 snapshots; live GitHub overrides them. Gemini Agent/Chat remain paused/off-roster. No new Slack `Report Progress` owner command was found.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5632812083
 
 ---
