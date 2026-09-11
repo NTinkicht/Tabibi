@@ -141,7 +141,7 @@ describe('NotificationDispatchService', () => {
     { kind: 'delivered', code: { provider: 'bad-shape' } },
   ])(
     'records malformed fulfilled provider result %# as unknown',
-    async result => {
+    async (result) => {
       const dispatchStore = store({ completed: intent({ state: 'unknown' }) });
       const dispatch = vi.fn(
         async () => result,
