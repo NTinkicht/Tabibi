@@ -98,12 +98,13 @@ describe('notification dispatch eligibility and bounded batch', () => {
     await pool.query(
       `UPDATE notification_outbox
           SET created_at = CASE id
-            WHEN $1 THEN TIMESTAMPTZ '2026-09-11 00:00:03+00'
-            WHEN $2 THEN TIMESTAMPTZ '2026-09-11 00:00:01+00'
-            ELSE TIMESTAMPTZ '2026-09-11 00:00:02+00'
+            WHEN $1::uuid THEN TIMESTAMPTZ '2026-09-11 00:00:03+00'
+            WHEN $2::uuid THEN TIMESTAMPTZ '2026-09-11 00:00:01+00'
+            WHEN $3::uuid THEN TIMESTAMPTZ '2026-09-11 00:00:02+00'
+            ELSE created_at
           END
-        WHERE id = ANY($4::uuid[])`,
-      [first.id, second.id, third.id, [first.id, second.id, third.id]],
+        WHERE id IN ($1::uuid, $2::uuid, $3::uuid)`,
+      [first.id, second.id, third.id],
     );
 
     const selected = await scanner.listEligible({
