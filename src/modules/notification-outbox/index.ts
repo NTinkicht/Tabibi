@@ -50,17 +50,33 @@ interface IntentRow {
 const sensitivePayloadKey =
   /(password|passcode|secret|token|credential|diagnosis|medication|clinical|medical_record|access_key|api_key)/i;
 
+function isPlainJsonObject(value: object): boolean {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
 function assertPrivacyMinimalPayload(value: unknown, path = 'payload'): void {
-  if (value === null || ['string', 'number', 'boolean'].includes(typeof value))
+  if (value === null || typeof value === 'string' || typeof value === 'boolean')
     return;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value))
+      throw new NotificationOutboxValidationError(
+        `${path} contains a non-finite number`,
+      );
+    return;
+  }
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1)
       assertPrivacyMinimalPayload(value[index], `${path}[${index}]`);
     return;
   }
-  if (typeof value !== 'object')
+  if (typeof value !== 'object' || !isPlainJsonObject(value))
     throw new NotificationOutboxValidationError(
-      `${path} contains an unsupported value`,
+      `${path} contains an unsupported non-JSON value`,
+    );
+  if (Object.getOwnPropertySymbols(value).length > 0)
+    throw new NotificationOutboxValidationError(
+      `${path} contains unsupported symbol-keyed data`,
     );
 
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
