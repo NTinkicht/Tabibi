@@ -2,6 +2,9 @@ ALTER TABLE notification_outbox
   DROP CONSTRAINT notification_outbox_check,
   DROP CONSTRAINT notification_outbox_dispatch_claim_check;
 
+DROP INDEX notification_outbox_pending_target_idx;
+DROP INDEX notification_outbox_dispatch_claim_eligible_idx;
+
 ALTER TABLE notification_outbox ALTER COLUMN state DROP DEFAULT;
 ALTER TYPE notification_outbox_state RENAME TO notification_outbox_state_wu20;
 CREATE TYPE notification_outbox_state AS ENUM (
@@ -63,7 +66,10 @@ ALTER TABLE notification_outbox
     (state = 'superseded')
   );
 
-DROP INDEX notification_outbox_dispatch_claim_eligible_idx;
+CREATE INDEX notification_outbox_pending_target_idx
+  ON notification_outbox (clinic_id, logical_target_key, event_key, intent_version DESC)
+  WHERE state IN ('pending', 'failed', 'unknown');
+
 CREATE INDEX notification_outbox_dispatch_claim_eligible_idx
   ON notification_outbox (clinic_id, created_at, id)
   WHERE state IN ('pending', 'failed', 'unknown');
