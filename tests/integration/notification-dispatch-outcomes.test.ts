@@ -193,6 +193,43 @@ describe('notification dispatch outcomes', () => {
     },
   );
 
+  it('preserves an active final-attempt claim until its owner completes it', async () => {
+    const repository = new NotificationOutboxRepository(pool);
+    const intent = await repository.enqueue(input(1, 'active-final-claim'));
+    await pool.query(
+      `UPDATE notification_outbox
+          SET state='failed',
+              dispatch_attempt_count=1,
+              dispatch_max_attempts=2,
+              next_attempt_at=now()
+        WHERE id=$1`,
+      [intent.id],
+    );
+
+    const finalClaim = await claim(repository, intent.id);
+    expect(finalClaim.intent.dispatchAttemptCount).toBe(2);
+
+    await expect(
+      repository.claimPendingIntent({
+        clinicId: clinicA,
+        intentId: intent.id,
+        leaseMs: 60_000,
+      }),
+    ).resolves.toBeNull();
+
+    await expect(
+      repository.completeDispatchAttempt({
+        clinicId: clinicA,
+        intentId: intent.id,
+        claimToken: finalClaim.claimToken,
+        outcome: 'delivered',
+      }),
+    ).resolves.toMatchObject({
+      state: 'delivered',
+      dispatchAttemptCount: 2,
+    });
+  });
+
   it('fences wrong, cross-clinic, and replaced attempt tokens', async () => {
     const repository = new NotificationOutboxRepository(pool);
     const intent = await repository.enqueue(input(1, 'fenced-outcome'));
