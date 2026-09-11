@@ -87,9 +87,7 @@ beforeEach(async () => {
 });
 afterAll(async () => pool.end());
 
-async function liveBearer(
-  issuedAt = new Date('2026-09-10T09:00:00Z'),
-) {
+async function liveBearer(issuedAt = new Date('2026-09-10T09:00:00Z')) {
   const service = new GuestAccessService(pool);
   const issued = await service.issue(target, ids.actor, issuedAt);
   return service.consume(
