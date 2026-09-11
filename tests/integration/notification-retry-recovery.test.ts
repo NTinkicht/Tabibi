@@ -197,6 +197,82 @@ describe('notification retry recovery', () => {
     expect(replacement?.claimToken).not.toBe(abandoned?.claimToken);
   });
 
+  it('preserves an active final pending claim and terminalizes it after lease expiry', async () => {
+    const repository = new NotificationOutboxRepository(pool);
+    const intent = await repository.enqueue(input(1, 'final-pending-expiry'));
+    await pool.query(
+      'UPDATE notification_outbox SET dispatch_max_attempts=1 WHERE id=$1',
+      [intent.id],
+    );
+
+    const finalClaim = await repository.claimPendingIntent({
+      clinicId,
+      intentId: intent.id,
+      leaseMs: 60_000,
+    });
+    expect(finalClaim?.intent.dispatchAttemptCount).toBe(1);
+
+    await expect(
+      repository.claimPendingIntent({
+        clinicId,
+        intentId: intent.id,
+        leaseMs: 60_000,
+      }),
+    ).resolves.toBeNull();
+
+    const active = await pool.query<{
+      state: string;
+      dispatch_claim_token: string | null;
+    }>(
+      'SELECT state, dispatch_claim_token FROM notification_outbox WHERE id=$1',
+      [intent.id],
+    );
+    expect(active.rows[0]).toMatchObject({
+      state: 'pending',
+      dispatch_claim_token: finalClaim!.claimToken,
+    });
+
+    await pool.query(
+      `UPDATE notification_outbox
+          SET dispatch_claim_expires_at=now() - interval '1 millisecond'
+        WHERE id=$1`,
+      [intent.id],
+    );
+
+    await expect(
+      repository.claimPendingIntent({
+        clinicId,
+        intentId: intent.id,
+        leaseMs: 60_000,
+      }),
+    ).resolves.toBeNull();
+
+    const exhausted = await pool.query<{
+      state: string;
+      dispatch_claim_token: string | null;
+      next_attempt_at: Date | null;
+    }>(
+      `SELECT state, dispatch_claim_token, next_attempt_at
+         FROM notification_outbox
+        WHERE id=$1`,
+      [intent.id],
+    );
+    expect(exhausted.rows[0]).toMatchObject({
+      state: 'dead_letter',
+      dispatch_claim_token: null,
+      next_attempt_at: null,
+    });
+
+    await expect(
+      repository.completeDispatchAttempt({
+        clinicId,
+        intentId: intent.id,
+        claimToken: finalClaim!.claimToken,
+        outcome: 'delivered',
+      }),
+    ).resolves.toBeNull();
+  });
+
   it('does not exhaust pending work on explicit release and terminalizes expired final attempts', async () => {
     const repository = new NotificationOutboxRepository(pool);
     const intent = await repository.enqueue(input(1, 'abandoned-pending'));
