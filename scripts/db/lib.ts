@@ -5,6 +5,7 @@ import { Client } from 'pg';
 import { getEnvironment } from '../../src/platform/config/env';
 
 const migrationDirectory = resolve(process.cwd(), 'db/migrations');
+const nonTransactionalMarker = '-- tabibi:no-transaction';
 
 export async function migrate(): Promise<void> {
   const client = new Client({
@@ -31,6 +32,16 @@ export async function migrate(): Promise<void> {
           throw new Error(`Applied migration was modified: ${name}`);
         continue;
       }
+
+      if (sql.trimStart().startsWith(nonTransactionalMarker)) {
+        await client.query(sql);
+        await client.query(
+          'INSERT INTO schema_migrations (name, checksum) VALUES ($1, $2)',
+          [name, checksum],
+        );
+        continue;
+      }
+
       await client.query('BEGIN');
       try {
         await client.query(sql);
