@@ -88,6 +88,50 @@ describe('notification dispatch eligibility and bounded batch', () => {
     ).rejects.toThrow('Dispatch batch size must be between 1 and');
   });
 
+  it('recovers an expired claimed retry even though claiming cleared its retry deadline', async () => {
+    const outbox = new NotificationOutboxRepository(pool);
+    const scanner = new NotificationDispatchEligibilityRepository(pool);
+    const retry = await outbox.enqueue(input(clinicA, 'expired-retry-claim'));
+    const initialClaim = await outbox.claimPendingIntent({
+      clinicId: clinicA,
+      intentId: retry.id,
+      leaseMs: 60_000,
+    });
+    await outbox.completeDispatchAttempt({
+      clinicId: clinicA,
+      intentId: retry.id,
+      claimToken: initialClaim!.claimToken,
+      outcome: 'failed',
+    });
+    await pool.query(
+      `UPDATE notification_outbox
+          SET next_attempt_at = now() - interval '1 second'
+        WHERE id=$1`,
+      [retry.id],
+    );
+
+    const retryClaim = await outbox.claimPendingIntent({
+      clinicId: clinicA,
+      intentId: retry.id,
+      leaseMs: 60_000,
+    });
+    expect(retryClaim).not.toBeNull();
+    await expect(
+      scanner.listEligible({ clinicId: clinicA, limit: 10 }),
+    ).resolves.toEqual([]);
+
+    await pool.query(
+      `UPDATE notification_outbox
+          SET dispatch_claim_expires_at = now() - interval '1 second'
+        WHERE id=$1`,
+      [retry.id],
+    );
+
+    await expect(
+      scanner.listEligible({ clinicId: clinicA, limit: 10 }),
+    ).resolves.toEqual([expect.objectContaining({ intentId: retry.id })]);
+  });
+
   it('orders by due time with stable tie breakers and applies the requested limit', async () => {
     const outbox = new NotificationOutboxRepository(pool);
     const scanner = new NotificationDispatchEligibilityRepository(pool);
