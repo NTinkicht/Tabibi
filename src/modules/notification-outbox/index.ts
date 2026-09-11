@@ -51,10 +51,7 @@ const sensitivePayloadKey =
   /(password|passcode|secret|token|credential|diagnosis|medication|clinical|medical_record|access_key|api_key)/i;
 
 function assertPrivacyMinimalPayload(value: unknown, path = 'payload'): void {
-  if (
-    value === null ||
-    ['string', 'number', 'boolean'].includes(typeof value)
-  )
+  if (value === null || ['string', 'number', 'boolean'].includes(typeof value))
     return;
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1)
@@ -135,10 +132,7 @@ function toIntent(row: IntentRow): NotificationIntent {
   };
 }
 
-function sameIntent(
-  row: IntentRow,
-  input: ReturnType<typeof normalizeInput>,
-) {
+function sameIntent(row: IntentRow, input: ReturnType<typeof normalizeInput>) {
   return (
     row.logical_target_key === input.logicalTargetKey &&
     row.event_key === input.eventKey &&
@@ -174,9 +168,12 @@ export class NotificationOutboxRepository {
     const input = normalizeInput(rawInput);
 
     return inTransaction(this.pool, async (client) => {
-      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
-        `notification-outbox:${input.clinicId}:${input.logicalTargetKey}:${input.eventKey}`,
-      ]);
+      await client.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [
+          `notification-outbox:${input.clinicId}:${input.logicalTargetKey}:${input.eventKey}`,
+        ],
+      );
 
       const retry = await loadByIdempotencyKey(
         client,
