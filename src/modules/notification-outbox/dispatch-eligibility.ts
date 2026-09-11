@@ -1,5 +1,7 @@
 import type { Pool } from 'pg';
-import { NotificationOutboxValidationError } from '@/modules/notification-outbox';
+import {
+  NotificationOutboxValidationError,
+} from '@/modules/notification-outbox';
 
 export const MAX_NOTIFICATION_DISPATCH_BATCH_SIZE = 100;
 
@@ -18,7 +20,9 @@ interface EligibleIntentRow {
   eligible_at: Date;
 }
 
-function normalizeEligibilityInput(input: ListNotificationDispatchEligibleInput) {
+function normalizeEligibilityInput(
+  input: ListNotificationDispatchEligibleInput,
+) {
   const clinicId = input.clinicId.trim();
   if (!clinicId)
     throw new NotificationOutboxValidationError('Clinic id is required');
