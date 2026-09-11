@@ -26,7 +26,7 @@ END;
 $$;
 
 CREATE TRIGGER notification_outbox_retry_budget_guard
-BEFORE INSERT OR UPDATE OF state, dispatch_attempt_count, next_attempt_at, dispatch_max_attempts
+BEFORE INSERT OR UPDATE OF state, dispatch_max_attempts
 ON notification_outbox
 FOR EACH ROW
 EXECUTE FUNCTION notification_outbox_apply_retry_budget();

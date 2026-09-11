@@ -119,7 +119,7 @@ describe('notification dispatch outcomes', () => {
       expect(completed).toMatchObject({
         state: outcome,
         dispatchAttemptCount: 1,
-        dispatchMaxAttempts: 3,
+        dispatchMaxAttempts: outcome === 'failed' ? 5 : 4,
       });
       expect(
         new Date(completed!.nextAttemptAt!).getTime() -
@@ -201,6 +201,8 @@ describe('notification dispatch outcomes', () => {
           SET state='failed',
               dispatch_attempt_count=1,
               dispatch_max_attempts=2,
+              dispatch_last_attempt_at=now(),
+              dispatch_outcome_at=now(),
               next_attempt_at=now()
         WHERE id=$1`,
       [intent.id],

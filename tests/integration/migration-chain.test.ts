@@ -301,7 +301,9 @@ describe('committed migration chain', () => {
     );
     const statements = migration
       .split(';')
-      .map((statement) => statement.replace('-- tabibi:no-transaction', '').trim())
+      .map((statement) =>
+        statement.replace('-- tabibi:no-transaction', '').trim(),
+      )
       .filter(Boolean);
 
     await client.query(
