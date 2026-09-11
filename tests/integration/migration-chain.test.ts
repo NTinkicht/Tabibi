@@ -290,4 +290,43 @@ describe('committed migration chain', () => {
     expect(migration).toContain('CREATE INDEX CONCURRENTLY');
     expect(migration).toContain('DROP INDEX CONCURRENTLY');
   });
+
+  it('recovers safely when an interrupted concurrent retry-index build leaves the temporary index behind', async () => {
+    const migration = await readFile(
+      resolve(
+        process.cwd(),
+        'db/migrations/0021_notification_retry_claim_index.sql',
+      ),
+      'utf8',
+    );
+    const statements = migration
+      .split(';')
+      .map((statement) => statement.replace('-- tabibi:no-transaction', '').trim())
+      .filter(Boolean);
+
+    await client.query(
+      'DROP INDEX CONCURRENTLY IF EXISTS notification_outbox_dispatch_claim_eligible_idx_wu23',
+    );
+    await client.query(
+      `CREATE INDEX notification_outbox_dispatch_claim_eligible_idx_wu23
+         ON notification_outbox (clinic_id, created_at)`,
+    );
+
+    for (const statement of statements) await client.query(statement);
+
+    const recovered = await client.query<{
+      canonical: string;
+      temporary: string | null;
+    }>(
+      `SELECT
+         pg_get_indexdef(
+           'notification_outbox_dispatch_claim_eligible_idx'::regclass
+         ) canonical,
+         to_regclass(
+           'notification_outbox_dispatch_claim_eligible_idx_wu23'
+         )::text temporary`,
+    );
+    expect(recovered.rows[0]?.canonical).toContain('next_attempt_at');
+    expect(recovered.rows[0]?.temporary).toBeNull();
+  });
 });
