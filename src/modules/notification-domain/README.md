@@ -29,3 +29,20 @@ deduplicate a later retry. Payload content and attempt counters are not included
 in that key. WU24 intentionally defines no real SMS, WhatsApp, push, credential,
 scheduler, or network implementation; those remain later bounded slices behind
 this contract.
+
+WU25 adds a deterministic, clinic-scoped discovery and bounded execution layer.
+`NotificationDispatchEligibilityRepository` returns only intent identifiers and
+their eligibility timestamp; it never returns notification payloads. It excludes
+terminal/superseded intents, exhausted attempt budgets, not-yet-due retries, and
+active unexpired claims, then orders eligible rows by due time with stable
+persisted tie breakers. Batch size is explicitly bounded to 1-100 intents.
+
+`NotificationDispatchBatchRunner` consumes that read-only scan and invokes the
+existing single-intent dispatch boundary once per selected identifier. Selection
+is not ownership: concurrent runners still race through the WU21 atomic claim
+fence, so a losing runner records `notClaimed` rather than creating a second
+ownership mechanism. The returned batch summary contains aggregate counts only
+(`selected`, `completed`, `notClaimed`, `claimLost`) and therefore does not expose
+provider payloads or patient-sensitive notification data. WU25 deliberately does
+not add a timer, cron process, daemon, queue consumer, real provider network call,
+or cross-clinic scheduler.
