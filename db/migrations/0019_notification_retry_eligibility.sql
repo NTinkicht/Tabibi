@@ -39,8 +39,21 @@ SET dispatch_max_attempts = CASE
     next_attempt_at = CASE
       WHEN state = 'unknown' AND dispatch_attempt_count < 4
         THEN COALESCE(dispatch_last_attempt_at, dispatch_outcome_at, created_at, now())
+             + CASE dispatch_attempt_count
+                 WHEN 1 THEN interval '1 minute'
+                 WHEN 2 THEN interval '5 minutes'
+                 WHEN 3 THEN interval '15 minutes'
+                 ELSE interval '1 hour'
+               END
       WHEN state = 'failed' AND dispatch_attempt_count < 5
         THEN COALESCE(dispatch_last_attempt_at, dispatch_outcome_at, created_at, now())
+             + CASE dispatch_attempt_count
+                 WHEN 1 THEN interval '1 minute'
+                 WHEN 2 THEN interval '5 minutes'
+                 WHEN 3 THEN interval '15 minutes'
+                 WHEN 4 THEN interval '1 hour'
+                 ELSE interval '4 hours'
+               END
       ELSE NULL
     END
 WHERE state IN ('failed', 'unknown');
