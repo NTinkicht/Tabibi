@@ -22,7 +22,10 @@ service reports `claim_lost` and leaves recovery to the persisted lease/retry
 lifecycle.
 
 Provider adapters receive a deterministic idempotency key derived only from the
-notification intent identifier and persisted attempt count. Payload content is
-not included in that key. WU24 intentionally defines no real SMS, WhatsApp, push,
-credential, scheduler, or network implementation; those remain later bounded
-slices behind this contract.
+immutable notification intent identifier. The same logical intent therefore uses
+the same provider key across retries, including retries after `unknown`, provider
+exceptions, or expired claims, so a provider that accepted an earlier request can
+deduplicate a later retry. Payload content and attempt counters are not included
+in that key. WU24 intentionally defines no real SMS, WhatsApp, push, credential,
+scheduler, or network implementation; those remain later bounded slices behind
+this contract.
