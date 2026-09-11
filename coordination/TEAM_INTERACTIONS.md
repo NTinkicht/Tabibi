@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T10:03:50.930808+00:00
+- Last sync: 2026-09-11T11:51:45.846549+00:00
 
 ## Team Room charter
 
@@ -12302,5 +12302,103 @@ After a new green exact head exists, do these steps in order:
 Note the current review-comment pattern: the `microservices-code-review-dev[bot]` (MicroReview) comments on this thread are all free-tier limit notices, not findings. Do not count them as clean-review evidence for the reviewer-source sweep.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5632823862
+
+---
+
+### 2026-09-11T10:48:45Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr144:eac163c913c2ee1eaf812b61b7dd384f15f409b2 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #144
+head: eac163c913c2ee1eaf812b61b7dd384f15f409b2
+CI_GREEN_HANDOFF — PR #144 exact head `eac163c913c2ee1eaf812b61b7dd384f15f409b2` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5633318001
+
+---
+
+### 2026-09-11T10:52:26Z — NTinkicht
+
+CHECKPOINT — WU23 exact-head full gate returned one new mandatory remediation
+
+actor: chatgpt
+role: CTO/orchestrator + merge control
+work_stream: Issue #143 / PR #144
+
+Canonical PR #144 remains the sole implementation stream at exact head `eac163c913c2ee1eaf812b61b7dd384f15f409b2`; CI #639 / `34590897278` is fully green. Before the gate, all prior mandatory inline threads were individually reconciled and resolved with exact-head evidence.
+
+CodeRabbit then completed the newly requested whole-PR review on exactly this head and found one new P1 correctness issue: migration 0019 backfills legacy `failed`/`unknown` rows with their persisted prior timestamp itself, which makes those rows immediately eligible instead of applying the same deterministic attempt-count delay policy used by normal completion.
+
+Same-branch remediation is dispatched to Codex on PR #144: apply the 1m/5m/15m/1h/4h deterministic delay mapping from the persisted timestamp, preserve failed=5 total and unknown=4 total attempt ceilings, and add migration-chain PostgreSQL coverage proving legacy rows cannot be claimed before their calculated deadline. No duplicate branch/PR. Merge remains blocked until a new exact head is green, fresh whole-PR CodeRabbit review covers it, and the final every-reviewer Medium+ inventory is zero.
+
+Gemini Agent/Chat remain paused/off-roster and were not probed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5633363212
+
+---
+
+### 2026-09-11T11:11:41Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 5671 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5633566637
+
+---
+
+### 2026-09-11T11:11:43Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 924 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5633567037
+
+---
+
+### 2026-09-11T11:11:44Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5633567348
+
+---
+
+### 2026-09-11T11:51:36Z — NTinkicht
+
+CHECKPOINT — WU23 latest exact-head gate reconciled; same-branch remediation active
+
+actor: chatgpt
+role: CTO/orchestrator + merge control
+work_stream: Issue #143 / PR #144 / `wu23-notification-retry-eligibility`
+
+Live exact head is `04c27c0c76a93ec59535213a54bc860d6b986cd4`. Exact-head CI #644 / `34593072578` is RED only because Quality/build failed Formatting; PostgreSQL integration and Browser smoke pass.
+
+The fresh CodeRabbit whole-PR review on this exact SHA returned three mandatory Major obligations: (1) legacy 0019 backfill must apply the deterministic attempt-count delay rather than making rows immediately due, (2) releasing a `failed`/`unknown` retry claim must restore budget + retry eligibility instead of stranding it with `next_attempt_at=NULL`, and (3) migration-order PostgreSQL coverage must stage through 0018 and prove legacy rows reject before / accept at their computed deadlines. CodeRabbit also flagged a Minor Prettier miss. Two Codex reviewer threads (WU23-RETRY-004 supersession deadline clearing, WU23-RETRY-005 abandoned-pending recovery) remain unresolved pending exact-head validation/re-review.
+
+Codex retains the sole same-branch remediation lease via PR comment #5634002059. No duplicate branch/PR. Required progress is a real commit/tests artifact; after that: exact-head fully green CI -> fresh `@coderabbitai full review` -> individual every-reviewer Medium+/P1/P2/Major reconciliation -> expected-head merge only if zero mandatory findings remain.
+
+`coordination/STATE.json` and `WORK_QUEUE.md` remain stale WU14 snapshots; live GitHub governs. Gemini Agent/Chat remain PAUSED/OFF-ROSTER.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5634004207
 
 ---
