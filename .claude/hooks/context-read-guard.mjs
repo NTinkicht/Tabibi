@@ -13,11 +13,6 @@ const bootstrapAllowlist = new Set([
   "coordination/WORK_QUEUE.md",
   "coordination/AI_CAPACITY_POLICY.md",
   "coordination/CONTEXT_ROUTER.md",
-  "AGENTS.md",
-  "PRODUCT.md",
-  "ARCHITECTURE.md",
-  "SECURITY.md",
-  "CLAUDE.md",
 ]);
 
 function allow() {
