@@ -371,6 +371,7 @@ export class NotificationOutboxRepository {
             SET state='superseded',
                 superseded_by_id=$4,
                 superseded_at=now(),
+                next_attempt_at=NULL,
                 dispatch_claim_token=NULL,
                 dispatch_claimed_at=NULL,
                 dispatch_claim_expires_at=NULL
@@ -397,6 +398,28 @@ export class NotificationOutboxRepository {
     const input = normalizeClaimInput(rawInput);
     const claimToken = randomUUID();
     return inTransaction(this.pool, async (client) => {
+      await client.query(
+        `UPDATE notification_outbox
+            SET state='unknown',
+                next_attempt_at=now() + CASE dispatch_attempt_count
+                  WHEN 1 THEN interval '1 minute'
+                  WHEN 2 THEN interval '5 minutes'
+                  WHEN 3 THEN interval '15 minutes'
+                  WHEN 4 THEN interval '1 hour'
+                  ELSE interval '4 hours'
+                END,
+                dispatch_outcome_at=COALESCE(dispatch_outcome_at, now()),
+                dispatch_outcome_code=COALESCE(dispatch_outcome_code, 'claim_lease_expired'),
+                dispatch_claim_token=NULL,
+                dispatch_claimed_at=NULL,
+                dispatch_claim_expires_at=NULL
+          WHERE clinic_id=$1
+            AND id=$2
+            AND state='pending'
+            AND dispatch_claim_token IS NOT NULL
+            AND dispatch_claim_expires_at <= now()`,
+        [input.clinicId, input.intentId],
+      );
       await client.query(
         `UPDATE notification_outbox
             SET state='dead_letter',
@@ -463,7 +486,11 @@ export class NotificationOutboxRepository {
 
     const result = await this.pool.query(
       `UPDATE notification_outbox
-          SET dispatch_claim_token=NULL,
+          SET dispatch_attempt_count=CASE
+                WHEN state='pending' THEN GREATEST(dispatch_attempt_count - 1, 0)
+                ELSE dispatch_attempt_count
+              END,
+              dispatch_claim_token=NULL,
               dispatch_claimed_at=NULL,
               dispatch_claim_expires_at=NULL
         WHERE clinic_id=$1
