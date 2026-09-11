@@ -5,7 +5,10 @@ import {
   type NotificationDispatchExecutor,
 } from '@/modules/notification-domain/dispatch-batch';
 
-function candidate(intentId: string, eligibleAt = '2026-09-11T00:00:00.000Z') {
+function candidate(
+  intentId: string,
+  eligibleAt = '2026-09-11T00:00:00.000Z',
+) {
   return { intentId, eligibleAt };
 }
 
@@ -39,7 +42,10 @@ describe('NotificationDispatchBatchRunner', () => {
       notClaimed: 1,
       claimLost: 1,
     });
-    expect(listEligible).toHaveBeenCalledWith({ clinicId: 'clinic-1', limit: 3 });
+    expect(listEligible).toHaveBeenCalledWith({
+      clinicId: 'clinic-1',
+      limit: 3,
+    });
     expect(dispatchOne.mock.calls.map(([input]) => input.intentId)).toEqual([
       'intent-1',
       'intent-2',
@@ -56,7 +62,9 @@ describe('NotificationDispatchBatchRunner', () => {
       { dispatchOne },
     );
 
-    await expect(runner.run({ clinicId: 'clinic-1', limit: 10 })).resolves.toEqual({
+    await expect(
+      runner.run({ clinicId: 'clinic-1', limit: 10 }),
+    ).resolves.toEqual({
       selected: 0,
       completed: 0,
       notClaimed: 0,
