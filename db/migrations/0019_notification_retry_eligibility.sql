@@ -6,14 +6,11 @@ ALTER TABLE notification_outbox
 ALTER TABLE notification_outbox
   ADD CONSTRAINT notification_outbox_retry_schedule_check
   CHECK (
-    (state = 'pending' AND next_attempt_at IS NULL)
-    OR
-    (state IN ('failed', 'unknown')
-      AND next_attempt_at IS NOT NULL
-      AND dispatch_attempt_count < dispatch_max_attempts)
-    OR
-    (state IN ('delivered', 'dead_letter', 'superseded')
-      AND next_attempt_at IS NULL)
+    next_attempt_at IS NULL
+    OR (
+      state IN ('failed', 'unknown')
+      AND dispatch_attempt_count < dispatch_max_attempts
+    )
   );
 
 DROP INDEX notification_outbox_dispatch_claim_eligible_idx;
