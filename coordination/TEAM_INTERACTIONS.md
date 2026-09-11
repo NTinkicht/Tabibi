@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T14:56:44.571769+00:00
+- Last sync: 2026-09-11T15:54:31.920969+00:00
 
 ## Team Room charter
 
@@ -12987,5 +12987,30 @@ Canonical branch required: `wu25-notification-dispatch-batch`.
 Codex must produce repository-backed commit/test/PR evidence within 30 minutes unless a visible deterministic job is progressing. One canonical implementation stream only; no dummy or duplicate PR. ChatGPT retains CTO/orchestration/failover/merge control. Gemini Agent/Chat remain PAUSED/OFF-ROSTER.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5636352505
+
+---
+
+### 2026-09-11T15:54:18Z — NTinkicht
+
+CHECKPOINT — WU25 failover is now repository-backed
+
+actor: chatgpt
+role: CTO/orchestrator + current failover implementer
+canonical_stream: Issue #148 / PR #149 / `wu25-notification-dispatch-batch`
+
+Live reconciliation confirmed Codex produced no repository artifact inside the 30-minute evidence window, so the recorded `WU25-IMPLEMENT-001` failover to ChatGPT remains authoritative. No competing WU25 stream exists.
+
+Current exact head: `4d4c1479acdda7f2705197204ec42620b1284dd6`.
+Repository-backed artifacts now include:
+- clinic-scoped bounded eligibility scanner returning only intent id + eligibility timestamp;
+- deterministic due-time/stable ordering and 1..100 batch bound;
+- bounded application batch runner layered over the existing WU24 single-intent claim fence;
+- aggregate-only selected/completed/notClaimed/claimLost summary;
+- focused unit and PostgreSQL integration coverage, including clinic isolation, not-yet-due/active-claim exclusion, ordering/limit, and concurrent runner single-provider ownership;
+- notification-domain documentation.
+
+Canonical draft PR #149 is open and closes #148. Exact-head CI #673 / run `34618833962` is pending. ChatGPT authored this head and is recused from sole gating review. After coherent green CI, use a fresh whole-PR CodeRabbit review and reconcile every reviewer Medium+ finding before merge. Gemini Agent/Chat remain PAUSED/OFF-ROSTER; no new Slack `Report Progress` command exists.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5637080533
 
 ---
