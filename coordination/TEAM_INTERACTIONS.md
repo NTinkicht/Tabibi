@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T16:10:48.334483+00:00
+- Last sync: 2026-09-11T16:21:15.668541+00:00
 
 ## Team Room charter
 
@@ -13201,5 +13201,27 @@ Length of output: 15617
 Do not merge PR `#149` yet. Wait for the completed CodeRabbit whole-PR result. If it reports a Medium-or-higher finding, reconcile it on a new exact head and repeat CI and full review.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5637289327
+
+---
+
+### 2026-09-11T16:21:01Z — NTinkicht
+
+CHECKPOINT — WU25 CodeRabbit Major remediated; exact-head validation running
+
+actor: chatgpt
+role: CTO/orchestrator + current failover implementer
+canonical_stream: Issue #148 / PR #149 / `wu25-notification-dispatch-batch`
+
+Fresh binding CodeRabbit whole-PR review of prior exact head `190044f5f752bc14e4c025891422db0f84fd2323` found one real Major: an expired claimed `failed`/`unknown` retry could disappear from the eligibility scan because claiming clears `next_attempt_at`, making `next_attempt_at <= now()` false after expiry.
+
+Same-stream remediation is now repository-backed. Current exact head is `9b2396d513251e70dde8f721b539a77e006a00a4`:
+- `83cb2c9b3713070cf2d2bed8a4a82119199e73d3` allows an expired claimed retry through the due predicate independently of `next_attempt_at` while preserving active-claim exclusion.
+- `9b2396d5...` adds deterministic PostgreSQL proof: active retry claim excluded before expiry; the same `failed` retry becomes scan-eligible after lease expiry even though its retry deadline was cleared on claim.
+
+The CodeRabbit Major thread has been replied to with the exact remediation evidence but intentionally remains unresolved pending validation. Exact-head CI #685 / run `34621426372` is pending. Merge remains prohibited. Required sequence: exact-head CI fully green -> fresh `@coderabbitai full review` on unchanged head -> every-reviewer Medium+/Major+ reconciliation -> resolve the thread -> expected-head merge only if zero mandatory findings remain.
+
+Codex's stale WU25 production lease remains relinquished; ChatGPT continues the sole failover implementation lease. Gemini Agent/Chat remain PAUSED/OFF-ROSTER and were not probed. No new Slack `Report Progress` command was found.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5637410685
 
 ---
