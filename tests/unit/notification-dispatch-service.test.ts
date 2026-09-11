@@ -135,6 +135,34 @@ describe('NotificationDispatchService', () => {
     );
   });
 
+  it.each([
+    null,
+    { kind: 'unexpected' },
+    { kind: 'delivered', code: { provider: 'bad-shape' } },
+  ])('records malformed fulfilled provider result %# as unknown', async result => {
+    const dispatchStore = store({ completed: intent({ state: 'unknown' }) });
+    const dispatch = vi.fn(async () => result) as unknown as NotificationProviderAdapter['dispatch'];
+    const service = new NotificationDispatchService(dispatchStore.value, {
+      dispatch,
+    });
+
+    await expect(
+      service.dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' }),
+    ).resolves.toMatchObject({
+      status: 'completed',
+      providerResult: {
+        kind: 'unknown',
+        code: 'provider_indeterminate_result',
+      },
+    });
+    expect(dispatchStore.completeDispatchAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: 'unknown',
+        outcomeCode: 'provider_indeterminate_result',
+      }),
+    );
+  });
+
   it('does not invoke a provider when the intent cannot be claimed', async () => {
     const dispatchStore = store({ claimed: null, completed: null });
     const notificationProvider = provider({ kind: 'delivered' });
