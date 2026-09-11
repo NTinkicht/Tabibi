@@ -121,10 +121,12 @@ describe('notification dispatch eligibility and bounded batch', () => {
     const outbox = new NotificationOutboxRepository(pool);
     const scanner = new NotificationDispatchEligibilityRepository(pool);
     const intent = await outbox.enqueue(input(clinicA, 'concurrent'));
-    const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(async () => ({
-      kind: 'delivered',
-      code: 'accepted',
-    }));
+    const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(
+      async () => ({
+        kind: 'delivered',
+        code: 'accepted',
+      }),
+    );
     const service = new NotificationDispatchService(outbox, { dispatch });
     const runnerA = new NotificationDispatchBatchRunner(scanner, service);
     const runnerB = new NotificationDispatchBatchRunner(scanner, service);
