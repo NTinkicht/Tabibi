@@ -13,3 +13,6 @@ tsconfig.tsbuildinfo
 # Gemini CLI local state / credentials
 .gemini/
 gha-creds-*.json
+
+# Tabibi local context-router budget/metrics state
+.tabibi/
