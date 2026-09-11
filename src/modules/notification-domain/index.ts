@@ -51,6 +51,30 @@ export type NotificationDispatchExecution =
       intent: NotificationIntent;
     };
 
+function normalizeProviderResult(result: unknown): NotificationProviderResult {
+  if (!result || typeof result !== 'object')
+    return { kind: 'unknown', code: 'provider_indeterminate_result' };
+
+  const candidate = result as { kind?: unknown; code?: unknown };
+  const validKind =
+    candidate.kind === 'delivered' ||
+    candidate.kind === 'retryable_failure' ||
+    candidate.kind === 'unknown' ||
+    candidate.kind === 'terminal_failure';
+  const validCode =
+    candidate.code === undefined ||
+    candidate.code === null ||
+    typeof candidate.code === 'string';
+
+  if (!validKind || !validCode)
+    return { kind: 'unknown', code: 'provider_indeterminate_result' };
+
+  return {
+    kind: candidate.kind,
+    ...(candidate.code === undefined ? {} : { code: candidate.code }),
+  } as NotificationProviderResult;
+}
+
 function toPersistedOutcome(
   result: NotificationProviderResult,
 ): NotificationDispatchOutcome {
@@ -100,12 +124,14 @@ export class NotificationDispatchService {
     const idempotencyKey = providerIdempotencyKey(claim);
     let providerResult: NotificationProviderResult;
     try {
-      providerResult = await this.provider.dispatch({
-        clinicId,
-        intentId: claim.intent.id,
-        payload: claim.intent.payload,
-        providerIdempotencyKey: idempotencyKey,
-      });
+      providerResult = normalizeProviderResult(
+        await this.provider.dispatch({
+          clinicId,
+          intentId: claim.intent.id,
+          payload: claim.intent.payload,
+          providerIdempotencyKey: idempotencyKey,
+        }),
+      );
     } catch {
       providerResult = { kind: 'unknown', code: 'provider_exception' };
     }
