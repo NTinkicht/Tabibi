@@ -418,7 +418,8 @@ export class NotificationOutboxRepository {
               dispatch_claimed_at=now(),
               dispatch_claim_expires_at=now() + ($4::double precision * interval '1 millisecond'),
               dispatch_attempt_count=dispatch_attempt_count + 1,
-              dispatch_last_attempt_at=now()
+              dispatch_last_attempt_at=now(),
+              next_attempt_at=NULL
         WHERE clinic_id=$1
           AND id=$2
           AND state IN ('pending', 'failed', 'unknown')
