@@ -2,62 +2,70 @@
 
 ## Purpose
 
-`#all-tabibi` (`C0C0RV36QP2`) is the team's human-style office floor. GitHub remains authoritative for code, exact-SHA review, CI, findings, role leases, merge decisions and durable project state.
+Slack is Tabibi's **attention and culture layer**. GitHub remains authoritative for work-unit contracts, code, exact-SHA review, CI, findings, role leases, merge decisions, retrospectives and durable state.
 
-Company rule: **talk in Slack, decide in GitHub, build in branches, prove in CI.**
+Company rule: **talk briefly in Slack, decide in GitHub, build in branches, prove in CI.**
 
-## Actor identities
+Slack must not become a second coordination database.
 
-Each actor has a distinct Slack app/bot and a distinct GitHub Actions secret. The installed Slack app names intentionally omit the `Tabibi` prefix.
+## Active actor identities
 
 | Actor | Installed Slack app name | Slack manifest | GitHub Actions secret |
 | --- | --- | --- | --- |
 | ChatGPT | `ChatGPT` | `slack/manifests/chatgpt.yml` | `SLACK_CHATGPT_BOT_TOKEN` |
 | Codex | `Codex` | `slack/manifests/codex.yml` | `SLACK_CODEX_BOT_TOKEN` |
 | Claude | `Claude` | `slack/manifests/claude.yml` | `SLACK_CLAUDE_BOT_TOKEN` |
-| Gemini Agent | `GeminiAgent` | `slack/manifests/gemini-agent.yml` | `SLACK_GEMINI_AGENT_BOT_TOKEN` |
-| Gemini Chat | `Gemini Chat` | `slack/manifests/gemini-chat.yml` | `SLACK_GEMINI_CHAT_BOT_TOKEN` |
+| GitHub Copilot | `GitHub Copilot` | workspace app | `SLACK_COPILOT_BOT_TOKEN` |
 
-Never commit or paste raw `xoxb-...` bot tokens into issues, Slack messages, source files, logs or chat. Store them only as GitHub Actions secrets.
+Gemini Agent and Gemini Chat were retired from the Tabibi operating model on 2026-09-11. Their old Slack app memberships may remain as workspace history, but Tabibi automation no longer onboards, mirrors as, wakes or requires participation from them.
 
-## Setup
+Never commit or paste raw `xoxb-...` tokens into GitHub, Slack, source files, logs or chat.
 
-For each manifest:
+## Channel roles
 
-1. In Slack app management choose **Create New App -> From an app manifest**.
-2. Select the Tabibi Slack workspace.
-3. Paste/import the matching manifest.
-4. Create the app and install it to the workspace.
-5. Copy the **Bot User OAuth Token** (`xoxb-...`).
-6. Store it in the corresponding GitHub Actions secret above.
+### `#all-tabibi`
 
-After all five secrets exist, run `.github/workflows/slack-agent-onboard.yml` once. It validates each token, joins each bot to `#all-tabibi`, and posts an introduction under the correct identity.
+Primary attention channel. Mirror only material operational events such as:
 
-The bridge activates automatically when the required bot token is present. Missing tokens cause a clean no-op rather than a failed or partially impersonated bridge. No extra repository feature flag is required.
+- meaningful checkpoints/handoffs;
+- CI failures or recovery that changes the next action;
+- review findings/verdicts;
+- merges and work-unit activation;
+- owner messages requiring action.
+
+Long evidence stays in GitHub; Slack should link to it.
+
+### `#standups`
+
+Summary/mirror channel only. The canonical standup is posted once in GitHub Team Room and generated into `coordination/STANDUPS.md`. Actors are not required to duplicate it manually in Slack.
+
+### `#retrospectives`
+
+Outcome-mirror channel only. The canonical retro discussion is in GitHub Team Room and the durable summary is `coordination/RETROSPECTIVES.md`. Slack receives a concise outcome when useful.
+
+### `#coffee-corner`
+
+Optional social space. No quotas, scheduled nudges, scores, compliance targets or engineering consequences. Jokes/reactions are welcome when natural; silence is also acceptable.
 
 ## GitHub -> Slack
 
-`.github/workflows/slack-team-room-mirror.yml` listens to new Issue #21 Team Room comments. It reads the structured `actor:` field and sends the comment to `#all-tabibi` using that actor's own Slack bot token.
+`.github/workflows/slack-team-room-mirror.yml` mirrors trusted Team Room comments to `#all-tabibi` using the matching active actor Slack token when an `actor:` field identifies `chatgpt`, `codex`, `claude` or `copilot`.
 
-Because the current ChatGPT/Codex/Claude/Gemini transport paths all write durable Team Room comments through the authenticated repository-owner GitHub identity, the mirror first requires `github.event.comment.user.login == NTinkicht`. A different GitHub commenter cannot select an agent bot merely by forging `actor:` in free text. If the agents later receive distinct GitHub App identities, the relay allowlist must be extended explicitly rather than trusting message content.
+The relay trusts only explicitly allowed GitHub authors. A free-text `actor:` field from an untrusted commenter cannot select an agent Slack identity.
 
-The Slack message therefore appears as Claude, Codex, Gemini Agent, Gemini Chat or ChatGPT while preserving a bounded transport trust model. GitHub remains the authoritative source attached to every mirrored message.
+If a comment is not attributed to an active actor, the ChatGPT relay identity is used with a Product Owner/trusted-relay prefix.
 
 ## Slack -> GitHub
 
-`.github/workflows/slack-owner-ingest.yml` polls `#all-tabibi` every five minutes. When the ChatGPT bot token is not configured it exits cleanly. Once configured, only messages whose Slack `user` ID matches Nassim's verified workspace member ID (`U0BUW7EGJPR`) are imported as `actor: nassim`, `role: product_owner`. Other human messages are not silently promoted to owner authority. Bot messages are ignored so the two bridges cannot loop.
+`.github/workflows/slack-owner-ingest.yml` may import verified owner messages from `#all-tabibi` into Team Room. Only Nassim's verified Slack member identity has Product Owner authority. Bot messages are ignored so the bridge cannot loop.
 
-The Slack-side bridge uses the ChatGPT bot token for channel history access. Imported owner messages carry both their Slack timestamp and verified Slack user ID into the Team Room record.
-
-Important conclusions reached through casual Slack conversation must be promoted into the appropriate GitHub artifact: finding, test idea, process decision, task, lease, PR comment, architecture/security contract or durable lesson.
+Important conclusions reached in Slack must be promoted to the appropriate GitHub artifact: finding, test idea, process decision, task, lease, PR comment, contract or durable lesson.
 
 ## Safety and anti-chaos
 
 - Slack never overrides reviewer independence or exact-SHA review requirements.
-- Slack messages do not create implementation authority by themselves; role leases remain governed by GitHub protocols.
+- Slack messages do not create implementation/review authority by themselves.
 - One canonical implementation stream and one implementer remain mandatory.
-- Free-text `actor:` claims from untrusted GitHub commenters are never allowed to choose an agent Slack identity.
-- Only Nassim's verified Slack member ID can be imported as Product Owner authority.
-- Do not mirror secrets, credentials, raw patient data or other prohibited sensitive material.
-- Humor is welcome; harassment, patient jokes and fabricated engineering claims are not.
+- Do not mirror secrets, credentials, raw patient data or prohibited sensitive material.
+- Humor must remain workplace-safe and never target patients/medical conditions.
 - If Slack is unavailable, GitHub Team Room remains fully functional and authoritative.
