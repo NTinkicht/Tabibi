@@ -21,6 +21,7 @@ const committedMigrations = [
   '0013_appointment_recovery.sql',
   '0014_guest_exchange_credential_foundation.sql',
   '0015_guest_status_rate_limit.sql',
+  '0016_notification_outbox_foundation.sql',
 ];
 
 beforeAll(async () => {
@@ -47,7 +48,7 @@ describe('committed migration chain', () => {
     expect(rerun.rows[0]!.count).toBe(String(committedMigrations.length));
   });
 
-  it('exposes queue lifecycle, ETA timing and appointment-booking artifacts created by later migrations', async () => {
+  it('exposes queue lifecycle, ETA timing, appointment-booking and notification artifacts created by later migrations', async () => {
     const artifacts = await client.query<{
       queue_order_version: string;
       reorder_receipts: string | null;
@@ -63,6 +64,8 @@ describe('committed migration chain', () => {
       guest_exchange_ids: string | null;
       guest_credentials: string | null;
       guest_status_rate_limits: string | null;
+      notification_outbox: string | null;
+      notification_pending_idx: string | null;
       appointment_source_allowed: boolean;
       appointment_entity_allowed: boolean;
       patient_session_uq: string | null;
@@ -95,6 +98,8 @@ describe('committed migration chain', () => {
          to_regclass('guest_exchange_ids')::text guest_exchange_ids,
          to_regclass('guest_credentials')::text guest_credentials,
          to_regclass('guest_status_rate_limit_buckets')::text guest_status_rate_limits,
+         to_regclass('notification_outbox')::text notification_outbox,
+         to_regclass('notification_outbox_pending_target_idx')::text notification_pending_idx,
          (SELECT pg_get_constraintdef(oid) LIKE '%appointment%'
             FROM pg_constraint
            WHERE conname='queue_entries_source_check') AS appointment_source_allowed,
@@ -127,6 +132,8 @@ describe('committed migration chain', () => {
       guest_exchange_ids: 'guest_exchange_ids',
       guest_credentials: 'guest_credentials',
       guest_status_rate_limits: 'guest_status_rate_limit_buckets',
+      notification_outbox: 'notification_outbox',
+      notification_pending_idx: 'notification_outbox_pending_target_idx',
       appointment_source_allowed: true,
       appointment_entity_allowed: true,
       patient_session_uq: 'appointments_clinic_session_patient_uq',
