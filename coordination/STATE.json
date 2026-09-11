@@ -2,11 +2,11 @@
   "project": "Tabibi",
   "phase": "company_os_v2_restructuring",
   "state": "company_os_v2_review_pending",
-  "current_pr": null,
+  "current_pr": 153,
   "current_issue": 21,
   "last_actor": "chatgpt",
   "next_actor": "independent_non_author_reviewer",
-  "next_action": "Review the Company OS v2 / Headroom shadow / Gemini retirement change on its exact head, require green CI, then merge mechanically if all governance gates pass. Afterward resume Epic PR #151 against the new main.",
+  "next_action": "Review PR #153 on its exact head, require green CI, then merge mechanically if all governance gates pass. Afterward resume Epic PR #151 against the new main.",
   "operating_model": "four-active-actor-mesh-v8-company-os-v2-headroom-shadow",
   "binding_protocols": [
     "AGENTS.md",
@@ -35,7 +35,7 @@
         "review": "available_when_non_author",
         "merge_execution": "available"
       },
-      "current_activity": "Company OS v2 author/orchestrator; recused from sole independent gating of this exact head."
+      "current_activity": "Company OS v2 author/orchestrator for PR #153; recused from sole independent gating of this exact head."
     },
     "codex": {
       "capability_status": {
@@ -44,14 +44,14 @@
         "merge_execution": "available_subject_to_plan_capacity",
         "review": "available_when_non_author_subject_to_plan_capacity"
       },
-      "current_activity": "Available for bounded implementation/CI/mechanical merge work; not required to duplicate the current governance stream."
+      "current_activity": "Available for bounded implementation/CI/mechanical merge work; not required to duplicate PR #153."
     },
     "claude": {
       "capability_status": {
         "review": "available_subject_to_pro_capacity",
         "adversarial_security_review": "available_subject_to_pro_capacity"
       },
-      "current_activity": "Preferred independent governance/adversarial reviewer when concretely available and non-author."
+      "current_activity": "Preferred independent governance/adversarial reviewer for PR #153 when concretely available and non-author."
     },
     "copilot": {
       "capability_status": {
@@ -59,7 +59,7 @@
         "implementation": "available_subject_to_included_credits",
         "review": "available_when_non_author_subject_to_included_credits"
       },
-      "current_activity": "QA/Test Automation and eligible non-author exact-head Code Review; also candidate for the Headroom shadow evaluation later."
+      "current_activity": "QA/Test Automation and eligible non-author exact-head Code Review; candidate reviewer for PR #153 and later Headroom shadow evaluation."
     },
     "coderabbit": {
       "capability_status": {
@@ -82,7 +82,7 @@
     "implementer": {
       "actor": "chatgpt",
       "status": "implementation_complete_pending_pr_gate",
-      "note": "One canonical Company OS v2 branch only."
+      "note": "One canonical Company OS v2 branch/PR (#153) only."
     },
     "gating_reviewer": {
       "actor": "claude_or_copilot_non_author",
@@ -99,13 +99,13 @@
     "id": "COMPANY-OS-V2-001",
     "status": "implementation_complete_pending_review",
     "actor": "chatgpt",
-    "scope": "Simplify Slack/standup/retro behavior, retire Gemini from active/runtime paths, enforce specialist-overlay selection, and add a read-only Headroom shadow-trial path without resuming Epic itself."
+    "scope": "PR #153: simplify Slack/standup/retro behavior, retire Gemini from active/runtime paths, enforce specialist-overlay selection, and add a read-only Headroom shadow-trial path without resuming Epic itself."
   },
   "next_work": {
     "id": "EPIC-RESUME",
     "status": "blocked_pending_company_os_v2_merge",
     "actor": "chatgpt",
-    "scope": "Rebase/reconcile and resume Spotify-inspired Epic PR #151 only after Company OS v2 lands."
+    "scope": "Rebase/reconcile and resume Spotify-inspired Epic PR #151 only after PR #153 lands."
   },
   "headroom": {
     "mode": "shadow_read_only",
