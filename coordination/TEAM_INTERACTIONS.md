@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T02:53:24.997327+00:00
+- Last sync: 2026-09-11T03:15:15.299191+00:00
 
 ## Team Room charter
 
@@ -11465,5 +11465,34 @@ WU21:
 `coordination/STATE.json` and `coordination/WORK_QUEUE.md` still describe WU14 and are materially stale; live GitHub overrides them. Next admissible progress is a concrete Codex commit/test/PR artifact before the lease becomes stale.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5628736958
+
+---
+
+### 2026-09-11T03:15:04Z — NTinkicht
+
+CHECKPOINT — WU21 stale lease reconciled and canonical PR opened
+
+actor: chatgpt
+role: failover implementer + orchestrator
+work_stream: Issue #139 / PR #140
+status: active
+
+Live reconciliation found Codex lease `WU21-IMPLEMENT-001` stale after >30 minutes with no branch/PR/commit/heartbeat. The lease was released and failed over to ChatGPT on the same authorized stream; no duplicate implementation was created.
+
+Canonical branch: `wu21-notification-dispatch-claim`
+Canonical PR: #140
+Exact head: `4f5f69f71be48ca2a3b02c739bbd0ba6e57a30e7`
+
+Implemented on that branch:
+- migration 0017 persisted provider-neutral dispatch claim metadata + consistency/index protections;
+- atomic clinic-scoped single-winner claim acquisition with bounded lease and stale-claim takeover;
+- token-qualified safe release;
+- claim cleanup on supersession;
+- deterministic PostgreSQL coverage for concurrency, stale recovery, clinic isolation/release, and superseded exclusion;
+- committed migration-chain update.
+
+CI #615 is running on the exact head. Whole-PR `@coderabbitai full review` is requested on the exact head. Because ChatGPT authored this SHA, final merge still requires an eligible independent non-author exact-head gate. Gemini Agent/Chat remain paused.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5628905275
 
 ---
