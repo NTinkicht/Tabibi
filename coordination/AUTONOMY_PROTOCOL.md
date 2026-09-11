@@ -1,202 +1,220 @@
-# Tabibi Autonomous Tri-Agent Operating Protocol v4
+# Tabibi Autonomous Four-Actor Operating Protocol v5
 
-Status: binding project coordination protocol
+Status: **binding project coordination protocol**.
 
-## Objective
-Tabibi must progress without Nassim acting as messenger, scheduler, reviewer coordinator, technical decision relay, or routine merge coordinator. GitHub is the canonical shared workspace and durable memory. The preferred execution path is event-driven between Codex Cloud and Claude, with ChatGPT retaining product/architecture authority and an independent repository watch as a safety net.
+This protocol defines how Tabibi continues without Nassim acting as routine messenger, scheduler, reviewer coordinator, idle-agent detector or merge coordinator. It supplements `AGENTS.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, `coordination/COLLABORATION_PROTOCOL.md`, and `coordination/COMPANY_OPERATING_SYSTEM.md`.
 
-## Roles
+## 1. Source of truth
 
-### ChatGPT — Product architect and orchestrator
-- Owns product specification, architecture, security-policy interpretation, backlog decomposition, acceptance criteria, and final technical decisions that are not already safely resolvable under the consensus fast path below.
-- Selects work units and writes durable implementation instructions in issues/PRs.
-- Resolves or rebuts findings that require consequential product, architecture, security-policy, data-ownership, external-provider, irreversible migration, legal/business-policy, or competing-design decisions.
-- Monitors GitHub independently and may implement directly when useful, but Codex Cloud is the default execution runtime for approved implementation work.
-- Defines merge gates and pre-approves the next work unit so event-driven execution does not stop after a successful review.
+GitHub is authoritative for work contracts, role leases, branches/PRs, exact-SHA review, findings, CI, merge decisions, retrospectives and durable state.
 
-### Codex Cloud — Primary implementation runtime and mechanical merge executor
-- Executes approved work from committed specs, issues, PR handoffs, ChatGPT architectural decisions, and eligible consensus-fast-path candidates. A valid nomination authorizes exactly one bounded implementation attempt; acceptance occurs only after Claude re-review.
-- Owns routine coding, refactoring, migrations, tests, deterministic documentation updates, CI setup/remediation, and reviewer fixes that do not require changing a disqualified or unresolved product/architecture contract.
-- Must read `PRODUCT.md`, `ARCHITECTURE.md`, `SECURITY.md`, `AGENTS.md`, this protocol, and current coordination state before material implementation.
-- Must not silently invent or alter consequential product/security/architecture policy. If a requested fix is outside the consensus fast-path eligibility rules, hand control to ChatGPT instead of guessing.
-- After implementation, run/inspect all available deterministic checks, update coordination evidence where requested, and leave a durable `HANDOFF_TO_CLAUDE` on the active PR.
-- After Claude emits a valid `MERGE_READY` for an unchanged reviewed head and an executable Codex wake command, Codex performs the mechanical merge if every merge gate below is satisfied. This is execution of a pre-authorized decision, not a new product/architecture judgment.
+Slack is an attention/culture layer only. Compressed context, agent memory and Slack summaries are never authority over GitHub evidence.
 
-### Claude — Independent adversarial reviewer and merge gate
-- Owns independent architecture/security/correctness/concurrency/privacy/QA/spec-compliance review.
-- Reviews from first principles and must not rubber-stamp ChatGPT or Codex.
-- Uses its active PR-activity webhook/subscription as the primary wakeup mechanism and its fallback heartbeat where available.
-- For findings that are purely implementation defects and have an unambiguous resolution under existing contracts, Claude may hand directly to Codex Cloud with `HANDOFF_TO_CODEX` plus an executable `@codex ...` command.
-- For conservative reversible architecture/spec clarifications that satisfy every consensus-fast-path eligibility rule, Claude may nominate `CONSENSUS_FAST_PATH_CANDIDATE` instead of waiting for ChatGPT.
-- For consequential, ambiguous, security-weakening, privacy-weakening, data-ownership, business-policy, legal, provider, irreversible migration, or competing-design choices, Claude must use `HANDOFF_TO_CHATGPT`.
-- On successful re-review, Claude must not merely recommend a merge. It posts `PASS` or `PASS_WITH_MINOR_FINDINGS`, then `MERGE_READY` and `HANDOFF_TO_CODEX`, and includes an executable `@codex merge this PR if gates pass` command naming the exact reviewed SHA.
+## 2. Active actors
 
-### CI — Deterministic referee
-- Required checks, tests, migrations, linting, type checks, security/static checks, and reproducibility checks are objective gates.
-- Codex fixes deterministic failures where feasible.
-- Neither AI may waive a required failing check without a documented technical resolution accepted under this protocol.
+The active roster is:
 
-## No-idle invariant
-Every completed action must leave the system in one of four states: another actor has an explicit executable next action, a merge is mechanically executable and actively triggered, a pre-approved next work unit is actively triggered, or a genuine external blocker is recorded.
+- `chatgpt` — product/architecture/orchestration/state/failover control;
+- `codex` — preferred production implementation, CI remediation and mechanical merge execution;
+- `claude` — preferred independent adversarial reviewer/gate;
+- `copilot` — preferred QA/Test Automation/System Verification, bounded implementation assistance and eligible non-author Code Review.
 
-The following are prohibited terminal states:
-- "looks good, waiting for someone to merge";
-- "review complete" without an explicit next actor;
-- a `HANDOFF_TO_CODEX` marker without a supported `@codex ...` wake command;
-- `MERGE_READY` without an executable Codex merge trigger;
-- "merged" without either triggering the updated umbrella PR review or actively starting the next pre-approved work unit;
-- waiting for Nassim to announce activity already visible in GitHub.
+Gemini Agent and Gemini Chat are retired and cannot receive new leases, wakes, reviews, gates or failover tasks.
 
-Every handoff must name `next_actor` and `next_action`. If an event-driven actor can perform that action safely under this protocol, it must be actively woken rather than merely named.
+CI is the deterministic referee and is not an AI actor.
 
-## Executable wake-trigger rule
-A handoff marker is durable state, not necessarily a runtime trigger. Therefore:
+## 3. Canonical-stream invariant
 
-### Codex wakeups
-- Every `HANDOFF_TO_CODEX` must include a supported executable `@codex ...` instruction in the same GitHub comment.
-- Examples: `@codex address that feedback`, `@codex implement this issue now`, `@codex review`, or `@codex merge this PR if gates pass`.
-- `HANDOFF_TO_CODEX` without an `@codex` command is invalid/incomplete and must be repaired by the first agent/watchdog that notices it.
-- A Codex 👀 reaction, task link/comment, branch movement, or subsequent Codex-authored activity is evidence that the wakeup was consumed. Lack of immediate evidence does not authorize duplicate work, but the watchdog may re-trigger once with an idempotent instruction if the state remains idle.
+For every bounded work stream:
 
-### Claude wakeups
-- `HANDOFF_TO_CLAUDE` relies on Claude's PR-activity subscription/webhook on that PR.
-- When work moves to a new PR, Claude should establish the equivalent subscription there where supported.
-- If no Claude activity appears and the system is otherwise idle, the watchdog may post one explicit reminder on a PR Claude is already monitoring, linking the new PR and exact SHA. Do not ask Nassim to relay it.
+1. exactly one canonical implementation branch/PR exists;
+2. exactly one active implementer lease exists;
+3. all replacement implementers continue the existing stream where technically possible;
+4. parallel work must be orthogonal: architecture/risk, QA, tests, review, observability, documentation, backlog or process improvement;
+5. do not create duplicate implementations merely to use spare model capacity.
 
-### ChatGPT wakeups
-- `HANDOFF_TO_CHATGPT` is consumed by ChatGPT's repository watch or an active conversation turn.
-- If the finding qualifies for the consensus fast path, prefer that event-driven route instead of waiting for ChatGPT.
+## 4. Required leases
 
-## Canonical handoff markers
-Top-level PR/issue comments use one or more of these exact markers:
+Every substantial work unit names:
+
+- orchestrator;
+- implementer;
+- gating reviewer;
+- merge executor;
+- optional orthogonal specialist/QA verifier(s).
+
+Every substantial work unit also selects the smallest useful Agency-Agents overlay set under `coordination/ROLE_OVERLAY_PROTOCOL.md`. `none` requires an explicit reason.
+
+A role name or overlay does not prove capacity, authorship independence or execution progress.
+
+## 5. Evidence-backed execution
+
+Assignment is not progress. Useful evidence includes:
+
+- repository-backed commit/branch/PR movement;
+- deterministic test/CI run;
+- exact-SHA review artifact/finding;
+- visible long-running deterministic job;
+- completed merge or durable next-work activation.
+
+Heartbeats/checkpoints expose this evidence but do not replace it.
+
+An active lease with no evidence/checkpoint for 30 minutes is potentially stale unless a visible deterministic job is progressing. Reconcile live GitHub evidence before failover.
+
+## 6. Default event-driven path
+
+### New bounded implementation
+
+1. ChatGPT publishes/approves the bounded work-unit contract, lease set and overlay set.
+2. The implementer works on the single canonical branch/PR and produces deterministic evidence.
+3. Required CI runs on the exact current head.
+4. An eligible independent non-author reviewer inspects the exact head.
+5. Routine implementation findings return to the current implementer on the same stream.
+6. After fixes, CI and exact-head review repeat.
+7. Once the exact head has green required CI, zero known-open BLOCKER/MAJOR findings and a valid independent gate, the merge executor mechanically merges with expected-head protection where supported.
+8. Post-merge state/retro/next-work reconciliation happens immediately; do not wait for Nassim to relay the result.
+
+### Preferred actors
+
+- implementer: Codex;
+- gate: Claude;
+- QA/Test Automation: Copilot;
+- orchestrator/architecture: ChatGPT.
+
+Use `coordination/ROLE_FAILOVER_PROTOCOL.md` when preferred capacity is unavailable or authorship makes a candidate ineligible.
+
+## 7. Reviewer independence
+
+Reviewer independence is based on **material authorship of the exact diff**, not display name or commit metadata.
+
+An actor that authored/materially modified a reviewed exact head cannot be its sole binding gate. Cherry-picking/replaying an equivalent patch does not launder authorship.
+
+Copilot coding-agent and Copilot Code Review identities count as one actor for self-gating.
+
+A valid binding gate records:
+
+- PR number;
+- exact SHA;
+- reviewer actor;
+- `code-reviewer` overlay where required;
+- verdict: `PASS`, `PASS_WITH_MINOR_FINDINGS`, or `CHANGES_REQUIRED`;
+- merge-ready status;
+- zero unresolved BLOCKER/MAJOR findings from that review.
+
+Any code/governance change after the gate invalidates it and requires fresh exact-head review.
+
+## 8. All-reviewer finding rule
+
+Before merge, inspect all available reviewer sources.
+
+- Any known-open `BLOCKER` or `MAJOR` from any reviewer source prevents merge until fixed or technically disproven/reconciled.
+- Supplemental reviewers do not silently become binding gates.
+- A PASS from one reviewer does not erase another reviewer's unresolved material finding.
+- Required CI failures remain independently blocking.
+
+## 9. Mechanical merge gates
+
+Merge is allowed only when all are true:
+
+1. PR is open, non-draft and mergeable;
+2. reviewed exact head has not changed;
+3. required exact-head CI is green;
+4. one eligible independent non-author exact-head gate is valid;
+5. all known-open BLOCKER/MAJOR findings across reviewer sources are resolved/reconciled;
+6. no owner-only/external blocker remains;
+7. the merge executor is acting mechanically, not inventing new policy.
+
+If any gate is false or ambiguous, do not merge.
+
+## 10. Finding routing
+
+Routine implementation defect under an existing contract -> current implementer.
+
+Consequential product/architecture/security/data-policy ambiguity -> ChatGPT.
+
+If ChatGPT is unavailable, use the technical-quorum rules in `coordination/ROLE_FAILOVER_PROTOCOL.md`; do not invent owner/legal/business policy.
+
+A provider/tool limitation never justifies weakening security/privacy/tenant/concurrency/product invariants.
+
+## 11. CI failure routing
+
+Codex is preferred for deterministic CI remediation; fail over by capability when needed.
+
+CI remediation stays on the existing canonical stream. If a proposed CI fix changes product/security/architecture semantics, route the semantic decision through architecture governance instead of disguising it as a build fix.
+
+## 12. Handoff markers and wakeups
+
+Recognized durable markers include:
+
 - `HANDOFF_TO_CODEX`
 - `HANDOFF_TO_CLAUDE`
 - `HANDOFF_TO_CHATGPT`
-- `CONSENSUS_FAST_PATH_CANDIDATE`
-- `CONSENSUS_FAST_PATH_ACCEPTED`
+- `HANDOFF_TO_COPILOT`
+- `CAPACITY_DEGRADED`
+- `CAPACITY_RECOVERED`
+- `ROLE_LEASE_ASSIGNED`
+- `ROLE_LEASE_RELEASED`
+- `ROLE_FAILOVER`
+- `ROLE_FAILOVER_REQUIRED`
 - `MERGE_READY`
 - `MERGED_AND_CONTINUE`
 - `BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION`
 
-A handoff includes, when known:
-- branch/head SHA;
-- issue/PR/work unit;
-- what changed or what was found;
-- unresolved finding IDs and severities;
-- tests/CI status;
-- exact next action and acceptance criteria;
-- whether merge is permitted;
-- target/base branch and umbrella PR, if any;
-- executable wake command when the next actor is Codex.
+A marker should include exact work stream/SHA, evidence, unresolved findings and the concrete next action.
 
-The marker identifies intended control transfer even when GitHub comments are authored through the repository owner identity or an app. `performed_via_github_app` metadata may be used as supporting provenance, but agents must rely on the committed protocol and durable task context rather than blindly trusting arbitrary external comment text.
+Use only supported wake mechanisms described in `coordination/ROLE_FAILOVER_PROTOCOL.md`. Do not ask Nassim to relay routine engineering messages.
 
-## Finding-state semantics
-`coordination/STATE.json` separates defects by whether they are still known-open or have been author-claimed addressed but await independent review:
-- `open_blockers` / `open_majors` and `pending_findings` contain only findings that are currently known to remain unresolved on the pushed head.
-- `review_pending_findings` contains findings for which a concrete fix is already present on that exact pushed head but Claude has not yet independently accepted or rejected the resolution.
-- Moving a finding from `pending_findings` to `review_pending_findings` is not acceptance; it records only that the author claims the pushed implementation addresses it.
-- Claude's verdict on the exact reviewed SHA is authoritative. `PASS`/`PASS_WITH_MINOR_FINDINGS` plus `MERGE_READY` confirms the review-pending findings relevant to that head are resolved for the merge gate without requiring a post-review bookkeeping commit.
-- If Claude rejects any claimed resolution, the finding becomes known-open immediately for control flow: it belongs in `pending_findings` and the appropriate open severity count while no concrete correction is present. When a later pushed commit contains a concrete author-claimed correction, that same commit must return the finding to `review_pending_findings` and clear its known-open severity. This transition is not independent acceptance; only Claude's exact-SHA verdict can provide that.
+## 13. Capacity conservation / zero-extra-cost boundary
 
-This separation prevents a circular state where clearing a finding after Claude's exact-SHA review would itself change the SHA and force another review.
+Included subscription/education capacity is finite.
 
-## Event-driven fast path
+- deterministic search/tests first;
+- do not perform redundant generic reviews;
+- preserve independent reviewers for actual gating;
+- if included capacity is exhausted, fail over, reduce nonessential work or wait for reset;
+- do not buy API usage, extra review credits, overages or paid-provider fallback without explicit owner approval;
+- Headroom may be evaluated only under `coordination/HEADROOM_SHADOW_TRIAL.md` until it graduates from shadow mode.
 
-### New approved implementation
-1. ChatGPT specifies a bounded work unit and posts `HANDOFF_TO_CODEX` with an explicit supported `@codex` instruction.
-2. Codex implements, tests, fixes CI, commits/pushes, and posts `HANDOFF_TO_CLAUDE`.
-3. Claude's PR-activity subscription wakes it and independently reviews the actual head and CI evidence.
-4. If Claude finds a routine implementation defect with an unambiguous contract-preserving fix, Claude posts `HANDOFF_TO_CODEX` and `@codex address that feedback` with stable finding IDs and verification criteria.
-5. Codex fixes and posts `HANDOFF_TO_CLAUDE`; Claude re-reviews immediately from the GitHub event.
-6. Repeat until Claude reaches `PASS` or `PASS_WITH_MINOR_FINDINGS`.
-7. Claude posts `MERGE_READY` + `HANDOFF_TO_CODEX`, names the exact reviewed SHA, and includes `@codex merge this PR if gates pass`.
-8. Codex verifies merge gates and mechanically merges the unchanged reviewed PR.
-9. Codex posts `MERGED_AND_CONTINUE` and actively triggers the next required action.
-10. If the merged PR targeted an integration/umbrella branch with an open umbrella PR, Codex immediately posts `HANDOFF_TO_CLAUDE` on that umbrella PR for cumulative review of its new head.
-11. If the merged PR targeted `main`, Codex first continues an explicitly pre-approved active `current_work` from coordination state. If no such work is actionable, Codex starts pre-approved `next_work`. Only when neither record is actionable, or the selected record is ambiguous, does it post `HANDOFF_TO_CHATGPT` rather than idling.
+## 14. No-idle without busywork
 
-## Consensus fast path for conservative architecture/spec clarifications
-The purpose is to remove unnecessary ChatGPT latency without allowing Claude and Codex to redesign Tabibi by convenience.
+When work completes:
 
-This path may clarify canonical `PRODUCT.md`, `ARCHITECTURE.md`, or `SECURITY.md` text only when the clarification is already logically entailed by committed invariants and has one conservative deterministic interpretation. It may not establish previously unstated product, security, or architecture policy. A genuinely new canonical contract, a materially different valid design, or a security/privacy/authentication/authorization/tenant-isolation/data-ownership/policy choice is disqualified and must route to ChatGPT.
+1. post final evidence/checkpoint;
+2. release stale lease;
+3. take another explicit lease if assigned;
+4. otherwise check `WORK_QUEUE.md` for safe `READY` orthogonal work;
+5. claim one bounded useful task or post one concise `TASK_PROPOSAL` / `AVAILABLE_FOR_WORK` note;
+6. stop rather than manufacturing status messages or duplicate work.
 
-Claude may nominate `CONSENSUS_FAST_PATH_CANDIDATE` only when **all** of the following are true:
-1. The change narrows, clarifies, or makes executable an already-committed product/architecture/security invariant rather than introducing a new product capability or business rule.
-2. There is one clearly safer/more deterministic interpretation; materially competing valid designs do not exist.
-3. The change is reversible and does not require an irreversible data migration or destructive production action.
-4. It introduces no new patient-facing business policy, pricing, consent model, retention policy, legal interpretation, or external-provider commitment.
-5. It does not weaken authentication, authorization, tenant isolation, privacy, auditability, concurrency correctness, notification reliability, or failure handling.
-6. It does not broaden sensitive-data collection or data ownership.
-7. It requires no unavailable credential, paid service, owner-level legal decision, or external account authorization.
+Invalid terminal states include:
 
-Fast-path procedure:
-1. Claude posts `CONSENSUS_FAST_PATH_CANDIDATE` with stable finding ID, why all eligibility rules are satisfied, the smallest acceptable contract change, and verification criteria.
-2. In the same comment Claude posts `HANDOFF_TO_CODEX` plus `@codex address that feedback`.
-3. Before editing, Codex independently checks every eligibility criterion. If any criterion fails, Codex posts `HANDOFF_TO_CHATGPT` instead. If all pass, the candidate authorizes exactly one bounded implementation attempt: Codex implements only the smallest nominated change and its regression tests/evidence, without opportunistically broadening the design. `CONSENSUS_FAST_PATH_ACCEPTED` is not a prerequisite to begin and is reserved for Claude's post-implementation verdict.
-4. Codex posts `HANDOFF_TO_CLAUDE` with exact SHA and verification.
-5. Claude re-reviews once. If correct, it posts `CONSENSUS_FAST_PATH_ACCEPTED` and continues the normal PASS/merge path when applicable.
-6. If Claude disagrees with the implementation, discovers a disqualifier, sees a materially competing design, or the same finding survives this one implementation/re-review cycle, it immediately posts `HANDOFF_TO_CHATGPT`. No second autonomous architecture cycle is allowed.
+- “looks good, waiting for someone to merge” when a merge executor is available;
+- review complete without a concrete next action;
+- duplicate implementation branches;
+- silently stale active lease;
+- repeated capacity probing with no new evidence;
+- waiting for Nassim to announce information already visible in GitHub.
 
-The consensus fast path may resolve MINOR or MAJOR findings when eligible; severity alone does not decide eligibility. BLOCKER findings involving active security/privacy/data-loss exposure should default to ChatGPT unless the committed contract already makes the only safe correction completely mechanical.
+## 15. Post-merge continuation
 
-## Consequential architecture/product finding
-If Claude or Codex discovers that a correct fix falls outside the consensus-fast-path eligibility rules:
-1. post `HANDOFF_TO_CHATGPT` with the finding, evidence, competing options if any, and why fast-path eligibility failed;
-2. ChatGPT makes the architectural/product decision and updates or authorizes changes to the canonical documents;
-3. ChatGPT posts `HANDOFF_TO_CODEX` with exact implementation acceptance criteria and an executable `@codex ...` command;
-4. the normal Codex -> Claude loop resumes.
+After merge:
 
-## CI failure
-- Codex Cloud is the default responder for deterministic CI failures on an active implementation PR.
-- Claude may identify root-cause/security implications but does not replace CI.
-- If a CI fix would change consequential product/architecture semantics and is not eligible for the consensus fast path, route to ChatGPT.
+1. reconcile `STATE.json` and `WORK_QUEUE.md`;
+2. capture a retro only when there is a reusable lesson, with one concrete improvement/no-change conclusion;
+3. activate the next already-approved bounded work if dependency-ready;
+4. otherwise route an architecture/product decision to ChatGPT;
+5. do not auto-expand scope beyond committed product/security contracts.
 
-## Mechanical merge gates
-Codex may merge only when all of the following are true:
-1. Claude's `MERGE_READY` names the exact current PR head SHA and that SHA has not changed.
-2. The PR is open, non-draft, and mergeable.
-3. `coordination/STATE.json` records zero currently known-open BLOCKER and MAJOR findings for that work unit. Findings listed only in `review_pending_findings` are satisfied for this gate when Claude's `MERGE_READY` explicitly covers the exact current head containing their fixes; no post-review state mutation is required.
-4. All required deterministic checks pass. For production implementation PRs, absence of the project's required CI is itself a blocker. Foundation-document-only work may use the explicitly documented pre-CI exception until the technical-foundation/CI work unit is merged.
-5. No `BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION` remains unresolved for the work unit.
-6. The merge handoff includes an executable `@codex merge this PR if gates pass` trigger or equivalent supported Codex merge command.
+## 16. Definition of healthy autonomy
 
-If any gate is false or ambiguous, Codex must not merge; it routes to the actor that can resolve the gate.
+Tabibi is operating autonomously when:
 
-## Umbrella and top-level continuation
-- Child PR accepted into an integration branch: merge immediately, then trigger Claude on the updated umbrella PR.
-- Umbrella or other top-level PR accepted into `main`: merge immediately, then actively continue an explicitly pre-approved active `current_work`; only if none is actionable, start recorded pre-approved `next_work`, without waiting for a human or periodic monitor.
-- A current or next work unit is explicitly pre-approved when it is identified by issue number/title in coordination state, its status makes it actionable, and it does not require an unresolved external decision. `current_work` takes deterministic priority when both records exist.
-
-## Loop-stability rule
-Claude and Codex may iterate directly on routine findings under the committed specification. Architecture/spec clarifications may use only the single-cycle consensus fast path above. If the same MAJOR survives two routine implementation cycles, or one consensus-fast-path cycle, or Claude and Codex disagree about what the contract requires, route it to ChatGPT with evidence rather than looping indefinitely. Do not route routine disagreement to Nassim.
-
-## Monitoring mechanics
-
-### Claude
-Current primary mechanism: active PR-activity webhook/subscription on active PRs. Claude should create an equivalent subscription when work moves to a new PR where supported. A fallback heartbeat may sweep the wider repository.
-
-### Codex Cloud
-Codex is event-triggered through GitHub actions/comments supported by Codex Cloud. Durable markers alone are not assumed to wake Codex: every Codex handoff includes an executable `@codex ...` instruction. Any limitations discovered in issue-versus-PR wakeups must be documented and the protocol should prefer a confirmed working trigger surface.
-
-### ChatGPT
-ChatGPT maintains an independent recurring repository condition-watch and immediate checks when this conversation/task is activated. This is a safety net and consequential architectural-control channel, not the preferred latency path for routine Claude<->Codex iterations, eligible consensus-fast-path clarifications, or mechanical merges.
-
-## Merge policy
-- Any currently known-open BLOCKER or MAJOR: no merge.
-- Findings whose fixes are already present on the exact reviewed head may remain in `review_pending_findings` until Claude's verdict; they are not treated as unresolved after Claude emits `MERGE_READY` for that exact SHA.
-- Required deterministic checks must pass when configured and, after the CI-foundation work is complete, required CI must exist for implementation PRs.
-- `PASS`: merge permitted when all mechanical gates pass.
-- `PASS_WITH_MINOR_FINDINGS`: merge permitted only when remaining minors are explicitly accepted/tracked and do not violate a release gate.
-- Notes/recommendations may become backlog items when documented.
-- Claude decides the independent review gate; Codex executes the mechanical merge; ChatGPT retains authority over consequential product/architecture policy and can halt or supersede a merge authorization when a real contract issue exists.
-
-## Escalation
-Do not involve Nassim for routine UX, architecture, implementation, testing, refactoring, review, CI, backlog, or ordinary technical trade-offs.
-
-Use `BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION` only for genuinely external matters that the agents cannot resolve technically, such as unavailable credentials/account authorization, spending or paid-provider commitments, owner-level legal/business policy, irreversible destructive production actions, or an irreducible product-direction conflict with materially different business consequences.
-
-Continue all unaffected work whenever possible.
-
-## Quality principle
-Autonomy is not permission to lower standards. The goal is an exceptional Algeria-first production application. Privacy, clinic-tenant isolation, concurrency correctness, Arabic/French localization, accessibility, reliability, observability, recoverability, realistic clinic-day operations, and adversarial testing remain release gates.
+- there is one canonical implementation stream per work unit;
+- actor/overlay leases are explicit;
+- progress is evidence-backed;
+- exact-head CI and reviewer independence are preserved;
+- failover happens without owner relay;
+- Slack does not become a second state database;
+- context optimization cannot override evidence;
+- included AI capacity is used deliberately without hidden spending;
+- completed work immediately leaves a valid next action or genuine blocker.
