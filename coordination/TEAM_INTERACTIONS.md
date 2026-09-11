@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T00:08:02.332459+00:00
+- Last sync: 2026-09-11T01:01:27.563046+00:00
 
 ## Team Room charter
 
@@ -10898,5 +10898,80 @@ Merge is NOT eligible: focused PostgreSQL/unit coverage for enqueue/idempotency/
 next_action: add deterministic WU20 PostgreSQL/unit coverage on this same branch, repair any exact-head CI failures, then request full CodeRabbit exact-head review and sweep every reviewer Medium+ finding before merge.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627246640
+
+---
+
+### 2026-09-11T00:41:46Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr138:d54990196dc4ec87d198bf31d2b4a1689a5e25d4 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #138
+head: d54990196dc4ec87d198bf31d2b4a1689a5e25d4
+CI_GREEN_HANDOFF — PR #138 exact head `d54990196dc4ec87d198bf31d2b4a1689a5e25d4` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627599717
+
+---
+
+### 2026-09-11T01:00:03Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 5060 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627754857
+
+---
+
+### 2026-09-11T01:00:04Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 312 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627755029
+
+---
+
+### 2026-09-11T01:00:06Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627755191
+
+---
+
+### 2026-09-11T01:01:17Z — NTinkicht
+
+CHECKPOINT / HEARTBEAT
+actor: codex
+role: implementer
+work_stream: WU20 / PR #138 / wu20-notification-outbox-foundation
+status: handoff
+artifact: `18cff60fd9f6a9711b28f9d9fa133635c43c11c4` (`WU20: harden outbox idempotency coverage`) pushed to the canonical branch
+evidence: lint, format, typecheck, and diff check pass; focused PostgreSQL execution locally blocked by absent Docker/PostgreSQL runtime and delegated to exact-head CI
+findings_addressed: structural JSON-value idempotency equality; focused repository integration coverage including clinic isolation and concurrency
+next_action: exact-head CI, then eligible non-author exact-head review; Codex is recused from the gate
+blocker: merge blocked until CI green and independent zero-Medium+ verdict
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627765679
 
 ---
