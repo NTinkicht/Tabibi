@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T01:06:19.308043+00:00
+- Last sync: 2026-09-11T01:54:28.265133+00:00
 
 ## Team Room charter
 
@@ -11211,5 +11211,39 @@ The fresh `@coderabbitai full review` request is present for this exact head. It
 Do not merge PR `#138` yet. Wait for that exact-head full review. Then reconcile any remaining Medium-or-higher findings before the expected-head merge.</answer></rawResChunk> -->
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5627810512
+
+---
+
+### 2026-09-11T01:28:40Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr138:c5b9815468122fe7dd6ad2d8a88a2be40f01731b -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #138
+head: c5b9815468122fe7dd6ad2d8a88a2be40f01731b
+CI_GREEN_HANDOFF — PR #138 exact head `c5b9815468122fe7dd6ad2d8a88a2be40f01731b` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5628015276
+
+---
+
+### 2026-09-11T01:54:13Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr138:27446961e5581899c4edb5a14fda59af717cac61 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #138
+head: 27446961e5581899c4edb5a14fda59af717cac61
+CI_GREEN_HANDOFF — PR #138 exact head `27446961e5581899c4edb5a14fda59af717cac61` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5628244661
+
+---
+
+### 2026-09-11T01:54:15Z — NTinkicht
+
+CTO checkpoint — WU20 / PR #138 remains canonical at `27446961e5581899c4edb5a14fda59af717cac61`. CodeRabbit's exact-head Medium on acronym-leading sensitive keys was verified and repaired on the same branch: acronym boundaries are normalized before sensitive-key matching, and deterministic PostgreSQL coverage now rejects `APIKey` and `AccessKey` with zero persistence. Exact-head Quality/build and Browser smoke are green; PostgreSQL integration is still visibly progressing. Fresh `@coderabbitai full review` has been requested against this exact SHA. Merge remains blocked until PostgreSQL is green, the independent whole-PR gate is clean, and the complete every-reviewer Medium+ reconciliation is zero. Gemini Agent/Chat remain paused/off-roster.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5628244931
 
 ---
