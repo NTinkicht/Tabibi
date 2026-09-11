@@ -67,7 +67,7 @@ function toPersistedOutcome(
 }
 
 function providerIdempotencyKey(claim: NotificationDispatchClaim): string {
-  return `notification:${claim.intent.id}:attempt:${claim.intent.dispatchAttemptCount}`;
+  return `notification:${claim.intent.id}`;
 }
 
 /** Executes one already-persisted notification intent through an injected provider. */
