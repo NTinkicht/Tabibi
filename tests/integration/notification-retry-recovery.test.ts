@@ -68,104 +68,107 @@ describe('notification retry recovery', () => {
     });
   });
 
-  it('does not exhaust pending work on explicit release and terminalizes expired final attempts', async () => {
-    const repository = new NotificationOutboxRepository(pool);
-    const intent = await repository.enqueue(input(1, 'abandoned-pending'));
-    await pool.query(
-      'UPDATE notification_outbox SET dispatch_max_attempts=2 WHERE id=$1',
-      [intent.id],
-    );
+  it(
+    'does not exhaust pending work on explicit release and terminalizes expired final attempts',
+    async () => {
+      const repository = new NotificationOutboxRepository(pool);
+      const intent = await repository.enqueue(input(1, 'abandoned-pending'));
+      await pool.query(
+        'UPDATE notification_outbox SET dispatch_max_attempts=2 WHERE id=$1',
+        [intent.id],
+      );
 
-    for (let index = 0; index < 3; index += 1) {
-      const releasedClaim = await repository.claimPendingIntent({
+      for (let index = 0; index < 3; index += 1) {
+        const releasedClaim = await repository.claimPendingIntent({
+          clinicId,
+          intentId: intent.id,
+          leaseMs: 60_000,
+        });
+        expect(releasedClaim?.intent.dispatchAttemptCount).toBe(1);
+        await expect(
+          repository.releaseDispatchClaim(
+            clinicId,
+            intent.id,
+            releasedClaim!.claimToken,
+          ),
+        ).resolves.toBe(true);
+      }
+
+      const afterReleases = await pool.query<{ dispatch_attempt_count: number }>(
+        'SELECT dispatch_attempt_count FROM notification_outbox WHERE id=$1',
+        [intent.id],
+      );
+      expect(afterReleases.rows[0]?.dispatch_attempt_count).toBe(0);
+
+      const abandoned = await repository.claimPendingIntent({
         clinicId,
         intentId: intent.id,
         leaseMs: 60_000,
       });
-      expect(releasedClaim?.intent.dispatchAttemptCount).toBe(1);
+      expect(abandoned).not.toBeNull();
+      await pool.query(
+        `UPDATE notification_outbox
+            SET dispatch_claim_expires_at=now() - interval '1 millisecond'
+          WHERE id=$1`,
+        [intent.id],
+      );
+
       await expect(
-        repository.releaseDispatchClaim(
+        repository.claimPendingIntent({
           clinicId,
-          intent.id,
-          releasedClaim!.claimToken,
-        ),
-      ).resolves.toBe(true);
-    }
+          intentId: intent.id,
+          leaseMs: 60_000,
+        }),
+      ).resolves.toBeNull();
+      const recovered = await pool.query<{
+        state: string;
+        dispatch_attempt_count: number;
+        next_attempt_at: Date | null;
+      }>(
+        `SELECT state, dispatch_attempt_count, next_attempt_at
+           FROM notification_outbox
+          WHERE id=$1`,
+        [intent.id],
+      );
+      expect(recovered.rows[0]?.state).toBe('unknown');
+      expect(recovered.rows[0]?.dispatch_attempt_count).toBe(1);
+      expect(recovered.rows[0]?.next_attempt_at).not.toBeNull();
 
-    const afterReleases = await pool.query<{ dispatch_attempt_count: number }>(
-      'SELECT dispatch_attempt_count FROM notification_outbox WHERE id=$1',
-      [intent.id],
-    );
-    expect(afterReleases.rows[0]?.dispatch_attempt_count).toBe(0);
-
-    const abandoned = await repository.claimPendingIntent({
-      clinicId,
-      intentId: intent.id,
-      leaseMs: 60_000,
-    });
-    expect(abandoned).not.toBeNull();
-    await pool.query(
-      `UPDATE notification_outbox
-          SET dispatch_claim_expires_at=now() - interval '1 millisecond'
-        WHERE id=$1`,
-      [intent.id],
-    );
-
-    await expect(
-      repository.claimPendingIntent({
+      await pool.query(
+        'UPDATE notification_outbox SET next_attempt_at=now() WHERE id=$1',
+        [intent.id],
+      );
+      const finalClaim = await repository.claimPendingIntent({
         clinicId,
         intentId: intent.id,
         leaseMs: 60_000,
-      }),
-    ).resolves.toBeNull();
-    const recovered = await pool.query<{
-      state: string;
-      dispatch_attempt_count: number;
-      next_attempt_at: Date | null;
-    }>(
-      `SELECT state, dispatch_attempt_count, next_attempt_at
-         FROM notification_outbox
-        WHERE id=$1`,
-      [intent.id],
-    );
-    expect(recovered.rows[0]?.state).toBe('unknown');
-    expect(recovered.rows[0]?.dispatch_attempt_count).toBe(1);
-    expect(recovered.rows[0]?.next_attempt_at).not.toBeNull();
+      });
+      expect(finalClaim?.intent.dispatchAttemptCount).toBe(2);
+      await pool.query(
+        `UPDATE notification_outbox
+            SET dispatch_claim_expires_at=now() - interval '1 millisecond'
+          WHERE id=$1`,
+        [intent.id],
+      );
 
-    await pool.query(
-      'UPDATE notification_outbox SET next_attempt_at=now() WHERE id=$1',
-      [intent.id],
-    );
-    const finalClaim = await repository.claimPendingIntent({
-      clinicId,
-      intentId: intent.id,
-      leaseMs: 60_000,
-    });
-    expect(finalClaim?.intent.dispatchAttemptCount).toBe(2);
-    await pool.query(
-      `UPDATE notification_outbox
-          SET dispatch_claim_expires_at=now() - interval '1 millisecond'
-        WHERE id=$1`,
-      [intent.id],
-    );
-
-    await expect(
-      repository.claimPendingIntent({
-        clinicId,
-        intentId: intent.id,
-        leaseMs: 60_000,
-      }),
-    ).resolves.toBeNull();
-    const exhausted = await pool.query<{
-      state: string;
-      next_attempt_at: Date | null;
-    }>(
-      'SELECT state, next_attempt_at FROM notification_outbox WHERE id=$1',
-      [intent.id],
-    );
-    expect(exhausted.rows[0]).toMatchObject({
-      state: 'dead_letter',
-      next_attempt_at: null,
-    });
-  });
+      await expect(
+        repository.claimPendingIntent({
+          clinicId,
+          intentId: intent.id,
+          leaseMs: 60_000,
+        }),
+      ).resolves.toBeNull();
+      const exhausted = await pool.query<{
+        state: string;
+        next_attempt_at: Date | null;
+      }>(
+        'SELECT state, next_attempt_at FROM notification_outbox WHERE id=$1',
+        [intent.id],
+      );
+      expect(exhausted.rows[0]).toMatchObject({
+        state: 'dead_letter',
+        next_attempt_at: null,
+      });
+    },
+  );
 });
