@@ -409,7 +409,11 @@ export class NotificationOutboxRepository {
           WHERE clinic_id=$1
             AND id=$2
             AND state IN ('failed', 'unknown')
-            AND dispatch_attempt_count >= dispatch_max_attempts`,
+            AND dispatch_attempt_count >= dispatch_max_attempts
+            AND (
+              dispatch_claim_token IS NULL
+              OR dispatch_claim_expires_at <= now()
+            )`,
         [input.clinicId, input.intentId],
       );
       const result = await client.query<ClaimRow>(
