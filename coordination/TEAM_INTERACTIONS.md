@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T03:15:15.299191+00:00
+- Last sync: 2026-09-11T03:16:06.726590+00:00
 
 ## Team Room charter
 
@@ -11494,5 +11494,251 @@ Implemented on that branch:
 CI #615 is running on the exact head. Whole-PR `@coderabbitai full review` is requested on the exact head. Because ChatGPT authored this SHA, final merge still requires an eligible independent non-author exact-head gate. Gemini Agent/Chat remain paused.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5628905275
+
+---
+
+### 2026-09-11T03:15:53Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+<details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="140"
+
+echo "== Required coordination guidance =="
+for file in \
+  AGENTS.md \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  if [ -f "$file" ]; then
+    echo "--- $file ---"
+    sed -n '1,240p' "$file"
+  fi
+done
+
+echo "== PR metadata and checks =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,baseRefName,mergeable,reviewDecision,title,url,author
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Open pull requests =="
+gh pr list --repo "$repo" --state open --limit 20 \
+  --json number,title,headRefName,headRefOid,mergeable,url
+
+echo "== Recent PR discussion and reviews =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-25:][] | {user:.user.login,created_at,body}' || true
+gh api "repos/$repo/pulls/$pr/reviews?per_page=100" \
+  --jq '.[-20:][] | {user:.user.login,state,commit_id,submitted_at,body}' || true
+
+echo "== Unresolved review threads =="
+gh api graphql \
+  -F owner="NTinkicht" -F name="Tabibi" -F number="$pr" \
+  -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 20) {
+            nodes { author { login } commit { oid } body }
+          }
+        }
+      }
+    }
+  }
+}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+  | select(.isResolved == false)
+  | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+
+echo "== Changed files =="
+gh pr diff "$pr" --repo "$repo" --name-only
+
+echo "== Relevant implementation at current PR head =="
+head_sha="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+for file in \
+  src/modules/notification-outbox/index.ts \
+  tests/integration/notification-outbox.test.ts \
+  db/migrations/0017_notification_dispatch_claim.sql \
+  db/migrations/0016_notification_outbox_foundation.sql
+do
+  echo "--- $file @ $head_sha ---"
+  gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' \
+    | base64 -d > "/tmp/$(basename "$file")" 2>/dev/null || true
+  if [ -s "/tmp/$(basename "$file")" ]; then
+    case "$file" in
+      *.ts)
+        ast-grep outline "/tmp/$(basename "$file")" --items all || true
+        nl -ba "/tmp/$(basename "$file")" | sed -n '1,460p'
+        ;;
+      *)
+        nl -ba "/tmp/$(basename "$file")" | sed -n '1,360p'
+        ;;
+    esac
+  fi
+done
+```
+
+Length of output: 101804
+
+---
+
+</details>
+
+`@NTinkicht`, PR `#140` is the only open PR and remains on the canonical branch at exact head `4f5f69f71be48ca2a3b02c739bbd0ba6e57a30e7`.
+
+The CI gate is not clear:
+
+- `Quality and build` is `FAILURE`.
+- `PostgreSQL integration` is `IN_PROGRESS`.
+- `Browser smoke` is `IN_PROGRESS`.
+
+The requested `@coderabbitai full review` did not run. CodeRabbit posted an automatic-review skip notice because the repository has fewer than 10 stars. The successful `CodeRabbit` check is not full-review evidence.
+
+One idempotency race also needs coverage or remediation. `NotificationOutboxRepository.enqueue()` serializes on `clinicId`, `logicalTargetKey`, and `eventKey`. Two concurrent requests can reuse one `idempotencyKey` with different targets or event keys. They take different advisory locks, both miss `loadByIdempotencyKey()`, and then race on `UNIQUE (clinic_id, idempotency_key)`. One request can receive raw PostgreSQL error `23505` instead of `NotificationOutboxConflictError`.
+
+Use a clinic-and-idempotency-key serialization boundary, or translate the unique-constraint violation to `NotificationOutboxConflictError`. Add a deterministic concurrent regression for the same clinic and idempotency key with different request content.
+
+Do not merge PR `#140` until required CI passes on a new exact head and a completed independent exact-head review is available.
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer><details>
+<summary>🧩 Analysis chain</summary>
+
+🏁 Script executed:
+
+```shell
+#!/bin/bash
+set -euo pipefail
+
+repo="NTinkicht/Tabibi"
+pr="140"
+
+echo "== Required coordination guidance =="
+for file in \
+  AGENTS.md \
+  coordination/COLLABORATION_PROTOCOL.md \
+  coordination/COMPANY_OPERATING_SYSTEM.md \
+  coordination/WORK_QUEUE.md \
+  coordination/STATE.json \
+  coordination/TEAM_LEARNING.md \
+  coordination/RETROSPECTIVES.md
+do
+  if [ -f "$file" ]; then
+    echo "--- $file ---"
+    sed -n '1,240p' "$file"
+  fi
+done
+
+echo "== PR metadata and checks =="
+gh pr view "$pr" --repo "$repo" \
+  --json number,state,isDraft,headRefName,headRefOid,baseRefName,mergeable,reviewDecision,title,url,author
+gh pr checks "$pr" --repo "$repo" --json name,state,workflow,link || true
+
+echo "== Open pull requests =="
+gh pr list --repo "$repo" --state open --limit 20 \
+  --json number,title,headRefName,headRefOid,mergeable,url
+
+echo "== Recent PR discussion and reviews =="
+gh api "repos/$repo/issues/$pr/comments?per_page=100" \
+  --jq '.[-25:][] | {user:.user.login,created_at,body}' || true
+gh api "repos/$repo/pulls/$pr/reviews?per_page=100" \
+  --jq '.[-20:][] | {user:.user.login,state,commit_id,submitted_at,body}' || true
+
+echo "== Unresolved review threads =="
+gh api graphql \
+  -F owner="NTinkicht" -F name="Tabibi" -F number="$pr" \
+  -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 20) {
+            nodes { author { login } commit { oid } body }
+          }
+        }
+      }
+    }
+  }
+}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+  | select(.isResolved == false)
+  | {path,line,comments:[.comments.nodes[]|{author:.author.login,commit:.commit.oid,body}]}' || true
+
+echo "== Changed files =="
+gh pr diff "$pr" --repo "$repo" --name-only
+
+echo "== Relevant implementation at current PR head =="
+head_sha="$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)"
+for file in \
+  src/modules/notification-outbox/index.ts \
+  tests/integration/notification-outbox.test.ts \
+  db/migrations/0017_notification_dispatch_claim.sql \
+  db/migrations/0016_notification_outbox_foundation.sql
+do
+  echo "--- $file @ $head_sha ---"
+  gh api "repos/$repo/contents/$file?ref=$head_sha" --jq '.content' \
+    | base64 -d > "/tmp/$(basename "$file")" 2>/dev/null || true
+  if [ -s "/tmp/$(basename "$file")" ]; then
+    case "$file" in
+      *.ts)
+        ast-grep outline "/tmp/$(basename "$file")" --items all || true
+        nl -ba "/tmp/$(basename "$file")" | sed -n '1,460p'
+        ;;
+      *)
+        nl -ba "/tmp/$(basename "$file")" | sed -n '1,360p'
+        ;;
+    esac
+  fi
+done
+```
+
+Length of output: 101804
+
+---
+
+</details>
+
+`@NTinkicht`, PR `#140` is the only open PR and remains on the canonical branch at exact head `4f5f69f71be48ca2a3b02c739bbd0ba6e57a30e7`.
+
+The CI gate is not clear:
+
+- `Quality and build` is `FAILURE`.
+- `PostgreSQL integration` is `IN_PROGRESS`.
+- `Browser smoke` is `IN_PROGRESS`.
+
+The requested `@coderabbitai full review` did not run. CodeRabbit posted an automatic-review skip notice because the repository has fewer than 10 stars. The successful `CodeRabbit` check is not full-review evidence.
+
+One idempotency race also needs coverage or remediation. `NotificationOutboxRepository.enqueue()` serializes on `clinicId`, `logicalTargetKey`, and `eventKey`. Two concurrent requests can reuse one `idempotencyKey` with different targets or event keys. They take different advisory locks, both miss `loadByIdempotencyKey()`, and then race on `UNIQUE (clinic_id, idempotency_key)`. One request can receive raw PostgreSQL error `23505` instead of `NotificationOutboxConflictError`.
+
+Use a clinic-and-idempotency-key serialization boundary, or translate the unique-constraint violation to `NotificationOutboxConflictError`. Add a deterministic concurrent regression for the same clinic and idempotency key with different request content.
+
+Do not merge PR `#140` until required CI passes on a new exact head and a completed independent exact-head review is available.</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5628911737
 
 ---
