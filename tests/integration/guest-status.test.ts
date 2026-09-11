@@ -87,17 +87,15 @@ beforeEach(async () => {
 });
 afterAll(async () => pool.end());
 
-async function liveBearer() {
+async function liveBearer(
+  issuedAt = new Date('2026-09-10T09:00:00Z'),
+) {
   const service = new GuestAccessService(pool);
-  const issued = await service.issue(
-    target,
-    ids.actor,
-    new Date('2026-09-10T09:00:00Z'),
-  );
+  const issued = await service.issue(target, ids.actor, issuedAt);
   return service.consume(
     issued.exchangeId,
     target,
-    new Date('2026-09-10T09:01:00Z'),
+    new Date(issuedAt.getTime() + 60_000),
   );
 }
 
@@ -209,7 +207,7 @@ describe('WU17 guest queue-status read', () => {
   });
 
   it('serves the cookie-authenticated API as no-store and rejects missing credentials generically', async () => {
-    const credential = await liveBearer();
+    const credential = await liveBearer(new Date());
     const expectedPublicDisplayLabel = await targetPublicDisplayLabel();
     const ok = await GET(
       new Request('http://localhost/api/guest/status', {
@@ -245,7 +243,7 @@ describe('WU17 guest queue-status read', () => {
   });
 
   it('shares credential polling limits through PostgreSQL across route invocations', async () => {
-    const credential = await liveBearer();
+    const credential = await liveBearer(new Date());
     const request = (ip = '203.0.113.19') =>
       GET(
         new Request('http://localhost/api/guest/status', {
