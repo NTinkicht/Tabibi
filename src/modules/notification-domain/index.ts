@@ -19,7 +19,9 @@ export interface NotificationProviderRequest {
 }
 
 export interface NotificationProviderAdapter {
-  dispatch(request: NotificationProviderRequest): Promise<NotificationProviderResult>;
+  dispatch(
+    request: NotificationProviderRequest,
+  ): Promise<NotificationProviderResult>;
 }
 
 export interface NotificationDispatchStore {
