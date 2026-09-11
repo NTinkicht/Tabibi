@@ -64,7 +64,7 @@ function normalizeProviderResult(result: unknown): NotificationProviderResult {
   const validCode =
     candidate.code === undefined ||
     candidate.code === null ||
-    typeof candidate.code === 'string';
+    (typeof candidate.code === 'string' && candidate.code.length <= 160);
 
   if (!validKind || !validCode)
     return { kind: 'unknown', code: 'provider_indeterminate_result' };
