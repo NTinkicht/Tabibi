@@ -11,10 +11,4 @@ ALTER TABLE notification_outbox
       state IN ('failed', 'unknown')
       AND dispatch_attempt_count < dispatch_max_attempts
     )
-  );
-
-DROP INDEX notification_outbox_dispatch_claim_eligible_idx;
-
-CREATE INDEX notification_outbox_dispatch_claim_eligible_idx
-  ON notification_outbox (clinic_id, next_attempt_at, created_at, id)
-  WHERE state IN ('pending', 'failed', 'unknown');
+  ) NOT VALID;
