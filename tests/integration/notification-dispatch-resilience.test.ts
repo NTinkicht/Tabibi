@@ -1,14 +1,26 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import {
   NotificationDispatchService,
   type NotificationProviderAdapter,
 } from '@/modules/notification-domain';
-import { NotificationDispatchBatchRunner } from '@/modules/notification-domain/dispatch-batch';
+import {
+  NotificationDispatchBatchRunner,
+} from '@/modules/notification-domain/dispatch-batch';
 import { NotificationOutboxRepository } from '@/modules/notification-outbox';
-import { NotificationDispatchEligibilityRepository } from '@/modules/notification-outbox/dispatch-eligibility';
+import {
+  NotificationDispatchEligibilityRepository,
+} from '@/modules/notification-outbox/dispatch-eligibility';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 4 });
 const clinicId = randomUUID();
@@ -82,12 +94,18 @@ describe('WU31 PostgreSQL dispatch resilience', () => {
       kind: 'delivered',
       code: 'accepted',
     }));
-    const service = new NotificationDispatchService(outbox, { dispatch }, {
-      resolve: vi.fn(async (intent) => {
-        if (intent.id === failing.id) throw new Error('Sensitive resolver detail');
-        return eligibleContext(intent.clinicId);
-      }),
-    });
+    const service = new NotificationDispatchService(
+      outbox,
+      { dispatch },
+      {
+        resolve: vi.fn(async (intent) => {
+          if (intent.id === failing.id) {
+            throw new Error('Sensitive resolver detail');
+          }
+          return eligibleContext(intent.clinicId);
+        }),
+      },
+    );
     const runner = new NotificationDispatchBatchRunner(scanner, service);
 
     const summary = await runner.run({ clinicId, limit: 2 });
