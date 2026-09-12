@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { renderNotificationTemplate } from '@/modules/notification-templates';
+import {
+  composeGuestTransferExchangeLink,
+  renderNotificationTemplate,
+} from '@/modules/notification-templates';
 
 describe('notification template integration boundary', () => {
   it.each(['session_cancelled.v1', 'queue_entry_cancelled.v1'] as const)(
@@ -28,6 +31,31 @@ describe('notification template integration boundary', () => {
       templateVersion: 1,
       sourceIntentVersion: 43,
     });
+  });
+
+  it('keeps decrypted transfer links out of the general renderer', () => {
+    expect(() =>
+      renderNotificationTemplate({
+        templateId: 'queue_entry_transferred.v1',
+        sourceIntentVersion: 5,
+        variables: {},
+        exchangeUrl: 'https://tabibi.example/g/exchange/opaque_123',
+      } as never),
+    ).toThrow('Invalid notification template input');
+  });
+
+  it('allows the exchange link only through the dedicated post-decryption path', () => {
+    const base = renderNotificationTemplate({
+      templateId: 'queue_entry_transferred.v1',
+      sourceIntentVersion: 5,
+      variables: {},
+    });
+    const rendered = composeGuestTransferExchangeLink(
+      base,
+      'https://tabibi.example/g/exchange/opaque_123',
+    );
+    expect(rendered.body).toContain('/g/exchange/opaque_123');
+    expect(rendered.sourceIntentVersion).toBe(5);
   });
 
   it.each([
