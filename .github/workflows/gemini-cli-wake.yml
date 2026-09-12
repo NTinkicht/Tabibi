@@ -17,7 +17,7 @@ jobs:
       github.actor == 'NTinkicht' &&
       contains(github.event.comment.body, '@gemini-cli')
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -50,7 +50,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Run Gemini CLI in read-only plan mode
+      - name: Run Gemini CLI with safe live progress
         if: steps.preflight.outputs.ready == 'true'
         id: actor
         env:
@@ -87,18 +87,139 @@ jobs:
           EOF
           printf '\nDispatch text:\n%s\n' "$DISPATCH_BODY" >> /tmp/tabibi-gemini-prompt.txt
 
+          # Gemini CLI v0.59.0 supports stream-json. Consume that stream through a
+          # redacting monitor: GitHub logs show lifecycle/tool/status events only.
+          # Prompt text, assistant content, tool parameters/results and provider stderr
+          # never enter the live Actions log. Assistant content is retained only for the
+          # final Issue #11 result comment.
+          cat > /tmp/tabibi-gemini-monitor.cjs <<'NODE'
+          const fs = require('node:fs');
+          const readline = require('node:readline');
+
+          const output = fs.createWriteStream('/tmp/tabibi-gemini-output.txt', {
+            flags: 'w',
+            mode: 0o600,
+          });
+          const input = readline.createInterface({
+            input: process.stdin,
+            crlfDelay: Infinity,
+          });
+
+          const safeToken = (value) =>
+            String(value ?? 'unknown')
+              .replace(/[^a-zA-Z0-9._:/-]/g, '_')
+              .slice(0, 120);
+
+          let assistantChars = 0;
+          let assistantChunks = 0;
+          let toolCalls = 0;
+
+          input.on('line', (line) => {
+            let event;
+            try {
+              event = JSON.parse(line);
+            } catch {
+              console.log('[gemini] malformed structured event received; content redacted');
+              return;
+            }
+
+            switch (event.type) {
+              case 'init':
+                console.log(`[gemini] session started model=${safeToken(event.model)}`);
+                break;
+              case 'tool_use':
+                toolCalls += 1;
+                console.log(`[gemini] tool_use #${toolCalls} name=${safeToken(event.tool_name)}`);
+                break;
+              case 'tool_result':
+                console.log(`[gemini] tool_result status=${safeToken(event.status)}`);
+                break;
+              case 'message':
+                if (event.role === 'assistant' && typeof event.content === 'string') {
+                  output.write(event.content);
+                  assistantChars += event.content.length;
+                  assistantChunks += 1;
+                }
+                break;
+              case 'error':
+                console.log(`[gemini] event severity=${safeToken(event.severity)}`);
+                break;
+              case 'result': {
+                const stats = event.stats ?? {};
+                console.log(
+                  `[gemini] result status=${safeToken(event.status)} ` +
+                    `tool_calls=${Number(stats.tool_calls ?? toolCalls)} ` +
+                    `duration_ms=${Number(stats.duration_ms ?? 0)} ` +
+                    `output_tokens=${Number(stats.output_tokens ?? 0)}`,
+                );
+                break;
+              }
+              default:
+                console.log(`[gemini] event type=${safeToken(event.type)}`);
+            }
+          });
+
+          input.on('close', () => {
+            output.end(() => {
+              console.log(
+                `[gemini] response captured safely chunks=${assistantChunks} chars=${assistantChars}`,
+              );
+            });
+          });
+          NODE
+
+          start_epoch="$(date +%s)"
+          (
+            while true; do
+              sleep 60
+              now="$(date +%s)"
+              elapsed="$((now - start_epoch))"
+              echo "::notice title=Gemini CLI heartbeat::still running; elapsed=${elapsed}s"
+            done
+          ) &
+          heartbeat_pid=$!
+
+          stop_heartbeat() {
+            kill "$heartbeat_pid" 2>/dev/null || true
+            wait "$heartbeat_pid" 2>/dev/null || true
+          }
+          trap stop_heartbeat EXIT
+
+          echo "::notice title=Gemini CLI::actor execution started; hard limit=600s; live content redacted"
           set +e
-          gemini \
-            --skip-trust \
-            --approval-mode=plan \
-            --policy /tmp/tabibi-gemini-policy.toml \
-            --output-format text \
-            --prompt "$(cat /tmp/tabibi-gemini-prompt.txt)" \
-            > /tmp/tabibi-gemini-output.txt \
-            2> /tmp/tabibi-gemini-error.txt
-          code=$?
+          timeout --signal=TERM --kill-after=15s 600s \
+            gemini \
+              --skip-trust \
+              --approval-mode=plan \
+              --policy /tmp/tabibi-gemini-policy.toml \
+              --output-format stream-json \
+              --prompt "$(cat /tmp/tabibi-gemini-prompt.txt)" \
+              2> /tmp/tabibi-gemini-error.txt \
+            | node /tmp/tabibi-gemini-monitor.cjs
+          pipeline_codes=("${PIPESTATUS[@]}")
           set -e
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+
+          stop_heartbeat
+          trap - EXIT
+
+          actor_code="${pipeline_codes[0]:-1}"
+          monitor_code="${pipeline_codes[1]:-1}"
+          reason="ready"
+
+          if [[ "$actor_code" == "124" ]]; then
+            reason="Gemini CLI exceeded the 10-minute actor time limit"
+          elif [[ "$actor_code" != "0" ]]; then
+            reason="Gemini CLI exited without a usable result"
+          elif [[ "$monitor_code" != "0" ]]; then
+            actor_code=90
+            reason="Gemini structured progress monitor failed"
+          elif [[ ! -s /tmp/tabibi-gemini-output.txt ]]; then
+            actor_code=91
+            reason="Gemini CLI completed without an assistant result"
+          fi
+
+          echo "exit_code=$actor_code" >> "$GITHUB_OUTPUT"
+          echo "failure_reason=$reason" >> "$GITHUB_OUTPUT"
 
       - name: Post Gemini result
         if: always()
@@ -107,6 +228,7 @@ jobs:
           READY: ${{ steps.preflight.outputs.ready }}
           PREFLIGHT_REASON: ${{ steps.preflight.outputs.reason }}
           ACTOR_EXIT: ${{ steps.actor.outputs.exit_code }}
+          ACTOR_REASON: ${{ steps.actor.outputs.failure_reason }}
         shell: bash
         run: |
           set -euo pipefail
@@ -116,7 +238,7 @@ jobs:
             if [[ "${READY:-false}" != "true" ]]; then
               echo "CAPACITY_DEGRADED - ${PREFLIGHT_REASON:-preflight failed}. No paid fallback was attempted."
             elif [[ "${ACTOR_EXIT:-1}" != "0" ]]; then
-              echo "CAPACITY_DEGRADED - Gemini CLI exited without a usable result. No paid fallback was attempted."
+              echo "CAPACITY_DEGRADED - ${ACTOR_REASON:-Gemini CLI exited without a usable result}. No paid fallback was attempted."
             else
               echo '```text'
               head -c 50000 /tmp/tabibi-gemini-output.txt
