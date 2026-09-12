@@ -26,6 +26,7 @@ export interface NotificationDispatchBatchSummary {
   suppressed: number;
   notClaimed: number;
   claimLost: number;
+  errors: number;
 }
 
 /** Runs one bounded, clinic-scoped dispatch batch through the existing claim fence. */
@@ -53,13 +54,21 @@ export class NotificationDispatchBatchRunner {
       suppressed: 0,
       notClaimed: 0,
       claimLost: 0,
+      errors: 0,
     };
 
     for (const candidate of eligible) {
-      const result = await this.executor.dispatchOne({
-        clinicId,
-        intentId: candidate.intentId,
-      });
+      let result: NotificationDispatchExecution;
+      try {
+        result = await this.executor.dispatchOne({
+          clinicId,
+          intentId: candidate.intentId,
+        });
+      } catch {
+        summary.errors += 1;
+        continue;
+      }
+
       if (result.status === 'completed') summary.completed += 1;
       else if (result.status === 'suppressed') summary.suppressed += 1;
       else if (result.status === 'not_claimed') summary.notClaimed += 1;
