@@ -74,10 +74,7 @@ describe('AI capacity policy', () => {
         guard: 'TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED',
         secret: 'MISTRAL_API_KEY',
         readonlyMarker: '--agent plan',
-        hardeningMarkers: [
-          '--enabled-tools grep',
-          '--enabled-tools read_file',
-        ],
+        hardeningMarkers: ['--enabled-tools grep', '--enabled-tools read_file'],
       },
     ];
 
