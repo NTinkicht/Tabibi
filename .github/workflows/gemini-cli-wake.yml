@@ -61,6 +61,18 @@ jobs:
           set -euo pipefail
           npm install --global @google/gemini-cli@0.59.0
 
+          cat > /tmp/tabibi-gemini-policy.toml <<'EOF'
+          [[rule]]
+          toolName = "*"
+          decision = "deny"
+          priority = 998
+
+          [[rule]]
+          toolName = ["glob", "grep_search", "list_directory", "read_file", "read_many_files"]
+          decision = "allow"
+          priority = 999
+          EOF
+
           cat > /tmp/tabibi-gemini-prompt.txt <<'EOF'
           You are actor=gemini-cli in the Tabibi Company OS.
           This is an unattended READ-ONLY wake from the permanent GitHub wake bus.
@@ -79,7 +91,7 @@ jobs:
           gemini \
             --skip-trust \
             --approval-mode=plan \
-            --exclude-tools run_shell_command,write_file,replace,google_web_search,web_fetch,activate_skill,read_mcp_resource,list_mcp_resources \
+            --policy /tmp/tabibi-gemini-policy.toml \
             --output-format text \
             --prompt "$(cat /tmp/tabibi-gemini-prompt.txt)" \
             > /tmp/tabibi-gemini-output.txt \
