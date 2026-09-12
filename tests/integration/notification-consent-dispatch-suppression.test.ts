@@ -16,7 +16,9 @@ import {
   type NotificationProviderAdapter,
 } from '@/modules/notification-domain';
 import { NotificationOutboxRepository } from '@/modules/notification-outbox';
-import { NotificationDispatchEligibilityRepository } from '@/modules/notification-outbox/dispatch-eligibility';
+import {
+  NotificationDispatchEligibilityRepository,
+} from '@/modules/notification-outbox/dispatch-eligibility';
 import { NotificationPreferenceRepository } from '@/modules/notification-preferences';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
