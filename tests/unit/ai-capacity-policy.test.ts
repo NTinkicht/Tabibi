@@ -39,7 +39,10 @@ describe('AI capacity policy', () => {
         });
       }
 
-      for (const [secretName, allowedWorkflow] of providerSecretWorkflowAllowlist) {
+      for (const [
+        secretName,
+        allowedWorkflow,
+      ] of providerSecretWorkflowAllowlist) {
         lines.forEach((line, index) => {
           if (line.includes(secretName) && file !== allowedWorkflow) {
             violations.push(
@@ -53,39 +56,42 @@ describe('AI capacity policy', () => {
     expect(violations).toEqual([]);
   });
 
-  it('keeps Gemini and Mistral unattended wakes owner-only, event-driven and read-only', () => {
-    const wakePolicies = [
-      {
-        file: 'gemini-cli-wake.yml',
-        mention: '@gemini-cli',
-        guard: 'TABIBI_GEMINI_ZERO_BILLING_CONFIRMED',
-        secret: 'GEMINI_API_KEY',
-        readonlyMarker: '--approval-mode=plan',
-      },
-      {
-        file: 'mistral-vibe-wake.yml',
-        mention: '@mistral-vibe',
-        guard: 'TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED',
-        secret: 'MISTRAL_API_KEY',
-        readonlyMarker: '--agent plan',
-      },
-    ];
+  it(
+    'keeps Gemini and Mistral unattended wakes owner-only, event-driven and read-only',
+    () => {
+      const wakePolicies = [
+        {
+          file: 'gemini-cli-wake.yml',
+          mention: '@gemini-cli',
+          guard: 'TABIBI_GEMINI_ZERO_BILLING_CONFIRMED',
+          secret: 'GEMINI_API_KEY',
+          readonlyMarker: '--approval-mode=plan',
+        },
+        {
+          file: 'mistral-vibe-wake.yml',
+          mention: '@mistral-vibe',
+          guard: 'TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED',
+          secret: 'MISTRAL_API_KEY',
+          readonlyMarker: '--agent plan',
+        },
+      ];
 
-    for (const policy of wakePolicies) {
-      const content = fs.readFileSync(
-        path.join(workflowDirectory, policy.file),
-        'utf8',
-      );
+      for (const policy of wakePolicies) {
+        const content = fs.readFileSync(
+          path.join(workflowDirectory, policy.file),
+          'utf8',
+        );
 
-      expect(content).toContain('github.event.issue.number == 11');
-      expect(content).toContain("github.actor == 'NTinkicht'");
-      expect(content).toContain(policy.mention);
-      expect(content).toContain(policy.guard);
-      expect(content).toContain(policy.secret);
-      expect(content).toContain(policy.readonlyMarker);
-      expect(content).toMatch(/permissions:\s*[\s\S]*?contents:\s*read/);
-      expect(content).not.toMatch(/contents:\s*write/);
-      expect(content).not.toMatch(/^\s*schedule\s*:/m);
-    }
-  });
+        expect(content).toContain('github.event.issue.number == 11');
+        expect(content).toContain("github.actor == 'NTinkicht'");
+        expect(content).toContain(policy.mention);
+        expect(content).toContain(policy.guard);
+        expect(content).toContain(policy.secret);
+        expect(content).toContain(policy.readonlyMarker);
+        expect(content).toMatch(/permissions:\s*[\s\S]*?contents:\s*read/);
+        expect(content).not.toMatch(/contents:\s*write/);
+        expect(content).not.toMatch(/^\s*schedule\s*:/m);
+      }
+    },
+  );
 });
