@@ -225,7 +225,9 @@ describe('WU30 consent-gated rendered dispatch composition', () => {
     expect(notificationProvider.dispatch).toHaveBeenCalledWith(frenchEnvelope);
     expect(
       JSON.stringify(notificationProvider.dispatch.mock.calls),
-    ).not.toMatch(/Sensitive Name|\+213555000000|clinic-1|patient-1|claim-token/);
+    ).not.toMatch(
+      /Sensitive Name|\+213555000000|clinic-1|patient-1|claim-token/,
+    );
   });
 
   it('leaves renderer failure recoverable and invokes no provider or completion', async () => {
