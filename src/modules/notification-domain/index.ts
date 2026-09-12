@@ -4,6 +4,16 @@ import type {
   NotificationDispatchOutcome,
   NotificationIntent,
 } from '@/modules/notification-outbox';
+import {
+  noNotificationDispatchObserver,
+  recordNotificationDispatchEvent,
+  type NotificationDispatchObserver,
+} from '@/modules/notification-domain/observability';
+
+export type {
+  NotificationDispatchOperationalEvent,
+  NotificationDispatchObserver,
+} from '@/modules/notification-domain/observability';
 
 export type NotificationProviderResult =
   | { kind: 'delivered'; code?: string | null }
@@ -100,6 +110,7 @@ export class NotificationDispatchService {
     private readonly store: NotificationDispatchStore,
     private readonly provider: NotificationProviderAdapter,
     private readonly leaseMs = 60_000,
+    private readonly observer: NotificationDispatchObserver = noNotificationDispatchObserver,
   ) {
     if (!Number.isSafeInteger(leaseMs) || leaseMs <= 0 || leaseMs > 86_400_000)
       throw new Error('Dispatch lease must be between 1 ms and 24 hours');
@@ -119,7 +130,14 @@ export class NotificationDispatchService {
       intentId,
       leaseMs: this.leaseMs,
     });
-    if (!claim) return { status: 'not_claimed' };
+    if (!claim) {
+      recordNotificationDispatchEvent(this.observer, {
+        name: 'notification.dispatch.not_claimed',
+        clinicId,
+        intentId,
+      });
+      return { status: 'not_claimed' };
+    }
 
     const idempotencyKey = providerIdempotencyKey(claim);
     let providerResult: NotificationProviderResult;
@@ -144,13 +162,33 @@ export class NotificationDispatchService {
       outcomeCode: providerResult.code ?? null,
     });
 
-    if (!completed)
+    if (!completed) {
+      recordNotificationDispatchEvent(this.observer, {
+        name: 'notification.dispatch.claim_lost',
+        clinicId,
+        intentId: claim.intent.id,
+        providerResultKind: providerResult.kind,
+      });
       return {
         status: 'claim_lost',
         claimToken: claim.claimToken,
         providerIdempotencyKey: idempotencyKey,
         providerResult,
       };
+    }
+
+    recordNotificationDispatchEvent(this.observer, {
+      name: 'notification.dispatch.outcome',
+      clinicId,
+      intentId: completed.id,
+      outcome: completed.state as NotificationDispatchOutcome,
+      attempt: completed.dispatchAttemptCount,
+      maxAttempts: completed.dispatchMaxAttempts,
+      retryScheduled: completed.nextAttemptAt !== null,
+      exhausted:
+        completed.state === 'dead_letter' &&
+        completed.dispatchAttemptCount >= completed.dispatchMaxAttempts,
+    });
 
     return {
       status: 'completed',

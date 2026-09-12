@@ -78,6 +78,95 @@ function provider(result: NotificationProviderResult) {
 }
 
 describe('NotificationDispatchService', () => {
+  it('contains observer failures after persisting the dispatch result', async () => {
+    const dispatchStore = store();
+    const observerFailure = new Error('Sensitive observer failure');
+    const error = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    const service = new NotificationDispatchService(
+      dispatchStore.value,
+      provider({ kind: 'delivered' }).value,
+      60_000,
+      {
+        record: () => {
+          throw observerFailure;
+        },
+      },
+    );
+
+    await expect(
+      service.dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' }),
+    ).resolves.toMatchObject({ status: 'completed' });
+    expect(dispatchStore.completeDispatchAttempt).toHaveBeenCalledOnce();
+    expect(error).toHaveBeenCalledWith(
+      'notification.dispatch.observer_failure',
+    );
+    expect(JSON.stringify(error.mock.calls)).not.toContain(
+      observerFailure.message,
+    );
+    error.mockRestore();
+  });
+
+  it('emits deterministic privacy-safe events for persisted outcomes', async () => {
+    const dispatchStore = store({
+      completed: intent({
+        state: 'failed',
+        payload: { patientName: 'Sensitive Name', phone: '+213555000000' },
+        nextAttemptAt: '2026-09-11T00:06:00.000Z',
+        dispatchOutcomeCode: 'credential=secret',
+      }),
+    });
+    const record = vi.fn();
+    const service = new NotificationDispatchService(
+      dispatchStore.value,
+      provider({ kind: 'retryable_failure', code: 'credential=secret' }).value,
+      60_000,
+      { record },
+    );
+
+    await service.dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
+
+    expect(record).toHaveBeenCalledWith({
+      name: 'notification.dispatch.outcome',
+      clinicId: 'clinic-1',
+      intentId: 'intent-1',
+      outcome: 'failed',
+      attempt: 2,
+      maxAttempts: 5,
+      retryScheduled: true,
+      exhausted: false,
+    });
+    expect(JSON.stringify(record.mock.calls)).not.toMatch(
+      /Sensitive Name|\+213555000000|credential=secret|claim-token|notification:intent/,
+    );
+  });
+
+  it('makes retry exhaustion observable from the persisted result', async () => {
+    const record = vi.fn();
+    const service = new NotificationDispatchService(
+      store({
+        completed: intent({
+          state: 'dead_letter',
+          dispatchAttemptCount: 5,
+          dispatchMaxAttempts: 5,
+        }),
+      }).value,
+      provider({ kind: 'retryable_failure' }).value,
+      60_000,
+      { record },
+    );
+
+    await service.dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: 'dead_letter',
+        exhausted: true,
+        retryScheduled: false,
+      }),
+    );
+  });
+
   it.each([
     ['delivered', 'delivered'],
     ['retryable_failure', 'failed'],
@@ -183,6 +272,38 @@ describe('NotificationDispatchService', () => {
     ).resolves.toEqual({ status: 'not_claimed' });
     expect(notificationProvider.dispatch).not.toHaveBeenCalled();
     expect(dispatchStore.completeDispatchAttempt).not.toHaveBeenCalled();
+  });
+
+  it('emits categorical not-claimed and claim-lost events without fence secrets', async () => {
+    const notClaimedRecord = vi.fn();
+    await new NotificationDispatchService(
+      store({ claimed: null }).value,
+      provider({ kind: 'delivered' }).value,
+      60_000,
+      { record: notClaimedRecord },
+    ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
+    expect(notClaimedRecord).toHaveBeenCalledWith({
+      name: 'notification.dispatch.not_claimed',
+      clinicId: 'clinic-1',
+      intentId: 'intent-1',
+    });
+
+    const claimLostRecord = vi.fn();
+    await new NotificationDispatchService(
+      store({ completed: null }).value,
+      provider({ kind: 'unknown', code: 'private-provider-detail' }).value,
+      60_000,
+      { record: claimLostRecord },
+    ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
+    expect(claimLostRecord).toHaveBeenCalledWith({
+      name: 'notification.dispatch.claim_lost',
+      clinicId: 'clinic-1',
+      intentId: 'intent-1',
+      providerResultKind: 'unknown',
+    });
+    expect(JSON.stringify(claimLostRecord.mock.calls)).not.toContain(
+      'private-provider-detail',
+    );
   });
 
   it('reports claim loss when completion is fenced after provider execution', async () => {
