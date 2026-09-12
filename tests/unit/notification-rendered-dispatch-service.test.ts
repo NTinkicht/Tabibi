@@ -230,41 +230,43 @@ describe('WU30 consent-gated rendered dispatch composition', () => {
     );
   });
 
-  it('leaves renderer failure recoverable and invokes no provider or completion', async () => {
-    const dispatchStore = store();
+  it('classifies renderer failure as retryable without invoking the provider', async () => {
+    const dispatchStore = store({
+      completed: intent({
+        state: 'failed',
+        nextAttemptAt: '2026-09-12T00:06:00.000Z',
+        dispatchOutcomeCode: 'render_failure',
+      }),
+    });
     const notificationProvider = provider({ kind: 'delivered' });
-    const renderAuthorized = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('Sensitive render failure'))
-      .mockResolvedValueOnce(frenchEnvelope);
-    const notificationRenderer = {
-      renderAuthorized,
-    } satisfies NotificationDispatchRenderer;
-
-    const dispatchService = service({
-      dispatchStore: dispatchStore.value,
-      notificationProvider: notificationProvider.value,
-      deliveryContext: context(),
-      notificationRenderer,
+    const renderAuthorized = vi.fn(async () => {
+      throw new Error('Sensitive render failure');
     });
 
     await expect(
-      dispatchService.dispatchOne({
-        clinicId: 'clinic-1',
-        intentId: 'intent-1',
-      }),
-    ).rejects.toThrow('Sensitive render failure');
-    expect(notificationProvider.dispatch).not.toHaveBeenCalled();
-    expect(dispatchStore.completeDispatchAttempt).not.toHaveBeenCalled();
+      service({
+        dispatchStore: dispatchStore.value,
+        notificationProvider: notificationProvider.value,
+        deliveryContext: context(),
+        notificationRenderer: { renderAuthorized },
+      }).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' }),
+    ).resolves.toMatchObject({
+      status: 'completed',
+      providerResult: { kind: 'retryable_failure', code: 'render_failure' },
+      intent: { state: 'failed' },
+    });
 
-    await expect(
-      dispatchService.dispatchOne({
-        clinicId: 'clinic-1',
-        intentId: 'intent-1',
-      }),
-    ).resolves.toMatchObject({ status: 'completed' });
-    expect(renderAuthorized).toHaveBeenCalledTimes(2);
-    expect(notificationProvider.dispatch).toHaveBeenCalledTimes(1);
+    expect(notificationProvider.dispatch).not.toHaveBeenCalled();
+    expect(dispatchStore.completeDispatchAttempt).toHaveBeenCalledWith({
+      clinicId: 'clinic-1',
+      intentId: 'intent-1',
+      claimToken: 'claim-token-1',
+      outcome: 'failed',
+      outcomeCode: 'render_failure',
+    });
+    expect(
+      JSON.stringify(dispatchStore.completeDispatchAttempt.mock.calls),
+    ).not.toContain('Sensitive render failure');
   });
 
   it('preserves claim fencing after successful rendering and provider execution', async () => {
@@ -342,8 +344,14 @@ describe('WU30 consent-gated rendered dispatch composition', () => {
     },
   );
 
-  it('fails closed on renderer/template mismatch before provider invocation', async () => {
-    const dispatchStore = store();
+  it('fails closed on renderer/template mismatch and persists a bounded retryable outcome', async () => {
+    const dispatchStore = store({
+      completed: intent({
+        state: 'failed',
+        nextAttemptAt: '2026-09-12T00:06:00.000Z',
+        dispatchOutcomeCode: 'render_failure',
+      }),
+    });
     const notificationProvider = provider({ kind: 'delivered' });
     const renderAuthorized = vi.fn(async () => {
       throw new Error('Unsupported notification render event');
@@ -356,9 +364,18 @@ describe('WU30 consent-gated rendered dispatch composition', () => {
         deliveryContext: context(),
         notificationRenderer: { renderAuthorized },
       }).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' }),
-    ).rejects.toThrow('Unsupported notification render event');
+    ).resolves.toMatchObject({
+      status: 'completed',
+      providerResult: { kind: 'retryable_failure', code: 'render_failure' },
+    });
 
     expect(notificationProvider.dispatch).not.toHaveBeenCalled();
-    expect(dispatchStore.completeDispatchAttempt).not.toHaveBeenCalled();
+    expect(dispatchStore.completeDispatchAttempt).toHaveBeenCalledWith({
+      clinicId: 'clinic-1',
+      intentId: 'intent-1',
+      claimToken: 'claim-token-1',
+      outcome: 'failed',
+      outcomeCode: 'render_failure',
+    });
   });
 });
