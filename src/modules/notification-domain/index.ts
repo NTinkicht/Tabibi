@@ -47,22 +47,7 @@ export type NotificationProviderResult =
   | { kind: 'unknown'; code?: string | null }
   | { kind: 'terminal_failure'; code?: string | null };
 
-/**
- * Transitional provider request surface for WU30.
- *
- * The rendered envelope path is the canonical WU30 path. The legacy raw request
- * remains temporarily accepted only so existing callers/tests can migrate on the
- * same branch without creating a second implementation stream. PR #176 must not
- * leave draft/review state until all call sites use the rendered-envelope path.
- */
-export type NotificationProviderRequest =
-  | RenderedNotificationDispatchEnvelope
-  | {
-      clinicId: string;
-      intentId: string;
-      payload: Record<string, unknown>;
-      providerIdempotencyKey: string;
-    };
+export type NotificationProviderRequest = RenderedNotificationDispatchEnvelope;
 
 export interface NotificationProviderAdapter {
   dispatch(
@@ -171,9 +156,9 @@ export class NotificationDispatchService {
     private readonly store: NotificationDispatchStore,
     private readonly provider: NotificationProviderAdapter,
     private readonly deliveryContext: NotificationDeliveryContextResolver,
+    private readonly renderer: NotificationDispatchRenderer,
     private readonly leaseMs = 60_000,
     private readonly observer: NotificationDispatchObserver = noNotificationDispatchObserver,
-    private readonly renderer?: NotificationDispatchRenderer,
   ) {
     if (!Number.isSafeInteger(leaseMs) || leaseMs <= 0 || leaseMs > 86_400_000)
       throw new Error('Dispatch lease must be between 1 ms and 24 hours');
@@ -247,18 +232,11 @@ export class NotificationDispatchService {
     }
 
     const idempotencyKey = providerIdempotencyKey(claim);
-    const providerRequest: NotificationProviderRequest = this.renderer
-      ? await this.renderer.renderAuthorized({
-          intent: claim.intent,
-          deliveryContext: currentDeliveryContext!,
-          providerIdempotencyKey: idempotencyKey,
-        })
-      : {
-          clinicId,
-          intentId: claim.intent.id,
-          payload: claim.intent.payload,
-          providerIdempotencyKey: idempotencyKey,
-        };
+    const providerRequest = await this.renderer.renderAuthorized({
+      intent: claim.intent,
+      deliveryContext: currentDeliveryContext!,
+      providerIdempotencyKey: idempotencyKey,
+    });
 
     let providerResult: NotificationProviderResult;
     try {
