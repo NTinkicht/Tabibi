@@ -18,6 +18,7 @@ const STATE_DIR =
     : path.join(ROOT, '.tabibi');
 const BUDGET_PATH = path.join(STATE_DIR, 'context-budget.json');
 const BUDGET_LOCK_PATH = path.join(STATE_DIR, 'context-budget.lock');
+const BUDGET_GATE_PATH = path.join(STATE_DIR, 'context-budget.gate');
 const METRICS_PATH = path.join(STATE_DIR, 'context-router-metrics.jsonl');
 
 const sensitivePatterns = [
@@ -227,6 +228,44 @@ function processIsAlive(pid) {
   }
 }
 
+function acquireBudgetGate() {
+  fs.mkdirSync(STATE_DIR, { recursive: true });
+  try {
+    const fd = fs.openSync(BUDGET_GATE_PATH, 'wx', 0o600);
+    fs.writeFileSync(
+      fd,
+      `${JSON.stringify({ pid: process.pid, createdAtMs: Date.now() })}\n`,
+    );
+    return fd;
+  } catch (error) {
+    if (error?.code !== 'EEXIST') throw error;
+    throw new Error(
+      'Copilot budget lock acquisition/recovery gate is busy or abandoned; fail closed. Verify no context-router process is running before manually removing the local gate file.',
+    );
+  }
+}
+
+function releaseBudgetGate(fd) {
+  try {
+    fs.closeSync(fd);
+  } finally {
+    try {
+      fs.unlinkSync(BUDGET_GATE_PATH);
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+}
+
+function createBudgetLock() {
+  const fd = fs.openSync(BUDGET_LOCK_PATH, 'wx', 0o600);
+  fs.writeFileSync(
+    fd,
+    `${JSON.stringify({ pid: process.pid, createdAtMs: Date.now() })}\n`,
+  );
+  return fd;
+}
+
 function recoverStaleBudgetLock() {
   try {
     const metadata = JSON.parse(fs.readFileSync(BUDGET_LOCK_PATH, 'utf8'));
@@ -245,24 +284,22 @@ function recoverStaleBudgetLock() {
 }
 
 function acquireBudgetLock() {
-  fs.mkdirSync(STATE_DIR, { recursive: true });
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  const gateFd = acquireBudgetGate();
+  try {
     try {
-      const fd = fs.openSync(BUDGET_LOCK_PATH, 'wx', 0o600);
-      fs.writeFileSync(
-        fd,
-        `${JSON.stringify({ pid: process.pid, createdAtMs: Date.now() })}\n`,
-      );
-      return fd;
+      return createBudgetLock();
     } catch (error) {
       if (error?.code !== 'EEXIST') throw error;
-      if (attempt === 0 && recoverStaleBudgetLock()) continue;
-      throw new Error(
-        'Copilot context budget reservation is already in progress; fail closed and retry later.',
-      );
+      if (!recoverStaleBudgetLock()) {
+        throw new Error(
+          'Copilot context budget reservation is already in progress; fail closed and retry later.',
+        );
+      }
+      return createBudgetLock();
     }
+  } finally {
+    releaseBudgetGate(gateFd);
   }
-  throw new Error('Unable to reserve local Copilot context budget.');
 }
 
 function releaseBudgetLock(fd) {
