@@ -9,15 +9,15 @@ goal: <one bounded outcome>
 
 actors:
   orchestrator: chatgpt
-  implementer: <chatgpt|codex|claude|copilot>
-  gate: <independent eligible chatgpt|codex|claude|copilot>
+  implementer: <chatgpt|codex|claude|copilot|gemini-cli|mistral-vibe>
+  gate: <independent eligible chatgpt|codex|claude|copilot|gemini-cli|mistral-vibe>
   merge_executor: <chatgpt|codex|claude|copilot>
   secondary_verifiers:
-    - actor: <optional actor>
+    - actor: <optional active actor>
       overlay: <specialist overlay id>
       scope: <bounded orthogonal review question>
   experience_qa:
-    - actor: <optional actor>
+    - actor: <optional active actor>
       overlay: persona-walkthrough
       scope: <bounded UX/localization/accessibility question>
 
@@ -49,7 +49,8 @@ review_independence:
 ## Lease rules
 
 - Every substantial work unit names all four mandatory leases: orchestrator, implementer, gating reviewer and merge executor.
-- Active actors are `chatgpt`, `codex`, `claude` and `copilot`. Retired actors are not valid lease targets.
+- Active actors are `chatgpt`, `codex`, `claude`, `copilot`, `gemini-cli`, and `mistral-vibe`, subject to `coordination/ACTOR_REGISTRY.json`, capability evidence, current included-plan availability, and authorship independence. Retired actors are not valid lease targets.
+- `gemini-cli` and `mistral-vibe` have no default production merge authority; merge execution remains restricted to actors that explicitly declare `merge_execution` capability in `coordination/ACTOR_REGISTRY.json`.
 - Every active specialist/experience-QA lane names one actor and one overlay. An overlay never creates/shares a lease by itself.
 - Secondary verifiers cannot issue the authoritative `MERGE_READY` verdict and receive no implementation authority from an overlay. Known-open `BLOCKER`/`MAJOR` findings from any verifier still invalidate merge readiness until reconciled.
 - The merge executor performs only the mechanical merge after every gate in `coordination/AUTONOMY_PROTOCOL.md` passes.
