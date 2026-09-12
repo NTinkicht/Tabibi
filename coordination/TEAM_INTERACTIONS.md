@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T18:46:28.507404+00:00
+- Last sync: 2026-09-11T19:57:34.666661+00:00
 
 ## Team Room charter
 
@@ -13755,5 +13755,141 @@ reason: WU25 completed under its existing binding CodeRabbit fallback policy bef
 WU25 has no remaining known deferred implementation finding.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639156391
+
+---
+
+### 2026-09-11T19:36:51Z — NTinkicht
+
+TEAM_DECISION — Company OS v2 / pre-Epic restructuring
+actor: chatgpt
+
+Owner decision recorded: Gemini Agent and Gemini Chat are retired from Tabibi, not merely paused. No further work, review, capacity probes, wakeups or participation requirements may target them unless a future explicit owner decision plus reviewed governance change reintroduces them.
+
+PR #153 is the sole Company OS v2 stream. It makes GitHub authoritative and Slack an attention/culture layer, removes Coffee Corner quotas/reminders, makes Team Room canonical for standups/retrospectives, requires explicit Agency-Agents overlay selection for substantial work units, and introduces a local read-only Headroom shadow trial pinned to the refreshed `NTinkicht/headroom` fork.
+
+Epic PR #151 remains separate and must not resume until #153 is merged and Epic is reconciled against the new main.
+
+ChatGPT authored #153 and is recused from sole gating. Required next evidence: green exact-head CI plus eligible independent non-author review.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639700526
+
+---
+
+### 2026-09-11T19:37:23Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 6177 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639705929
+
+---
+
+### 2026-09-11T19:37:25Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 1429 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639706110
+
+---
+
+### 2026-09-11T19:37:26Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639706343
+
+---
+
+### 2026-09-11T19:37:37Z — NTinkicht
+
+HANDOFF_TO_CLAUDE
+actor: chatgpt
+ROLE_LEASE_ASSIGNED
+work: PR #153 — Company OS v2 / Gemini retirement / Headroom shadow trial
+role: independent governance + adversarial gating review
+exact_head: `6db866bc4d288676a205d3e309191cec4f5fd8dd`
+status: pending exact-head CI completion
+scope: when CI is green, independently inspect the exact unchanged head. Focus on reviewer-independence preservation, four-actor failover safety, removal of active Gemini routes without deleting history, Slack/GitHub authority boundaries, mandatory overlay semantics, and Headroom shadow helper privacy/no-provider-call constraints. ChatGPT materially authored this head and is recused from sole gating.
+next: issue PASS/PASS_WITH_MINOR_FINDINGS or CHANGES_REQUIRED on the exact head; do not modify the branch while gating.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639708144
+
+---
+
+### 2026-09-11T19:40:35Z — NTinkicht
+
+HANDOFF_TO_CLAUDE
+actor: chatgpt
+ROLE_LEASE_ASSIGNED
+work: PR #153 — Company OS v2 / Gemini retirement / Headroom shadow trial
+role: independent governance + adversarial gating review
+exact_head: `e20719afecd30242d516d062a4eead51b23470bb`
+status: final implementation head; exact-head CI #705 is starting
+scope: supersedes the earlier #153 handoff. When CI is green, independently inspect this exact unchanged head. Focus on reviewer-independence preservation, four-actor autonomy/failover, removal of active Gemini routes while preserving history, Slack/GitHub authority boundaries, Agency-Agents overlay enforcement, and Headroom shadow privacy/no-provider-call boundaries. ChatGPT materially authored the head and is recused from sole gating.
+next: exact-head PASS/PASS_WITH_MINOR_FINDINGS or CHANGES_REQUIRED; do not edit the branch while gating.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639738743
+
+---
+
+### 2026-09-11T19:42:24Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr153:e20719afecd30242d516d062a4eead51b23470bb -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #153
+head: e20719afecd30242d516d062a4eead51b23470bb
+CI_GREEN_HANDOFF — PR #153 exact head `e20719afecd30242d516d062a4eead51b23470bb` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639758539
+
+---
+
+### 2026-09-11T19:57:09Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-changes-required-remediation-pr153:e20719afecd30242d516d062a4eead51b23470bb -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #153
+head: e20719afecd30242d516d062a4eead51b23470bb
+HANDOFF_TO_IMPLEMENTER — PR #153 exact head `e20719afecd30242d516d062a4eead51b23470bb` has CHANGES_REQUIRED. Continue the existing canonical branch/PR only; resolve the concrete findings and rerun CI. The orchestrator must reconcile the current implementer lease before any edit.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639915461
+
+---
+
+### 2026-09-11T19:57:23Z — NTinkicht
+
+OWNER_DECISION — PR #153 governance gate reassigned
+
+Nassim has explicitly promoted **CodeRabbit** to the binding independent governance gate for Company OS v2 / PR #153. The previous Claude gate assignment is released for this PR only.
+
+Current exact head: `e20719afecd30242d516d062a4eead51b23470bb`.
+
+CodeRabbit's current review is CHANGES_REQUIRED with unresolved Major findings around Headroom reproducibility/revision verification and shadow-compression configuration, plus Minor findings on CHECKPOINT freshness and latency metrics. These findings must be remediated or concretely disproven, exact-head CI rerun, then a fresh `@coderabbitai full review` must cover the final unchanged head. CodeRabbit's final whole-PR verdict is binding for #153 under this owner-specific override.
+
+Do not spend Claude Pro capacity on a duplicate gate for #153. This does not globally alter Tabibi's normal reviewer hierarchy.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639917836
 
 ---
