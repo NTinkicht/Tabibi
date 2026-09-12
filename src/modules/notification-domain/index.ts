@@ -194,7 +194,7 @@ export class NotificationDispatchService {
     }
 
     const idempotencyKey = providerIdempotencyKey(claim);
-    let currentDeliveryContext: NotificationDeliveryContext;
+    let currentDeliveryContext: NotificationDeliveryContext | null;
     try {
       currentDeliveryContext = await this.deliveryContext.resolve(claim.intent);
     } catch {
@@ -276,7 +276,7 @@ export class NotificationDispatchService {
     try {
       providerRequest = await this.renderer.renderAuthorized({
         intent: claim.intent,
-        deliveryContext: currentDeliveryContext,
+        deliveryContext: currentDeliveryContext!,
         providerIdempotencyKey: idempotencyKey,
       });
     } catch {
