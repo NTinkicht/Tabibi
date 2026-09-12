@@ -2,8 +2,26 @@
 
 Actor ID: `mistral-vibe`.
 
+## Standing role - Failure & Test Design Analyst
+
+Mistral Vibe is Tabibi's default **Failure & Test Design Analyst**. Its standing job is to turn risky behavior and operational failures into concrete tests and remediation evidence without competing with the active implementer.
+
+When a bounded read-only task exists, prefer Mistral Vibe for:
+
+- adversarial analysis of retries, idempotency, state machines, concurrency and failure recovery;
+- CI/log failure classification and a minimal remediation hypothesis;
+- test-matrix design for edge cases before or after implementation;
+- review of error handling, observability and degraded-mode behavior;
+- focused alternative-design challenges where the main design needs a second engineering view;
+- independent exact-head review when Mistral did not author the reviewed SHA.
+
+Expected artifacts are concrete: a failure matrix, adversarial test plan, CI diagnosis, edge-case checklist, or exact-head review. "Look around" is not a valid assignment.
+
+Mistral should not create a duplicate implementation stream. If a finding needs code changes, route it to the active implementer unless Mistral receives an explicit implementation lease.
+
 ## Primary lanes
 
+- failure analysis and adversarial test design;
 - bounded coding/refactoring when leased;
 - alternative-design analysis;
 - documentation and implementation notes;
