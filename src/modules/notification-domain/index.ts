@@ -5,6 +5,11 @@ import type {
   NotificationIntent,
 } from '@/modules/notification-outbox';
 import {
+  notificationSuppressionReason,
+  type NotificationDeliveryContextResolver,
+  type NotificationSuppressionReason,
+} from '@/modules/notification-domain/delivery-policy';
+import {
   noNotificationDispatchObserver,
   recordNotificationDispatchEvent,
   type NotificationDispatchObserver,
@@ -14,6 +19,16 @@ export type {
   NotificationDispatchOperationalEvent,
   NotificationDispatchObserver,
 } from '@/modules/notification-domain/observability';
+export {
+  NotificationPreferenceDeliveryContextResolver,
+  notificationSuppressionReason,
+  type NotificationDeliveryContext,
+  type NotificationDeliveryContextResolver,
+  type NotificationDeliveryTarget,
+  type NotificationDeliveryTargetResolver,
+  type NotificationPreferenceReader,
+  type NotificationSuppressionReason,
+} from '@/modules/notification-domain/delivery-policy';
 
 export type NotificationProviderResult =
   | { kind: 'delivered'; code?: string | null }
@@ -50,8 +65,15 @@ export type NotificationDispatchExecution =
   | {
       status: 'claim_lost';
       claimToken: string;
-      providerIdempotencyKey: string;
-      providerResult: NotificationProviderResult;
+      providerIdempotencyKey?: string;
+      providerResult?: NotificationProviderResult;
+      suppressionReason?: NotificationSuppressionReason;
+    }
+  | {
+      status: 'suppressed';
+      claimToken: string;
+      suppressionReason: NotificationSuppressionReason;
+      intent: NotificationIntent;
     }
   | {
       status: 'completed';
@@ -104,11 +126,30 @@ function providerIdempotencyKey(claim: NotificationDispatchClaim): string {
   return `notification:${claim.intent.id}`;
 }
 
+function recordPersistedOutcome(
+  observer: NotificationDispatchObserver,
+  completed: NotificationIntent,
+): void {
+  recordNotificationDispatchEvent(observer, {
+    name: 'notification.dispatch.outcome',
+    clinicId: completed.clinicId,
+    intentId: completed.id,
+    outcome: completed.state as NotificationDispatchOutcome,
+    attempt: completed.dispatchAttemptCount,
+    maxAttempts: completed.dispatchMaxAttempts,
+    retryScheduled: completed.nextAttemptAt !== null,
+    exhausted:
+      completed.state === 'dead_letter' &&
+      completed.dispatchAttemptCount >= completed.dispatchMaxAttempts,
+  });
+}
+
 /** Executes one already-persisted notification intent through an injected provider. */
 export class NotificationDispatchService {
   constructor(
     private readonly store: NotificationDispatchStore,
     private readonly provider: NotificationProviderAdapter,
+    private readonly deliveryContext: NotificationDeliveryContextResolver,
     private readonly leaseMs = 60_000,
     private readonly observer: NotificationDispatchObserver = noNotificationDispatchObserver,
   ) {
@@ -137,6 +178,47 @@ export class NotificationDispatchService {
         intentId,
       });
       return { status: 'not_claimed' };
+    }
+
+    // Resolve current authorization only after the exact claim and immediately
+    // before provider execution. A resolver failure is deliberately not caught:
+    // no provider call occurs and the existing claim lease recovery can retry.
+    const currentDeliveryContext = await this.deliveryContext.resolve(claim.intent);
+    const suppressionReason = notificationSuppressionReason(
+      claim.intent,
+      currentDeliveryContext,
+    );
+
+    if (suppressionReason) {
+      const suppressed = await this.store.completeDispatchAttempt({
+        clinicId,
+        intentId: claim.intent.id,
+        claimToken: claim.claimToken,
+        outcome: 'suppressed',
+        outcomeCode: suppressionReason,
+      });
+
+      if (!suppressed) {
+        recordNotificationDispatchEvent(this.observer, {
+          name: 'notification.dispatch.claim_lost',
+          clinicId,
+          intentId: claim.intent.id,
+          providerResultKind: 'suppressed',
+        });
+        return {
+          status: 'claim_lost',
+          claimToken: claim.claimToken,
+          suppressionReason,
+        };
+      }
+
+      recordPersistedOutcome(this.observer, suppressed);
+      return {
+        status: 'suppressed',
+        claimToken: claim.claimToken,
+        suppressionReason,
+        intent: suppressed,
+      };
     }
 
     const idempotencyKey = providerIdempotencyKey(claim);
@@ -177,19 +259,7 @@ export class NotificationDispatchService {
       };
     }
 
-    recordNotificationDispatchEvent(this.observer, {
-      name: 'notification.dispatch.outcome',
-      clinicId,
-      intentId: completed.id,
-      outcome: completed.state as NotificationDispatchOutcome,
-      attempt: completed.dispatchAttemptCount,
-      maxAttempts: completed.dispatchMaxAttempts,
-      retryScheduled: completed.nextAttemptAt !== null,
-      exhausted:
-        completed.state === 'dead_letter' &&
-        completed.dispatchAttemptCount >= completed.dispatchMaxAttempts,
-    });
-
+    recordPersistedOutcome(this.observer, completed);
     return {
       status: 'completed',
       claimToken: claim.claimToken,
