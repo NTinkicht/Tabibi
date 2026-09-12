@@ -158,6 +158,51 @@ describe('context router safety', () => {
     ).toBe(false);
   });
 
+  it('serializes concurrent stale-lock recovery before reserving the final Copilot unit', async () => {
+    if (process.platform === 'win32') return;
+    const source = path.join(scratch, 'safe-source.txt');
+    fs.writeFileSync(source, 'bounded evidence');
+    writeBudget(1);
+    const stateDir = path.join(scratch, 'state');
+    fs.writeFileSync(
+      path.join(stateDir, 'context-budget.lock'),
+      `${JSON.stringify({
+        pid: 999999,
+        createdAtMs: Date.now() - 11 * 60 * 1000,
+      })}\n`,
+    );
+    const count = path.join(scratch, 'stale-recovery-count.txt');
+    const bin = makeFakeCopilot(
+      'printf "1\\n" >> "$TABIBI_FAKE_COPILOT_COUNT"\nsleep 0.4\nprintf "compressed\\n"',
+    );
+    const env = {
+      TABIBI_CONTEXT_ALLOW_COPILOT: '1',
+      TABIBI_FAKE_COPILOT_COUNT: count,
+      PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
+    };
+    const args = ['compress', 'summarize', '--', relative(source)];
+
+    const results = await Promise.all([
+      runRouterAsync(args, env),
+      runRouterAsync(args, env),
+    ]);
+
+    expect(results.map((result) => result.code).sort()).toEqual([0, 2]);
+    expect(fs.readFileSync(count, 'utf8').trim().split(/\r?\n/)).toHaveLength(
+      1,
+    );
+    const budget = JSON.parse(
+      fs.readFileSync(path.join(stateDir, 'context-budget.json'), 'utf8'),
+    );
+    expect(budget.remainingUnits).toBe(0);
+    expect(fs.existsSync(path.join(stateDir, 'context-budget.lock'))).toBe(
+      false,
+    );
+    expect(fs.existsSync(path.join(stateDir, 'context-budget.gate'))).toBe(
+      false,
+    );
+  });
+
   it('refunds an ordinary failed Copilot invocation while keeping crash recovery fail-closed', () => {
     if (process.platform === 'win32') return;
     const source = path.join(scratch, 'safe-source.txt');
