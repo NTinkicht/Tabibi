@@ -156,10 +156,7 @@ const copies: Record<
 const variableNames: Record<NotificationTemplateId, readonly string[]> = {
   'appointment_confirmed.v1': [],
   'queue_entry_created.v1': [],
-  'estimate_changed_materially.v1': [
-    'windowStartMinutes',
-    'windowEndMinutes',
-  ],
+  'estimate_changed_materially.v1': ['windowStartMinutes', 'windowEndMinutes'],
   'turn_approaching.v1': ['position'],
   'patient_called.v1': [],
   'session_delayed.v1': ['delayMinutes'],
