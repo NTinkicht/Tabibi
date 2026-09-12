@@ -67,6 +67,8 @@ describe('AI capacity policy', () => {
           'decision = "deny"',
           'read_many_files',
           '--output-format stream-json',
+          "text.replace(secret, '[REDACTED]')",
+          '/tmp/tabibi-gemini-public.txt',
         ],
       },
       {
