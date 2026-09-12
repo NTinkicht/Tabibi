@@ -14,13 +14,9 @@ import {
   NotificationDispatchService,
   type NotificationProviderAdapter,
 } from '@/modules/notification-domain';
-import {
-  NotificationDispatchBatchRunner,
-} from '@/modules/notification-domain/dispatch-batch';
+import { NotificationDispatchBatchRunner } from '@/modules/notification-domain/dispatch-batch';
 import { NotificationOutboxRepository } from '@/modules/notification-outbox';
-import {
-  NotificationDispatchEligibilityRepository,
-} from '@/modules/notification-outbox/dispatch-eligibility';
+import { NotificationDispatchEligibilityRepository } from '@/modules/notification-outbox/dispatch-eligibility';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 4 });
 const clinicId = randomUUID();
