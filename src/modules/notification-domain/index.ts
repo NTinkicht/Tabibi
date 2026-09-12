@@ -14,12 +14,8 @@ import {
   recordNotificationDispatchEvent,
   type NotificationDispatchObserver,
 } from '@/modules/notification-domain/observability';
-import type {
-  NotificationDispatchRenderer,
-} from '@/modules/notification-domain/rendered-dispatch-renderer';
-import type {
-  RenderedNotificationDispatchEnvelope,
-} from '@/modules/notification-domain/rendered-dispatch-envelope';
+import type { NotificationDispatchRenderer } from '@/modules/notification-domain/rendered-dispatch-renderer';
+import type { RenderedNotificationDispatchEnvelope } from '@/modules/notification-domain/rendered-dispatch-envelope';
 
 export type {
   NotificationDispatchOperationalEvent,
