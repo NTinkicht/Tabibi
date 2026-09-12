@@ -25,18 +25,21 @@ No workflow, script, scheduled task, hook or actor may create a billing commitme
 - **Codex included capacity:** primary implementation, tests, refactors, CI remediation and merge execution.
 - **Claude Pro / Claude Code:** adversarial review, security/privacy/authorization, concurrency/data-integrity analysis and difficult debugging.
 - **GitHub Copilot education entitlement:** coding assistance, QA/Test Automation, eligible non-author Code Review and explicitly budgeted local context compression.
-- **Gemini CLI (`gemini-cli`):** only the owner's already-configured free/non-billable local allowance. A local API key is acceptable only when its project cannot generate a bill; uncertainty about billing makes the actor unavailable.
-- **Mistral Vibe (`mistral-vibe`):** the owner's existing Mistral subscription allowance only. PAYG/overage must remain disabled.
+- **Gemini CLI (`gemini-cli`):** only the owner's already-configured free/non-billable allowance. A Gemini API key may be used by the dedicated owner-only wake workflow only when `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true`; no Vertex AI or paid Gemini tier is authorized.
+- **Mistral Vibe (`mistral-vibe`):** the owner's existing included Mistral plan allowance only. The dedicated owner-only wake workflow may use a Vibe/API credential only when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`; PAYG/overage must remain disabled.
 - **Headroom:** local read-only shadow compression under `HEADROOM_SHADOW_TRIAL.md`.
 - **Shell/Git/CI:** first choice for search, indexing, diffs, tests and logs.
 
 ## Credential boundary
 
-Gemini/Mistral credentials are local runtime credentials, not repository assets.
+Gemini/Mistral credentials are runtime credentials, not repository assets.
 
 - Never commit API keys, OAuth material, `.gemini/`, `.vibe/`, `.mistral/` or generated auth files.
-- Active GitHub workflows must not reference `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `MISTRAL_API_KEY`, Vertex AI or other billable Gemini/Mistral routes.
-- Unattended provider automation using those credentials requires a separate explicit owner decision and deterministic spend controls.
+- `GEMINI_API_KEY` is permitted only in `.github/workflows/gemini-cli-wake.yml`, guarded by `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true` and an owner-only Issue #11 event trigger.
+- `MISTRAL_API_KEY` is permitted only in `.github/workflows/mistral-vibe-wake.yml`, guarded by `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true` and an owner-only Issue #11 event trigger.
+- `GOOGLE_API_KEY`, Vertex AI and other billable Gemini routes remain forbidden in active workflows.
+- The dedicated unattended wake workflows are read-only actor lanes: they may inspect repository evidence and return findings, but may not edit, commit, push, merge, label, create reviews or mutate GitHub state.
+- Issue #162 is the scoped owner authorization for these two unattended wake paths only; it is not blanket authorization for provider-key automation elsewhere.
 - Do not paste credentials into issues, PRs, Team Room, Slack or model prompts.
 
 ## Deterministic-first context budget
@@ -53,8 +56,8 @@ A strong actor may always request more original evidence when correctness requir
 
 ## Fail-closed degradation
 
-- Gemini quota/billing uncertainty -> `CAPACITY_DEGRADED`; do not switch to paid Gemini/Vertex.
-- Mistral allowance exhausted -> `CAPACITY_DEGRADED`; PAYG stays off.
+- Gemini guard missing, quota exhausted, credential unavailable or billing uncertainty -> `CAPACITY_DEGRADED`; do not switch to paid Gemini/Vertex.
+- Mistral guard missing, allowance exhausted or credential unavailable -> `CAPACITY_DEGRADED`; PAYG stays off.
 - Copilot compression unavailable -> deterministic retrieval/Headroom/targeted reads.
 - Codex implementation limited -> fail over to already-included eligible implementation capacity.
 - Claude review limited -> another eligible independent non-author reviewer; never weaken a security/concurrency gate.
@@ -69,6 +72,8 @@ Copilot context compression remains a finite included resource. Local budget sta
 ## Scheduled-task budget
 
 Scheduled tasks consume capacity. Use event-driven state and shared cooldown/lease signals rather than multiple staggered polling tasks. Quiet Git history alone is not proof of idleness when CI/tests or an active lease exist.
+
+Gemini CLI and Mistral Vibe unattended wakes are deliberately event-driven only. They must not add polling or cron schedules without another explicit owner decision.
 
 ## Data/security exclusions
 

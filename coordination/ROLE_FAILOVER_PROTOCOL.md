@@ -93,8 +93,8 @@ A slow response alone is not enough. Reconcile live evidence first.
 - Codex: executable `@codex ...` instruction/assignment when included capacity is available.
 - Claude: persistent Claude Code review/session handoff; do not assume the stateless Action is available.
 - Copilot: `@copilot ...`, coding-agent assignment and/or GitHub Code Review request.
-- Gemini CLI: interactive `gemini` CLI in the owner's Codespace/local environment. Repository-wide unattended Gemini API-key automation is not authorized.
-- Mistral Vibe: interactive `vibe` CLI in the owner's Codespace/local environment. PAYG/API-key automation is not authorized.
+- Gemini CLI: interactive `gemini` CLI in the owner's Codespace/local environment, plus the dedicated owner-only Issue #11 wake workflow `.github/workflows/gemini-cli-wake.yml` when `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true`. Any other repository-wide unattended Gemini API-key automation remains unauthorized.
+- Mistral Vibe: interactive `vibe` CLI in the owner's Codespace/local environment, plus the dedicated owner-only Issue #11 wake workflow `.github/workflows/mistral-vibe-wake.yml` when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`. Any other PAYG/API-key automation remains unauthorized.
 
 A durable marker without a supported executable path is not a complete handoff.
 

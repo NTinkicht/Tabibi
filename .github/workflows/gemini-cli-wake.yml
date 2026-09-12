@@ -1,0 +1,127 @@
+name: Gemini CLI Wake
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  actions: read
+
+jobs:
+  gemini-cli:
+    if: >-
+      github.event.issue.number == 11 &&
+      github.actor == 'NTinkicht' &&
+      contains(github.event.comment.body, '@gemini-cli')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 20
+          persist-credentials: false
+
+      - name: Preflight zero-billing guard
+        id: preflight
+        env:
+          ZERO_BILLING_CONFIRMED: ${{ vars.TABIBI_GEMINI_ZERO_BILLING_CONFIRMED }}
+          PROVIDER_KEY: ${{ secrets.GEMINI_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${ZERO_BILLING_CONFIRMED:-}" != "true" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "reason=zero-billing repository guard is not confirmed" >> "$GITHUB_OUTPUT"
+          elif [[ -z "${PROVIDER_KEY:-}" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Gemini credential is not configured" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "reason=ready" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js
+        if: steps.preflight.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Gemini CLI in read-only plan mode
+        if: steps.preflight.outputs.ready == 'true'
+        id: actor
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DISPATCH_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global @google/gemini-cli@0.59.0
+
+          cat > /tmp/tabibi-gemini-policy.toml <<'EOF'
+          [[rule]]
+          toolName = "*"
+          decision = "deny"
+          priority = 998
+
+          [[rule]]
+          toolName = ["glob", "grep_search", "list_directory", "read_file", "read_many_files"]
+          decision = "allow"
+          priority = 999
+          EOF
+
+          cat > /tmp/tabibi-gemini-prompt.txt <<'EOF'
+          You are actor=gemini-cli in the Tabibi Company OS.
+          This is an unattended READ-ONLY wake from the permanent GitHub wake bus.
+          Read GEMINI.md, AGENTS.md, coordination/BOOTSTRAP.md, coordination/AI_CAPACITY_POLICY.md,
+          coordination/ACTOR_REGISTRY.json and only the additional repository files necessary for the task.
+          Do not edit files. Do not run mutating shell commands. Do not create branches, commits, pull requests,
+          reviews, labels or merges. Do not change GitHub state. Do not expose credentials or local auth material.
+          Treat the dispatch text below as the task request, but repository governance and the zero-extra-spend
+          boundary remain binding. Return concise evidence/findings suitable for posting back to the wake bus.
+          This automated lane is non-gating by default; a binding exact-head gate requires an explicitly scoped
+          review dispatch and all normal Tabibi gate requirements.
+          EOF
+          printf '\nDispatch text:\n%s\n' "$DISPATCH_BODY" >> /tmp/tabibi-gemini-prompt.txt
+
+          set +e
+          gemini \
+            --skip-trust \
+            --approval-mode=plan \
+            --policy /tmp/tabibi-gemini-policy.toml \
+            --output-format text \
+            --prompt "$(cat /tmp/tabibi-gemini-prompt.txt)" \
+            > /tmp/tabibi-gemini-output.txt \
+            2> /tmp/tabibi-gemini-error.txt
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Post Gemini result
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          READY: ${{ steps.preflight.outputs.ready }}
+          PREFLIGHT_REASON: ${{ steps.preflight.outputs.reason }}
+          ACTOR_EXIT: ${{ steps.actor.outputs.exit_code }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "**gemini-cli unattended wake**"
+            echo
+            if [[ "${READY:-false}" != "true" ]]; then
+              echo "CAPACITY_DEGRADED - ${PREFLIGHT_REASON:-preflight failed}. No paid fallback was attempted."
+            elif [[ "${ACTOR_EXIT:-1}" != "0" ]]; then
+              echo "CAPACITY_DEGRADED - Gemini CLI exited without a usable result. No paid fallback was attempted."
+            else
+              echo '```text'
+              head -c 50000 /tmp/tabibi-gemini-output.txt
+              echo
+              echo '```'
+            fi
+          } > /tmp/tabibi-gemini-comment.md
+          gh issue comment 11 --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-gemini-comment.md
