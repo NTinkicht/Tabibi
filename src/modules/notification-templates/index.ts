@@ -248,15 +248,16 @@ export function renderNotificationTemplate(
   const rawVariables = raw.variables as Record<string, unknown>;
   for (const name of expected) {
     const value = rawVariables[name];
+    const numericValue = value as number;
     if (
       !Number.isSafeInteger(value) ||
-      (value as number) < 0 ||
-      (value as number) > MAX_OPERATIONAL_TEMPLATE_NUMBER
+      numericValue < 0 ||
+      numericValue > MAX_OPERATIONAL_TEMPLATE_NUMBER
     )
       throw new NotificationTemplateValidationError(
         'Invalid notification template variables',
       );
-    variables[name] = value as number;
+    variables[name] = numericValue;
   }
   if (
     templateId === 'estimate_changed_materially.v1' &&
