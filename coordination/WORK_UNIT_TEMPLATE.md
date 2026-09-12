@@ -9,9 +9,9 @@ goal: <one bounded outcome>
 
 actors:
   orchestrator: chatgpt
-  implementer: <actor>
-  gate: <independent eligible actor>
-  merge_executor: <actor>
+  implementer: <chatgpt|codex|claude|copilot>
+  gate: <independent eligible chatgpt|codex|claude|copilot>
+  merge_executor: <chatgpt|codex|claude|copilot>
   secondary_verifiers:
     - actor: <optional actor>
       overlay: <specialist overlay id>
@@ -22,9 +22,11 @@ actors:
       scope: <bounded UX/localization/accessibility question>
 
 role_overlays:
-  orchestrator: <optional overlay id>
-  implementer: <overlay id>
+  selection_required: true
+  orchestrator: <overlay id | none-with-reason>
+  implementer: <overlay id | none-with-reason>
   gate: code-reviewer
+  rationale: <why this is the smallest useful overlay set>
 
 scope:
   include:
@@ -46,12 +48,19 @@ review_independence:
 
 ## Lease rules
 
-- Every substantial work unit names all four mandatory leases: orchestrator, implementer, gating reviewer, and merge executor.
-- Every active specialist or experience-QA lane names exactly one actor and one overlay. An overlay never creates or shares a lease by itself.
-- Secondary verifiers cannot issue the authoritative `MERGE_READY` verdict and receive no implementation authority from the overlay. However, any known-open `BLOCKER` or `MAJOR` finding from a secondary verifier invalidates merge readiness until the orchestrator reconciles and re-checks it.
-- The merge executor performs only the mechanical merge after all gates in `coordination/AUTONOMY_PROTOCOL.md` pass, including a valid unchanged exact-head gate, an open non-draft mergeable PR, zero known-open `BLOCKER`/`MAJOR` findings, green required CI, no unresolved `BLOCKED_CREDENTIAL_OR_EXTERNAL_DECISION`, and an executable merge handoff.
+- Every substantial work unit names all four mandatory leases: orchestrator, implementer, gating reviewer and merge executor.
+- Active actors are `chatgpt`, `codex`, `claude` and `copilot`. Retired actors are not valid lease targets.
+- Every active specialist/experience-QA lane names one actor and one overlay. An overlay never creates/shares a lease by itself.
+- Secondary verifiers cannot issue the authoritative `MERGE_READY` verdict and receive no implementation authority from an overlay. Known-open `BLOCKER`/`MAJOR` findings from any verifier still invalidate merge readiness until reconciled.
+- The merge executor performs only the mechanical merge after every gate in `coordination/AUTONOMY_PROTOCOL.md` passes.
 
-## Overlay selection defaults
+## Overlay selection is mandatory
+
+For every substantial work unit, choose the smallest useful overlay set before implementation begins.
+
+`none` is allowed only when the work-unit contract gives a concrete reason, for example a purely mechanical docs/metadata change with no meaningful specialist lens. Omitting the field is not equivalent to `none`.
+
+Defaults:
 
 - Backend/domain/API work: `backend-architect` for implementer or orchestrator.
 - PostgreSQL/concurrency/migration work: add one actor-backed `database-reliability` secondary verification lane.
@@ -60,4 +69,4 @@ review_independence:
 - External provider/realtime/deployment work: add one actor-backed `sre` secondary verification lane.
 - External healthcare messaging/pilot proposals: `healthcare-innovation-strategist`.
 
-Do not add overlays merely to increase reviewer count. Each overlay must answer a distinct question and have one explicit owner.
+Do not add overlays merely to increase reviewer count. Each overlay must answer a distinct question and have one explicit actor owner.

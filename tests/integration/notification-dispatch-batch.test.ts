@@ -190,23 +190,45 @@ describe('notification dispatch eligibility and bounded batch', () => {
     ).resolves.toEqual([expect.objectContaining({ intentId: retry.id })]);
   });
 
-  it('orders by due time with stable tie breakers and applies the requested limit', async () => {
+  it('orders expired claims by claim expiry instead of original creation time', async () => {
     const outbox = new NotificationOutboxRepository(pool);
     const scanner = new NotificationDispatchEligibilityRepository(pool);
-    const first = await outbox.enqueue(input(clinicA, 'first'));
-    const second = await outbox.enqueue(input(clinicA, 'second'));
-    const third = await outbox.enqueue(input(clinicA, 'third'));
+
+    const expiredClaim = await outbox.enqueue(input(clinicA, 'expired-order'));
+    const expiredToken = await outbox.claimPendingIntent({
+      clinicId: clinicA,
+      intentId: expiredClaim.id,
+      leaseMs: 60_000,
+    });
+    expect(expiredToken).not.toBeNull();
+
+    const dueRetry = await outbox.enqueue(input(clinicA, 'due-retry-order'));
+    const dueRetryClaim = await outbox.claimPendingIntent({
+      clinicId: clinicA,
+      intentId: dueRetry.id,
+      leaseMs: 60_000,
+    });
+    await outbox.completeDispatchAttempt({
+      clinicId: clinicA,
+      intentId: dueRetry.id,
+      claimToken: dueRetryClaim!.claimToken,
+      outcome: 'failed',
+    });
 
     await pool.query(
       `UPDATE notification_outbox
-          SET created_at = CASE id
-            WHEN $1::uuid THEN TIMESTAMPTZ '2026-09-11 00:00:03+00'
-            WHEN $2::uuid THEN TIMESTAMPTZ '2026-09-11 00:00:01+00'
-            WHEN $3::uuid THEN TIMESTAMPTZ '2026-09-11 00:00:02+00'
-            ELSE created_at
-          END
-        WHERE id IN ($1::uuid, $2::uuid, $3::uuid)`,
-      [first.id, second.id, third.id],
+          SET created_at = now() - interval '1 day',
+              dispatch_claimed_at = now() - interval '2 minutes',
+              dispatch_claim_expires_at = now() - interval '1 minute'
+        WHERE id=$1`,
+      [expiredClaim.id],
+    );
+    await pool.query(
+      `UPDATE notification_outbox
+          SET created_at = now() - interval '2 hours',
+              next_attempt_at = now() - interval '2 minutes'
+        WHERE id=$1`,
+      [dueRetry.id],
     );
 
     const selected = await scanner.listEligible({
@@ -214,8 +236,74 @@ describe('notification dispatch eligibility and bounded batch', () => {
       limit: 2,
     });
     expect(selected.map((candidate) => candidate.intentId)).toEqual([
-      second.id,
-      third.id,
+      dueRetry.id,
+      expiredClaim.id,
+    ]);
+    expect(new Date(selected[0]!.eligibleAt).getTime()).toBeLessThan(
+      new Date(selected[1]!.eligibleAt).getTime(),
+    );
+  });
+
+  it('orders by due time with stable created-at and id tie breakers and applies the requested limit', async () => {
+    const outbox = new NotificationOutboxRepository(pool);
+    const scanner = new NotificationDispatchEligibilityRepository(pool);
+
+    const olderRetry = await outbox.enqueue(input(clinicA, 'retry-older'));
+    const newerRetry = await outbox.enqueue(input(clinicA, 'retry-newer'));
+    for (const retry of [olderRetry, newerRetry]) {
+      const claim = await outbox.claimPendingIntent({
+        clinicId: clinicA,
+        intentId: retry.id,
+        leaseMs: 60_000,
+      });
+      await outbox.completeDispatchAttempt({
+        clinicId: clinicA,
+        intentId: retry.id,
+        claimToken: claim!.claimToken,
+        outcome: 'failed',
+      });
+    }
+
+    const tiedPendingA = await outbox.enqueue(input(clinicA, 'pending-tie-a'));
+    const tiedPendingB = await outbox.enqueue(input(clinicA, 'pending-tie-b'));
+
+    await pool.query(
+      `UPDATE notification_outbox
+          SET next_attempt_at = now() - interval '5 minutes',
+              created_at = CASE id
+                WHEN $1::uuid THEN now() - interval '1 hour'
+                WHEN $2::uuid THEN now() - interval '30 minutes'
+                ELSE created_at
+              END
+        WHERE id IN ($1::uuid, $2::uuid)`,
+      [olderRetry.id, newerRetry.id],
+    );
+    await pool.query(
+      `UPDATE notification_outbox
+          SET created_at = now() - interval '1 minute'
+        WHERE id IN ($1::uuid, $2::uuid)`,
+      [tiedPendingA.id, tiedPendingB.id],
+    );
+
+    const pendingById = [tiedPendingA.id, tiedPendingB.id].sort();
+    const selected = await scanner.listEligible({
+      clinicId: clinicA,
+      limit: 4,
+    });
+    expect(selected.map((candidate) => candidate.intentId)).toEqual([
+      olderRetry.id,
+      newerRetry.id,
+      ...pendingById,
+    ]);
+
+    const limited = await scanner.listEligible({
+      clinicId: clinicA,
+      limit: 3,
+    });
+    expect(limited.map((candidate) => candidate.intentId)).toEqual([
+      olderRetry.id,
+      newerRetry.id,
+      pendingById[0],
     ]);
   });
 

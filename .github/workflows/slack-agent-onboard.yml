@@ -22,10 +22,8 @@ jobs:
       SLACK_CODEX_BOT_TOKEN: ${{ secrets.SLACK_CODEX_BOT_TOKEN }}
       SLACK_CLAUDE_BOT_TOKEN: ${{ secrets.SLACK_CLAUDE_BOT_TOKEN }}
       SLACK_COPILOT_BOT_TOKEN: ${{ secrets.SLACK_COPILOT_BOT_TOKEN }}
-      SLACK_GEMINI_AGENT_BOT_TOKEN: ${{ secrets.SLACK_GEMINI_AGENT_BOT_TOKEN }}
-      SLACK_GEMINI_CHAT_BOT_TOKEN: ${{ secrets.SLACK_GEMINI_CHAT_BOT_TOKEN }}
     steps:
-      - name: Validate identities, join #all-tabibi and introduce the team
+      - name: Validate identities, join #all-tabibi and introduce the active team
         run: |
           python - <<'PY'
           import json, os, urllib.request
@@ -35,8 +33,6 @@ jobs:
               ('Codex', 'SLACK_CODEX_BOT_TOKEN', 'Implementation / CI Engineer'),
               ('Claude', 'SLACK_CLAUDE_BOT_TOKEN', 'Independent Adversarial Reviewer'),
               ('GitHub Copilot', 'SLACK_COPILOT_BOT_TOKEN', 'Independent QA / Test Automation Engineer'),
-              ('Gemini Agent', 'SLACK_GEMINI_AGENT_BOT_TOKEN', 'Overflow QA / UX / System Verification'),
-              ('Gemini Chat', 'SLACK_GEMINI_CHAT_BOT_TOKEN', 'Overflow Generalist Collaborator'),
           ]
           channel = os.environ['SLACK_CHANNEL_ID']
 
@@ -62,7 +58,7 @@ jobs:
               call('conversations.join', token, {'channel': channel})
               call('chat.postMessage', token, {
                   'channel': channel,
-                  'text': f"👋 *{name} reporting in.*\nRole: {role}\nCompany rule: talk in Slack, decide in GitHub, build in branches, prove in CI.\nCoffee optional, evidence mandatory."
+                  'text': f"👋 *{name} reporting in.*\nRole: {role}\nCompany rule: talk briefly in Slack, decide in GitHub, build in branches, prove in CI.\nCoffee optional, evidence mandatory."
               })
               print(f"{name}: connected as {identity.get('user')} ({identity.get('user_id')})")
           PY

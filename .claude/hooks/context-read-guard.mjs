@@ -13,6 +13,7 @@ const bootstrapAllowlist = new Set([
   'coordination/WORK_QUEUE.md',
   'coordination/AI_CAPACITY_POLICY.md',
   'coordination/CONTEXT_ROUTER.md',
+  'coordination/HEADROOM_SHADOW_TRIAL.md',
 ]);
 
 function allow() {
@@ -52,9 +53,7 @@ process.stdin.on('end', () => {
     const absolute = path.resolve(projectDir, requested);
     const relative = path.relative(projectDir, absolute).replaceAll('\\', '/');
 
-    if (relative.startsWith('../') || path.isAbsolute(relative)) {
-      allow();
-    }
+    if (relative.startsWith('../') || path.isAbsolute(relative)) allow();
     if (bootstrapAllowlist.has(relative)) allow();
     if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) allow();
 
@@ -74,11 +73,11 @@ process.stdin.on('end', () => {
       `Context Router blocked an unbounded read of ${relative} (${lines} lines, ${stat.size} bytes). ` +
         `Use deterministic discovery first, e.g. node scripts/context-router.mjs search "<symbol/question term>", ` +
         `then Read only the relevant slice with offset+limit <= ${MAX_BOUNDED_LINES}. ` +
-        `If broad semantic compression is genuinely needed, use the explicit opt-in compression path documented in coordination/CONTEXT_ROUTER.md.`,
+        `If broad semantic compression is genuinely needed, follow coordination/CONTEXT_ROUTER.md.`,
     );
   } catch {
-    // A hook failure must not strand engineering work. Fail open and let the
-    // normal Claude permission system continue to govern the read.
+    // This is a context-efficiency rail, not a security boundary. Hook failure
+    // must not strand engineering work; normal Claude permissions still apply.
     allow();
   }
 });

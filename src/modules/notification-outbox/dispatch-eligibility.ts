@@ -45,7 +45,12 @@ export class NotificationDispatchEligibilityRepository {
     const input = normalizeEligibilityInput(rawInput);
     const result = await this.pool.query<EligibleIntentRow>(
       `SELECT id,
-              COALESCE(next_attempt_at, created_at) AS eligible_at
+              CASE
+                WHEN dispatch_claim_token IS NOT NULL
+                 AND dispatch_claim_expires_at <= now()
+                  THEN dispatch_claim_expires_at
+                ELSE COALESCE(next_attempt_at, created_at)
+              END AS eligible_at
          FROM notification_outbox
         WHERE clinic_id=$1
           AND state IN ('pending', 'failed', 'unknown')
@@ -63,7 +68,7 @@ export class NotificationDispatchEligibilityRepository {
             dispatch_claim_token IS NULL
             OR dispatch_claim_expires_at <= now()
           )
-        ORDER BY COALESCE(next_attempt_at, created_at) ASC,
+        ORDER BY eligible_at ASC,
                  created_at ASC,
                  id ASC
         LIMIT $2`,

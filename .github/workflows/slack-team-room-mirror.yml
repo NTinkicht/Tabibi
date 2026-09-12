@@ -17,10 +17,9 @@ jobs:
       SLACK_CHATGPT_BOT_TOKEN: ${{ secrets.SLACK_CHATGPT_BOT_TOKEN }}
       SLACK_CODEX_BOT_TOKEN: ${{ secrets.SLACK_CODEX_BOT_TOKEN }}
       SLACK_CLAUDE_BOT_TOKEN: ${{ secrets.SLACK_CLAUDE_BOT_TOKEN }}
-      SLACK_GEMINI_AGENT_BOT_TOKEN: ${{ secrets.SLACK_GEMINI_AGENT_BOT_TOKEN }}
-      SLACK_GEMINI_CHAT_BOT_TOKEN: ${{ secrets.SLACK_GEMINI_CHAT_BOT_TOKEN }}
+      SLACK_COPILOT_BOT_TOKEN: ${{ secrets.SLACK_COPILOT_BOT_TOKEN }}
     steps:
-      - name: Mirror comment using actor identity
+      - name: Mirror comment using active actor identity
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
           COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
@@ -34,11 +33,9 @@ jobs:
           if body.startswith('SLACK_TO_TEAM_ROOM'):
               raise SystemExit(0)
 
-          # Current Tabibi agent transports (ChatGPT connector, Codex/Claude/Gemini handoffs)
-          # all publish durable Team Room comments through the repository owner's authenticated
-          # GitHub identity. Never let another GitHub commenter select an agent Slack bot simply
-          # by forging `actor:` in free text. If/when an actor gets a distinct GitHub App identity,
-          # extend this allowlist explicitly rather than trusting the body.
+          # Current Tabibi agent transports publish durable Team Room comments through the
+          # repository owner's authenticated GitHub identity. Never let another commenter
+          # select an agent Slack bot by forging `actor:` in free text.
           trusted_relay_authors = {'NTinkicht'}
           if author not in trusted_relay_authors:
               print(f'Untrusted Team Room commenter {author!r}; Slack mirror skipped.')
@@ -46,14 +43,13 @@ jobs:
 
           actor_match = re.search(r'(?mi)^actor:\s*([a-zA-Z0-9_-]+)', body)
           actor = (actor_match.group(1).lower() if actor_match else '')
-          aliases = {'codex_cloud': 'codex', 'gemini': 'gemini_agent'}
+          aliases = {'codex_cloud': 'codex'}
           actor = aliases.get(actor, actor)
           token_env = {
               'chatgpt': 'SLACK_CHATGPT_BOT_TOKEN',
               'codex': 'SLACK_CODEX_BOT_TOKEN',
               'claude': 'SLACK_CLAUDE_BOT_TOKEN',
-              'gemini_agent': 'SLACK_GEMINI_AGENT_BOT_TOKEN',
-              'gemini_chat': 'SLACK_GEMINI_CHAT_BOT_TOKEN',
+              'copilot': 'SLACK_COPILOT_BOT_TOKEN',
           }
           prefix = ''
           env_name = token_env.get(actor)

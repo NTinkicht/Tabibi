@@ -2,7 +2,7 @@
 
 ## Goal
 
-Reduce repeated strong-model context consumption without changing Tabibi's product, security, CI, authorship, or independent-review rules.
+Reduce repeated strong-model context consumption without changing Tabibi's product, security, CI, authorship, Company OS v2, role-overlay, or independent-review rules.
 
 The router is infrastructure, not an actor. It has no role lease, implementation authority, review authority, or merge authority.
 
@@ -10,122 +10,94 @@ The router is infrastructure, not an actor. It has no role lease, implementation
 
 ### L0 - reuse
 
-Reuse a fresh deterministic/cache result when the underlying file content and question class are unchanged. Cache keys should include content hashes rather than file names alone.
+Reuse fresh deterministic/cache results when the underlying file content and question class are unchanged. Prefer content-hash keys.
 
 ### L1 - deterministic discovery
 
-Before a broad model read, use one or more of:
+Before broad model reads use `git grep`/`rg`, changed-file lists and `git diff`, symbol lookup, file profiling, bounded slices, and deterministic CI/test logs. The desired output is a small evidence packet with relevant paths, symbols, line ranges, and bounded excerpts.
 
-- `git grep` / `rg`;
-- changed-file lists and `git diff`;
-- path and symbol lookup;
-- file size / line count profiling;
-- bounded line slices around matched symbols;
-- deterministic CI and test logs.
+### L1.5 - verified local Headroom shadow
 
-The desired output is an evidence packet: relevant paths, symbols, line ranges, and a small bounded excerpt.
+For non-sensitive material, Headroom may be evaluated locally under `coordination/HEADROOM_SHADOW_TRIAL.md` before spending Copilot/strong-model context. Its pinned source revision must be verified. Headroom output is convenience context only and original evidence must remain retrievable.
 
-### L2 - optional compression worker
+### L2 - optional Copilot/Luna compression
 
-Only when L0/L1 are insufficient for a genuinely broad repository-reading question, the local helper may explicitly send a bounded, non-sensitive evidence packet to GitHub Copilot CLI using GPT-5.6 Luna.
+Only when cheaper levels are insufficient for a genuinely broad repository-reading question, the helper may explicitly send a bounded non-sensitive evidence packet to GitHub Copilot CLI using GPT-5.6 Luna.
 
 Rules:
 
 - disabled by default;
-- must require explicit local opt-in (`TABIBI_CONTEXT_ALLOW_COPILOT=1`);
-- source excerpts are assembled by the deterministic helper before the model call;
-- the Copilot call receives no filesystem-write permission and is not trusted as an authority;
-- repository custom instructions are disabled for this worker so `AGENTS.md` and other broad startup material are not silently re-injected into the compression call;
-- Copilot CLI remote/session export and automatic CLI updates are disabled for the compression call;
+- requires explicit local opt-in `TABIBI_CONTEXT_ALLOW_COPILOT=1`;
+- repository custom instructions, auto-update, remote access, and remote export are disabled for the worker;
 - never use `--allow-all`;
-- output must be compact: filenames, symbols, line references, facts, and uncertainty;
 - no automatic retry through another paid provider;
-- if the local budget state is absent, exhausted, or invalid, fail closed to L0/L1.
+- local budget state must be valid and positive;
+- a unit is atomically reserved under an exclusive local lock before Copilot starts;
+- concurrent calls may not consume the same final unit;
+- ordinary invocation failure refunds under the same lock;
+- hard crash remains fail-closed: the unit stays consumed, and stale-lock recovery never refunds it;
+- output has no architecture, implementation, review, or merge authority.
 
 ### L3 - strong actor
 
-ChatGPT, Codex, or Claude receives the smallest evidence packet adequate for the actual task. The strong actor may request targeted additional source whenever correctness requires it.
+ChatGPT, Codex, or Claude receives the smallest evidence packet adequate for the actual task and may request original source whenever correctness requires it.
 
-Use strong actors directly for:
+Use strong actors directly for product/architecture decisions, authentication/authorization/privacy/tenant isolation, concurrency/data-integrity reasoning, exact-head adversarial review, difficult debugging, and code modification.
 
-- product/architecture decisions;
-- authentication, authorization, privacy, tenant isolation and secret handling;
-- concurrency/data-integrity reasoning;
-- exact-head adversarial review and merge verdicts;
-- difficult debugging where compressed evidence could hide causality;
-- code modification of the exact implementation area.
+## Real-path and sensitive-data enforcement
+
+Before `profile`, `slice`, or `compress` reads a file, `scripts/context-router.mjs`:
+
+1. requires the lexical requested path to stay inside the repository;
+2. rejects obvious sensitive requested paths;
+3. resolves the path with `realpath`;
+4. requires the real target to stay inside the real repository root;
+5. applies sensitive-path exclusions again to the resolved target.
+
+This prevents an in-repository symlink from smuggling an external file into the router.
+
+Conservative excluded classes include `.env*`, credentials/keys, local `.tabibi` state, patient record/data/fixture/export files, provider/webhook/notification payload/response data, production exports/backups, and database dumps/backups. The policy is intentionally path-conservative; if a legitimate source file collides with a data-like name, use original strong-actor reading rather than weakening the compression boundary.
 
 ## Claude Code read guard
 
-The project `.claude/settings.json` installs a `PreToolUse` hook for `Read`.
+`.claude/settings.json` installs a `PreToolUse` guard for `Read`. Small files, bounded reads, and bootstrap/current-state files are allowed. Large unbounded reads are redirected to deterministic discovery or bounded slices.
 
-The hook allows:
-
-- small files;
-- explicit bounded reads (`offset` + a modest `limit`);
-- current-state/bootstrap files required for safe startup.
-
-For a large unbounded file read, it denies the tool call and points Claude to `scripts/context-router.mjs` or a bounded `Read`. The hook itself never invokes Copilot or any model, so merely opening Claude Code cannot consume another provider's allowance.
-
-The guard is a context-efficiency rail, not a security boundary. An actor may deliberately use bounded reads repeatedly when complete evidence is genuinely necessary.
+The hook itself never calls a model. It is a context-efficiency rail, not a security boundary, and fails open so engineering is not stranded by hook errors.
 
 ## Bootstrap procedure
 
-For a new engineering turn:
-
 1. Read `coordination/BOOTSTRAP.md`.
 2. Read current `coordination/STATE.json` and `coordination/WORK_QUEUE.md`.
-3. Reconcile live PR/issue/CI evidence for the work unit.
-4. Retrieve only the task-relevant sections of `PRODUCT.md`, `ARCHITECTURE.md`, `SECURITY.md`, `AGENTS.md`, and the relevant coordination protocols.
-5. Expand context only when the task or evidence requires it.
+3. Reconcile live PR/issue/CI/review/lease/overlay evidence.
+4. Retrieve only task-relevant source-contract sections.
+5. Expand originals whenever correctness/security/review requires it.
 
-The bootstrap is an index, not a replacement contract. If it conflicts with a source contract, the source contract wins.
+The bootstrap is an index. Source contracts win on conflict.
 
 ## Evidence packet format
 
-A useful deterministic/compressed result should prefer:
+Prefer:
 
 ```text
 question: <bounded question>
 paths:
   - path/to/file.ts:120-185 — <why relevant>
-  - path/to/test.ts:40-88 — <why relevant>
 symbols:
   - SomeService.method
 facts:
-  - <fact grounded in the supplied excerpt>
+  - <grounded fact>
 uncertainty:
-  - <what still requires a direct read or test>
+  - <what still needs a direct read/test>
 ```
 
-Do not return long prose when paths and exact ranges are sufficient.
+## Budget state and recovery
 
-## Sensitive-path exclusions
+Local budget/metrics/lock files live under `.tabibi/` and are gitignored. Repository defaults are zero-spend-safe.
 
-The helper refuses obvious secret/sensitive paths and should be extended conservatively. Never route `.env*`, credentials, keys, database dumps, production exports, patient data, or provider payloads into model compression.
-
-Repository source/tests/docs may still contain accidental secrets; deterministic scanning and normal security discipline remain required.
-
-## Budget modes
-
-The local optional compression mode is controlled outside Git by `.tabibi/context-budget.json` and environment variables. Repository defaults must always be zero-spend-safe:
-
-- no opt-in -> compression disabled;
-- no valid budget file -> compression disabled;
-- allowance at/above hard stop -> compression disabled;
-- Copilot CLI missing/error -> deterministic fallback, no provider substitution.
-
-See `coordination/AI_CAPACITY_POLICY.md` for the binding financial policy.
+A reservation lock uses exclusive file creation. If a previous process was hard-killed, the lock may become stale. The router may remove a stale lock only after its age exceeds the configured threshold and the recorded PID is no longer alive. It never refunds the already-reserved unit during stale-lock recovery. This deliberately prefers under-using included capacity over accidental overage.
 
 ## Success metrics
 
-Evaluate the router on real work units using:
+Evaluate real work units using strong-model bulk-read bytes/tokens avoided, deterministic/search hit rate, Headroom fidelity, optional worker input/output estimates, added latency, strong-model re-read rate, CI/test success, and review finding rate.
 
-- strong-model bulk-read bytes/tokens avoided;
-- deterministic cache/search hit rate;
-- optional worker input/output estimates;
-- added latency;
-- strong-model re-read rate;
-- CI/test success and review finding rate.
-
-The goal is not a specific marketing percentage. A smaller context with equal or better engineering evidence is the win.
+The goal is not a marketing percentage. Smaller context with equal or better engineering evidence is the win.
