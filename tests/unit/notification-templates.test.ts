@@ -108,20 +108,23 @@ describe('notification template rendering', () => {
     'https://tabibi.example/g/exchange/opaque?token=secret',
     'https://tabibi.example/g/exchange/opaque#secret',
     'https://tabibi.example/not-exchange/opaque',
-  ])('rejects malformed guest exchange link %s without reflecting it', (url) => {
-    const rendered = renderNotificationTemplate({
-      templateId: 'queue_entry_transferred.v1',
-      sourceIntentVersion: 1,
-      variables: {},
-    });
-    try {
-      composeGuestTransferExchangeLink(rendered, url);
-      throw new Error('expected rejection');
-    } catch (error) {
-      expect(error).toBeInstanceOf(NotificationTemplateValidationError);
-      expect(String(error)).not.toContain(url);
-    }
-  });
+  ])(
+    'rejects malformed guest exchange link %s without reflecting it',
+    (url) => {
+      const rendered = renderNotificationTemplate({
+        templateId: 'queue_entry_transferred.v1',
+        sourceIntentVersion: 1,
+        variables: {},
+      });
+      try {
+        composeGuestTransferExchangeLink(rendered, url);
+        throw new Error('expected rejection');
+      } catch (error) {
+        expect(error).toBeInstanceOf(NotificationTemplateValidationError);
+        expect(String(error)).not.toContain(url);
+      }
+    },
+  );
 
   it('rejects attaching exchange links to other notification intents', () => {
     const rendered = renderNotificationTemplate({
