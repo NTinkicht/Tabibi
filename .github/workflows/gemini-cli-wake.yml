@@ -48,7 +48,7 @@ jobs:
         if: steps.preflight.outputs.ready == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Run Gemini CLI with safe live progress
         if: steps.preflight.outputs.ready == 'true'
@@ -187,10 +187,14 @@ jobs:
 
           echo "::notice title=Gemini CLI::actor execution started; hard limit=600s; live content redacted"
           set +e
+          # Do not use non-interactive plan mode here. Upstream documents special
+          # plan-mode transitions in CI, and our live smoke showed it can stall after
+          # read-tool calls. Default approval mode plus the explicit policy engine is
+          # simpler: the policy denies every tool except the read-only allow-list.
           timeout --signal=TERM --kill-after=15s 600s \
             gemini \
               --skip-trust \
-              --approval-mode=plan \
+              --approval-mode=default \
               --policy /tmp/tabibi-gemini-policy.toml \
               --output-format stream-json \
               --prompt "$(cat /tmp/tabibi-gemini-prompt.txt)" \
