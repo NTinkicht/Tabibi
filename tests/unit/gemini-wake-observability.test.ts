@@ -37,7 +37,8 @@ describe('Gemini unattended wake observability', () => {
   it('keeps the existing zero-billing and read-only policy boundary', () => {
     expect(workflow).toContain('TABIBI_GEMINI_ZERO_BILLING_CONFIRMED');
     expect(workflow).toContain('GEMINI_API_KEY');
-    expect(workflow).toContain('--approval-mode=plan');
+    expect(workflow).toContain('--approval-mode=default');
+    expect(workflow).not.toContain('--approval-mode=plan');
     expect(workflow).toContain('--policy /tmp/tabibi-gemini-policy.toml');
     expect(workflow).toContain('toolName = "*"');
     expect(workflow).toContain('decision = "deny"');
