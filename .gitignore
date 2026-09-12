@@ -10,8 +10,10 @@ coverage/
 npm-debug.log*
 tsconfig.tsbuildinfo
 
-# Retired Gemini CLI local state / credentials must still never be committed.
+# Local AI actor state / credentials must never be committed.
 .gemini/
+.vibe/
+.mistral/
 gha-creds-*.json
 
 # Tabibi local context-router budget/metrics/lock/test state

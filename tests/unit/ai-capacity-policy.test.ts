@@ -8,10 +8,13 @@ const forbiddenWorkflowPatterns = [
   { label: 'OpenRouter provider reference', pattern: /openrouter/i },
   { label: 'OpenRouter repository secret', pattern: /OPENROUTER_API_KEY/ },
   { label: 'OpenRouter PR-Agent key', pattern: /OPENROUTER__KEY/ },
+  { label: 'Gemini API key automation', pattern: /(?:GEMINI|GOOGLE)_API_KEY/ },
+  { label: 'Mistral API key automation', pattern: /MISTRAL_API_KEY/ },
+  { label: 'Vertex AI paid route', pattern: /(?:vertexai|aiplatform\.googleapis\.com)/i },
 ];
 
 describe('AI capacity policy', () => {
-  it('keeps active GitHub workflows free of metered OpenRouter paths', () => {
+  it('keeps active GitHub workflows free of unapproved metered-provider paths', () => {
     const workflowFiles = fs
       .readdirSync(workflowDirectory)
       .filter((file) => /\.ya?ml$/i.test(file));
@@ -24,9 +27,7 @@ describe('AI capacity policy', () => {
 
       for (const { label, pattern } of forbiddenWorkflowPatterns) {
         lines.forEach((line, index) => {
-          if (pattern.test(line)) {
-            violations.push(`${file}:${index + 1} ${label}`);
-          }
+          if (pattern.test(line)) violations.push(`${file}:${index + 1} ${label}`);
         });
       }
     }
