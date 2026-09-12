@@ -86,6 +86,40 @@ describe('notification template rendering', () => {
     ]);
   });
 
+  it('renders every template in both locales without undefined copy drift', () => {
+    const cases = [
+      ['appointment_confirmed.v1', {}],
+      ['queue_entry_created.v1', {}],
+      [
+        'estimate_changed_materially.v1',
+        { windowStartMinutes: 10, windowEndMinutes: 20 },
+      ],
+      ['turn_approaching.v1', { position: 2 }],
+      ['patient_called.v1', {}],
+      ['session_delayed.v1', { delayMinutes: 15 }],
+      ['session_cancelled.v1', {}],
+      ['queue_entry_cancelled.v1', {}],
+      ['queue_entry_transferred.v1', {}],
+    ] as const;
+
+    expect(cases.map(([templateId]) => templateId)).toEqual(
+      notificationTemplateIds,
+    );
+
+    for (const [templateId, variables] of cases) {
+      for (const locale of ['fr', 'ar'] as const) {
+        const rendered = renderNotificationTemplate({
+          templateId,
+          sourceIntentVersion: 1,
+          locale,
+          variables,
+        } as never);
+        expect(rendered.title).not.toContain('undefined');
+        expect(rendered.body).not.toContain('undefined');
+      }
+    }
+  });
+
   it('composes only a narrow HTTPS guest exchange link after rendering', () => {
     const rendered = renderNotificationTemplate({
       templateId: 'queue_entry_transferred.v1',
@@ -164,6 +198,21 @@ describe('notification template rendering', () => {
       templateId: 'turn_approaching.v1',
       sourceIntentVersion: 1,
       variables: { position: -1 },
+    },
+    {
+      templateId: 'turn_approaching.v1',
+      sourceIntentVersion: 1,
+      variables: { position: 1441 },
+    },
+    {
+      templateId: 'session_delayed.v1',
+      sourceIntentVersion: 1,
+      variables: { delayMinutes: 1441 },
+    },
+    {
+      templateId: 'estimate_changed_materially.v1',
+      sourceIntentVersion: 1,
+      variables: { windowStartMinutes: 20, windowEndMinutes: 1441 },
     },
     {
       templateId: 'turn_approaching.v1',
