@@ -1,7 +1,7 @@
 {
   "project": "Tabibi",
   "phase": "epic_six_actor_company_os",
-  "state": "pr158_implementation_complete_pending_ci_and_gate",
+  "state": "pr158_awaiting_exact_head_ci_and_gate",
   "current_pr": 158,
   "current_issue": 154,
   "related_issue": 155,
@@ -50,13 +50,13 @@
   },
   "role_leases": {
     "orchestrator": {"actor": "chatgpt", "status": "active", "work_stream": "issues-154-155-pr-158"},
-    "implementer": {"actor": "chatgpt", "status": "implementation_complete_pending_ci", "work_stream": "issues-154-155-pr-158"},
+    "implementer": {"actor": "chatgpt", "status": "implementation_complete_awaiting_ci", "work_stream": "issues-154-155-pr-158"},
     "gating_reviewer": {"actor": "eligible_non_author", "status": "reserved_after_green_ci", "note": "ChatGPT materially authored PR #158 and cannot self-gate."},
     "merge_executor": {"actor": "codex_or_chatgpt", "status": "mechanical_after_gates"}
   },
   "current_work": {
     "id": "EPIC-ORG-002+EPIC-ACTORS-003",
-    "status": "implementation_complete_pending_ci_and_review",
+    "status": "implementation_complete_awaiting_ci_and_review",
     "actor": "chatgpt",
     "implementation_pr": 158,
     "branch": "epic/six-actor-capacity-routing",
