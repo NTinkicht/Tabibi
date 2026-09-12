@@ -8,7 +8,9 @@ import {
   type NotificationProviderAdapter,
 } from '@/modules/notification-domain';
 import { NotificationOutboxRepository } from '@/modules/notification-outbox';
-import { NotificationDispatchEligibilityRepository } from '@/modules/notification-outbox/dispatch-eligibility';
+import {
+  NotificationDispatchEligibilityRepository,
+} from '@/modules/notification-outbox/dispatch-eligibility';
 import { NotificationPreferenceRepository } from '@/modules/notification-preferences';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
@@ -91,55 +93,60 @@ function context(preferences: NotificationPreferenceRepository) {
 }
 
 describe('notification consent-aware dispatch suppression', () => {
-  it('persists missing authorization as terminal suppression and never calls provider', async () => {
-    const outbox = new NotificationOutboxRepository(pool);
-    const preferences = new NotificationPreferenceRepository(pool);
-    const scanner = new NotificationDispatchEligibilityRepository(pool);
-    const queued = await outbox.enqueue(enqueueInput('missing'));
-    const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(async () => ({
-      kind: 'delivered',
-    }));
-    const service = new NotificationDispatchService(
-      outbox,
-      { dispatch },
-      context(preferences),
-    );
+  it(
+    'persists missing authorization as terminal suppression and never calls provider',
+    async () => {
+      const outbox = new NotificationOutboxRepository(pool);
+      const preferences = new NotificationPreferenceRepository(pool);
+      const scanner = new NotificationDispatchEligibilityRepository(pool);
+      const queued = await outbox.enqueue(enqueueInput('missing'));
+      const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(
+        async () => ({
+          kind: 'delivered',
+        }),
+      );
+      const service = new NotificationDispatchService(
+        outbox,
+        { dispatch },
+        context(preferences),
+      );
 
-    await expect(
-      service.dispatchOne({ clinicId: ids.clinic, intentId: queued.id }),
-    ).resolves.toMatchObject({
-      status: 'suppressed',
-      suppressionReason: 'preference_missing',
-    });
-    expect(dispatch).not.toHaveBeenCalled();
+      await expect(
+        service.dispatchOne({ clinicId: ids.clinic, intentId: queued.id }),
+      ).resolves.toMatchObject({
+        status: 'suppressed',
+        suppressionReason: 'preference_missing',
+      });
+      expect(dispatch).not.toHaveBeenCalled();
 
-    const persisted = await pool.query<{
-      state: string;
-      dispatch_outcome_code: string | null;
-      next_attempt_at: Date | null;
-      dispatch_claim_token: string | null;
-    }>(
-      `SELECT state, dispatch_outcome_code, next_attempt_at, dispatch_claim_token
+      const persisted = await pool.query<{
+        state: string;
+        dispatch_outcome_code: string | null;
+        next_attempt_at: Date | null;
+        dispatch_claim_token: string | null;
+      }>(
+        `SELECT state, dispatch_outcome_code, next_attempt_at, dispatch_claim_token
          FROM notification_outbox WHERE id=$1`,
-      [queued.id],
-    );
-    expect(persisted.rows[0]).toMatchObject({
-      state: 'suppressed',
-      dispatch_outcome_code: 'preference_missing',
-      next_attempt_at: null,
-      dispatch_claim_token: null,
-    });
-    await expect(
-      scanner.listEligible({ clinicId: ids.clinic, limit: 10 }),
-    ).resolves.toEqual([]);
-    await expect(
-      outbox.claimPendingIntent({
-        clinicId: ids.clinic,
-        intentId: queued.id,
-        leaseMs: 60_000,
-      }),
-    ).resolves.toBeNull();
-  });
+        [queued.id],
+      );
+      expect(persisted.rows[0]).toMatchObject({
+        state: 'suppressed',
+        dispatch_outcome_code: 'preference_missing',
+        next_attempt_at: null,
+        dispatch_claim_token: null,
+      });
+      await expect(
+        scanner.listEligible({ clinicId: ids.clinic, limit: 10 }),
+      ).resolves.toEqual([]);
+      await expect(
+        outbox.claimPendingIntent({
+          clinicId: ids.clinic,
+          intentId: queued.id,
+          leaseMs: 60_000,
+        }),
+      ).resolves.toBeNull();
+    },
+  );
 
   it('delivers when granted and suppresses a later intent after revocation', async () => {
     const outbox = new NotificationOutboxRepository(pool);
@@ -190,32 +197,38 @@ describe('notification consent-aware dispatch suppression', () => {
     expect(dispatch).toHaveBeenCalledTimes(1);
   });
 
-  it('fails closed when target identity cannot resolve to a matching clinic preference', async () => {
-    const outbox = new NotificationOutboxRepository(pool);
-    const preferences = new NotificationPreferenceRepository(pool);
-    const queued = await outbox.enqueue(enqueueInput('mismatch'));
-    const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(async () => ({
-      kind: 'delivered',
-    }));
-    const mismatchedContext = new NotificationPreferenceDeliveryContextResolver(
-      {
-        resolveTarget: async () => ({
-          subjectKind: 'visit_patient' as const,
-          subjectId: randomUUID(),
-          channel: 'sms' as const,
+  it(
+    'fails closed when target identity cannot resolve to a matching clinic preference',
+    async () => {
+      const outbox = new NotificationOutboxRepository(pool);
+      const preferences = new NotificationPreferenceRepository(pool);
+      const queued = await outbox.enqueue(enqueueInput('mismatch'));
+      const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(
+        async () => ({
+          kind: 'delivered',
         }),
-      },
-      preferences,
-    );
-    const service = new NotificationDispatchService(
-      outbox,
-      { dispatch },
-      mismatchedContext,
-    );
+      );
+      const mismatchedContext =
+        new NotificationPreferenceDeliveryContextResolver(
+          {
+            resolveTarget: async () => ({
+              subjectKind: 'visit_patient' as const,
+              subjectId: randomUUID(),
+              channel: 'sms' as const,
+            }),
+          },
+          preferences,
+        );
+      const service = new NotificationDispatchService(
+        outbox,
+        { dispatch },
+        mismatchedContext,
+      );
 
-    await expect(
-      service.dispatchOne({ clinicId: ids.clinic, intentId: queued.id }),
-    ).resolves.toMatchObject({ status: 'suppressed' });
-    expect(dispatch).not.toHaveBeenCalled();
-  });
+      await expect(
+        service.dispatchOne({ clinicId: ids.clinic, intentId: queued.id }),
+      ).resolves.toMatchObject({ status: 'suppressed' });
+      expect(dispatch).not.toHaveBeenCalled();
+    },
+  );
 });
