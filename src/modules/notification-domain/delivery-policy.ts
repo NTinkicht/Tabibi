@@ -33,7 +33,9 @@ export interface NotificationDeliveryContext {
 }
 
 export interface NotificationDeliveryContextResolver {
-  resolve(intent: NotificationIntent): Promise<NotificationDeliveryContext | null>;
+  resolve(
+    intent: NotificationIntent,
+  ): Promise<NotificationDeliveryContext | null>;
 }
 
 /**
