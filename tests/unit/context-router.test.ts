@@ -141,9 +141,9 @@ describe('context router safety', () => {
     ]);
 
     expect(results.map((result) => result.code).sort()).toEqual([0, 2]);
-    expect(
-      fs.readFileSync(count, 'utf8').trim().split(/\r?\n/),
-    ).toHaveLength(1);
+    expect(fs.readFileSync(count, 'utf8').trim().split(/\r?\n/)).toHaveLength(
+      1,
+    );
     const budget = JSON.parse(
       fs.readFileSync(
         path.join(scratch, 'state', 'context-budget.json'),
