@@ -1,12 +1,12 @@
 {
   "project": "Tabibi",
-  "phase": "epic_resumed_on_company_os_v2",
-  "state": "pr151_gated_pass_awaiting_merge",
-  "current_pr": 151,
-  "current_issue": 150,
-  "last_actor": "claude",
-  "next_actor": "merge_executor",
-  "next_action": "PR #153 merged (commit 4fcff66b7396e73c63d1ca377fe5fd4096a60459). Claude independently gated Epic PR #151 (Issue #150) on exact head 30d2c98d57681716cb73d403ad97e79b6c060df9: PASS/MERGE_READY posted (https://github.com/NTinkicht/Tabibi/pull/151), zero BLOCKER/MAJOR findings, CI green on all 3 required jobs, mergeable_state clean, zero open review threads. Two non-blocking notes recorded (temp-file-name collision robustness note; suggestion of an optional second independent concurrency/security pass). Ready for the orchestrator/owner's mechanical merge; Epic org routing (EPIC-ORG-002) can then resume.",
+  "phase": "company_os_v2_restructuring",
+  "state": "company_os_v2_review_pending",
+  "current_pr": 153,
+  "current_issue": 21,
+  "last_actor": "chatgpt",
+  "next_actor": "independent_non_author_reviewer",
+  "next_action": "Review PR #153 on its exact head, require green CI, then merge mechanically if all governance gates pass. Afterward resume Epic PR #151 against the new main.",
   "operating_model": "four-active-actor-mesh-v8-company-os-v2-headroom-shadow",
   "binding_protocols": [
     "AGENTS.md",
@@ -35,7 +35,7 @@
         "review": "available_when_non_author",
         "merge_execution": "available"
       },
-      "current_activity": "Company OS v2 (PR #153) merged. Epic PR #151 author/reconciler; recused from sole independent gating of this exact head, now PASS-gated by Claude and awaiting mechanical merge."
+      "current_activity": "Company OS v2 author/orchestrator for PR #153; recused from sole independent gating of this exact head."
     },
     "codex": {
       "capability_status": {
@@ -51,7 +51,7 @@
         "review": "available_subject_to_pro_capacity",
         "adversarial_security_review": "available_subject_to_pro_capacity"
       },
-      "current_activity": "Gated Epic PR #151 (Issue #150) exact head 30d2c98d57681716cb73d403ad97e79b6c060df9: PASS/MERGE_READY, zero BLOCKER/MAJOR findings. No active lease."
+      "current_activity": "Preferred independent governance/adversarial reviewer for PR #153 when concretely available and non-author."
     },
     "copilot": {
       "capability_status": {
@@ -81,32 +81,31 @@
     },
     "implementer": {
       "actor": "chatgpt",
-      "status": "implementation_complete_gate_passed",
-      "note": "One canonical Epic branch/PR (#151) only, reconciled onto Company OS v2 (PR #153 merged)."
+      "status": "implementation_complete_pending_pr_gate",
+      "note": "One canonical Company OS v2 branch/PR (#153) only."
     },
     "gating_reviewer": {
-      "actor": "claude",
-      "status": "pass_posted",
-      "note": "Claude posted PASS/MERGE_READY on exact head 30d2c98d57681716cb73d403ad97e79b6c060df9 (https://github.com/NTinkicht/Tabibi/pull/151). ChatGPT is the material author and could not self-gate."
+      "actor": "claude_or_copilot_non_author",
+      "status": "reserved_for_exact_head",
+      "note": "Governance change requires an eligible independent exact-head review after green CI. ChatGPT is the material author and cannot self-gate."
     },
     "merge_executor": {
       "actor": "codex_or_chatgpt",
-      "status": "ready",
-      "note": "Merge the unchanged reviewed head 30d2c98d57681716cb73d403ad97e79b6c060df9 -- CI green, mergeable_state clean, independent gate satisfied."
+      "status": "mechanical_after_gates",
+      "note": "Merge only the unchanged reviewed head after exact-head CI and independent gate are clear."
     }
   },
   "current_work": {
-    "id": "EPIC-CONTEXT-001",
-    "status": "gate_passed_awaiting_merge",
+    "id": "COMPANY-OS-V2-001",
+    "status": "implementation_complete_pending_review",
     "actor": "chatgpt",
-    "scope": "PR #151 (Issue #150): deterministic-first context router, zero-extra-cost Copilot/Luna capacity governor, OpenRouter/paid-provider circuit breaker, Headroom shadow boundary, Claude read guard, and Company OS v2 governance doc consolidation.",
-    "gate_result": "PASS, zero BLOCKER/MAJOR findings, Claude non-author gate, exact head 30d2c98d57681716cb73d403ad97e79b6c060df9"
+    "scope": "PR #153: simplify Slack/standup/retro behavior, retire Gemini from active/runtime paths, enforce specialist-overlay selection, and add a read-only Headroom shadow-trial path without resuming Epic itself."
   },
   "next_work": {
-    "id": "EPIC-ORG-002",
-    "status": "blocked_pending_pr151_merge",
+    "id": "EPIC-RESUME",
+    "status": "blocked_pending_company_os_v2_merge",
     "actor": "chatgpt",
-    "scope": "Continue the Spotify-inspired Epic organization/capacity routing work after PR #151 merges."
+    "scope": "Rebase/reconcile and resume Spotify-inspired Epic PR #151 only after PR #153 lands."
   },
   "headroom": {
     "mode": "shadow_read_only",
