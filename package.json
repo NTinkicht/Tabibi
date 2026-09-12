@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write coordination/ACTOR_REGISTRY.json coordination/STATE.json scripts/actor-router.mjs tests/unit/actor-router.test.ts tests/unit/ai-capacity-policy.test.ts && git diff --exit-code -- coordination/ACTOR_REGISTRY.json coordination/STATE.json scripts/actor-router.mjs tests/unit/actor-router.test.ts tests/unit/ai-capacity-policy.test.ts",
+    "format": "prettier --check .",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit --project api",

@@ -35,24 +35,64 @@
   },
   "team_room": {
     "issue": 21,
-    "active_roster": ["chatgpt", "codex", "claude", "copilot", "gemini-cli", "mistral-vibe"],
+    "active_roster": [
+      "chatgpt",
+      "codex",
+      "claude",
+      "copilot",
+      "gemini-cli",
+      "mistral-vibe"
+    ],
     "retired_actors": ["gemini_agent", "gemini_chat"],
     "slack_role": "attention_and_culture_only",
     "coffee_corner": "optional_no_quota_no_reminders"
   },
   "agents": {
-    "chatgpt": {"status": "active", "current_activity": "PR #158 orchestrator/material author; recused from sole gate."},
-    "codex": {"status": "available_subject_to_included_capacity", "current_activity": "No duplicate implementation lease; available for CI/merge failover."},
-    "claude": {"status": "available_subject_to_pro_capacity", "current_activity": "Preferred non-author adversarial gate for PR #158 when concretely available."},
-    "copilot": {"status": "available_subject_to_included_entitlement", "current_activity": "QA/Test Automation and eligible non-author review fallback."},
-    "gemini-cli": {"status": "available_probe_passed", "current_activity": "Scouting/research/long-context/QA/overflow review; free/non-billable local allowance only."},
-    "mistral-vibe": {"status": "available_probe_passed", "current_activity": "Developer reserve/design challenge/QA/overflow review; existing Pro subscription, PAYG disabled."}
+    "chatgpt": {
+      "status": "active",
+      "current_activity": "PR #158 orchestrator/material author; recused from sole gate."
+    },
+    "codex": {
+      "status": "available_subject_to_included_capacity",
+      "current_activity": "No duplicate implementation lease; available for CI/merge failover."
+    },
+    "claude": {
+      "status": "available_subject_to_pro_capacity",
+      "current_activity": "Preferred non-author adversarial gate for PR #158 when concretely available."
+    },
+    "copilot": {
+      "status": "available_subject_to_included_entitlement",
+      "current_activity": "QA/Test Automation and eligible non-author review fallback."
+    },
+    "gemini-cli": {
+      "status": "available_probe_passed",
+      "current_activity": "Scouting/research/long-context/QA/overflow review; free/non-billable local allowance only."
+    },
+    "mistral-vibe": {
+      "status": "available_probe_passed",
+      "current_activity": "Developer reserve/design challenge/QA/overflow review; existing Pro subscription, PAYG disabled."
+    }
   },
   "role_leases": {
-    "orchestrator": {"actor": "chatgpt", "status": "active", "work_stream": "issues-154-155-pr-158"},
-    "implementer": {"actor": "chatgpt", "status": "implementation_complete_awaiting_ci", "work_stream": "issues-154-155-pr-158"},
-    "gating_reviewer": {"actor": "eligible_non_author", "status": "reserved_after_green_ci", "note": "ChatGPT materially authored PR #158 and cannot self-gate."},
-    "merge_executor": {"actor": "codex_or_chatgpt", "status": "mechanical_after_gates"}
+    "orchestrator": {
+      "actor": "chatgpt",
+      "status": "active",
+      "work_stream": "issues-154-155-pr-158"
+    },
+    "implementer": {
+      "actor": "chatgpt",
+      "status": "implementation_complete_awaiting_ci",
+      "work_stream": "issues-154-155-pr-158"
+    },
+    "gating_reviewer": {
+      "actor": "eligible_non_author",
+      "status": "reserved_after_green_ci",
+      "note": "ChatGPT materially authored PR #158 and cannot self-gate."
+    },
+    "merge_executor": {
+      "actor": "codex_or_chatgpt",
+      "status": "mechanical_after_gates"
+    }
   },
   "current_work": {
     "id": "EPIC-ORG-002+EPIC-ACTORS-003",

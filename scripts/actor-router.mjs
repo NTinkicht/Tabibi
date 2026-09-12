@@ -3,7 +3,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const registryPath = path.join(process.cwd(), 'coordination', 'ACTOR_REGISTRY.json');
+const registryPath = path.join(
+  process.cwd(),
+  'coordination',
+  'ACTOR_REGISTRY.json',
+);
 
 function parseCsvFlag(args, name) {
   const prefix = `${name}=`;
@@ -19,13 +23,17 @@ function parseCsvFlag(args, name) {
 }
 
 function fail(message, details = {}) {
-  process.stdout.write(`${JSON.stringify({ selected: null, error: message, ...details })}\n`);
+  process.stdout.write(
+    `${JSON.stringify({ selected: null, error: message, ...details })}\n`,
+  );
   process.exit(2);
 }
 
 const [, , capability, ...flags] = process.argv;
 if (!capability) {
-  fail('Usage: node scripts/actor-router.mjs <capability> [--authors=a,b] [--unavailable=a,b]');
+  fail(
+    'Usage: node scripts/actor-router.mjs <capability> [--authors=a,b] [--unavailable=a,b]',
+  );
 }
 
 const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
@@ -44,10 +52,13 @@ for (const id of route) {
   let reason = null;
 
   if (!actor || !actor.active) reason = 'inactive_or_missing';
-  else if (actor.paid_fallback !== false) reason = 'paid_fallback_not_fail_closed';
-  else if (!actor.capabilities.includes(capability)) reason = 'capability_not_declared';
+  else if (actor.paid_fallback !== false)
+    reason = 'paid_fallback_not_fail_closed';
+  else if (!actor.capabilities.includes(capability))
+    reason = 'capability_not_declared';
   else if (unavailable.has(id)) reason = 'currently_unavailable';
-  else if (capability === 'review' && authors.has(id)) reason = 'material_author_cannot_self_gate';
+  else if (capability === 'review' && authors.has(id))
+    reason = 'material_author_cannot_self_gate';
 
   considered.push({ id, eligible: reason === null, reason });
   if (reason === null) {
