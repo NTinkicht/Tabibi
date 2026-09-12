@@ -443,7 +443,7 @@ describe('NotificationDispatchService', () => {
     expect(smsProvider.dispatch).toHaveBeenCalledOnce();
   });
 
-  it('persists a bounded retry outcome when the authorization resolver fails', async () => {
+  it('persists bounded retry when authorization resolution fails', async () => {
     const notificationProvider = provider({ kind: 'delivered' });
     const dispatchStore = store({ completed: intent({ state: 'failed' }) });
     const service = new NotificationDispatchService(
