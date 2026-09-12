@@ -17,7 +17,7 @@ jobs:
       github.actor == 'NTinkicht' &&
       contains(github.event.comment.body, '@mistral-vibe')
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -36,12 +36,41 @@ jobs:
           if [[ "${PAYG_DISABLED_CONFIRMED:-}" != "true" ]]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "reason=Mistral PAYG-disabled repository guard is not confirmed" >> "$GITHUB_OUTPUT"
-          elif [[ -z "${PROVIDER_KEY:-}" ]]; then
+            exit 0
+          fi
+          if [[ -z "${PROVIDER_KEY:-}" ]]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "reason=Mistral credential is not configured" >> "$GITHUB_OUTPUT"
-          else
+            exit 0
+          fi
+
+          # `/api/vibe/whoami` is a non-inference entitlement check. Never print
+          # the provider response body or credential.
+          set +e
+          http_status="$(curl \
+            --silent \
+            --show-error \
+            --connect-timeout 10 \
+            --max-time 20 \
+            --output /dev/null \
+            --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${PROVIDER_KEY}" \
+            'https://console.mistral.ai/api/vibe/whoami')"
+          curl_code=$?
+          set -e
+
+          if [[ "$curl_code" != "0" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Mistral Vibe entitlement could not be verified" >> "$GITHUB_OUTPUT"
+          elif [[ "$http_status" == "200" ]]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
             echo "reason=ready" >> "$GITHUB_OUTPUT"
+          elif [[ "$http_status" == "401" || "$http_status" == "403" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Mistral credential is not authorized for Vibe Code (HTTP ${http_status})" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Mistral Vibe entitlement check returned HTTP ${http_status}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up Python
@@ -55,15 +84,24 @@ jobs:
         shell: bash
         run: python -m pip install --disable-pip-version-check 'mistral-vibe==2.25.3'
 
-      - name: Run Mistral Vibe in read-only plan mode
+      - name: Run Mistral Vibe in bounded read-only programmatic mode
         if: steps.preflight.outputs.ready == 'true'
         id: actor
         env:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           DISPATCH_BODY: ${{ github.event.comment.body }}
+          VIBE_HOME: /tmp/tabibi-vibe-home
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p "$VIBE_HOME"
+          cat > "$VIBE_HOME/config.toml" <<'EOF'
+          enable_auto_update = false
+          enable_notifications = false
+          enable_telemetry = false
+          enabled_tools = ["grep", "read_file"]
+          EOF
+
           cat > /tmp/tabibi-mistral-prompt.txt <<'EOF'
           You are actor=mistral-vibe in the Tabibi Company OS.
           This is an unattended READ-ONLY wake from the permanent GitHub wake bus.
@@ -78,42 +116,91 @@ jobs:
           EOF
           printf '\nDispatch text:\n%s\n' "$DISPATCH_BODY" >> /tmp/tabibi-mistral-prompt.txt
 
+          # Mistral documents enabled_tools as an allow-list. Enforce it twice:
+          # in ephemeral config and on the CLI, and bind the working directory to
+          # the checked-out repository. No shell/write tool is exposed to Vibe.
           set +e
-          vibe \
-            --trust \
-            --agent plan \
-            --enabled-tools grep \
-            --enabled-tools read_file \
-            --max-turns 8 \
-            --max-tokens 30000 \
-            --output text \
-            --prompt "$(cat /tmp/tabibi-mistral-prompt.txt)" \
-            > /tmp/tabibi-mistral-output.txt \
-            2> /tmp/tabibi-mistral-error.txt
+          timeout --signal=TERM --kill-after=15s 600s \
+            vibe \
+              --trust \
+              --workdir "$GITHUB_WORKSPACE" \
+              --enabled-tools grep \
+              --enabled-tools read_file \
+              --max-turns 8 \
+              --max-tokens 30000 \
+              --output text \
+              --prompt "$(cat /tmp/tabibi-mistral-prompt.txt)" \
+              > /tmp/tabibi-mistral-output.txt \
+              2> /tmp/tabibi-mistral-error.txt
           code=$?
           set -e
+
+          reason="ready"
+          if [[ "$code" == "124" ]]; then
+            reason="Mistral Vibe exceeded the 10-minute actor time limit"
+          elif [[ "$code" != "0" ]]; then
+            if grep -Eqi '401|unauthori[sz]ed|invalid[^[:alnum:]]*(api[^[:alnum:]]*)?key|authentication' /tmp/tabibi-mistral-error.txt; then
+              reason="Mistral credential was rejected by the Vibe runtime"
+            elif grep -Eqi '403|forbidden|entitlement|permission denied' /tmp/tabibi-mistral-error.txt; then
+              reason="Mistral Vibe entitlement was rejected by the runtime"
+            elif grep -Eqi '429|rate.?limit|quota|usage[^[:alnum:]]*limit|capacity' /tmp/tabibi-mistral-error.txt; then
+              reason="Mistral included capacity is unavailable or exhausted"
+            elif grep -Eqi 'trust|trusted folder|workspace' /tmp/tabibi-mistral-error.txt; then
+              reason="Mistral Vibe workspace trust initialization failed"
+            elif grep -Eqi 'no such option|unknown option|unrecognized|usage:' /tmp/tabibi-mistral-error.txt; then
+              reason="Mistral Vibe CLI invocation is incompatible with the pinned version"
+            else
+              reason="Mistral Vibe runtime failed with an unclassified nonzero exit"
+            fi
+          fi
+
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          echo "failure_reason=$reason" >> "$GITHUB_OUTPUT"
 
       - name: Post Mistral result
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           READY: ${{ steps.preflight.outputs.ready }}
           PREFLIGHT_REASON: ${{ steps.preflight.outputs.reason }}
           ACTOR_EXIT: ${{ steps.actor.outputs.exit_code }}
+          ACTOR_REASON: ${{ steps.actor.outputs.failure_reason }}
         shell: bash
         run: |
           set -euo pipefail
+
+          if [[ "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" ]]; then
+            # Defense in depth: even though Vibe has no shell/write tool, scrub the
+            # literal provider credential plus common authorization/key renderings
+            # before any model-authored text can reach a public issue comment.
+            python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          source = Path('/tmp/tabibi-mistral-output.txt')
+          target = Path('/tmp/tabibi-mistral-public.txt')
+          text = source.read_text(encoding='utf-8', errors='replace') if source.exists() else ''
+          secret = os.environ.get('MISTRAL_API_KEY', '')
+          if secret:
+              text = text.replace(secret, '[REDACTED]')
+          text = re.sub(r'(?i)(authorization\s*:\s*bearer\s+)\S+', r'\1[REDACTED]', text)
+          text = re.sub(r'(?i)(MISTRAL_API_KEY\s*[=:]\s*)\S+', r'\1[REDACTED]', text)
+          target.write_text(text[:50000], encoding='utf-8')
+          PY
+          fi
+
           {
             echo "**mistral-vibe unattended wake**"
             echo
             if [[ "${READY:-false}" != "true" ]]; then
               echo "CAPACITY_DEGRADED - ${PREFLIGHT_REASON:-preflight failed}. No paid fallback was attempted."
             elif [[ "${ACTOR_EXIT:-1}" != "0" ]]; then
-              echo "CAPACITY_DEGRADED - Mistral Vibe exited without a usable result. PAYG remains disabled and no paid fallback was attempted."
+              echo "CAPACITY_DEGRADED - ${ACTOR_REASON:-Mistral Vibe exited without a usable result}. PAYG remains disabled and no paid fallback was attempted."
             else
               echo '```text'
-              head -c 50000 /tmp/tabibi-mistral-output.txt
+              cat /tmp/tabibi-mistral-public.txt
               echo
               echo '```'
             fi
