@@ -103,12 +103,23 @@ jobs:
           Path('coordination/TEAM_INTERACTIONS.md').write_text('\n'.join(out).rstrip() + '\n', encoding='utf-8')
 
           fields = ['actor', 'role', 'work_stream', 'status', 'current_action', 'last_artifact', 'next_checkpoint', 'blocker']
-          latest = {}
+          latest_heartbeat = {}
+          latest_activity = {}
           heartbeat_re = re.compile(r'(?mi)^HEARTBEAT\s*$')
+          activity_re = re.compile(r'(?mi)^(?:HEARTBEAT|CHECKPOINT)\s*$')
+          actor_re = re.compile(r'(?mi)^actor:\s*(chatgpt|codex|claude|copilot)\s*$')
           field_res = {field: re.compile(rf'(?mi)^{re.escape(field)}:\s*(.+?)\s*$') for field in fields}
 
           for comment in comments:
               body = comment.get('body') or ''
+              if activity_re.search(body):
+                  actor_match = actor_re.search(body)
+                  if actor_match:
+                      actor = actor_match.group(1).lower()
+                      previous = latest_activity.get(actor)
+                      if previous is None or (comment.get('created_at') or '') > (previous.get('created_at') or ''):
+                          latest_activity[actor] = comment
+
               if not heartbeat_re.search(body):
                   continue
               parsed = {}
@@ -121,20 +132,20 @@ jobs:
               parsed['actor'] = actor
               parsed['created_at'] = comment.get('created_at') or ''
               parsed['url'] = comment.get('html_url') or ''
-              latest[actor] = parsed
+              latest_heartbeat[actor] = parsed
 
           now = datetime.now(timezone.utc)
           status_lines = [
               '# Tabibi Team Status',
               '',
-              '> Generated from latest active-roster `HEARTBEAT` comments in GitHub Issue #21. Do not edit manually except to repair the sync mechanism.',
+              '> Generated from latest active-roster `HEARTBEAT` details and latest `HEARTBEAT`/`CHECKPOINT` activity in GitHub Issue #21. Do not edit manually except to repair the sync mechanism.',
               '',
               f'- Last sync: {now.isoformat()}',
               '- Active roster: `chatgpt`, `codex`, `claude`, `copilot`.',
               '- Stale threshold: 30 minutes for a lease that claims `active`, unless a visible deterministic job is still progressing.',
               '- Retired actors remain visible only in the raw historical transcript.',
               '',
-              '| Actor | Last heartbeat | Freshness | Role | Work stream | Status | Current action | Last artifact | Next checkpoint | Blocker |',
+              '| Actor | Last activity | Freshness | Role | Work stream | Status | Current action | Last artifact | Next checkpoint | Blocker |',
               '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
           ]
 
@@ -142,31 +153,35 @@ jobs:
               return (value or '—').replace('|', '\\|').replace('\n', ' ')
 
           for actor in ['chatgpt', 'codex', 'claude', 'copilot']:
-              item = latest.get(actor)
-              if not item:
-                  status_lines.append(f'| {actor} | — | no heartbeat | — | — | — | — | — | — | — |')
+              item = latest_heartbeat.get(actor)
+              activity = latest_activity.get(actor)
+              if not item and not activity:
+                  status_lines.append(f'| {actor} | — | no heartbeat/checkpoint | — | — | — | — | — | — | — |')
                   continue
+
+              activity_created_at = (activity or {}).get('created_at') or (item or {}).get('created_at') or ''
               freshness = 'unknown'
               try:
-                  stamp = datetime.fromisoformat(item['created_at'].replace('Z', '+00:00'))
+                  stamp = datetime.fromisoformat(activity_created_at.replace('Z', '+00:00'))
                   age_minutes = int((now - stamp).total_seconds() // 60)
                   freshness = f'{age_minutes}m old'
-                  if item.get('status', '').lower() == 'active' and age_minutes >= 30:
+                  if (item or {}).get('status', '').lower() == 'active' and age_minutes >= 30:
                       freshness += ' ⚠️ stale'
               except Exception:
                   pass
+
               status_lines.append(
                   '| ' + ' | '.join([
                       actor,
-                      cell(item.get('created_at')),
+                      cell(activity_created_at),
                       cell(freshness),
-                      cell(item.get('role')),
-                      cell(item.get('work_stream')),
-                      cell(item.get('status')),
-                      cell(item.get('current_action')),
-                      cell(item.get('last_artifact')),
-                      cell(item.get('next_checkpoint')),
-                      cell(item.get('blocker')),
+                      cell((item or {}).get('role')),
+                      cell((item or {}).get('work_stream')),
+                      cell((item or {}).get('status')),
+                      cell((item or {}).get('current_action')),
+                      cell((item or {}).get('last_artifact')),
+                      cell((item or {}).get('next_checkpoint')),
+                      cell((item or {}).get('blocker')),
                   ]) + ' |'
               )
 
@@ -174,7 +189,7 @@ jobs:
               '',
               '## Interpretation',
               '',
-              'A fresh heartbeat is visibility, not proof of progress. Commits, CI, review findings, branch/PR movement, and merges remain the authoritative execution evidence.',
+              'A fresh heartbeat/checkpoint is visibility, not proof of progress. Commits, CI, review findings, branch/PR movement, and merges remain the authoritative execution evidence.',
           ])
           Path('coordination/TEAM_STATUS.md').write_text('\n'.join(status_lines).rstrip() + '\n', encoding='utf-8')
           PY
