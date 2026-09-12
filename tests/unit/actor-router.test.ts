@@ -24,6 +24,16 @@ describe('six-actor capacity routing', () => {
     expect(route('implementation').selected).toBe('codex');
   });
 
+  it('routes repository intelligence and regression scouting to Gemini CLI', () => {
+    expect(route('repository_intelligence').selected).toBe('gemini-cli');
+    expect(route('regression_scouting').selected).toBe('gemini-cli');
+  });
+
+  it('routes failure analysis and test design to Mistral Vibe', () => {
+    expect(route('failure_analysis').selected).toBe('mistral-vibe');
+    expect(route('test_design').selected).toBe('mistral-vibe');
+  });
+
   it('preserves reviewer independence and can fail over to Gemini CLI', () => {
     const result = route('review', '--authors=claude,chatgpt,codex');
     expect(result.selected).toBe('gemini-cli');
@@ -79,6 +89,23 @@ describe('six-actor capacity routing', () => {
         (actor: { paid_fallback: boolean }) => actor.paid_fallback === false,
       ),
     ).toBe(true);
+  });
+
+  it('declares standing roles for Gemini CLI and Mistral Vibe', () => {
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const actors = new Map(
+      registry.actors.map((actor: { id: string; standing_role?: string }) => [
+        actor.id,
+        actor,
+      ]),
+    );
+
+    expect(actors.get('gemini-cli')?.standing_role).toBe(
+      'repository-intelligence-and-regression-scout',
+    );
+    expect(actors.get('mistral-vibe')?.standing_role).toBe(
+      'failure-and-test-design-analyst',
+    );
   });
 
   it('declares every routed capability on every routed actor', () => {
