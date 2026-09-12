@@ -30,7 +30,11 @@ export interface NotificationDispatchRenderer {
 }
 
 function payloadRecord(intent: NotificationIntent): Record<string, unknown> {
-  if (!intent.payload || typeof intent.payload !== 'object' || Array.isArray(intent.payload))
+  if (
+    !intent.payload ||
+    typeof intent.payload !== 'object' ||
+    Array.isArray(intent.payload)
+  )
     throw new Error('Invalid notification render payload');
   return intent.payload;
 }
@@ -67,9 +71,17 @@ export class NotificationIntentTemplateInputResolver
 
     switch (input.intent.eventKey) {
       case 'appointment_confirmed':
-        return { ...common, templateId: 'appointment_confirmed.v1', variables: {} };
+        return {
+          ...common,
+          templateId: 'appointment_confirmed.v1',
+          variables: {},
+        };
       case 'queue_entry_created':
-        return { ...common, templateId: 'queue_entry_created.v1', variables: {} };
+        return {
+          ...common,
+          templateId: 'queue_entry_created.v1',
+          variables: {},
+        };
       case 'estimate_changed_materially':
         return {
           ...common,
@@ -83,10 +95,16 @@ export class NotificationIntentTemplateInputResolver
         return {
           ...common,
           templateId: 'turn_approaching.v1',
-          variables: { position: requiredNumber(payload, 'position', 'places') },
+          variables: {
+            position: requiredNumber(payload, 'position', 'places'),
+          },
         };
       case 'patient_called':
-        return { ...common, templateId: 'patient_called.v1', variables: {} };
+        return {
+          ...common,
+          templateId: 'patient_called.v1',
+          variables: {},
+        };
       case 'session_delayed':
         return {
           ...common,
@@ -94,11 +112,23 @@ export class NotificationIntentTemplateInputResolver
           variables: { delayMinutes: requiredNumber(payload, 'delayMinutes') },
         };
       case 'session_cancelled':
-        return { ...common, templateId: 'session_cancelled.v1', variables: {} };
+        return {
+          ...common,
+          templateId: 'session_cancelled.v1',
+          variables: {},
+        };
       case 'queue_entry_cancelled':
-        return { ...common, templateId: 'queue_entry_cancelled.v1', variables: {} };
+        return {
+          ...common,
+          templateId: 'queue_entry_cancelled.v1',
+          variables: {},
+        };
       case 'queue_entry_transferred':
-        return { ...common, templateId: 'queue_entry_transferred.v1', variables: {} };
+        return {
+          ...common,
+          templateId: 'queue_entry_transferred.v1',
+          variables: {},
+        };
       default:
         throw new Error('Unsupported notification render event');
     }
