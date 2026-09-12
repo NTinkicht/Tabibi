@@ -44,7 +44,8 @@ function requiredNumber(
   key: string,
   fallbackKey?: string,
 ): number {
-  const value = payload[key] ?? (fallbackKey ? payload[fallbackKey] : undefined);
+  const value =
+    payload[key] ?? (fallbackKey ? payload[fallbackKey] : undefined);
   if (typeof value !== 'number' || !Number.isFinite(value))
     throw new Error('Missing notification render input');
   return value;
@@ -100,11 +101,7 @@ export class NotificationIntentTemplateInputResolver
           },
         };
       case 'patient_called':
-        return {
-          ...common,
-          templateId: 'patient_called.v1',
-          variables: {},
-        };
+        return { ...common, templateId: 'patient_called.v1', variables: {} };
       case 'session_delayed':
         return {
           ...common,
@@ -112,11 +109,7 @@ export class NotificationIntentTemplateInputResolver
           variables: { delayMinutes: requiredNumber(payload, 'delayMinutes') },
         };
       case 'session_cancelled':
-        return {
-          ...common,
-          templateId: 'session_cancelled.v1',
-          variables: {},
-        };
+        return { ...common, templateId: 'session_cancelled.v1', variables: {} };
       case 'queue_entry_cancelled':
         return {
           ...common,
