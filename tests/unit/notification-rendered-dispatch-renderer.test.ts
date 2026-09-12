@@ -79,11 +79,15 @@ describe('NotificationTemplateDispatchRenderer', () => {
       intent,
       deliveryContext: context,
     });
-    expect(JSON.stringify(await renderer.renderAuthorized({
-      intent,
-      deliveryContext: context,
-      providerIdempotencyKey: 'notification:intent-1',
-    }))).not.toMatch(/Sensitive Name|patient-1|clinic-1/);
+    expect(
+      JSON.stringify(
+        await renderer.renderAuthorized({
+          intent,
+          deliveryContext: context,
+          providerIdempotencyKey: 'notification:intent-1',
+        }),
+      ),
+    ).not.toMatch(/Sensitive Name|patient-1|clinic-1/);
   });
 
   it('propagates strict render validation failure before any provider boundary exists', async () => {
