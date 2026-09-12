@@ -49,6 +49,7 @@ describe('NotificationDispatchBatchRunner', () => {
       suppressed: 0,
       notClaimed: 2,
       claimLost: 0,
+      errors: 0,
     });
     expect(intentIds).toEqual(['intent-1', 'intent-2']);
     expect(error).toHaveBeenCalledTimes(3);
@@ -56,6 +57,42 @@ describe('NotificationDispatchBatchRunner', () => {
       'Sensitive telemetry',
     );
     error.mockRestore();
+  });
+
+  it('continues with later intents when one executor call throws', async () => {
+    const dispatchOne = vi
+      .fn<NotificationDispatchExecutor['dispatchOne']>()
+      .mockRejectedValueOnce(new Error('Sensitive resolver detail'))
+      .mockResolvedValueOnce({ status: 'not_claimed' });
+    const record = vi.fn();
+    const runner = new NotificationDispatchBatchRunner(
+      {
+        listEligible: vi.fn(async () => [
+          candidate('intent-1'),
+          candidate('intent-2'),
+        ]),
+      },
+      { dispatchOne },
+      { record },
+    );
+
+    await expect(
+      runner.run({ clinicId: 'clinic-1', limit: 2 }),
+    ).resolves.toEqual({
+      selected: 2,
+      completed: 0,
+      suppressed: 0,
+      notClaimed: 1,
+      claimLost: 0,
+      errors: 1,
+    });
+    expect(dispatchOne.mock.calls.map(([input]) => input.intentId)).toEqual([
+      'intent-1',
+      'intent-2',
+    ]);
+    expect(JSON.stringify(record.mock.calls)).not.toContain(
+      'Sensitive resolver detail',
+    );
   });
 
   it('executes selected intents in scanner order and returns aggregate-only counts', async () => {
@@ -91,6 +128,7 @@ describe('NotificationDispatchBatchRunner', () => {
       suppressed: 1,
       notClaimed: 1,
       claimLost: 1,
+      errors: 0,
     });
     expect(listEligible).toHaveBeenCalledWith({
       clinicId: 'clinic-1',
@@ -111,6 +149,7 @@ describe('NotificationDispatchBatchRunner', () => {
       suppressed: 1,
       notClaimed: 1,
       claimLost: 1,
+      errors: 0,
     });
   });
 
@@ -132,6 +171,7 @@ describe('NotificationDispatchBatchRunner', () => {
       suppressed: 0,
       notClaimed: 0,
       claimLost: 0,
+      errors: 0,
     });
     expect(dispatchOne).not.toHaveBeenCalled();
     expect(record).toHaveBeenCalledOnce();
@@ -143,6 +183,7 @@ describe('NotificationDispatchBatchRunner', () => {
       suppressed: 0,
       notClaimed: 0,
       claimLost: 0,
+      errors: 0,
     });
   });
 });
