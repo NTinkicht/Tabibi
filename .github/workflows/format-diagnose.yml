@@ -1,0 +1,25 @@
+name: Format Diagnose
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  prettier-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Show required Prettier delta
+        shell: bash
+        run: |
+          npx prettier --write tests/unit/ai-capacity-policy.test.ts
+          git diff --no-ext-diff -- tests/unit/ai-capacity-policy.test.ts
+          exit 1
