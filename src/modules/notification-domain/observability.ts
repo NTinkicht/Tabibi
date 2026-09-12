@@ -35,6 +35,7 @@ export type NotificationDispatchOperationalEvent =
       suppressed: number;
       notClaimed: number;
       claimLost: number;
+      errors: number;
     };
 
 /** Receives metadata-only operational events; it is not an audit-history sink. */
