@@ -34,7 +34,7 @@ The compact bootstrap and compressed context are indexes/convenience only. Sourc
 
 `coordination/AI_CAPACITY_POLICY.md` is binding. No actor, hook, workflow or scheduled task may introduce additional paid AI usage, OpenAI/Anthropic API credits, OpenRouter, Copilot overage, Mistral PAYG, paid Gemini/Vertex usage, auto-topups or another metered fallback without a new explicit owner decision.
 
-Gemini CLI may use the owner's configured local free/non-billable allowance only. Mistral Vibe may use the owner's existing subscription allowance only, with PAYG disabled. Local credentials never become repository/workflow credentials.
+Gemini CLI may use the owner's configured free/non-billable allowance only. Mistral Vibe may use the owner's existing subscription allowance only, with PAYG disabled. Credentials never become repository assets or general-purpose workflow credentials. The only authorized workflow exception is the dedicated owner-only Issue #11 wake paths defined by `coordination/AI_CAPACITY_POLICY.md`: `GEMINI_API_KEY` may be used only by `.github/workflows/gemini-cli-wake.yml` when `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true`, and `MISTRAL_API_KEY` may be used only by `.github/workflows/mistral-vibe-wake.yml` when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`. No other unattended credential route is authorized.
 
 Quota exhaustion is `CAPACITY_DEGRADED`, not permission to spend. Fail over to another already-included actor, deterministic tooling, bounded scope or wait for reset.
 
