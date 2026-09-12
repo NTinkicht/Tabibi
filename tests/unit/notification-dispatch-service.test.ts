@@ -78,6 +78,36 @@ function provider(result: NotificationProviderResult) {
 }
 
 describe('NotificationDispatchService', () => {
+  it('contains observer failures after persisting the dispatch result', async () => {
+    const dispatchStore = store();
+    const observerFailure = new Error('Sensitive observer failure');
+    const error = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    const service = new NotificationDispatchService(
+      dispatchStore.value,
+      provider({ kind: 'delivered' }).value,
+      60_000,
+      {
+        record: () => {
+          throw observerFailure;
+        },
+      },
+    );
+
+    await expect(
+      service.dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' }),
+    ).resolves.toMatchObject({ status: 'completed' });
+    expect(dispatchStore.completeDispatchAttempt).toHaveBeenCalledOnce();
+    expect(error).toHaveBeenCalledWith(
+      'notification.dispatch.observer_failure',
+    );
+    expect(JSON.stringify(error.mock.calls)).not.toContain(
+      observerFailure.message,
+    );
+    error.mockRestore();
+  });
+
   it('emits deterministic privacy-safe events for persisted outcomes', async () => {
     const dispatchStore = store({
       completed: intent({

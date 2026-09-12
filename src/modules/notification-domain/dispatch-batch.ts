@@ -2,6 +2,7 @@ import type { NotificationDispatchExecution } from '@/modules/notification-domai
 import type { NotificationDispatchEligibleIntent } from '@/modules/notification-outbox/dispatch-eligibility';
 import {
   noNotificationDispatchObserver,
+  recordNotificationDispatchEvent,
   type NotificationDispatchObserver,
 } from '@/modules/notification-domain/observability';
 
@@ -62,7 +63,7 @@ export class NotificationDispatchBatchRunner {
       else summary.claimLost += 1;
     }
 
-    this.observer.record({
+    recordNotificationDispatchEvent(this.observer, {
       name: 'notification.dispatch.batch',
       clinicId,
       ...summary,

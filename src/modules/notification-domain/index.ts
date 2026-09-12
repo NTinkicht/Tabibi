@@ -6,6 +6,7 @@ import type {
 } from '@/modules/notification-outbox';
 import {
   noNotificationDispatchObserver,
+  recordNotificationDispatchEvent,
   type NotificationDispatchObserver,
 } from '@/modules/notification-domain/observability';
 
@@ -130,7 +131,7 @@ export class NotificationDispatchService {
       leaseMs: this.leaseMs,
     });
     if (!claim) {
-      this.observer.record({
+      recordNotificationDispatchEvent(this.observer, {
         name: 'notification.dispatch.not_claimed',
         clinicId,
         intentId,
@@ -162,7 +163,7 @@ export class NotificationDispatchService {
     });
 
     if (!completed) {
-      this.observer.record({
+      recordNotificationDispatchEvent(this.observer, {
         name: 'notification.dispatch.claim_lost',
         clinicId,
         intentId: claim.intent.id,
@@ -176,7 +177,7 @@ export class NotificationDispatchService {
       };
     }
 
-    this.observer.record({
+    recordNotificationDispatchEvent(this.observer, {
       name: 'notification.dispatch.outcome',
       clinicId,
       intentId: completed.id,

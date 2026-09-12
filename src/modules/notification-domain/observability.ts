@@ -43,3 +43,18 @@ export interface NotificationDispatchObserver {
 export const noNotificationDispatchObserver: NotificationDispatchObserver = {
   record: () => undefined,
 };
+
+const OBSERVER_FAILURE_CATEGORY = 'notification.dispatch.observer_failure';
+
+/** Keeps optional operational telemetry from becoming a dispatch dependency. */
+export function recordNotificationDispatchEvent(
+  observer: NotificationDispatchObserver,
+  event: NotificationDispatchOperationalEvent,
+): void {
+  try {
+    observer.record(event);
+  } catch {
+    // Deliberately omit the event and exception: both may contain sensitive data.
+    console.error(OBSERVER_FAILURE_CATEGORY);
+  }
+}
