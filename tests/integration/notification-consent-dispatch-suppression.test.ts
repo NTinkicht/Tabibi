@@ -1,6 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import {
   NotificationDispatchService,
@@ -11,7 +19,9 @@ import { NotificationOutboxRepository } from '@/modules/notification-outbox';
 import {
   NotificationDispatchEligibilityRepository,
 } from '@/modules/notification-outbox/dispatch-eligibility';
-import { NotificationPreferenceRepository } from '@/modules/notification-preferences';
+import {
+  NotificationPreferenceRepository,
+} from '@/modules/notification-preferences';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
 const ids = {
@@ -148,54 +158,59 @@ describe('notification consent-aware dispatch suppression', () => {
     },
   );
 
-  it('delivers when granted and suppresses a later intent after revocation', async () => {
-    const outbox = new NotificationOutboxRepository(pool);
-    const preferences = new NotificationPreferenceRepository(pool);
-    const granted = await preferences.change({
-      clinicId: ids.clinic,
-      subjectKind: 'visit_patient',
-      subjectId: ids.patient,
-      channel: 'sms',
-      preferenceState: 'enabled',
-      consentState: 'granted',
-      idempotencyKey: 'grant-sms',
-    });
-    const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(async () => ({
-      kind: 'delivered',
-      code: 'accepted',
-    }));
-    const service = new NotificationDispatchService(
-      outbox,
-      { dispatch },
-      context(preferences),
-    );
+  it(
+    'delivers when granted and suppresses a later intent after revocation',
+    async () => {
+      const outbox = new NotificationOutboxRepository(pool);
+      const preferences = new NotificationPreferenceRepository(pool);
+      const granted = await preferences.change({
+        clinicId: ids.clinic,
+        subjectKind: 'visit_patient',
+        subjectId: ids.patient,
+        channel: 'sms',
+        preferenceState: 'enabled',
+        consentState: 'granted',
+        idempotencyKey: 'grant-sms',
+      });
+      const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(
+        async () => ({
+          kind: 'delivered',
+          code: 'accepted',
+        }),
+      );
+      const service = new NotificationDispatchService(
+        outbox,
+        { dispatch },
+        context(preferences),
+      );
 
-    const authorized = await outbox.enqueue(enqueueInput('authorized'));
-    await expect(
-      service.dispatchOne({ clinicId: ids.clinic, intentId: authorized.id }),
-    ).resolves.toMatchObject({ status: 'completed' });
-    expect(dispatch).toHaveBeenCalledTimes(1);
+      const authorized = await outbox.enqueue(enqueueInput('authorized'));
+      await expect(
+        service.dispatchOne({ clinicId: ids.clinic, intentId: authorized.id }),
+      ).resolves.toMatchObject({ status: 'completed' });
+      expect(dispatch).toHaveBeenCalledTimes(1);
 
-    await preferences.change({
-      clinicId: ids.clinic,
-      subjectKind: 'visit_patient',
-      subjectId: ids.patient,
-      channel: 'sms',
-      preferenceState: 'disabled',
-      consentState: 'revoked',
-      expectedRevision: granted.revision,
-      idempotencyKey: 'revoke-sms',
-    });
+      await preferences.change({
+        clinicId: ids.clinic,
+        subjectKind: 'visit_patient',
+        subjectId: ids.patient,
+        channel: 'sms',
+        preferenceState: 'disabled',
+        consentState: 'revoked',
+        expectedRevision: granted.revision,
+        idempotencyKey: 'revoke-sms',
+      });
 
-    const revoked = await outbox.enqueue(enqueueInput('revoked'));
-    await expect(
-      service.dispatchOne({ clinicId: ids.clinic, intentId: revoked.id }),
-    ).resolves.toMatchObject({
-      status: 'suppressed',
-      suppressionReason: 'preference_disabled',
-    });
-    expect(dispatch).toHaveBeenCalledTimes(1);
-  });
+      const revoked = await outbox.enqueue(enqueueInput('revoked'));
+      await expect(
+        service.dispatchOne({ clinicId: ids.clinic, intentId: revoked.id }),
+      ).resolves.toMatchObject({
+        status: 'suppressed',
+        suppressionReason: 'preference_disabled',
+      });
+      expect(dispatch).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it(
     'fails closed when target identity cannot resolve to a matching clinic preference',
