@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "financial_mode": "zero-extra-spend",
   "principles": {
     "roles_belong_to_project": true,
@@ -22,7 +22,9 @@
         "merge_execution",
         "research",
         "scouting",
-        "long_context_analysis"
+        "long_context_analysis",
+        "repository_intelligence",
+        "failure_analysis"
       ],
       "included_capacity": "ChatGPT Plus",
       "paid_fallback": false
@@ -41,7 +43,9 @@
         "merge_execution",
         "research",
         "scouting",
-        "long_context_analysis"
+        "long_context_analysis",
+        "failure_analysis",
+        "test_design"
       ],
       "included_capacity": "ChatGPT included Codex capacity",
       "paid_fallback": false
@@ -60,7 +64,11 @@
         "merge_execution",
         "research",
         "scouting",
-        "long_context_analysis"
+        "long_context_analysis",
+        "repository_intelligence",
+        "regression_scouting",
+        "failure_analysis",
+        "test_design"
       ],
       "included_capacity": "Claude Pro",
       "paid_fallback": false
@@ -79,7 +87,9 @@
         "merge_execution",
         "research",
         "scouting",
-        "long_context_analysis"
+        "long_context_analysis",
+        "regression_scouting",
+        "test_design"
       ],
       "included_capacity": "GitHub Copilot education entitlement",
       "paid_fallback": false
@@ -87,6 +97,8 @@
     {
       "id": "gemini-cli",
       "active": true,
+      "standing_role": "repository-intelligence-and-regression-scout",
+      "role_mission": "Produce bounded repository-wide impact maps, regression scouts, drift reports, long-context risk syntheses and eligible exact-head reviews without duplicating the implementation stream.",
       "capabilities": [
         "orchestration",
         "architecture",
@@ -96,7 +108,9 @@
         "documentation",
         "research",
         "scouting",
-        "long_context_analysis"
+        "long_context_analysis",
+        "repository_intelligence",
+        "regression_scouting"
       ],
       "included_capacity": "owner-configured Gemini CLI free/non-billable allowance",
       "paid_fallback": false,
@@ -104,7 +118,7 @@
       "wake": "owner-only Issue #11 @gemini-cli GitHub Action when zero-billing guard and secret are configured; interactive Gemini CLI in owner Codespace otherwise",
       "unattended_wake": {
         "workflow": ".github/workflows/gemini-cli-wake.yml",
-        "mode": "read-only-plan",
+        "mode": "read-only-policy",
         "guard_variable": "TABIBI_GEMINI_ZERO_BILLING_CONFIRMED",
         "credential_secret": "GEMINI_API_KEY",
         "schedule_allowed": false
@@ -113,6 +127,8 @@
     {
       "id": "mistral-vibe",
       "active": true,
+      "standing_role": "failure-and-test-design-analyst",
+      "role_mission": "Turn risky state transitions, retries, concurrency, degraded modes and CI failures into bounded failure matrices, test plans, diagnoses and eligible exact-head reviews without creating a duplicate implementation stream.",
       "capabilities": [
         "orchestration",
         "architecture",
@@ -123,7 +139,9 @@
         "ci_remediation",
         "research",
         "scouting",
-        "long_context_analysis"
+        "long_context_analysis",
+        "failure_analysis",
+        "test_design"
       ],
       "included_capacity": "owner existing included Mistral plan allowance with PAYG disabled",
       "paid_fallback": false,
@@ -131,7 +149,7 @@
       "wake": "owner-only Issue #11 @mistral-vibe GitHub Action when PAYG-disabled guard and secret are configured; interactive Vibe CLI in owner Codespace otherwise",
       "unattended_wake": {
         "workflow": ".github/workflows/mistral-vibe-wake.yml",
-        "mode": "read-only-plan",
+        "mode": "read-only-allowlist",
         "guard_variable": "TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED",
         "credential_secret": "MISTRAL_API_KEY",
         "schedule_allowed": false
@@ -213,6 +231,10 @@
       "codex",
       "copilot"
     ],
+    "repository_intelligence": ["gemini-cli", "chatgpt", "claude"],
+    "regression_scouting": ["gemini-cli", "copilot", "claude"],
+    "failure_analysis": ["mistral-vibe", "claude", "codex", "chatgpt"],
+    "test_design": ["mistral-vibe", "copilot", "claude", "codex"],
     "merge_execution": ["codex", "chatgpt", "claude", "copilot"]
   }
 }
