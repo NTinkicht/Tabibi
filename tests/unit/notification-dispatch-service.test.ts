@@ -4,8 +4,10 @@ import type {
   NotificationDispatchClaim,
   NotificationIntent,
 } from '@/modules/notification-outbox';
+import type { NotificationPreference } from '@/modules/notification-preferences';
 import {
   NotificationDispatchService,
+  type NotificationDeliveryContextResolver,
   type NotificationDispatchStore,
   type NotificationProviderAdapter,
   type NotificationProviderResult,
@@ -77,6 +79,51 @@ function provider(result: NotificationProviderResult) {
   };
 }
 
+function preference(
+  overrides: Partial<NotificationPreference> = {},
+): NotificationPreference {
+  return {
+    id: 'preference-1',
+    clinicId: 'clinic-1',
+    subjectKind: 'visit_patient',
+    subjectId: 'patient-1',
+    channel: 'sms',
+    preferenceState: 'enabled',
+    consentState: 'granted',
+    revision: 1,
+    createdAt: '2026-09-11T00:00:00.000Z',
+    updatedAt: '2026-09-11T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function deliveryContext(options?: {
+  preference?: NotificationPreference | null;
+  channel?: 'in_app' | 'push' | 'sms' | 'email' | 'whatsapp';
+  subjectId?: string;
+}): NotificationDeliveryContextResolver {
+  const channel = options?.channel ?? 'sms';
+  const subjectId = options?.subjectId ?? 'patient-1';
+  const resolvedPreference =
+    options && Object.prototype.hasOwnProperty.call(options, 'preference')
+      ? (options.preference ?? null)
+      : preference({ channel });
+  return {
+    resolve: vi.fn(async () => ({
+      target: {
+        subjectKind: 'visit_patient' as const,
+        subjectId,
+        channel,
+      },
+      preference: resolvedPreference,
+    })),
+  };
+}
+
+const missingDeliveryContext: NotificationDeliveryContextResolver = {
+  resolve: vi.fn(async () => null),
+};
+
 describe('NotificationDispatchService', () => {
   it('contains observer failures after persisting the dispatch result', async () => {
     const dispatchStore = store();
@@ -87,6 +134,7 @@ describe('NotificationDispatchService', () => {
     const service = new NotificationDispatchService(
       dispatchStore.value,
       provider({ kind: 'delivered' }).value,
+      deliveryContext(),
       60_000,
       {
         record: () => {
@@ -121,6 +169,7 @@ describe('NotificationDispatchService', () => {
     const service = new NotificationDispatchService(
       dispatchStore.value,
       provider({ kind: 'retryable_failure', code: 'credential=secret' }).value,
+      deliveryContext(),
       60_000,
       { record },
     );
@@ -153,6 +202,7 @@ describe('NotificationDispatchService', () => {
         }),
       }).value,
       provider({ kind: 'retryable_failure' }).value,
+      deliveryContext(),
       60_000,
       { record },
     );
@@ -178,6 +228,7 @@ describe('NotificationDispatchService', () => {
     const service = new NotificationDispatchService(
       dispatchStore.value,
       notificationProvider.value,
+      deliveryContext(),
     );
 
     await expect(
@@ -205,9 +256,11 @@ describe('NotificationDispatchService', () => {
     const dispatch = vi.fn(async () => {
       throw new Error('provider timeout');
     });
-    const service = new NotificationDispatchService(dispatchStore.value, {
-      dispatch,
-    });
+    const service = new NotificationDispatchService(
+      dispatchStore.value,
+      { dispatch },
+      deliveryContext(),
+    );
 
     await expect(
       service.dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' }),
@@ -236,9 +289,11 @@ describe('NotificationDispatchService', () => {
       const dispatch = vi.fn(
         async () => result,
       ) as unknown as NotificationProviderAdapter['dispatch'];
-      const service = new NotificationDispatchService(dispatchStore.value, {
-        dispatch,
-      });
+      const service = new NotificationDispatchService(
+        dispatchStore.value,
+        { dispatch },
+        deliveryContext(),
+      );
 
       await expect(
         service.dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' }),
@@ -265,6 +320,7 @@ describe('NotificationDispatchService', () => {
     const service = new NotificationDispatchService(
       dispatchStore.value,
       notificationProvider.value,
+      deliveryContext(),
     );
 
     await expect(
@@ -274,11 +330,142 @@ describe('NotificationDispatchService', () => {
     expect(dispatchStore.completeDispatchAttempt).not.toHaveBeenCalled();
   });
 
+  it('suppresses missing delivery authorization before provider invocation', async () => {
+    const dispatchStore = store({
+      completed: intent({
+        state: 'suppressed',
+        dispatchOutcomeAt: '2026-09-11T00:01:05.000Z',
+        dispatchOutcomeCode: 'delivery_context_missing',
+      }),
+    });
+    const notificationProvider = provider({ kind: 'delivered' });
+    const service = new NotificationDispatchService(
+      dispatchStore.value,
+      notificationProvider.value,
+      missingDeliveryContext,
+    );
+
+    await expect(
+      service.dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' }),
+    ).resolves.toMatchObject({
+      status: 'suppressed',
+      suppressionReason: 'delivery_context_missing',
+      intent: { state: 'suppressed' },
+    });
+    expect(notificationProvider.dispatch).not.toHaveBeenCalled();
+    expect(dispatchStore.completeDispatchAttempt).toHaveBeenCalledWith({
+      clinicId: 'clinic-1',
+      intentId: 'intent-1',
+      claimToken: 'claim-token-1',
+      outcome: 'suppressed',
+      outcomeCode: 'delivery_context_missing',
+    });
+  });
+
+  it.each([
+    [null, 'preference_missing'],
+    [preference({ preferenceState: 'disabled' }), 'preference_disabled'],
+    [preference({ consentState: 'denied' }), 'consent_denied'],
+    [preference({ consentState: 'revoked' }), 'consent_revoked'],
+  ] as const)(
+    'suppresses ineligible preference %# without invoking provider',
+    async (resolvedPreference, expectedReason) => {
+      const dispatchStore = store({
+        completed: intent({ state: 'suppressed' }),
+      });
+      const notificationProvider = provider({ kind: 'delivered' });
+      const service = new NotificationDispatchService(
+        dispatchStore.value,
+        notificationProvider.value,
+        deliveryContext({ preference: resolvedPreference }),
+      );
+
+      await expect(
+        service.dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' }),
+      ).resolves.toMatchObject({
+        status: 'suppressed',
+        suppressionReason: expectedReason,
+      });
+      expect(notificationProvider.dispatch).not.toHaveBeenCalled();
+      expect(dispatchStore.completeDispatchAttempt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          outcome: 'suppressed',
+          outcomeCode: expectedReason,
+        }),
+      );
+    },
+  );
+
+  it('fails closed on a subject/channel preference mismatch', async () => {
+    const dispatchStore = store({ completed: intent({ state: 'suppressed' }) });
+    const notificationProvider = provider({ kind: 'delivered' });
+    const service = new NotificationDispatchService(
+      dispatchStore.value,
+      notificationProvider.value,
+      deliveryContext({
+        preference: preference({ subjectId: 'other-patient' }),
+      }),
+    );
+
+    await expect(
+      service.dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' }),
+    ).resolves.toMatchObject({
+      status: 'suppressed',
+      suppressionReason: 'preference_mismatch',
+    });
+    expect(notificationProvider.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('allows in-app not-required and external granted authorization', async () => {
+    const inAppProvider = provider({ kind: 'delivered' });
+    await new NotificationDispatchService(
+      store().value,
+      inAppProvider.value,
+      deliveryContext({
+        channel: 'in_app',
+        preference: preference({
+          channel: 'in_app',
+          consentState: 'not_required',
+        }),
+      }),
+    ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
+    expect(inAppProvider.dispatch).toHaveBeenCalledOnce();
+
+    const smsProvider = provider({ kind: 'delivered' });
+    await new NotificationDispatchService(
+      store().value,
+      smsProvider.value,
+      deliveryContext({ preference: preference() }),
+    ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
+    expect(smsProvider.dispatch).toHaveBeenCalledOnce();
+  });
+
+  it('never invokes provider when the authorization resolver fails', async () => {
+    const notificationProvider = provider({ kind: 'delivered' });
+    const dispatchStore = store();
+    const service = new NotificationDispatchService(
+      dispatchStore.value,
+      notificationProvider.value,
+      {
+        resolve: vi.fn(async () => {
+          throw new Error('preference database unavailable');
+        }),
+      },
+    );
+
+    await expect(
+      service.dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' }),
+    ).rejects.toThrow('preference database unavailable');
+    expect(notificationProvider.dispatch).not.toHaveBeenCalled();
+    expect(dispatchStore.completeDispatchAttempt).not.toHaveBeenCalled();
+  });
+
   it('emits categorical not-claimed and claim-lost events without fence secrets', async () => {
     const notClaimedRecord = vi.fn();
     await new NotificationDispatchService(
       store({ claimed: null }).value,
       provider({ kind: 'delivered' }).value,
+      deliveryContext(),
       60_000,
       { record: notClaimedRecord },
     ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
@@ -292,6 +479,7 @@ describe('NotificationDispatchService', () => {
     await new NotificationDispatchService(
       store({ completed: null }).value,
       provider({ kind: 'unknown', code: 'private-provider-detail' }).value,
+      deliveryContext(),
       60_000,
       { record: claimLostRecord },
     ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
@@ -315,6 +503,7 @@ describe('NotificationDispatchService', () => {
     const service = new NotificationDispatchService(
       dispatchStore.value,
       notificationProvider.value,
+      deliveryContext(),
     );
 
     await expect(
@@ -352,10 +541,12 @@ describe('NotificationDispatchService', () => {
     const firstResult = await new NotificationDispatchService(
       firstStore.value,
       firstProvider.value,
+      deliveryContext(),
     ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
     const retryResult = await new NotificationDispatchService(
       retryStore.value,
       retryProvider.value,
+      deliveryContext(),
     ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
 
     expect(firstResult).toMatchObject({

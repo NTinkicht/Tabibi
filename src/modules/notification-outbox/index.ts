@@ -8,13 +8,15 @@ export type NotificationIntentState =
   | 'unknown'
   | 'delivered'
   | 'dead_letter'
+  | 'suppressed'
   | 'superseded';
 
 export type NotificationDispatchOutcome =
   | 'delivered'
   | 'failed'
   | 'unknown'
-  | 'dead_letter';
+  | 'dead_letter'
+  | 'suppressed';
 
 export interface NotificationIntent {
   id: string;
@@ -517,7 +519,7 @@ export class NotificationOutboxRepository {
         'Clinic id, intent id and claim token are required',
       );
     if (
-      !['delivered', 'failed', 'unknown', 'dead_letter'].includes(
+      !['delivered', 'failed', 'unknown', 'dead_letter', 'suppressed'].includes(
         rawInput.outcome,
       )
     )

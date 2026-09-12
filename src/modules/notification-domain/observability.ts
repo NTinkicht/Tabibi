@@ -14,7 +14,8 @@ export type NotificationDispatchOperationalEvent =
         | 'delivered'
         | 'retryable_failure'
         | 'unknown'
-        | 'terminal_failure';
+        | 'terminal_failure'
+        | 'suppressed';
     }
   | {
       name: 'notification.dispatch.outcome';
@@ -31,6 +32,7 @@ export type NotificationDispatchOperationalEvent =
       clinicId: string;
       selected: number;
       completed: number;
+      suppressed: number;
       notClaimed: number;
       claimLost: number;
     };

@@ -23,6 +23,7 @@ export interface NotificationDispatchExecutor {
 export interface NotificationDispatchBatchSummary {
   selected: number;
   completed: number;
+  suppressed: number;
   notClaimed: number;
   claimLost: number;
 }
@@ -49,6 +50,7 @@ export class NotificationDispatchBatchRunner {
     const summary: NotificationDispatchBatchSummary = {
       selected: eligible.length,
       completed: 0,
+      suppressed: 0,
       notClaimed: 0,
       claimLost: 0,
     };
@@ -59,6 +61,7 @@ export class NotificationDispatchBatchRunner {
         intentId: candidate.intentId,
       });
       if (result.status === 'completed') summary.completed += 1;
+      else if (result.status === 'suppressed') summary.suppressed += 1;
       else if (result.status === 'not_claimed') summary.notClaimed += 1;
       else summary.claimLost += 1;
     }

@@ -28,6 +28,8 @@ const committedMigrations = [
   '0020_notification_retry_constraint_validation.sql',
   '0021_notification_retry_claim_index.sql',
   '0022_notification_preferences.sql',
+  '0023_notification_suppressed_state.sql',
+  '0024_notification_suppression_constraints.sql',
 ];
 
 beforeAll(async () => {

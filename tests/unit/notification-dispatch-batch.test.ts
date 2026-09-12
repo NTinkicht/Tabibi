@@ -46,6 +46,7 @@ describe('NotificationDispatchBatchRunner', () => {
     ).resolves.toEqual({
       selected: 2,
       completed: 0,
+      suppressed: 0,
       notClaimed: 2,
       claimLost: 0,
     });
@@ -63,15 +64,17 @@ describe('NotificationDispatchBatchRunner', () => {
       candidate('intent-1'),
       candidate('intent-2'),
       candidate('intent-3'),
+      candidate('intent-4'),
     ]);
     const dispatchOne = vi
       .fn<NotificationDispatchExecutor['dispatchOne']>()
       .mockResolvedValueOnce({ status: 'completed' } as never)
+      .mockResolvedValueOnce({ status: 'suppressed' } as never)
       .mockResolvedValueOnce({ status: 'not_claimed' })
       .mockResolvedValueOnce({
         status: 'claim_lost',
-        claimToken: 'claim-3',
-        providerIdempotencyKey: 'notification:intent-3',
+        claimToken: 'claim-4',
+        providerIdempotencyKey: 'notification:intent-4',
         providerResult: { kind: 'unknown' },
       });
 
@@ -81,28 +84,31 @@ describe('NotificationDispatchBatchRunner', () => {
       { record },
     );
 
-    const summary = await runner.run({ clinicId: ' clinic-1 ', limit: 3 });
+    const summary = await runner.run({ clinicId: ' clinic-1 ', limit: 4 });
     expect(summary).toEqual({
-      selected: 3,
+      selected: 4,
       completed: 1,
+      suppressed: 1,
       notClaimed: 1,
       claimLost: 1,
     });
     expect(listEligible).toHaveBeenCalledWith({
       clinicId: 'clinic-1',
-      limit: 3,
+      limit: 4,
     });
     expect(dispatchOne.mock.calls.map(([input]) => input.intentId)).toEqual([
       'intent-1',
       'intent-2',
       'intent-3',
+      'intent-4',
     ]);
     expect(JSON.stringify(summary)).not.toContain('providerResult');
     expect(record).toHaveBeenCalledWith({
       name: 'notification.dispatch.batch',
       clinicId: 'clinic-1',
-      selected: 3,
+      selected: 4,
       completed: 1,
+      suppressed: 1,
       notClaimed: 1,
       claimLost: 1,
     });
@@ -123,6 +129,7 @@ describe('NotificationDispatchBatchRunner', () => {
     ).resolves.toEqual({
       selected: 0,
       completed: 0,
+      suppressed: 0,
       notClaimed: 0,
       claimLost: 0,
     });
@@ -133,6 +140,7 @@ describe('NotificationDispatchBatchRunner', () => {
       clinicId: 'clinic-1',
       selected: 0,
       completed: 0,
+      suppressed: 0,
       notClaimed: 0,
       claimLost: 0,
     });
