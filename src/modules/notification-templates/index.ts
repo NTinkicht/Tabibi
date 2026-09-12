@@ -14,6 +14,8 @@ export type NotificationTemplateId = (typeof notificationTemplateIds)[number];
 export type NotificationTemplateLocale = 'ar' | 'fr';
 export type NotificationTemplateDirection = 'rtl' | 'ltr';
 
+const MAX_OPERATIONAL_TEMPLATE_NUMBER = 1440;
+
 type TemplateVariables = {
   'appointment_confirmed.v1': Record<string, never>;
   'queue_entry_created.v1': Record<string, never>;
@@ -246,7 +248,11 @@ export function renderNotificationTemplate(
   const rawVariables = raw.variables as Record<string, unknown>;
   for (const name of expected) {
     const value = rawVariables[name];
-    if (!Number.isSafeInteger(value) || (value as number) < 0)
+    if (
+      !Number.isSafeInteger(value) ||
+      (value as number) < 0 ||
+      (value as number) > MAX_OPERATIONAL_TEMPLATE_NUMBER
+    )
       throw new NotificationTemplateValidationError(
         'Invalid notification template variables',
       );
