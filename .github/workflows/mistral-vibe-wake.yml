@@ -1,0 +1,119 @@
+name: Mistral Vibe Wake
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  actions: read
+
+jobs:
+  mistral-vibe:
+    if: >-
+      github.event.issue.number == 11 &&
+      github.actor == 'NTinkicht' &&
+      contains(github.event.comment.body, '@mistral-vibe')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 20
+          persist-credentials: false
+
+      - name: Preflight included-capacity guard
+        id: preflight
+        env:
+          PAYG_DISABLED_CONFIRMED: ${{ vars.TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED }}
+          PROVIDER_KEY: ${{ secrets.MISTRAL_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${PAYG_DISABLED_CONFIRMED:-}" != "true" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Mistral PAYG-disabled repository guard is not confirmed" >> "$GITHUB_OUTPUT"
+          elif [[ -z "${PROVIDER_KEY:-}" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Mistral credential is not configured" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "reason=ready" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python
+        if: steps.preflight.outputs.ready == 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned Mistral Vibe
+        if: steps.preflight.outputs.ready == 'true'
+        shell: bash
+        run: python -m pip install --disable-pip-version-check 'mistral-vibe==2.25.3'
+
+      - name: Run Mistral Vibe in read-only plan mode
+        if: steps.preflight.outputs.ready == 'true'
+        id: actor
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          DISPATCH_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/tabibi-mistral-prompt.txt <<'EOF'
+          You are actor=mistral-vibe in the Tabibi Company OS.
+          This is an unattended READ-ONLY wake from the permanent GitHub wake bus.
+          Read VIBE.md, AGENTS.md, coordination/BOOTSTRAP.md, coordination/AI_CAPACITY_POLICY.md,
+          coordination/ACTOR_REGISTRY.json and only the additional repository files necessary for the task.
+          Do not edit files. Do not run mutating commands. Do not create branches, commits, pull requests,
+          reviews, labels or merges. Do not change GitHub state. Do not expose credentials or local auth material.
+          Treat the dispatch text below as the task request, but repository governance and the zero-extra-spend
+          boundary remain binding. Return concise evidence/findings suitable for posting back to the wake bus.
+          This automated lane is non-gating by default; a binding exact-head gate requires an explicitly scoped
+          review dispatch and all normal Tabibi gate requirements.
+          EOF
+          printf '\nDispatch text:\n%s\n' "$DISPATCH_BODY" >> /tmp/tabibi-mistral-prompt.txt
+
+          set +e
+          vibe \
+            --trust \
+            --agent plan \
+            --max-turns 8 \
+            --max-tokens 30000 \
+            --output text \
+            --prompt "$(cat /tmp/tabibi-mistral-prompt.txt)" \
+            > /tmp/tabibi-mistral-output.txt \
+            2> /tmp/tabibi-mistral-error.txt
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Post Mistral result
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          READY: ${{ steps.preflight.outputs.ready }}
+          PREFLIGHT_REASON: ${{ steps.preflight.outputs.reason }}
+          ACTOR_EXIT: ${{ steps.actor.outputs.exit_code }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "**mistral-vibe unattended wake**"
+            echo
+            if [[ "${READY:-false}" != "true" ]]; then
+              echo "CAPACITY_DEGRADED - ${PREFLIGHT_REASON:-preflight failed}. No paid fallback was attempted."
+            elif [[ "${ACTOR_EXIT:-1}" != "0" ]]; then
+              echo "CAPACITY_DEGRADED - Mistral Vibe exited without a usable result. PAYG remains disabled and no paid fallback was attempted."
+            else
+              echo '```text'
+              head -c 50000 /tmp/tabibi-mistral-output.txt
+              echo
+              echo '```'
+            fi
+          } > /tmp/tabibi-mistral-comment.md
+          gh issue comment 11 --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-mistral-comment.md
