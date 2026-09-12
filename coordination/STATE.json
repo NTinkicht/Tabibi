@@ -1,22 +1,34 @@
 {
   "project": "Tabibi",
-  "phase": "company_os_v2_restructuring",
-  "state": "company_os_v2_review_pending",
-  "current_pr": 153,
-  "current_issue": 21,
+  "phase": "epic_zero_extra_cost_restructuring",
+  "state": "epic_pr151_remediated_pending_ci_and_gate",
+  "current_pr": 151,
+  "current_issue": 150,
   "last_actor": "chatgpt",
-  "next_actor": "independent_non_author_reviewer",
-  "next_action": "Review PR #153 on its exact head, require green CI, then merge mechanically if all governance gates pass. Afterward resume Epic PR #151 against the new main.",
-  "operating_model": "four-active-actor-mesh-v8-company-os-v2-headroom-shadow",
+  "next_actor": "ci_then_independent_non_author_reviewer",
+  "next_action": "Validate reconciled PR #151 on its exact head. If CI is green, obtain an eligible independent non-author exact-head gate; resolve every remaining MAJOR/Medium+ finding, then merge mechanically and activate the next Epic organization slice.",
+  "operating_model": "four-active-actor-mesh-v9-epic-zero-extra-cost-context-routing",
   "binding_protocols": [
     "AGENTS.md",
+    "coordination/BOOTSTRAP.md",
     "coordination/AUTONOMY_PROTOCOL.md",
     "coordination/ROLE_FAILOVER_PROTOCOL.md",
     "coordination/COLLABORATION_PROTOCOL.md",
     "coordination/COMPANY_OPERATING_SYSTEM.md",
     "coordination/ROLE_OVERLAY_PROTOCOL.md",
-    "coordination/WORK_UNIT_TEMPLATE.md"
+    "coordination/WORK_UNIT_TEMPLATE.md",
+    "coordination/AI_CAPACITY_POLICY.md",
+    "coordination/CONTEXT_ROUTER.md",
+    "coordination/HEADROOM_SHADOW_TRIAL.md"
   ],
+  "financial_policy": {
+    "additional_paid_ai_usage": "forbidden",
+    "openai_api": "forbidden",
+    "anthropic_api_or_usage_credits": "forbidden",
+    "openrouter_or_metered_fallback": "forbidden",
+    "copilot_paid_overage": "forbidden",
+    "automatic_topups": "forbidden"
+  },
   "team_room": {
     "issue": 21,
     "heartbeat_target_minutes": 15,
@@ -32,87 +44,90 @@
         "orchestration": "available",
         "architecture": "available",
         "implementation": "available",
-        "review": "available_when_non_author",
-        "merge_execution": "available"
+        "review": "unavailable_for_self_authored_pr151_head",
+        "merge_execution": "available_after_independent_gate"
       },
-      "current_activity": "Company OS v2 author/orchestrator for PR #153; recused from sole independent gating of this exact head."
+      "current_activity": "Epic orchestrator/implementer reconciling PR #151 onto Company OS v2; recused from sole gating of authored head."
     },
     "codex": {
       "capability_status": {
-        "implementation": "available_subject_to_plan_capacity",
-        "ci_remediation": "available_subject_to_plan_capacity",
-        "merge_execution": "available_subject_to_plan_capacity",
+        "implementation": "available_subject_to_included_plan_capacity",
+        "ci_remediation": "available_subject_to_included_plan_capacity",
+        "merge_execution": "available_subject_to_included_plan_capacity",
         "review": "available_when_non_author_subject_to_plan_capacity"
       },
-      "current_activity": "Available for bounded implementation/CI/mechanical merge work; not required to duplicate PR #153."
+      "current_activity": "Preferred bounded implementation/CI/mechanical-merge lane after PR #151 handoff; no duplicate stream."
     },
     "claude": {
       "capability_status": {
         "review": "available_subject_to_pro_capacity",
         "adversarial_security_review": "available_subject_to_pro_capacity"
       },
-      "current_activity": "Preferred independent governance/adversarial reviewer for PR #153 when concretely available and non-author."
+      "current_activity": "Preferred independent PR #151 security/governance/concurrency gate when concretely available and non-author."
     },
     "copilot": {
       "capability_status": {
-        "qa_test_automation": "available_subject_to_included_credits",
-        "implementation": "available_subject_to_included_credits",
-        "review": "available_when_non_author_subject_to_included_credits"
+        "qa_test_automation": "available_subject_to_included_education_entitlement",
+        "implementation": "available_subject_to_included_education_entitlement",
+        "review": "available_when_non_author_subject_to_included_education_entitlement",
+        "context_compression": "disabled_by_default_local_opt_in_only"
       },
-      "current_activity": "QA/Test Automation and eligible non-author exact-head Code Review; candidate reviewer for PR #153 and later Headroom shadow evaluation."
+      "current_activity": "QA/Test Automation and eligible non-author PR #151 Code Review; optional Luna compression is infrastructure-only."
     },
     "coderabbit": {
-      "capability_status": {
-        "review": "supplemental_if_available"
-      },
-      "current_activity": "Supplemental review evidence only unless a work-unit owner policy explicitly promotes it."
-    },
-    "microreview": {
-      "capability_status": {
-        "review": "supplemental_if_available"
-      },
-      "current_activity": "Supplemental only; no paid upgrade or credit purchase is authorized."
+      "capability_status": { "review": "supplemental_if_available" },
+      "current_activity": "Supplemental review source; all Medium+/Major findings remain binding for reconciliation, but it is not the default independent actor gate for PR #151."
     }
   },
   "role_leases": {
-    "orchestrator": {
-      "actor": "chatgpt",
-      "status": "active"
-    },
+    "orchestrator": { "actor": "chatgpt", "status": "active" },
     "implementer": {
       "actor": "chatgpt",
-      "status": "implementation_complete_pending_pr_gate",
-      "note": "One canonical Company OS v2 branch/PR (#153) only."
+      "status": "remediation_pushed_pending_ci",
+      "work_stream": "issue-150-pr-151-epic-context-efficiency",
+      "note": "One canonical Epic PR #151; Company OS v2 is preserved."
     },
     "gating_reviewer": {
       "actor": "claude_or_copilot_non_author",
-      "status": "reserved_for_exact_head",
-      "note": "Governance change requires an eligible independent exact-head review after green CI. ChatGPT is the material author and cannot self-gate."
+      "status": "reserved_after_green_ci",
+      "note": "ChatGPT materially authored the PR #151 head and cannot self-gate."
     },
     "merge_executor": {
       "actor": "codex_or_chatgpt",
       "status": "mechanical_after_gates",
-      "note": "Merge only the unchanged reviewed head after exact-head CI and independent gate are clear."
+      "note": "Expected-head merge only after exact-head CI and independent review are clear."
     }
   },
   "current_work": {
-    "id": "COMPANY-OS-V2-001",
-    "status": "implementation_complete_pending_review",
+    "id": "EPIC-CONTEXT-001",
+    "status": "remediated_pending_ci_and_review",
     "actor": "chatgpt",
-    "scope": "PR #153: simplify Slack/standup/retro behavior, retire Gemini from active/runtime paths, enforce specialist-overlay selection, and add a read-only Headroom shadow-trial path without resuming Epic itself."
+    "scope": "Reconciled PR #151: zero-extra-cost AI capacity governor, deterministic-first context router, Headroom-before-Copilot shunt, compact bootstrap, Claude read guard, safe opt-in Copilot/Luna compression, and regression coverage for real-path/sensitive-data/budget-concurrency findings.",
+    "role_overlays": ["backend-architect", "code-reviewer"],
+    "role_overlay_reason": "Infrastructure/security/concurrency tooling requires design plus adversarial gate; no product UI overlay needed."
   },
   "next_work": {
-    "id": "EPIC-RESUME",
-    "status": "blocked_pending_company_os_v2_merge",
+    "id": "EPIC-ORG-002",
+    "status": "blocked_pending_pr151_merge",
     "actor": "chatgpt",
-    "scope": "Rebase/reconcile and resume Spotify-inspired Epic PR #151 only after PR #153 lands."
+    "scope": "Continue the Spotify-inspired Epic organization/capacity routing on top of the merged zero-extra-cost context layer."
   },
+  "remediated_review_findings": [
+    "PR151-CR-SYMLINK-BYPASS",
+    "PR151-CR-CONCURRENT-BUDGET",
+    "PR151-CR-SENSITIVE-PATH-CLASSES"
+  ],
+  "deferred_minor_followups": [
+    "WU25-FOLLOWUP-ORDER-001",
+    "WU25-FOLLOWUP-TEST-001"
+  ],
   "headroom": {
     "mode": "shadow_read_only",
     "source_repo": "NTinkicht/headroom",
     "source_head": "97aa9f6d0fc04619e4e821e7d54611eb9d6b9b81",
     "authoritative": false,
-    "paid_provider_fallback": false
+    "paid_provider_fallback": false,
+    "routing_position": "before_optional_copilot_luna"
   },
   "product_architect": "chatgpt",
   "deterministic_referee": "ci",
@@ -121,5 +136,9 @@
   "open_minors": 0,
   "human_decision_required": false,
   "pending_findings": [],
-  "review_pending_findings": []
+  "review_pending_findings": [
+    "Verify PR151-CR-SYMLINK-BYPASS remediation on exact head",
+    "Verify PR151-CR-CONCURRENT-BUDGET remediation on exact head",
+    "Verify PR151-CR-SENSITIVE-PATH-CLASSES remediation on exact head"
+  ]
 }
