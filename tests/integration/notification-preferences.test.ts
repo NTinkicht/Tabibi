@@ -28,32 +28,51 @@ beforeEach(async () => {
     'TRUNCATE notification_preference_receipts, notification_preferences, clinics, users CASCADE',
   );
   await pool.query(
-    `INSERT INTO users(id,auth_subject,display_name) VALUES($1,'pref-doctor','Doctor');
-     INSERT INTO clinics(id,tenant_key,name) VALUES
-       ($2,'pref-a','Preference A'),($3,'pref-b','Preference B');
-     INSERT INTO doctor_profiles(id,user_id,display_name) VALUES($4,$1,'Doctor');
-     INSERT INTO doctor_clinics(clinic_id,doctor_id) VALUES($2,$4),($3,$4);
-     INSERT INTO consultation_sessions
+    `INSERT INTO users(id,auth_subject,display_name)
+     VALUES($1,'pref-doctor','Doctor')`,
+    [ids.doctorUser],
+  );
+  await pool.query(
+    `INSERT INTO clinics(id,tenant_key,name) VALUES
+       ($1,'pref-a','Preference A'),($2,'pref-b','Preference B')`,
+    [ids.clinicA, ids.clinicB],
+  );
+  await pool.query(
+    `INSERT INTO doctor_profiles(id,user_id,display_name)
+     VALUES($1,$2,'Doctor')`,
+    [ids.doctor, ids.doctorUser],
+  );
+  await pool.query(
+    `INSERT INTO doctor_clinics(clinic_id,doctor_id)
+     VALUES($1,$3),($2,$3)`,
+    [ids.clinicA, ids.clinicB, ids.doctor],
+  );
+  await pool.query(
+    `INSERT INTO consultation_sessions
        (id,clinic_id,doctor_id,service_date,starts_at,ends_at,status) VALUES
-       ($5,$2,$4,'2026-09-12','2026-09-12T09:00Z','2026-09-12T12:00Z','open'),
-       ($6,$3,$4,'2026-09-13','2026-09-13T09:00Z','2026-09-13T12:00Z','planned');
-     INSERT INTO patient_operational_records(id,clinic_id,private_display_name) VALUES
-       ($7,$2,'Private A'),($8,$3,'Private B');
-     INSERT INTO queue_entries
+       ($1,$3,$5,'2026-09-12','2026-09-12T09:00Z','2026-09-12T12:00Z','open'),
+       ($2,$4,$5,'2026-09-13','2026-09-13T09:00Z','2026-09-13T12:00Z','planned')`,
+    [ids.sessionA, ids.sessionB, ids.clinicA, ids.clinicB, ids.doctor],
+  );
+  await pool.query(
+    `INSERT INTO patient_operational_records(id,clinic_id,private_display_name) VALUES
+       ($1,$3,'Private A'),($2,$4,'Private B')`,
+    [ids.patientA, ids.patientB, ids.clinicA, ids.clinicB],
+  );
+  await pool.query(
+    `INSERT INTO queue_entries
        (id,clinic_id,session_id,patient_id,state,source,registration_order,public_display_label) VALUES
-       ($9,$2,$5,$7,'waiting','walk_in',1,'A-001'),
-       ($10,$3,$6,$8,'waiting','walk_in',1,'B-001')`,
+       ($1,$3,$5,$7,'waiting','walk_in',1,'A-001'),
+       ($2,$4,$6,$8,'waiting','walk_in',1,'B-001')`,
     [
-      ids.doctorUser,
+      ids.entryA,
+      ids.entryB,
       ids.clinicA,
       ids.clinicB,
-      ids.doctor,
       ids.sessionA,
       ids.sessionB,
       ids.patientA,
       ids.patientB,
-      ids.entryA,
-      ids.entryB,
     ],
   );
 });
@@ -134,6 +153,28 @@ describe('notification preference repository', () => {
         change({ expectedRevision: 1, idempotencyKey: 'stale' }),
       ),
     ).rejects.toBeInstanceOf(NotificationPreferenceConflictError);
+    await expect(
+      repository.change(
+        change({
+          consentState: 'revoked',
+          preferenceState: 'disabled',
+          idempotencyKey: 'same-state',
+        }),
+      ),
+    ).resolves.toEqual(revoked);
+    await expect(
+      repository.change(change({ idempotencyKey: 'blind-change' })),
+    ).rejects.toBeInstanceOf(NotificationPreferenceConflictError);
+    await expect(
+      repository.change(
+        change({
+          consentState: 'granted',
+          preferenceState: 'enabled',
+          expectedRevision: revoked.revision,
+          idempotencyKey: 'restore-grant',
+        }),
+      ),
+    ).resolves.toMatchObject({ revision: 3, consentState: 'granted' });
   });
 
   it('rejects unknown channels, invalid consent combinations and cross-clinic writes', async () => {

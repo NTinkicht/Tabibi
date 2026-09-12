@@ -26,6 +26,8 @@ not alter the existing provider-neutral outbox or its dispatch behavior.
 Mutations serialize per clinic/subject/channel, support optimistic revisions and
 store privacy-minimal idempotency receipts. Exact retries return the persisted
 record without incrementing its revision; reuse of a key for different input and
-stale revisions fail explicitly. Consent may be initially granted or denied,
+stale revisions fail explicitly. A state-changing update must include the
+current revision; a same-state retry remains a safe no-op. Consent may be
+initially granted or denied,
 granted consent may be revoked, and any state may be replaced by an explicit new
 grant. Other consent transitions are rejected.

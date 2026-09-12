@@ -286,6 +286,10 @@ export class NotificationPreferenceRepository {
         ) {
           persisted = current;
         } else {
+          if (input.expectedRevision === null)
+            throw new NotificationPreferenceConflictError(
+              'Expected revision is required to change an existing notification preference',
+            );
           const updated = await client.query<PreferenceRow>(
             `UPDATE notification_preferences
                 SET preference_state=$5, consent_state=$6,
