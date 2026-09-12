@@ -1,40 +1,41 @@
 # Tabibi Work Queue
 
-This is the human-readable work marketplace for available engineering capacity. It supplements `coordination/STATE.json`; live GitHub evidence is authoritative for transient PR/CI facts.
+This is the human-readable work marketplace. Live GitHub evidence is authoritative for transient PR/CI/review facts.
 
 Status values: `ACTIVE`, `READY`, `BLOCKED`, `DONE`, `CANCELLED`.
 
-## Current company round - Epic resumed on Company OS v2
+## Current company round - Epic six-actor Company OS
 
-PR #153 / Company OS v2 is merged. Epic is resumed through canonical PR #151, reconciled onto the four-actor operating model and the Headroom shadow boundary.
+PR #151 / `EPIC-CONTEXT-001` is **DONE**, merged as `d935e5f72c74126f8b01e6a7688a3a96be7c0723` after green exact-head CI and Claude's independent PASS/MERGE_READY gate.
 
-The current slice installs the zero-extra-cost capacity governor and context shunt: deterministic retrieval first, verified local Headroom shadow when suitable, optional budgeted Copilot/Luna only when explicitly enabled, then strong subscribed actors. No new paid provider/overage path is permitted.
+The canonical active implementation stream is PR #158 on `epic/six-actor-capacity-routing`, combining `EPIC-ORG-002` (#154) and `EPIC-ACTORS-003` (#155). No competing implementation branch is authorized.
 
 | Task ID | Status | Preferred actor | Scope | Expected artifact | Code allowed? |
 | --- | --- | --- | --- | --- | --- |
-| EPIC-CONTEXT-001 | ACTIVE | ChatGPT | Reconciled PR #151: context router, capacity governor, Headroom-before-Copilot shunt, read guard, safety/concurrency tests | Green exact-head CI + no unresolved Medium+/Major findings + eligible non-author gate + merge | Infra/docs/tests only |
-| EPIC-CONTEXT-GATE-001 | BLOCKED | Claude or Copilot Code Review, non-author | Independent exact-head security/governance/concurrency review after CI | PASS / PASS_WITH_MINOR_FINDINGS / CHANGES_REQUIRED and MERGE_READY when appropriate | Review only |
-| HEADROOM-SHADOW-001 | READY | Copilot or other non-author test lane | Run historical/non-sensitive fidelity samples under `coordination/HEADROOM_SHADOW_TRIAL.md` without changing authority | Metrics + fidelity findings | Read-only tooling/evaluation |
-| EPIC-ORG-002 | BLOCKED | ChatGPT orchestrator | Continue Spotify-inspired organization/capacity routing after PR #151 merges | Next bounded Epic work unit/PR | After PR #151 |
-| WU25-FOLLOWUP-ORDER-001 | READY | Codex | Refine expired-claim eligibility ordering to use claim expiry as eligibility timestamp | Focused patch + PostgreSQL regression in a future notification hardening WU | Explicit product lease only |
-| WU25-FOLLOWUP-TEST-001 | READY | Copilot | Strengthen deterministic ordering coverage with equal eligibility/creation timestamps | Test-only regression/design in future notification hardening WU | Explicit lease only |
+| EPIC-CONTEXT-001 | DONE | ChatGPT | Zero-extra-cost context router/capacity governor | PR #151 merged (`d935e5f…`) | Complete |
+| EPIC-ORG-002 | ACTIVE | ChatGPT | Spotify-inspired squads/chapters/guilds + deterministic six-actor routing | PR #158, green exact-head CI, independent non-author gate, merge | Governance/tooling/tests |
+| EPIC-ACTORS-003 | ACTIVE | ChatGPT | Activate `gemini-cli` and `mistral-vibe` as zero-extra-spend actors | Activation evidence + PR #158 integration | Governance/tooling/tests |
+| HEADROOM-SHADOW-001 | READY | Copilot or other non-author test lane | Historical/non-sensitive fidelity samples under shadow rules | Metrics + fidelity findings | Read-only evaluation |
+| WU25-FOLLOWUP-ORDER-001 | READY | Codex | Refine expired-claim eligibility ordering | Focused future notification-hardening patch + PostgreSQL regression | Explicit lease only |
+| WU25-FOLLOWUP-TEST-001 | READY | Copilot | Strengthen deterministic ordering coverage | Test-only future notification-hardening regression | Explicit lease only |
 
 ## Current actor status
 
-- **ChatGPT:** ACTIVE - Epic PR #151 reconciler/implementer; recused from sole exact-head gate.
-- **Codex:** AVAILABLE SUBJECT TO INCLUDED PLAN CAPACITY - preferred implementation/CI/mechanical merge; do not duplicate #151.
-- **Claude:** AVAILABLE SUBJECT TO CLAUDE PRO CAPACITY - preferred independent adversarial gate when concretely available/non-author.
-- **Copilot:** AVAILABLE SUBJECT TO INCLUDED EDUCATION ENTITLEMENT - QA/Test Automation and eligible non-author Code Review; optional Luna compression remains OFF by default.
-- **CodeRabbit:** SUPPLEMENTAL reviewer source; Medium+/Major findings must still be reconciled.
-- **Gemini Agent / Gemini Chat:** RETIRED - historical evidence only; no work, wake, probe, review, or lease.
+- **ChatGPT:** ACTIVE - orchestrator/material author for PR #158; recused from sole exact-head gate.
+- **Codex:** AVAILABLE subject to included-plan capacity - preferred implementation/CI/mechanical merge; do not duplicate #158.
+- **Claude:** AVAILABLE subject to Claude Pro capacity - preferred independent adversarial gate when concretely available/non-author.
+- **Copilot:** AVAILABLE subject to included education entitlement - QA/Test Automation and eligible non-author Code Review.
+- **Gemini CLI (`gemini-cli`):** AVAILABLE - harmless activation probe passed; scouting/research/long-context/QA/overflow review; free/non-billable local allowance only.
+- **Mistral Vibe (`mistral-vibe`):** AVAILABLE - harmless activation probe passed and workspace remained clean; existing Pro subscription only, PAYG forbidden.
+- **CodeRabbit:** SUPPLEMENTAL reviewer source; material findings still require reconciliation.
+- **Gemini Agent / Gemini Chat:** RETIRED historical identities - never route/wake/probe/lease.
 
 ## Binding delivery rules
 
-- Exactly one canonical PR and one active implementer lease per work stream.
-- Assignment/heartbeat is not progress; require repository artifacts, CI/review evidence, or a visible deterministic job.
+- Exactly one canonical PR and one active implementer per work stream.
 - Required exact-head CI is binding.
 - Final merge requires an eligible independent non-author exact-SHA gate.
-- All reviewer sources must be inspected; unresolved Medium+/Major+/High+/Critical/Blocker findings prevent merge.
-- Additional paid AI/API usage, Copilot overage, and paid fallback are forbidden by `coordination/AI_CAPACITY_POLICY.md`.
-- Deterministic retrieval precedes Headroom shadow; Headroom precedes optional Copilot/Luna where suitable; compressed output never becomes authority.
+- All reviewer sources are inspected; unresolved BLOCKER/MAJOR/Medium+/High+/Critical findings prevent merge.
+- Actor selection uses `coordination/ACTOR_REGISTRY.json` plus live capability/authorship evidence.
+- Paid Gemini/Vertex routes, Mistral PAYG, OpenRouter, paid API credits, Copilot overage and other paid fallback are forbidden by `AI_CAPACITY_POLICY.md`.
 - GitHub is authoritative; Slack is attention/culture only.

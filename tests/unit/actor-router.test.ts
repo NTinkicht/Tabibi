@@ -27,35 +27,38 @@ describe('six-actor capacity routing', () => {
     expect(result.selected).toBe('mistral-vibe');
   });
 
-  it('fails closed when every review candidate is unavailable or an author', () => {
+  it('fails closed when every review candidate is a material author', () => {
     const result = spawnSync(
       process.execPath,
-      [
-        router,
-        'review',
-        '--authors=claude,chatgpt,codex,gemini-cli,mistral-vibe,copilot',
-      ],
+      [router, 'review', '--authors=claude,chatgpt,codex,gemini-cli,mistral-vibe,copilot'],
       { encoding: 'utf8' },
     );
     expect(result.status).toBe(2);
     expect(JSON.parse(result.stdout).selected).toBeNull();
   });
 
-  it('keeps retired Gemini identities out of all active routes and forbids paid fallback', () => {
+  it('keeps retired Gemini identities out of active routes and forbids paid fallback', () => {
     const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
     const activeIds = registry.actors.filter((actor: { active: boolean }) => actor.active).map((actor: { id: string }) => actor.id);
     const routedIds = Object.values(registry.routing).flat() as string[];
 
-    expect(activeIds).toEqual([
-      'chatgpt',
-      'codex',
-      'claude',
-      'copilot',
-      'gemini-cli',
-      'mistral-vibe',
-    ]);
+    expect(activeIds).toEqual(['chatgpt', 'codex', 'claude', 'copilot', 'gemini-cli', 'mistral-vibe']);
     expect(routedIds).not.toContain('gemini_agent');
     expect(routedIds).not.toContain('gemini_chat');
     expect(registry.actors.every((actor: { paid_fallback: boolean }) => actor.paid_fallback === false)).toBe(true);
+  });
+
+  it('declares every routed capability on every routed actor', () => {
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const actors = new Map<string, { capabilities: string[] }>(registry.actors.map((actor: { id: string; capabilities: string[] }) => [actor.id, actor]));
+    const violations: string[] = [];
+
+    for (const [capability, ids] of Object.entries(registry.routing) as [string, string[]][]) {
+      for (const id of ids) {
+        if (!actors.get(id)?.capabilities.includes(capability)) violations.push(`${capability}:${id}`);
+      }
+    }
+
+    expect(violations).toEqual([]);
   });
 });
