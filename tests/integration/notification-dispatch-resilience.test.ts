@@ -86,10 +86,12 @@ describe('WU31 PostgreSQL dispatch resilience', () => {
       [succeeding.id],
     );
 
-    const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(async () => ({
-      kind: 'delivered',
-      code: 'accepted',
-    }));
+    const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(
+      async () => ({
+        kind: 'delivered',
+        code: 'accepted',
+      }),
+    );
     const service = new NotificationDispatchService(
       outbox,
       { dispatch },
