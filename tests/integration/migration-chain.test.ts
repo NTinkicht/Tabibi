@@ -27,6 +27,7 @@ const committedMigrations = [
   '0019_notification_retry_eligibility.sql',
   '0020_notification_retry_constraint_validation.sql',
   '0021_notification_retry_claim_index.sql',
+  '0022_notification_preferences.sql',
 ];
 
 beforeAll(async () => {
@@ -71,6 +72,8 @@ describe('committed migration chain', () => {
       guest_status_rate_limits: string | null;
       notification_outbox: string | null;
       notification_pending_idx: string | null;
+      notification_preferences: string | null;
+      notification_preference_receipts: string | null;
       appointment_source_allowed: boolean;
       appointment_entity_allowed: boolean;
       patient_session_uq: string | null;
@@ -107,6 +110,8 @@ describe('committed migration chain', () => {
          to_regclass('guest_status_rate_limit_buckets')::text guest_status_rate_limits,
          to_regclass('notification_outbox')::text notification_outbox,
          to_regclass('notification_outbox_pending_target_idx')::text notification_pending_idx,
+         to_regclass('notification_preferences')::text notification_preferences,
+         to_regclass('notification_preference_receipts')::text notification_preference_receipts,
          (SELECT pg_get_constraintdef(oid) LIKE '%appointment%'
             FROM pg_constraint
            WHERE conname='queue_entries_source_check') AS appointment_source_allowed,
@@ -147,6 +152,8 @@ describe('committed migration chain', () => {
       guest_status_rate_limits: 'guest_status_rate_limit_buckets',
       notification_outbox: 'notification_outbox',
       notification_pending_idx: 'notification_outbox_pending_target_idx',
+      notification_preferences: 'notification_preferences',
+      notification_preference_receipts: 'notification_preference_receipts',
       appointment_source_allowed: true,
       appointment_entity_allowed: true,
       patient_session_uq: 'appointments_clinic_session_patient_uq',

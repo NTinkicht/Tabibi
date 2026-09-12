@@ -73,6 +73,8 @@ Append-oriented operational history for creation, check-in, priority, call, cons
 ### NotificationIntent
 Durable outbox record for patient-facing notification work, with stream/version/supersession metadata, delivery state, attempts, provider idempotency key and terminal/dead-letter outcome.
 
+Notification preferences are a separate provider-neutral policy boundary keyed by clinic, channel class and either a visit patient record or an account identity. Unlinked guests reset by design on a later registration; only account-linked patients carry preferences across visits. They store only enabled/disabled state, consent state and concurrency metadata—never contact-derived identifiers, guest credentials, clinical data or provider payloads. Missing preferences fail closed; external channels additionally require explicit granted consent. Provider adapters must apply the pure eligibility policy immediately before future channel-specific dispatch. Existing outbox dispatch remains unchanged until such an adapter is deliberately integrated.
+
 ## Authorization baseline
 Minimum clinic roles for MVP:
 - `doctor`: own session/queue progression and permitted session policy operations;
