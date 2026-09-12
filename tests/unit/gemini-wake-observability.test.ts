@@ -13,19 +13,16 @@ const workflowPath = path.join(
 describe('Gemini unattended wake observability', () => {
   const workflow = fs.readFileSync(workflowPath, 'utf8');
 
-  it(
-    'streams only structured operational progress with a bounded actor runtime',
-    () => {
-      expect(workflow).toContain('--output-format stream-json');
-      expect(workflow).toContain('timeout --signal=TERM --kill-after=15s 600s');
-      expect(workflow).toContain('Gemini CLI heartbeat');
-      expect(workflow).toContain('[gemini] session started model=');
-      expect(workflow).toContain('[gemini] tool_use #');
-      expect(workflow).toContain('[gemini] tool_result status=');
-      expect(workflow).toContain('[gemini] result status=');
-      expect(workflow).toContain('timeout-minutes: 15');
-    },
-  );
+  it('streams only structured operational progress with a bounded actor runtime', () => {
+    expect(workflow).toContain('--output-format stream-json');
+    expect(workflow).toContain('timeout --signal=TERM --kill-after=15s 600s');
+    expect(workflow).toContain('Gemini CLI heartbeat');
+    expect(workflow).toContain('[gemini] session started model=');
+    expect(workflow).toContain('[gemini] tool_use #');
+    expect(workflow).toContain('[gemini] tool_result status=');
+    expect(workflow).toContain('[gemini] result status=');
+    expect(workflow).toContain('timeout-minutes: 15');
+  });
 
   it('redacts live content while retaining the final assistant result', () => {
     expect(workflow).toContain('output.write(event.content)');
