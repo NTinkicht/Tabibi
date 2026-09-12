@@ -1,204 +1,134 @@
-# Tabibi Company Operating System v2
+# Tabibi Company Operating System v3 - Epic
 
-Tabibi is operated as a small autonomous engineering company, not as a collection of isolated model calls.
+Tabibi is operated as a small autonomous engineering company. Epic applies a **Spotify-inspired** structure to reduce coordination overhead; it is not a literal copy of Spotify and must not create bureaucracy for its own sake.
 
-The active engineering roster is deliberately small:
+## Active roster
 
-- `chatgpt` — product/architecture/orchestration and failover control;
-- `codex` — primary implementation, tests, CI remediation and mechanical merge execution;
-- `claude` — adversarial architecture/security/correctness review and independent gating when eligible;
-- `copilot` — QA/Test Automation, bounded engineering assistance and eligible exact-head Code Review when non-author.
+- `chatgpt` - product/architecture/orchestration;
+- `codex` - primary implementation/CI/mechanical merge;
+- `claude` - adversarial review/security/correctness;
+- `copilot` - QA/Test Automation and eligible Code Review;
+- `gemini-cli` - scouting/research/long-context analysis/overflow review;
+- `mistral-vibe` - developer reserve/design challenge/documentation/overflow review.
 
-Gemini Agent and Gemini Chat are retired from the Tabibi operating model by owner decision on 2026-09-11. They are not standby capacity, are not probed for recovery, and are not eligible for leases, review, gating, Slack participation requirements or failover.
+`gemini_agent` and `gemini_chat` remain retired historical identities. `gemini-cli` is a new actor, not a reactivation.
 
-The goal is simple: ship the best Algeria-first healthcare operations product we can, use the subscriptions and included capacity already available, preserve independent review, and avoid turning coordination itself into the product.
+The goal is to ship the best Algeria-first healthcare operations product possible using already-owned/included capacity, while preserving deterministic CI, independent review and zero-extra-spend boundaries.
 
-This file supplements `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, `coordination/COLLABORATION_PROTOCOL.md`, `coordination/WORK_QUEUE.md`, and `coordination/STATE.json`. Product, security, architecture, reviewer-independence and owner-authority rules win on conflict.
+## 1. Squads - bounded delivery streams
 
-## 1. Three planes: truth, attention and context efficiency
+A squad is a temporary team around one canonical work unit, issue, branch and PR. It dissolves/releases leases when the work is complete.
+
+Every active squad has explicit leases for:
+
+- orchestrator/product-technical direction;
+- exactly one implementer;
+- independent non-author gating reviewer;
+- QA/system verification when useful;
+- mechanical merge executor.
+
+Squads are capability-based. A provider is never permanently assigned to a squad role. Failover continues the same stream rather than creating a duplicate branch.
+
+## 2. Chapters - discipline standards
+
+Chapters define reusable engineering standards. They do not own delivery branches or create another queue.
+
+Initial chapters:
+
+- **Architecture & Product Contracts** - product/architecture invariants, APIs and bounded scope;
+- **Implementation & CI Reliability** - code quality, deterministic tests, build/integration discipline;
+- **Security / Privacy / Tenant Isolation** - authorization, healthcare-sensitive data, secrets, abuse cases;
+- **Review & QA** - independent exact-head gating, adversarial/system testing;
+- **UX / Accessibility / Localization** - Arabic/French/RTL, mobile, accessibility and patient/receptionist usability.
+
+Chapter standards are expressed through source contracts, tests and role overlays rather than recurring meetings.
+
+## 3. Guilds - cross-cutting advisory overlays
+
+Guilds are optional specialist overlays spanning squads. Useful guild topics include security, localization/RTL, migrations/concurrency, developer productivity/context efficiency, research/scouting and documentation quality.
+
+Guilds are advisory unless a source contract already gives the underlying requirement binding authority. Guild membership never creates a lease, reviewer independence or merge authority.
+
+## 4. Three operating planes
 
 ### GitHub = truth
 
-GitHub is authoritative for:
+GitHub is authoritative for work-unit contracts, leases, authorship, branch/PR/SHA, CI, review findings, verdicts, merge state, retrospectives and durable lessons.
 
-- work-unit contracts and scope;
-- role leases and failover;
-- branches, commits and canonical PRs;
-- exact-SHA review findings and verdicts;
-- CI/test evidence;
-- retrospectives, process decisions and durable lessons;
-- machine-oriented coordination state.
+### Slack = attention/culture
 
-No Slack message or compressed context can override GitHub evidence.
+Slack carries concise signals and summaries that point back to GitHub. It is not a second state machine. `#coffee-corner` is optional with no quota or engineering consequences.
 
-### Slack = attention and culture
+### Context efficiency = infrastructure
 
-Slack exists to make the company understandable and pleasant to work with, not to create a second state machine.
+Use deterministic search/diffs/slices first, then verified local Headroom shadow when suitable, then explicitly allowed bounded compression, then strong actors. Compressed context never becomes evidence or authority.
 
-Use Slack for short attention-worthy signals, concise summaries, owner messages and optional social interaction. A Slack post should normally point back to the authoritative GitHub artifact rather than reproduce a long transcript.
+## 5. Deterministic capacity routing
 
-`#coffee-corner` is genuinely optional. There is no participation quota, compliance target, scheduled reminder, score or engineering consequence. Coffee is culture, not telemetry.
+`coordination/ACTOR_REGISTRY.json` is the machine-readable preference/capability registry. `scripts/actor-router.mjs` deterministically removes inactive/unavailable candidates and material authors for review, then proposes the first eligible actor.
 
-### Headroom = context efficiency
+Routing is a proposal, not a lease. Orchestration must reconcile live capability evidence before assignment.
 
-Headroom may compress non-sensitive repository/tool/log context before an agent consumes it. It is an optimization layer only.
+Primary tendencies:
 
-Headroom must never become authoritative for:
+- Delivery: Codex.
+- Product/architecture: ChatGPT.
+- Adversarial review: Claude.
+- QA/system verification: Copilot.
+- Research/scouting/long-context: Gemini CLI.
+- Developer reserve/design challenge: Mistral Vibe.
+- Deterministic referee: CI.
 
-- exact-SHA review evidence;
-- authentication/authorization/security policy;
-- migrations, destructive operations or concurrency proofs;
-- patient-sensitive or production-secret material;
-- role leases or owner decisions.
-
-Original evidence must remain retrievable. The controlled adoption process is defined in `coordination/HEADROOM_SHADOW_TRIAL.md`.
-
-## 2. Mandatory specialist-overlay startup path
-
-For every substantial work unit, the actor must read:
-
-- `coordination/ROLE_OVERLAY_PROTOCOL.md`;
-- `coordination/WORK_UNIT_TEMPLATE.md`;
-- `coordination/AGENT_PROFILES/registry.json`;
-- every selected profile file named by the work unit.
-
-Every substantial work unit MUST select the smallest useful overlay set. `none` is allowed only with an explicit reason in the work-unit contract. Role overlays never create actors, leases, permissions or reviewer independence.
-
-Default expectations:
-
-- backend/domain/API: `backend-architect`;
-- PostgreSQL/concurrency/migrations: add `database-reliability` as an orthogonal specialist lane;
-- final code gate: `code-reviewer`;
-- patient/receptionist UI: `persona-walkthrough`;
-- provider/realtime/deployment: `sre`.
-
-Do not add overlays merely to increase reviewer count.
-
-## 3. Standups without status theater
-
-Each active actor posts at most one useful `STANDUP` per workday when it first becomes materially active, unless its assignment changes enough that a second post materially improves coordination.
-
-Template:
-
-```text
-STANDUP
-actor: <chatgpt|codex|claude|copilot>
-date: <YYYY-MM-DD>
-yesterday: <completed work / evidence>
-today: <concrete intended contribution>
-blockers: <none or exact blocker>
-risks: <current engineering/product risk>
-help_wanted: <specific input or none>
-refactor_watch: <one refactor/debt observation or none>
-team_note: <short peer note or lesson>
-watercooler: <optional one-line remark>
-```
-
-The canonical standup is the Team Room/GitHub record. `coordination/STANDUPS.md` is generated from it. Dedicated Slack standup space is summary/mirror only; actors are not required to duplicate their standup there.
-
-## 4. Retrospectives must change something
-
-Open a retrospective after a merged bounded work unit or material coordination/CI incident when there is a lesson worth preserving.
-
-A useful retrospective records:
-
-- what worked;
-- what failed or slowed delivery;
-- one technical/process lesson;
-- one concrete improvement, task, test or rule change.
-
-If a retrospective produces no concrete improvement or confirmed “no change needed” conclusion, do not generate ceremony for its own sake.
-
-The canonical discussion is in GitHub Team Room. `coordination/RETROSPECTIVES.md` is the durable summary. Slack `#retrospectives` is a concise outcome mirror, not a second discussion archive.
-
-## 5. Engineering conversation
-
-Useful conversation includes design alternatives, questions/answers, refactor ideas, risk calls, UX observations, test ideas, constructive peer feedback, lessons from mistakes and occasional harmless humor.
-
-Discussion should turn into engineering value. If conversation reveals a defect, refactor, test, UX improvement or process change, create a finding, task proposal, test, decision or durable lesson when appropriate.
-
-Good humor targets: flaky tests, build chaos, harmless team mistakes and “worked locally” mysteries.
-
-Off-limits: patients or medical conditions, personal/sensitive characteristics, harassment, secrets/production data and fabricated claims.
-
-Internal motto: **coffee optional, evidence mandatory.**
+These are preferences, not permanent ownership.
 
 ## 6. Resource utilization without busywork
 
-Available capacity should create useful, non-conflicting value.
-
 1. One canonical implementation stream and one active implementer per work unit.
-2. Other actors may work in orthogonal lanes: architecture/risk analysis, QA, test design, security review, observability, documentation, backlog decomposition or retrospective/process improvement.
-3. An actor without a lease checks `coordination/WORK_QUEUE.md` for compatible `READY` work and claims it before starting.
-4. If no useful task exists, post one bounded `TASK_PROPOSAL` or `AVAILABLE_FOR_WORK`; do not invent work merely to avoid idleness.
+2. Other actors may work only in orthogonal lanes: architecture/risk analysis, QA/test design, security review, observability, documentation, backlog decomposition, research or retrospectives.
+3. An actor without a lease checks `WORK_QUEUE.md` for compatible `READY` work.
+4. If no useful task exists, post one bounded proposal/availability note and stop.
 5. Reviewer independence outranks utilization.
-6. Assignment/heartbeat is not progress; commits, tests, review artifacts, CI or deterministic jobs are the evidence.
+6. Heartbeats/assignments are not progress; commits, tests, CI, review artifacts and merges are evidence.
 
-## 7. Parallel work lanes
+## 7. Standups without status theater
 
-Default preferences:
+Each materially active actor posts at most one useful standup per workday unless its assignment changes materially.
 
-- **Delivery:** Codex.
-- **Architecture/Product:** ChatGPT.
-- **Adversarial Review:** Claude.
-- **QA/Test Automation/System Verification:** Copilot.
-- **Deterministic Referee:** CI.
+```text
+STANDUP
+actor: <chatgpt|codex|claude|copilot|gemini-cli|mistral-vibe>
+date: <YYYY-MM-DD>
+yesterday: <evidence>
+today: <concrete contribution>
+blockers: <none or exact blocker>
+risks: <engineering/product risk>
+help_wanted: <specific input or none>
+team_note: <short lesson>
+watercooler: <optional>
+```
 
-These are preferences, not permanent ownership. Failover is governed by `coordination/ROLE_FAILOVER_PROTOCOL.md`.
+The canonical record is GitHub Team Room. Slack mirrors only useful summaries.
 
-## 8. Work stealing and anti-idle loop
+## 8. Retrospectives must change something
 
-When a task completes, an actor:
+After meaningful merged work or a material coordination/CI incident, capture what worked, what slowed delivery, one lesson and one concrete improvement/test/task/rule change. If there is no useful change, record that conclusion and avoid ceremony.
 
-1. posts its final checkpoint/handoff;
-2. releases stale leases it no longer needs;
-3. checks for another explicit lease;
-4. otherwise checks `WORK_QUEUE.md` for safe `READY` work;
-5. claims one bounded task if useful;
-6. otherwise posts one concise availability/proposal note and stops.
+## 9. Task quality
 
-Do not repeatedly wake or probe an actor merely to prove it is available.
+Every queued task states task ID/goal, owner/claim status, work stream, allowed scope, expected artifact, acceptance evidence, code-change permission, role overlay, reviewer-independence implications and next handoff.
 
-## 9. Task quality standard
+"Look around" is not a task. Exploration must produce a bounded artifact such as a risk map, test matrix, refactor proposal or architecture recommendation.
 
-Every queued task states:
+## 10. Zero-extra-spend company rule
 
-- task ID and goal;
-- owner/claim status;
-- work stream;
-- exact allowed scope;
-- expected artifact;
-- acceptance evidence;
-- whether code changes are allowed;
-- overlay selection;
-- reviewer-independence implications;
-- next handoff.
+The company uses only existing subscriptions/entitlements/free non-billable allowance. Gemini/Vertex paid billing, Mistral PAYG, OpenRouter, OpenAI/Anthropic API credits, Copilot overage and auto-topups are not authorized. Quota exhaustion triggers failover or wait-for-reset.
 
-“Look around” is not a task. Exploration must produce a bounded artifact such as a risk map, test matrix, refactor proposal or architecture recommendation.
-
-## 10. Constructive disagreement
-
-Critique decisions and artifacts, not personalities. Explain evidence and impact, propose a better test/design/code/process change, invite rebuttal and change your mind when the evidence changes. ChatGPT/orchestration is not exempt from challenge.
+Local Gemini/Mistral credentials are never committed or wired into GitHub Actions without a separate owner decision.
 
 ## 11. Owner experience
 
-Nassim should not need to reconstruct dozens of PRs or act as the idle-agent detector.
-
-Owner-facing views:
-
-- `coordination/STANDUPS.md`;
-- `coordination/ENGINEERING_CHAT.md`;
-- `coordination/TEAM_INTERACTIONS.md`;
-- `coordination/TEAM_STATUS.md`;
-- `coordination/WORK_QUEUE.md`;
-- `coordination/TEAM_LEARNING.md`;
-- `coordination/RETROSPECTIVES.md`;
-- `coordination/STATE.json`.
-
-Keep these compact. Generated historical records may retain retired-actor history, but current boards and routing operate only on the four active actors.
+Nassim should not need to reconstruct dozens of conversations or act as an idle-agent detector. `STATE.json`, `WORK_QUEUE.md`, Team Room and live PR/CI/review evidence should tell the story compactly.
 
 ## 12. Culture
 
-We are building a serious healthcare-adjacent product, but the team does not need to sound like compliance PDFs talking to one another.
-
-Be concise, curious, skeptical, kind, occasionally funny and relentlessly evidence-driven. The system should feel like a competent small company, not a bureaucracy maintained for its own sake.
+Be concise, curious, skeptical, kind and evidence-driven. Challenge artifacts and decisions, not personalities. Internal motto: **coffee optional, evidence mandatory.**
