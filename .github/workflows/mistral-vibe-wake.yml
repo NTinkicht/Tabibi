@@ -82,6 +82,8 @@ jobs:
           vibe \
             --trust \
             --agent plan \
+            --enabled-tools grep \
+            --enabled-tools read_file \
             --max-turns 8 \
             --max-tokens 30000 \
             --output text \
