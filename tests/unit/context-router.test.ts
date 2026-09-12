@@ -89,25 +89,22 @@ afterEach(() => {
 });
 
 describe('context router safety', () => {
-  it(
-    'rejects an in-repository symlink whose resolved target is outside the repository',
-    () => {
-      if (process.platform === 'win32') return;
-      const external = fs.mkdtempSync(path.join(os.tmpdir(), 'tabibi-router-'));
-      externalDirs.push(external);
-      const secret = path.join(external, 'external-secret.txt');
-      fs.writeFileSync(secret, 'must-not-be-read');
-      const link = path.join(scratch, 'safe-name.txt');
-      fs.symlinkSync(secret, link);
+  it('rejects an in-repository symlink whose resolved target is outside the repository', () => {
+    if (process.platform === 'win32') return;
+    const external = fs.mkdtempSync(path.join(os.tmpdir(), 'tabibi-router-'));
+    externalDirs.push(external);
+    const secret = path.join(external, 'external-secret.txt');
+    fs.writeFileSync(secret, 'must-not-be-read');
+    const link = path.join(scratch, 'safe-name.txt');
+    fs.symlinkSync(secret, link);
 
-      const result = runRouter(['profile', relative(link)]);
+    const result = runRouter(['profile', relative(link)]);
 
-      expect(result.status).toBe(2);
-      expect(result.stderr).toContain('Resolved target');
-      expect(result.stderr).toContain('must stay inside the repository');
-      expect(result.stdout).not.toContain('must-not-be-read');
-    },
-  );
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('Resolved target');
+    expect(result.stderr).toContain('must stay inside the repository');
+    expect(result.stdout).not.toContain('must-not-be-read');
+  });
 
   it.each(['patient-record.json', 'provider-payload.json'])(
     'rejects documented sensitive data class %s before reading it',
@@ -122,74 +119,68 @@ describe('context router safety', () => {
     },
   );
 
-  it(
-    'allows only one concurrent process to consume the final Copilot unit',
-    async () => {
-      if (process.platform === 'win32') return;
-      const source = path.join(scratch, 'safe-source.txt');
-      fs.writeFileSync(source, 'bounded evidence');
-      writeBudget(1);
-      const count = path.join(scratch, 'copilot-count.txt');
-      const bin = makeFakeCopilot(
-        'printf "1\\n" >> "$TABIBI_FAKE_COPILOT_COUNT"\nsleep 0.4\nprintf "compressed\\n"',
-      );
-      const env = {
+  it('allows only one concurrent process to consume the final Copilot unit', async () => {
+    if (process.platform === 'win32') return;
+    const source = path.join(scratch, 'safe-source.txt');
+    fs.writeFileSync(source, 'bounded evidence');
+    writeBudget(1);
+    const count = path.join(scratch, 'copilot-count.txt');
+    const bin = makeFakeCopilot(
+      'printf "1\\n" >> "$TABIBI_FAKE_COPILOT_COUNT"\nsleep 0.4\nprintf "compressed\\n"',
+    );
+    const env = {
+      TABIBI_CONTEXT_ALLOW_COPILOT: '1',
+      TABIBI_FAKE_COPILOT_COUNT: count,
+      PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
+    };
+    const args = ['compress', 'summarize', '--', relative(source)];
+
+    const results = await Promise.all([
+      runRouterAsync(args, env),
+      runRouterAsync(args, env),
+    ]);
+
+    expect(results.map((result) => result.code).sort()).toEqual([0, 2]);
+    expect(
+      fs.readFileSync(count, 'utf8').trim().split(/\r?\n/),
+    ).toHaveLength(1);
+    const budget = JSON.parse(
+      fs.readFileSync(
+        path.join(scratch, 'state', 'context-budget.json'),
+        'utf8',
+      ),
+    );
+    expect(budget.remainingUnits).toBe(0);
+    expect(
+      fs.existsSync(path.join(scratch, 'state', 'context-budget.lock')),
+    ).toBe(false);
+  });
+
+  it('refunds an ordinary failed Copilot invocation while keeping crash recovery fail-closed', () => {
+    if (process.platform === 'win32') return;
+    const source = path.join(scratch, 'safe-source.txt');
+    fs.writeFileSync(source, 'bounded evidence');
+    writeBudget(1);
+    const bin = makeFakeCopilot('echo "simulated failure" >&2\nexit 7');
+
+    const result = runRouter(
+      ['compress', 'summarize', '--', relative(source)],
+      {
         TABIBI_CONTEXT_ALLOW_COPILOT: '1',
-        TABIBI_FAKE_COPILOT_COUNT: count,
         PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
-      };
-      const args = ['compress', 'summarize', '--', relative(source)];
+      },
+    );
 
-      const results = await Promise.all([
-        runRouterAsync(args, env),
-        runRouterAsync(args, env),
-      ]);
-
-      expect(results.map((result) => result.code).sort()).toEqual([0, 2]);
-      expect(
-        fs.readFileSync(count, 'utf8').trim().split(/\r?\n/),
-      ).toHaveLength(1);
-      const budget = JSON.parse(
-        fs.readFileSync(
-          path.join(scratch, 'state', 'context-budget.json'),
-          'utf8',
-        ),
-      );
-      expect(budget.remainingUnits).toBe(0);
-      expect(
-        fs.existsSync(path.join(scratch, 'state', 'context-budget.lock')),
-      ).toBe(false);
-    },
-  );
-
-  it(
-    'refunds an ordinary failed Copilot invocation while keeping crash recovery fail-closed',
-    () => {
-      if (process.platform === 'win32') return;
-      const source = path.join(scratch, 'safe-source.txt');
-      fs.writeFileSync(source, 'bounded evidence');
-      writeBudget(1);
-      const bin = makeFakeCopilot('echo "simulated failure" >&2\nexit 7');
-
-      const result = runRouter(
-        ['compress', 'summarize', '--', relative(source)],
-        {
-          TABIBI_CONTEXT_ALLOW_COPILOT: '1',
-          PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
-        },
-      );
-
-      expect(result.status).toBe(2);
-      const budget = JSON.parse(
-        fs.readFileSync(
-          path.join(scratch, 'state', 'context-budget.json'),
-          'utf8',
-        ),
-      );
-      expect(budget.remainingUnits).toBe(1);
-      expect(
-        fs.existsSync(path.join(scratch, 'state', 'context-budget.lock')),
-      ).toBe(false);
-    },
-  );
+    expect(result.status).toBe(2);
+    const budget = JSON.parse(
+      fs.readFileSync(
+        path.join(scratch, 'state', 'context-budget.json'),
+        'utf8',
+      ),
+    );
+    expect(budget.remainingUnits).toBe(1);
+    expect(
+      fs.existsSync(path.join(scratch, 'state', 'context-budget.lock')),
+    ).toBe(false);
+  });
 });
