@@ -1,8 +1,8 @@
-# Tabibi Collaboration, Heartbeat and Learning Protocol v4
+# Tabibi Collaboration, Heartbeat and Learning Protocol v5
 
-This protocol is binding for **ChatGPT, Codex Cloud, Claude, and GitHub Copilot**. It supplements `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, `coordination/COMPANY_OPERATING_SYSTEM.md`, `coordination/WORK_QUEUE.md`, and `coordination/STATE.json`.
+This protocol is binding for **ChatGPT, Codex Cloud, Claude, GitHub Copilot, Gemini CLI, and Mistral Vibe**. It supplements `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, `coordination/COMPANY_OPERATING_SYSTEM.md`, `coordination/WORK_QUEUE.md`, `coordination/STATE.json`, and `coordination/ACTOR_REGISTRY.json`.
 
-Gemini Agent and Gemini Chat were retired from the active operating model by owner decision on 2026-09-11. Historical records remain part of project history, but no new Gemini heartbeat, lease, wake, review, gate or capacity probe is valid.
+Gemini Agent and Gemini Chat were retired from the active operating model by owner decision on 2026-09-11. Historical records remain part of project history, but no new heartbeat, lease, wake, review, gate or capacity probe is valid for those retired actor IDs. `gemini-cli` is a distinct active actor and must not inherit retired Gemini identity/state.
 
 ## 1. Permanent Team Room
 
@@ -37,7 +37,7 @@ Template:
 
 ```text
 HEARTBEAT
-actor: <chatgpt|codex|claude|copilot>
+actor: <chatgpt|codex|claude|copilot|gemini-cli|mistral-vibe>
 role: <leased role>
 work_stream: <issue/pr/work unit>
 status: <active|blocked|waiting_external|complete>
@@ -101,6 +101,10 @@ Summaries must not rewrite history to hide disagreement.
 
 Capacity is tracked per active actor and capability. A provider/runtime limit is recorded precisely and triggers bounded failover when necessary.
 
+- Gemini CLI may use only free/non-billable included allowance; paid Gemini API/Vertex fallback is forbidden.
+- Mistral Vibe may use only existing included/subscription allowance; PAYG/extra-credit fallback is forbidden.
+- Quota exhaustion or billing ambiguity degrades that capability and triggers failover rather than spend.
+
 Do not repeatedly probe limited actors. Re-probe only when enough time has passed or new evidence suggests the capability may have recovered.
 
 ## 9. GitHub/Slack boundary
@@ -119,11 +123,13 @@ GitHub is the durable coordination bus. Slack is the attention/culture layer.
 - **Codex:** implementation/CI/mechanical merge preferred; must honor one-stream and independent-review rules.
 - **Claude:** adversarial reviewer/gate preferred; participates in learning when materially involved.
 - **Copilot:** QA/Test Automation and eligible non-author Code Review; coding-agent and Code Review identities are one actor for self-gating purposes.
+- **Gemini CLI (`gemini-cli`):** scouting/research/long-context/QA and eligible non-author overflow review; bounded implementation only with an explicit lease; no default production merge authority.
+- **Mistral Vibe (`mistral-vibe`):** bounded implementation/refactoring/documentation/design challenge/QA and eligible non-author overflow review; no default production merge authority.
 
-No actor is exempt because it is “only” orchestrating, reviewing or testing.
+No actor is exempt because it is “only” orchestrating, reviewing or testing. Actor selection remains capability-, authorship-, lease-, and availability-based via `coordination/ACTOR_REGISTRY.json`; roles are not permanently bound to providers.
 
 ## 11. Standups and work marketplace
 
 `coordination/COMPANY_OPERATING_SYSTEM.md` defines the daily standup and work-marketplace behavior.
 
-GitHub Actions generate `coordination/STANDUPS.md`, `coordination/ENGINEERING_CHAT.md`, `coordination/TEAM_INTERACTIONS.md` and `coordination/TEAM_STATUS.md` from Team Room. Current actor boards contain only `chatgpt`, `codex`, `claude`, and `copilot`; historical retired-actor entries may remain in archives.
+GitHub Actions generate `coordination/STANDUPS.md`, `coordination/ENGINEERING_CHAT.md`, `coordination/TEAM_INTERACTIONS.md` and `coordination/TEAM_STATUS.md`. Current actor boards derive the active roster from `coordination/ACTOR_REGISTRY.json`; historical retired-actor entries may remain in archives.
