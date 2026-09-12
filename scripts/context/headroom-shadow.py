@@ -9,11 +9,19 @@ Use --emit-compressed only when manually comparing fidelity against the original
 from __future__ import annotations
 
 import argparse
+from importlib import metadata
 import json
 from pathlib import Path
 import sys
+import time
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+HEADROOM_REPOSITORY = "https://github.com/NTinkicht/headroom"
+HEADROOM_REVISION = "97aa9f6d0fc04619e4e821e7d54611eb9d6b9b81"
+HEADROOM_INSTALL = (
+    "headroom-ai[all] @ git+https://github.com/NTinkicht/headroom.git@"
+    + HEADROOM_REVISION
+)
 ALLOWED_ROOTS = {
     "coordination",
     "tests",
@@ -36,6 +44,7 @@ BLOCKED_PARTS = {
 
 
 def resolve_input(raw: str) -> Path:
+    """Resolve and validate one repository-local shadow-trial input file."""
     candidate = (REPO_ROOT / raw).resolve()
     try:
         relative = candidate.relative_to(REPO_ROOT)
@@ -59,7 +68,48 @@ def resolve_input(raw: str) -> Path:
     return candidate
 
 
+def verify_headroom_revision() -> None:
+    """Fail closed unless Headroom was installed from the approved fork commit."""
+    try:
+        distribution = metadata.distribution("headroom-ai")
+    except metadata.PackageNotFoundError as exc:
+        raise RuntimeError(
+            f"Headroom is not installed; install the pinned artifact: {HEADROOM_INSTALL}"
+        ) from exc
+
+    provenance_text = distribution.read_text("direct_url.json")
+    if not provenance_text:
+        raise RuntimeError(
+            "Headroom install has no PEP 610 VCS provenance; reinstall the pinned "
+            f"artifact: {HEADROOM_INSTALL}"
+        )
+
+    try:
+        provenance = json.loads(provenance_text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            "Headroom install provenance is malformed; reinstall the pinned artifact"
+        ) from exc
+
+    vcs_info = provenance.get("vcs_info") or {}
+    installed_revision = str(vcs_info.get("commit_id") or "").lower()
+    installed_url = str(provenance.get("url") or "").rstrip("/")
+    normalized_url = installed_url.removesuffix(".git").lower()
+
+    if (
+        str(vcs_info.get("vcs") or "").lower() != "git"
+        or installed_revision != HEADROOM_REVISION
+        or normalized_url != HEADROOM_REPOSITORY.lower()
+    ):
+        raise RuntimeError(
+            "Headroom revision mismatch: expected "
+            f"{HEADROOM_REPOSITORY}@{HEADROOM_REVISION}, found "
+            f"{installed_url or 'unknown-source'}@{installed_revision or 'unknown-revision'}"
+        )
+
+
 def main() -> int:
+    """Run one local, revision-attested Headroom shadow-compression sample."""
     parser = argparse.ArgumentParser(
         description="Run local Headroom compression in metrics-only shadow mode."
     )
@@ -84,27 +134,44 @@ def main() -> int:
         return 2
 
     try:
+        verify_headroom_revision()
         from headroom import compress
-    except ImportError:
-        print(
-            'headroom-shadow: Headroom is not installed. Install an isolated local copy of '
-            '"headroom-ai[all]" and run `headroom doctor` first.',
-            file=sys.stderr,
-        )
+    except (ImportError, RuntimeError) as exc:
+        print(f"headroom-shadow: {exc}", file=sys.stderr)
         return 3
 
-    result = compress([{"role": "user", "content": text}], model=args.model)
+    started_at = time.perf_counter()
+    try:
+        result = compress(
+            [{"role": "user", "content": text}],
+            model=args.model,
+            compress_user_messages=True,
+            protect_recent=0,
+        )
+    except Exception as exc:
+        print(f"headroom-shadow: compression failed: {exc}", file=sys.stderr)
+        return 4
+    compression_latency_seconds = time.perf_counter() - started_at
 
     compressed_messages = getattr(result, "messages", None)
-    encoded = json.dumps(compressed_messages, ensure_ascii=False) if compressed_messages is not None else ""
+    encoded = (
+        json.dumps(compressed_messages, ensure_ascii=False)
+        if compressed_messages is not None
+        else ""
+    )
     metrics = {
         "mode": "shadow_read_only",
         "source": str(source.relative_to(REPO_ROOT)),
+        "headroom_repository": HEADROOM_REPOSITORY,
+        "headroom_revision": HEADROOM_REVISION,
         "model_profile": args.model,
         "input_chars": len(text),
         "compressed_serialized_chars": len(encoded),
+        "tokens_before": getattr(result, "tokens_before", None),
+        "tokens_after": getattr(result, "tokens_after", None),
         "tokens_saved": getattr(result, "tokens_saved", None),
         "compression_ratio": getattr(result, "compression_ratio", None),
+        "compression_latency_seconds": compression_latency_seconds,
         "authoritative_source_retained": True,
         "provider_call_performed_by_helper": False,
     }
