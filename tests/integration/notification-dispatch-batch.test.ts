@@ -48,6 +48,28 @@ function input(clinicId: string, key: string, version = 1) {
   };
 }
 
+const eligibleDeliveryContext = {
+  resolve: async (intent: { clinicId: string }) => ({
+    target: {
+      subjectKind: 'visit_patient' as const,
+      subjectId: '00000000-0000-0000-0000-000000000001',
+      channel: 'sms' as const,
+    },
+    preference: {
+      id: '00000000-0000-0000-0000-000000000002',
+      clinicId: intent.clinicId,
+      subjectKind: 'visit_patient' as const,
+      subjectId: '00000000-0000-0000-0000-000000000001',
+      channel: 'sms' as const,
+      preferenceState: 'enabled' as const,
+      consentState: 'granted' as const,
+      revision: 1,
+      createdAt: '2026-09-11T00:00:00.000Z',
+      updatedAt: '2026-09-11T00:00:00.000Z',
+    },
+  }),
+};
+
 describe('notification dispatch eligibility and bounded batch', () => {
   it('selects only clinic-scoped due unclaimed intents and enforces bounds', async () => {
     const outbox = new NotificationOutboxRepository(pool);
@@ -317,7 +339,11 @@ describe('notification dispatch eligibility and bounded batch', () => {
         code: 'accepted',
       }),
     );
-    const service = new NotificationDispatchService(outbox, { dispatch });
+    const service = new NotificationDispatchService(
+      outbox,
+      { dispatch },
+      eligibleDeliveryContext,
+    );
     const runnerA = new NotificationDispatchBatchRunner(scanner, service);
     const runnerB = new NotificationDispatchBatchRunner(scanner, service);
 
@@ -331,6 +357,7 @@ describe('notification dispatch eligibility and bounded batch', () => {
     expect(
       summaries.reduce((sum, item) => sum + item.notClaimed, 0),
     ).toBeLessThanOrEqual(1);
+    expect(summaries.reduce((sum, item) => sum + item.suppressed, 0)).toBe(0);
     const persisted = await pool.query<{ state: string }>(
       'SELECT state FROM notification_outbox WHERE id=$1',
       [intent.id],
