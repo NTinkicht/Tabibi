@@ -118,4 +118,20 @@ describe('six-actor capacity routing', () => {
       expect(content).not.toContain('chatgpt|codex|claude|copilot');
     }
   });
+
+  it('relays Gemini CLI and Mistral Vibe in Slack without new credentials', () => {
+    const workflowPath = path.join(
+      process.cwd(),
+      '.github',
+      'workflows',
+      'slack-team-room-mirror.yml',
+    );
+    const content = fs.readFileSync(workflowPath, 'utf8');
+
+    expect(content).toContain("'gemini-cli': 'Gemini CLI'");
+    expect(content).toContain("'mistral-vibe': 'Mistral Vibe'");
+    expect(content).toContain('relayed by the ChatGPT Slack app');
+    expect(content).not.toContain('SLACK_GEMINI');
+    expect(content).not.toContain('SLACK_MISTRAL');
+  });
 });
