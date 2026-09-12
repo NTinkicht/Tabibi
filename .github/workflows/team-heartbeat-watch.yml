@@ -42,8 +42,13 @@ jobs:
           api = f'https://api.github.com/repos/{repo}'
           team_issue = 21
           state = json.loads(Path('coordination/STATE.json').read_text(encoding='utf-8'))
+          registry = json.loads(Path('coordination/ACTOR_REGISTRY.json').read_text(encoding='utf-8'))
           threshold = int(state.get('team_room', {}).get('stale_active_lease_minutes', 30))
-          active_roster = {'chatgpt', 'codex', 'claude', 'copilot'}
+          active_roster = {
+              actor['id']
+              for actor in registry.get('actors', [])
+              if actor.get('active') and actor.get('id')
+          }
 
           def request_json(method, url, payload=None):
               data = None
@@ -76,7 +81,10 @@ jobs:
 
           comments = get_all_comments(team_issue)
           latest = {}
-          actor_re = re.compile(r'(?mi)^actor:\s*(chatgpt|codex|claude|copilot)\s*$')
+          actor_pattern = '|'.join(
+              re.escape(actor) for actor in sorted(active_roster, key=len, reverse=True)
+          )
+          actor_re = re.compile(rf'(?mi)^actor:\s*({actor_pattern})\s*$')
           activity_re = re.compile(r'(?mi)^(?:HEARTBEAT|CHECKPOINT)\s*$')
           for comment in comments:
               body = comment.get('body') or ''

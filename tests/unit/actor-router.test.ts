@@ -103,4 +103,19 @@ describe('six-actor capacity routing', () => {
 
     expect(violations).toEqual([]);
   });
+
+  it('derives Team Room automation rosters from the actor registry', () => {
+    const workflowPaths = [
+      path.join(process.cwd(), '.github', 'workflows', 'team-heartbeat-watch.yml'),
+      path.join(process.cwd(), '.github', 'workflows', 'team-room-sync.yml'),
+    ];
+
+    for (const workflowPath of workflowPaths) {
+      const content = fs.readFileSync(workflowPath, 'utf8');
+      expect(content).toContain('coordination/ACTOR_REGISTRY.json');
+      expect(content).toContain("registry.get('actors', [])");
+      expect(content).not.toContain("{'chatgpt', 'codex', 'claude', 'copilot'}");
+      expect(content).not.toContain('chatgpt|codex|claude|copilot');
+    }
+  });
 });
