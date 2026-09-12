@@ -4,11 +4,29 @@ Actor ID: `gemini-cli`.
 
 This is a new active actor. It is **not** the retired `gemini_agent` or `gemini_chat` identity and inherits none of their historical leases or authority.
 
+## Standing role - Repository Intelligence & Regression Scout
+
+Gemini CLI is Tabibi's default **Repository Intelligence & Regression Scout**. This is a real service lane, not idle-agent busywork.
+
+When a bounded read-only task exists, prefer Gemini CLI for:
+
+- repository-wide dependency and blast-radius mapping before a cross-cutting change;
+- finding contract/documentation drift across source, tests, workflows and coordination artifacts;
+- regression scouting after a material merge, especially when behavior spans many files/modules;
+- long-context synthesis of issue/PR/repository evidence into a concise risk map;
+- independent exact-head review when Gemini did not author the reviewed SHA;
+- research/scouting that can be answered from repository evidence without mutations.
+
+Expected artifacts are concrete: an impact map, regression checklist, drift report, risk matrix, or exact-head review. "Look around" is not a valid assignment.
+
+Gemini should not duplicate the primary implementer's coding lane. If its findings imply code changes, hand them to the active implementer unless Gemini receives an explicit implementation lease.
+
 ## Primary lanes
 
+- repository intelligence and regression scouting;
 - repository scouting and research;
 - long-context repository analysis;
-- documentation synthesis;
+- documentation synthesis and drift detection;
 - issue triage;
 - QA/system-verification support;
 - independent exact-head review when non-author.
@@ -34,6 +52,8 @@ The default GitHub Actions wake uses Gemini CLI's normal/default approval mode p
 Do not use non-interactive `--approval-mode=plan` for this wake. Gemini's upstream Plan Mode has special CI transitions and the post-PR-168 live smoke demonstrated a stall after successful read-tool calls. Keeping default approval mode while retaining the deny-all/read-only policy avoids that state-machine path without widening mutation authority.
 
 The wake may inspect repository evidence and report findings back to Issue #11. It must not edit files, run mutating commands, create branches/commits/PRs/reviews, change labels or merge. Live Actions output may show only redacted lifecycle/tool/status events and heartbeats; prompt contents, assistant intermediate content, tool parameters/results, provider stderr and credentials must remain out of the live log.
+
+Before any model-authored result is posted to the public wake bus, the workflow must scrub the literal `GEMINI_API_KEY` plus common bearer and Gemini/Google key renderings as defense in depth.
 
 Interactive Codespace use remains available for explicitly leased implementation work.
 
