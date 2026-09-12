@@ -14,7 +14,10 @@ import {
   recordNotificationDispatchEvent,
   type NotificationDispatchObserver,
 } from '@/modules/notification-domain/observability';
-import type { NotificationDispatchRenderer } from '@/modules/notification-domain/rendered-dispatch-renderer';
+import {
+  defaultNotificationDispatchRenderer,
+  type NotificationDispatchRenderer,
+} from '@/modules/notification-domain/rendered-dispatch-renderer';
 import type { RenderedNotificationDispatchEnvelope } from '@/modules/notification-domain/rendered-dispatch-envelope';
 
 export type {
@@ -36,6 +39,8 @@ export {
   type RenderedNotificationDispatchEnvelope,
 } from '@/modules/notification-domain/rendered-dispatch-envelope';
 export {
+  defaultNotificationDispatchRenderer,
+  NotificationIntentTemplateInputResolver,
   NotificationTemplateDispatchRenderer,
   type NotificationDispatchRenderer,
   type NotificationDispatchTemplateInputResolver,
@@ -156,9 +161,9 @@ export class NotificationDispatchService {
     private readonly store: NotificationDispatchStore,
     private readonly provider: NotificationProviderAdapter,
     private readonly deliveryContext: NotificationDeliveryContextResolver,
-    private readonly renderer: NotificationDispatchRenderer,
     private readonly leaseMs = 60_000,
     private readonly observer: NotificationDispatchObserver = noNotificationDispatchObserver,
+    private readonly renderer: NotificationDispatchRenderer = defaultNotificationDispatchRenderer,
   ) {
     if (!Number.isSafeInteger(leaseMs) || leaseMs <= 0 || leaseMs > 86_400_000)
       throw new Error('Dispatch lease must be between 1 ms and 24 hours');
