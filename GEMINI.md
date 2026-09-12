@@ -29,7 +29,11 @@ Never commit Gemini credentials or `.gemini/` state.
 
 ## Unattended wake boundary
 
-The default GitHub Actions wake is read-only plan mode. It may inspect repository evidence and report findings back to Issue #11. It must not edit files, run mutating commands, create branches/commits/PRs/reviews, change labels or merge.
+The default GitHub Actions wake uses Gemini CLI's normal/default approval mode plus an explicit Policy Engine boundary: deny every tool by default, then allow only repository read/search tools (`glob`, `grep_search`, `list_directory`, `read_file`, `read_many_files`). The policy file, not an interactive approval prompt, is the read-only authority boundary.
+
+Do not use non-interactive `--approval-mode=plan` for this wake. Gemini's upstream Plan Mode has special CI transitions and the post-PR-168 live smoke demonstrated a stall after successful read-tool calls. Keeping default approval mode while retaining the deny-all/read-only policy avoids that state-machine path without widening mutation authority.
+
+The wake may inspect repository evidence and report findings back to Issue #11. It must not edit files, run mutating commands, create branches/commits/PRs/reviews, change labels or merge. Live Actions output may show only redacted lifecycle/tool/status events and heartbeats; prompt contents, assistant intermediate content, tool parameters/results, provider stderr and credentials must remain out of the live log.
 
 Interactive Codespace use remains available for explicitly leased implementation work.
 

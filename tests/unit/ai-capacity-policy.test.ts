@@ -60,12 +60,13 @@ describe('AI capacity policy', () => {
         mention: '@gemini-cli',
         guard: 'TABIBI_GEMINI_ZERO_BILLING_CONFIRMED',
         secret: 'GEMINI_API_KEY',
-        readonlyMarker: '--approval-mode=plan',
+        readonlyMarker: '--approval-mode=default',
         hardeningMarkers: [
           '--policy /tmp/tabibi-gemini-policy.toml',
           'toolName = "*"',
           'decision = "deny"',
           'read_many_files',
+          '--output-format stream-json',
         ],
       },
       {
@@ -73,8 +74,16 @@ describe('AI capacity policy', () => {
         mention: '@mistral-vibe',
         guard: 'TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED',
         secret: 'MISTRAL_API_KEY',
-        readonlyMarker: '--agent plan',
-        hardeningMarkers: ['--enabled-tools grep', '--enabled-tools read_file'],
+        readonlyMarker: '--enabled-tools grep',
+        hardeningMarkers: [
+          '--enabled-tools read_file',
+          'enabled_tools = ["grep", "read_file"]',
+          '--workdir "$GITHUB_WORKSPACE"',
+          'https://console.mistral.ai/api/vibe/whoami',
+          'VIBE_HOME: /tmp/tabibi-vibe-home',
+          'enable_telemetry = false',
+          "text.replace(secret, '[REDACTED]')",
+        ],
       },
     ];
 
@@ -95,5 +104,35 @@ describe('AI capacity policy', () => {
       expect(content).not.toMatch(/contents:\s*write/);
       expect(content).not.toMatch(/^\s*schedule\s*:/m);
     }
+  });
+
+  it('uses policy enforcement instead of non-interactive Gemini plan mode', () => {
+    const workflowPath = path.join(workflowDirectory, 'gemini-cli-wake.yml');
+    const content = fs.readFileSync(workflowPath, 'utf8');
+
+    expect(content).toContain('--approval-mode=default');
+    expect(content).not.toContain('--approval-mode=plan');
+    expect(content).toContain('toolName = "*"');
+    expect(content).toContain('decision = "deny"');
+    expect(content).toContain(
+      'toolName = ["glob", "grep_search", "list_directory", "read_file", "read_many_files"]',
+    );
+  });
+
+  it('limits unattended Mistral execution to read-only repository tools', () => {
+    const workflowPath = path.join(workflowDirectory, 'mistral-vibe-wake.yml');
+    const content = fs.readFileSync(workflowPath, 'utf8');
+    const enabledTools = [
+      ...content.matchAll(/--enabled-tools\s+([a-zA-Z0-9_-]+)/g),
+    ].map((match) => match[1]);
+
+    expect(enabledTools).toEqual(['grep', 'read_file']);
+    expect(content).toContain('enabled_tools = ["grep", "read_file"]');
+    expect(content).toContain('--workdir "$GITHUB_WORKSPACE"');
+    expect(content).not.toContain('--agent plan');
+    expect(content).toContain("text.replace(secret, '[REDACTED]')");
+    expect(content).toContain(
+      'PAYG remains disabled and no paid fallback was attempted',
+    );
   });
 });
