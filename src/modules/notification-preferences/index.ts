@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import { inTransaction } from '@/platform/database/transaction';
 
 export const notificationChannels = [
@@ -69,6 +69,8 @@ interface ReceiptRow {
   expected_revision: string | null;
   preference_id: string;
   result_revision: string;
+  result_created_at: Date;
+  result_updated_at: Date;
 }
 
 const preferenceColumns = `id, clinic_id, subject_kind, patient_id, account_user_id, channel,
@@ -142,7 +144,12 @@ function assertTransition(
   previous: NotificationConsentState | null,
   next: NotificationConsentState,
 ): void {
-  if (previous === null || previous === next || next === 'granted') return;
+  if (
+    (previous === null && next !== 'revoked') ||
+    previous === next ||
+    next === 'granted'
+  )
+    return;
   if (previous === 'granted' && next === 'revoked') return;
   throw new NotificationPreferenceValidationError(
     `Invalid notification consent transition from ${previous} to ${next}`,
@@ -182,22 +189,22 @@ export function isNotificationDeliveryEligible(
     : preference.consentState === 'granted';
 }
 
-async function loadPreferenceById(
-  client: PoolClient,
+function preferenceFromReceipt(
+  receipt: ReceiptRow,
   clinicId: string,
-  id: string,
-): Promise<NotificationPreference> {
-  const result = await client.query<PreferenceRow>(
-    `SELECT ${preferenceColumns} FROM notification_preferences
-      WHERE clinic_id=$1 AND id=$2`,
-    [clinicId, id],
-  );
-  const row = result.rows[0];
-  if (!row)
-    throw new NotificationPreferenceConflictError(
-      'Recorded notification preference no longer exists',
-    );
-  return toPreference(row);
+): NotificationPreference {
+  return {
+    id: receipt.preference_id,
+    clinicId,
+    subjectKind: receipt.subject_kind,
+    subjectId: receipt.patient_id ?? receipt.account_user_id!,
+    channel: receipt.channel,
+    preferenceState: receipt.preference_state,
+    consentState: receipt.consent_state,
+    revision: Number(receipt.result_revision),
+    createdAt: receipt.result_created_at.toISOString(),
+    updatedAt: receipt.result_updated_at.toISOString(),
+  };
 }
 
 /** Clinic-scoped preference store keyed by a visit patient or account identity. */
@@ -245,7 +252,7 @@ export class NotificationPreferenceRepository {
       );
       const priorReceipt = await client.query<ReceiptRow>(
         `SELECT subject_kind, patient_id, account_user_id, channel, preference_state, consent_state,
-                expected_revision, preference_id, result_revision
+                expected_revision, preference_id, result_revision, result_created_at, result_updated_at
            FROM notification_preference_receipts
           WHERE clinic_id=$1 AND idempotency_key=$2`,
         [input.clinicId, input.idempotencyKey],
@@ -256,11 +263,7 @@ export class NotificationPreferenceRepository {
           throw new NotificationPreferenceConflictError(
             'Idempotency key was already used for a different preference change',
           );
-        return loadPreferenceById(
-          client,
-          input.clinicId,
-          receipt.preference_id,
-        );
+        return preferenceFromReceipt(receipt, input.clinicId);
       }
 
       const currentResult = await client.query<PreferenceRow>(
@@ -330,8 +333,8 @@ export class NotificationPreferenceRepository {
         `INSERT INTO notification_preference_receipts
            (clinic_id, idempotency_key, subject_kind, patient_id, account_user_id, channel,
             preference_state, consent_state, expected_revision,
-            preference_id, result_revision)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+            preference_id, result_revision, result_created_at, result_updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [
           input.clinicId,
           input.idempotencyKey,
@@ -344,6 +347,8 @@ export class NotificationPreferenceRepository {
           input.expectedRevision,
           persisted.id,
           Number(persisted.revision),
+          persisted.created_at,
+          persisted.updated_at,
         ],
       );
       return toPreference(persisted);

@@ -126,6 +126,62 @@ describe('notification preference repository', () => {
     ).rejects.toBeInstanceOf(NotificationPreferenceConflictError);
   });
 
+  it('replays the original response after a later preference mutation', async () => {
+    const repository = new NotificationPreferenceRepository(pool);
+    const granted = await repository.change(change());
+    const revoked = await repository.change(
+      change({
+        consentState: 'revoked',
+        preferenceState: 'disabled',
+        expectedRevision: granted.revision,
+        idempotencyKey: 'revoke-sms',
+      }),
+    );
+
+    expect(await repository.change(change())).toEqual(granted);
+    expect(
+      await repository.get(ids.clinicA, 'visit_patient', ids.patientA, 'sms'),
+    ).toEqual(revoked);
+  });
+
+  it('accepts documented initial states and rejects an initial revocation', async () => {
+    const repository = new NotificationPreferenceRepository(pool);
+    await expect(repository.change(change())).resolves.toMatchObject({
+      consentState: 'granted',
+    });
+    await expect(
+      repository.change(
+        change({
+          subjectId: ids.patientB,
+          clinicId: ids.clinicB,
+          consentState: 'denied',
+          preferenceState: 'disabled',
+          idempotencyKey: 'deny-sms',
+        }),
+      ),
+    ).resolves.toMatchObject({ consentState: 'denied' });
+    await expect(
+      repository.change(
+        change({
+          channel: 'in_app',
+          consentState: 'not_required',
+          idempotencyKey: 'enable-in-app',
+        }),
+      ),
+    ).resolves.toMatchObject({ consentState: 'not_required' });
+    await expect(
+      repository.change(
+        change({
+          subjectId: ids.patientB,
+          clinicId: ids.clinicB,
+          consentState: 'revoked',
+          preferenceState: 'disabled',
+          idempotencyKey: 'invalid-initial-revoke',
+        }),
+      ),
+    ).rejects.toBeInstanceOf(NotificationPreferenceValidationError);
+  });
+
   it('enforces revisions and explicit consent transitions', async () => {
     const repository = new NotificationPreferenceRepository(pool);
     const first = await repository.change(change());

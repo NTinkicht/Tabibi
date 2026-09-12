@@ -61,6 +61,8 @@ CREATE TABLE notification_preference_receipts (
   expected_revision bigint CHECK (expected_revision IS NULL OR expected_revision > 0),
   preference_id uuid NOT NULL,
   result_revision bigint NOT NULL CHECK (result_revision > 0),
+  result_created_at timestamptz NOT NULL,
+  result_updated_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (clinic_id, idempotency_key),
   FOREIGN KEY (patient_id, clinic_id)
