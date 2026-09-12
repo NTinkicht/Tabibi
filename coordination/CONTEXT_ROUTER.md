@@ -33,6 +33,7 @@ Rules:
 - no automatic retry through another paid provider;
 - local budget state must be valid and positive;
 - a unit is atomically reserved under an exclusive local lock before Copilot starts;
+- lock acquisition and stale-lock reclamation are serialized by a separate short-lived local gate;
 - concurrent calls may not consume the same final unit;
 - ordinary invocation failure refunds under the same lock;
 - hard crash remains fail-closed: the unit stays consumed, and stale-lock recovery never refunds it;
@@ -92,9 +93,13 @@ uncertainty:
 
 ## Budget state and recovery
 
-Local budget/metrics/lock files live under `.tabibi/` and are gitignored. Repository defaults are zero-spend-safe.
+Local budget/metrics/lock/gate files live under `.tabibi/` and are gitignored. Repository defaults are zero-spend-safe.
 
-A reservation lock uses exclusive file creation. If a previous process was hard-killed, the lock may become stale. The router may remove a stale lock only after its age exceeds the configured threshold and the recorded PID is no longer alive. It never refunds the already-reserved unit during stale-lock recovery. This deliberately prefers under-using included capacity over accidental overage.
+A reservation lock uses exclusive file creation. Lock creation and stale-lock reclamation are themselves serialized by `context-budget.gate`, also created exclusively and held only around those local filesystem operations. This prevents two stale-lock reclaimers from replacing each other's newly acquired reservation lock.
+
+If a previous reservation process was hard-killed, its reservation lock may become stale. While holding the acquisition gate, the router may remove that stale reservation lock only after its age exceeds the configured threshold and the recorded PID is no longer alive. It never refunds the already-reserved unit during stale-lock recovery.
+
+The acquisition gate has no automatic stale-reclamation path. If a process is hard-killed during that very short critical section, later compression fails closed until an operator verifies that no context-router process is active and removes the local gate file. This deliberately prefers under-using included capacity over any path that could race into paid overage.
 
 ## Success metrics
 
