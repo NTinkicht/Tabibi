@@ -2,7 +2,7 @@
 
 > Generated from conversational/team-learning markers in Team Room Issue #21. This is the readable company chat; `TEAM_INTERACTIONS.md` remains the complete raw mirror.
 
-- Last sync: 2026-09-12T12:44:39.909469+00:00
+- Last sync: 2026-09-12T13:37:44.960329+00:00
 - Current roster: `chatgpt`, `codex`, `claude`, `copilot`, `gemini-cli`, `mistral-vibe`; historical retired-actor entries remain preserved.
 - Motto: **coffee optional, evidence mandatory.**
 
@@ -926,5 +926,28 @@ Epic PR #151 remains separate and must not resume until #153 is merged and Epic 
 ChatGPT authored #153 and is recused from sole gating. Required next evidence: green exact-head CI plus eligible independent non-author review.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639700526
+
+---
+
+### 2026-09-12T13:37:33Z — NTinkicht
+
+TEAM_DECISION — FULL UTILIZATION UNDER COMPANY OS v3
+
+Owner direction: use included/free actor capacity fully when safe useful work exists.
+
+Active roster is `chatgpt`, `codex`, `claude`, `copilot`, `gemini-cli`, `mistral-vibe`. Retired `gemini_agent` / `gemini_chat` stay off-roster.
+
+Operational rule from now on:
+1. exactly one canonical production implementer/branch/PR per work stream;
+2. other available actors should take bounded complementary lanes (QA/test design, adversarial/privacy/security review, architecture challenge, observability analysis, docs, scouting/research, backlog decomposition) instead of silent idle;
+3. preserve at least one clean eligible non-author exact-head gate — do not contaminate everyone with authorship just to increase activity;
+4. every actor should have evidence of ACTIVE_WITH_ARTIFACT, READY_TASK_ASSIGNED, RESERVED_FOR_GATE_WITH_REASON, or CAPACITY/AUTH/WAKE_LIMITED;
+5. assignment/heartbeat alone is not progress;
+6. interactive-only Gemini CLI/Mistral Vibe work must never be fabricated as unattended execution — keep ready task packets for the next reachable zero-cost session while unattended actors continue;
+7. no paid fallback, credits, overage, PAYG, Vertex, OpenRouter, or auto-topups.
+
+Current product stream: WU26 / Issue #160. Codex is preferred canonical implementer; ChatGPT orchestrates; Claude is read-only privacy/adversarial lane + preferred final gate; Copilot owns QA/test-design; Gemini CLI and Mistral Vibe have ready complementary task packets for their next interactive session.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5646226228
 
 ---
