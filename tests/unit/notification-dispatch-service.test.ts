@@ -237,9 +237,12 @@ describe('NotificationDispatchService', () => {
 
     expect(notificationProvider.dispatch).toHaveBeenCalledTimes(1);
     expect(notificationProvider.dispatch).toHaveBeenCalledWith({
-      clinicId: 'clinic-1',
-      intentId: 'intent-1',
-      payload: { locale: 'fr', places: 2 },
+      channel: 'sms',
+      locale: 'fr',
+      direction: 'ltr',
+      templateId: 'turn_approaching.v1',
+      title: 'Votre tour approche',
+      body: 'Il reste 2 passage(s) avant votre tour.',
       providerIdempotencyKey: 'notification:intent-1',
     });
     expect(dispatchStore.completeDispatchAttempt).toHaveBeenCalledWith({

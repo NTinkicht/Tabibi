@@ -14,6 +14,11 @@ import {
   recordNotificationDispatchEvent,
   type NotificationDispatchObserver,
 } from '@/modules/notification-domain/observability';
+import {
+  defaultNotificationDispatchRenderer,
+  type NotificationDispatchRenderer,
+} from '@/modules/notification-domain/rendered-dispatch-renderer';
+import type { RenderedNotificationDispatchEnvelope } from '@/modules/notification-domain/rendered-dispatch-envelope';
 
 export type {
   NotificationDispatchOperationalEvent,
@@ -29,6 +34,17 @@ export {
   type NotificationPreferenceReader,
   type NotificationSuppressionReason,
 } from '@/modules/notification-domain/delivery-policy';
+export {
+  createRenderedNotificationDispatchEnvelope,
+  type RenderedNotificationDispatchEnvelope,
+} from '@/modules/notification-domain/rendered-dispatch-envelope';
+export {
+  defaultNotificationDispatchRenderer,
+  NotificationIntentTemplateInputResolver,
+  NotificationTemplateDispatchRenderer,
+  type NotificationDispatchRenderer,
+  type NotificationDispatchTemplateInputResolver,
+} from '@/modules/notification-domain/rendered-dispatch-renderer';
 
 export type NotificationProviderResult =
   | { kind: 'delivered'; code?: string | null }
@@ -36,12 +52,7 @@ export type NotificationProviderResult =
   | { kind: 'unknown'; code?: string | null }
   | { kind: 'terminal_failure'; code?: string | null };
 
-export interface NotificationProviderRequest {
-  clinicId: string;
-  intentId: string;
-  payload: Record<string, unknown>;
-  providerIdempotencyKey: string;
-}
+export type NotificationProviderRequest = RenderedNotificationDispatchEnvelope;
 
 export interface NotificationProviderAdapter {
   dispatch(
@@ -152,6 +163,7 @@ export class NotificationDispatchService {
     private readonly deliveryContext: NotificationDeliveryContextResolver,
     private readonly leaseMs = 60_000,
     private readonly observer: NotificationDispatchObserver = noNotificationDispatchObserver,
+    private readonly renderer: NotificationDispatchRenderer = defaultNotificationDispatchRenderer,
   ) {
     if (!Number.isSafeInteger(leaseMs) || leaseMs <= 0 || leaseMs > 86_400_000)
       throw new Error('Dispatch lease must be between 1 ms and 24 hours');
@@ -180,9 +192,6 @@ export class NotificationDispatchService {
       return { status: 'not_claimed' };
     }
 
-    // Resolve current authorization only after the exact claim and immediately
-    // before provider execution. A resolver failure is deliberately not caught:
-    // no provider call occurs and the existing claim lease recovery can retry.
     const currentDeliveryContext = await this.deliveryContext.resolve(
       claim.intent,
     );
@@ -224,15 +233,55 @@ export class NotificationDispatchService {
     }
 
     const idempotencyKey = providerIdempotencyKey(claim);
+    let providerRequest: RenderedNotificationDispatchEnvelope;
+    try {
+      providerRequest = await this.renderer.renderAuthorized({
+        intent: claim.intent,
+        deliveryContext: currentDeliveryContext!,
+        providerIdempotencyKey: idempotencyKey,
+      });
+    } catch {
+      const rendererResult: NotificationProviderResult = {
+        kind: 'retryable_failure',
+        code: 'render_failure',
+      };
+      const completed = await this.store.completeDispatchAttempt({
+        clinicId,
+        intentId: claim.intent.id,
+        claimToken: claim.claimToken,
+        outcome: 'failed',
+        outcomeCode: 'render_failure',
+      });
+
+      if (!completed) {
+        recordNotificationDispatchEvent(this.observer, {
+          name: 'notification.dispatch.claim_lost',
+          clinicId,
+          intentId: claim.intent.id,
+          providerResultKind: rendererResult.kind,
+        });
+        return {
+          status: 'claim_lost',
+          claimToken: claim.claimToken,
+          providerIdempotencyKey: idempotencyKey,
+          providerResult: rendererResult,
+        };
+      }
+
+      recordPersistedOutcome(this.observer, completed);
+      return {
+        status: 'completed',
+        claimToken: claim.claimToken,
+        providerIdempotencyKey: idempotencyKey,
+        providerResult: rendererResult,
+        intent: completed,
+      };
+    }
+
     let providerResult: NotificationProviderResult;
     try {
       providerResult = normalizeProviderResult(
-        await this.provider.dispatch({
-          clinicId,
-          intentId: claim.intent.id,
-          payload: claim.intent.payload,
-          providerIdempotencyKey: idempotencyKey,
-        }),
+        await this.provider.dispatch(providerRequest),
       );
     } catch {
       providerResult = { kind: 'unknown', code: 'provider_exception' };
