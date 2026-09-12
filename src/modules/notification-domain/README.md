@@ -19,24 +19,25 @@ current WU27 delivery target and preference/consent **after the exact claim and
 immediately before provider execution**. Missing, disabled, denied, revoked, or
 mismatched authorization fails closed: the provider adapter is never invoked and
 the exact claim is completed as terminal `suppressed` with one bounded categorical
-reason code. Resolver failures are not converted into suppression; they abort
-before provider execution and leave the existing claim-lease recovery path to
-retry rather than permanently dropping an otherwise authorized notification.
+reason code. Delivery-context resolver failures are classified as the bounded
+`delivery_context_failure` retryable outcome and completed through the same
+claim-fenced retry/dead-letter lifecycle, so repeated failures cannot strand an
+intent outside normal terminal/operator-visible progression. Exception messages
+are never persisted or emitted.
 
-When authorization is valid, the service invokes exactly one injected provider
-adapter, maps the provider result onto the existing persisted outcomes, and
-completes only the exact claim token. Provider exceptions are classified as
-`unknown`; delivery success is never invented when execution is indeterminate. If
-completion loses the claim fence after provider execution, the service reports
-`claim_lost` and leaves recovery to the persisted lease/retry lifecycle.
+When authorization is valid, WU30 renders a bounded provider-neutral envelope only
+after the authorization decision and before provider invocation. The envelope may
+contain the rendered notification `title` and `body`, locale/direction, template id,
+channel, and provider idempotency key. Raw contact destinations, bearer material,
+provider credentials, claim tokens, arbitrary clinical payload fields, and patient
+identity data are not part of this provider boundary. Renderer failures are also
+classified as bounded retryable outcomes and never invoke the provider.
 
 The authorization resolver is intentionally provider-neutral. A
 `NotificationDeliveryTargetResolver` supplies only a clinic-local subject identity
 kind/id and channel; `NotificationPreferenceDeliveryContextResolver` then loads
 the latest WU27 preference through its public repository contract and reuses
-`isNotificationDeliveryEligible` for the final decision. Contact destinations,
-message bodies, bearer material, provider credentials, and clinical data are not
-part of this boundary.
+`isNotificationDeliveryEligible` for the final decision.
 
 There is one unavoidable external-send race: once the final authorization check
 has passed and a real provider invocation has started, a later consent change
@@ -53,6 +54,13 @@ in that key. WU24 intentionally defines no real SMS, WhatsApp, push, credential,
 scheduler, or network implementation; those remain later bounded slices behind
 this contract.
 
+For `turn_approaching`, new producers must persist the canonical numeric `position`
+field. The renderer temporarily accepts legacy `places` as a read-only compatibility
+alias for already-existing fixtures/intents; it must not be emitted by new producer
+code. `queue_entry_transferred` deliberately fails closed until the dedicated secure
+post-decryption exchange-link composition is injected, preventing a transfer from
+being reported delivered without the guest's replacement access path.
+
 WU25 adds a deterministic, clinic-scoped discovery and bounded execution layer.
 `NotificationDispatchEligibilityRepository` returns only intent identifiers and
 their eligibility timestamp; it never returns notification payloads. It excludes
@@ -64,11 +72,14 @@ stable persisted tie breakers. Batch size is explicitly bounded to 1-100 intents
 existing single-intent dispatch boundary once per selected identifier. Selection
 is not ownership: concurrent runners still race through the WU21 atomic claim
 fence, so a losing runner records `notClaimed` rather than creating a second
-ownership mechanism. The returned batch summary contains aggregate counts only
-(`selected`, `completed`, `suppressed`, `notClaimed`, `claimLost`) and therefore
-does not expose provider payloads or patient-sensitive notification data. WU25
-deliberately does not add a timer, cron process, daemon, queue consumer, real
-provider network call, or cross-clinic scheduler.
+ownership mechanism. Each selected item is isolated: an unexpected executor
+exception increments the aggregate `errors` counter and does not prevent later
+selected intents from running. The returned batch summary contains aggregate
+counts only (`selected`, `completed`, `suppressed`, `notClaimed`, `claimLost`,
+`errors`) and therefore does not expose provider payloads, exception messages, or
+patient-sensitive notification data. WU25/WU31 deliberately add no timer, cron
+process, daemon, queue consumer, real provider network call, or cross-clinic
+scheduler.
 
 ## Operational observability contract
 
@@ -78,8 +89,8 @@ events distinguish `not_claimed`, `claim_lost`, and persisted outcomes including
 `suppressed`. Persisted outcomes expose the attempt/max-attempt counters plus
 `retryScheduled` and `exhausted`, allowing retry, suppression, and dead-letter
 alerts without reading payloads. Bounded runs emit one clinic-scoped aggregate
-containing only selected/completed/suppressed/not-claimed/claim-lost counts. The
-default observer is an explicit no-op so the domain remains independent of a
+containing only selected/completed/suppressed/not-claimed/claim-lost/error counts.
+The default observer is an explicit no-op so the domain remains independent of a
 metrics or logging vendor.
 
 The schema deliberately permits only clinic and intent identifiers, fixed
