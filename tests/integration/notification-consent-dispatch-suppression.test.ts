@@ -106,11 +106,9 @@ describe('notification consent-aware dispatch suppression', () => {
       const preferences = new NotificationPreferenceRepository(pool);
       const scanner = new NotificationDispatchEligibilityRepository(pool);
       const queued = await outbox.enqueue(enqueueInput('missing'));
-      const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(
-        async () => ({
-          kind: 'delivered',
-        }),
-      );
+      const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(async () => ({
+        kind: 'delivered',
+      }));
       const service = new NotificationDispatchService(
         outbox,
         { dispatch },
@@ -168,12 +166,10 @@ describe('notification consent-aware dispatch suppression', () => {
         consentState: 'granted',
         idempotencyKey: 'grant-sms',
       });
-      const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(
-        async () => ({
-          kind: 'delivered',
-          code: 'accepted',
-        }),
-      );
+      const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(async () => ({
+        kind: 'delivered',
+        code: 'accepted',
+      }));
       const service = new NotificationDispatchService(
         outbox,
         { dispatch },
@@ -214,21 +210,20 @@ describe('notification consent-aware dispatch suppression', () => {
       const outbox = new NotificationOutboxRepository(pool);
       const preferences = new NotificationPreferenceRepository(pool);
       const queued = await outbox.enqueue(enqueueInput('mismatch'));
-      const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(
-        async () => ({
-          kind: 'delivered',
-        }),
-      );
-      const mismatchedContext = new NotificationPreferenceDeliveryContextResolver(
-        {
-          resolveTarget: async () => ({
-            subjectKind: 'visit_patient' as const,
-            subjectId: randomUUID(),
-            channel: 'sms' as const,
-          }),
-        },
-        preferences,
-      );
+      const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(async () => ({
+        kind: 'delivered',
+      }));
+      const mismatchedContext =
+        new NotificationPreferenceDeliveryContextResolver(
+          {
+            resolveTarget: async () => ({
+              subjectKind: 'visit_patient' as const,
+              subjectId: randomUUID(),
+              channel: 'sms' as const,
+            }),
+          },
+          preferences,
+        );
       const service = new NotificationDispatchService(
         outbox,
         { dispatch },
