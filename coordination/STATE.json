@@ -1,12 +1,12 @@
 {
   "project": "Tabibi",
-  "phase": "epic_zero_extra_cost_restructuring",
-  "state": "epic_pr151_remediated_pending_ci_and_gate",
-  "current_pr": 151,
-  "current_issue": 150,
-  "last_actor": "chatgpt",
-  "next_actor": "ci_then_independent_non_author_reviewer",
-  "next_action": "Validate reconciled PR #151 on its exact head. If CI is green, obtain an eligible independent non-author exact-head gate; resolve every remaining MAJOR/Medium+ finding, then merge mechanically and activate the next Epic organization slice.",
+  "phase": "epic_org_002_ready",
+  "state": "pr151_merged_epic_context_001_complete",
+  "current_pr": null,
+  "current_issue": null,
+  "last_actor": "claude",
+  "next_actor": "chatgpt",
+  "next_action": "PR #151 (Issue #150) is merged (commit d935e5f) and closed. Claude independently gated exact head 30d2c98d57681716cb73d403ad97e79b6c060df9 as PASS/MERGE_READY before merge, then verified zero drift between that head and the merge commit across the entire diff (not just coordination files). Note: this STATE.json had reverted to a pre-gate snapshot on the PR151 branch (a 'revert generated sync drift' commit undid the interim update from coordination PR #156) -- reconciled here directly against live GitHub truth rather than trusting the file's own prior content. EPIC-ORG-002 (Issue #154, Spotify-style squads/chapters/guilds and six-actor capacity routing) is now unblocked; EPIC-ACTORS-003 (Issue #155, activate Gemini CLI and Mistral Vibe) is also open and unscoped. Next: ChatGPT to scope/open the canonical implementation stream for one of these.",
   "operating_model": "four-active-actor-mesh-v9-epic-zero-extra-cost-context-routing",
   "binding_protocols": [
     "AGENTS.md",
@@ -44,10 +44,10 @@
         "orchestration": "available",
         "architecture": "available",
         "implementation": "available",
-        "review": "unavailable_for_self_authored_pr151_head",
-        "merge_execution": "available_after_independent_gate"
+        "review": "available_when_non_author",
+        "merge_execution": "available"
       },
-      "current_activity": "Epic orchestrator/implementer reconciling PR #151 onto Company OS v2; recused from sole gating of authored head."
+      "current_activity": "PR #151 merged (commit d935e5f), closing Issue #150/EPIC-CONTEXT-001. Available to scope/open the next Epic slice (EPIC-ORG-002, Issue #154, or EPIC-ACTORS-003, Issue #155)."
     },
     "codex": {
       "capability_status": {
@@ -63,7 +63,7 @@
         "review": "available_subject_to_pro_capacity",
         "adversarial_security_review": "available_subject_to_pro_capacity"
       },
-      "current_activity": "Preferred independent PR #151 security/governance/concurrency gate when concretely available and non-author."
+      "current_activity": "Gated PR #151 (Issue #150) exact head 30d2c98d57681716cb73d403ad97e79b6c060df9: PASS/MERGE_READY, zero BLOCKER/MAJOR findings. Verified zero drift into merge commit d935e5f. No active lease."
     },
     "copilot": {
       "capability_status": {
@@ -81,41 +81,34 @@
   },
   "role_leases": {
     "orchestrator": { "actor": "chatgpt", "status": "active" },
-    "implementer": {
-      "actor": "chatgpt",
-      "status": "remediation_pushed_pending_ci",
-      "work_stream": "issue-150-pr-151-epic-context-efficiency",
-      "note": "One canonical Epic PR #151; Company OS v2 is preserved."
-    },
-    "gating_reviewer": {
-      "actor": "claude_or_copilot_non_author",
-      "status": "reserved_after_green_ci",
-      "note": "ChatGPT materially authored the PR #151 head and cannot self-gate."
-    },
-    "merge_executor": {
-      "actor": "codex_or_chatgpt",
-      "status": "mechanical_after_gates",
-      "note": "Expected-head merge only after exact-head CI and independent review are clear."
-    }
+    "implementer": { "actor": null, "status": "not_assigned" },
+    "gating_reviewer": { "actor": null, "status": "not_assigned" },
+    "merge_executor": { "actor": null, "status": "not_assigned" }
   },
-  "current_work": {
-    "id": "EPIC-CONTEXT-001",
-    "status": "remediated_pending_ci_and_review",
-    "actor": "chatgpt",
-    "scope": "Reconciled PR #151: zero-extra-cost AI capacity governor, deterministic-first context router, Headroom-before-Copilot shunt, compact bootstrap, Claude read guard, safe opt-in Copilot/Luna compression, and regression coverage for real-path/sensitive-data/budget-concurrency findings.",
-    "role_overlays": ["backend-architect", "code-reviewer"],
-    "role_overlay_reason": "Infrastructure/security/concurrency tooling requires design plus adversarial gate; no product UI overlay needed."
-  },
+  "current_work": null,
   "next_work": {
     "id": "EPIC-ORG-002",
-    "status": "blocked_pending_pr151_merge",
+    "status": "ready_unscoped",
     "actor": "chatgpt",
-    "scope": "Continue the Spotify-inspired Epic organization/capacity routing on top of the merged zero-extra-cost context layer."
+    "scope": "Issue #154: Spotify-style squads, chapters, guilds and six-actor capacity routing, on top of the merged zero-extra-cost context layer.",
+    "sibling_candidate": "EPIC-ACTORS-003 (Issue #155: activate Gemini CLI and Mistral Vibe with zero-extra-spend guardrails) is also open and unscoped."
   },
-  "remediated_review_findings": [
-    "PR151-CR-SYMLINK-BYPASS",
-    "PR151-CR-CONCURRENT-BUDGET",
-    "PR151-CR-SENSITIVE-PATH-CLASSES"
+  "completed_work_recent": [
+    {
+      "id": "EPIC-CONTEXT-001",
+      "issue": 150,
+      "implementation_pr": 151,
+      "final_gated_head": "30d2c98d57681716cb73d403ad97e79b6c060df9",
+      "merge_commit": "d935e5f",
+      "review_verdict": "PASS",
+      "resolved_findings": [
+        "PR151-CR-SYMLINK-BYPASS",
+        "PR151-CR-CONCURRENT-BUDGET",
+        "PR151-CR-SENSITIVE-PATH-CLASSES"
+      ],
+      "merge_verification": "git diff 30d2c98d..d935e5f is completely empty across the entire repository -- zero drift, not limited to reviewed files",
+      "status": "merged"
+    }
   ],
   "deferred_minor_followups": [
     "WU25-FOLLOWUP-ORDER-001",
@@ -136,9 +129,5 @@
   "open_minors": 0,
   "human_decision_required": false,
   "pending_findings": [],
-  "review_pending_findings": [
-    "Verify PR151-CR-SYMLINK-BYPASS remediation on exact head",
-    "Verify PR151-CR-CONCURRENT-BUDGET remediation on exact head",
-    "Verify PR151-CR-SENSITIVE-PATH-CLASSES remediation on exact head"
-  ]
+  "review_pending_findings": []
 }
