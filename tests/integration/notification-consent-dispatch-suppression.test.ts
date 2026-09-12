@@ -213,17 +213,16 @@ describe('notification consent-aware dispatch suppression', () => {
       const dispatch = vi.fn<NotificationProviderAdapter['dispatch']>(async () => ({
         kind: 'delivered',
       }));
-      const mismatchedContext =
-        new NotificationPreferenceDeliveryContextResolver(
-          {
-            resolveTarget: async () => ({
-              subjectKind: 'visit_patient' as const,
-              subjectId: randomUUID(),
-              channel: 'sms' as const,
-            }),
-          },
-          preferences,
-        );
+      const mismatchedContext = new NotificationPreferenceDeliveryContextResolver(
+        {
+          resolveTarget: async () => ({
+            subjectKind: 'visit_patient' as const,
+            subjectId: randomUUID(),
+            channel: 'sms' as const,
+          }),
+        },
+        preferences,
+      );
       const service = new NotificationDispatchService(
         outbox,
         { dispatch },
