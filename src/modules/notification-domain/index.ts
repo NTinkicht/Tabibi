@@ -192,10 +192,6 @@ export class NotificationDispatchService {
       return { status: 'not_claimed' };
     }
 
-    // Resolve current authorization only after the exact claim and immediately
-    // before rendering/provider execution. Resolver or renderer failures are
-    // deliberately not caught: no provider call or outcome persistence occurs,
-    // leaving the existing claim lease recovery path available for a safe retry.
     const currentDeliveryContext = await this.deliveryContext.resolve(
       claim.intent,
     );
@@ -237,11 +233,50 @@ export class NotificationDispatchService {
     }
 
     const idempotencyKey = providerIdempotencyKey(claim);
-    const providerRequest = await this.renderer.renderAuthorized({
-      intent: claim.intent,
-      deliveryContext: currentDeliveryContext!,
-      providerIdempotencyKey: idempotencyKey,
-    });
+    let providerRequest: RenderedNotificationDispatchEnvelope;
+    try {
+      providerRequest = await this.renderer.renderAuthorized({
+        intent: claim.intent,
+        deliveryContext: currentDeliveryContext!,
+        providerIdempotencyKey: idempotencyKey,
+      });
+    } catch {
+      const rendererResult: NotificationProviderResult = {
+        kind: 'retryable_failure',
+        code: 'render_failure',
+      };
+      const completed = await this.store.completeDispatchAttempt({
+        clinicId,
+        intentId: claim.intent.id,
+        claimToken: claim.claimToken,
+        outcome: 'failed',
+        outcomeCode: 'render_failure',
+      });
+
+      if (!completed) {
+        recordNotificationDispatchEvent(this.observer, {
+          name: 'notification.dispatch.claim_lost',
+          clinicId,
+          intentId: claim.intent.id,
+          providerResultKind: rendererResult.kind,
+        });
+        return {
+          status: 'claim_lost',
+          claimToken: claim.claimToken,
+          providerIdempotencyKey: idempotencyKey,
+          providerResult: rendererResult,
+        };
+      }
+
+      recordPersistedOutcome(this.observer, completed);
+      return {
+        status: 'completed',
+        claimToken: claim.claimToken,
+        providerIdempotencyKey: idempotencyKey,
+        providerResult: rendererResult,
+        intent: completed,
+      };
+    }
 
     let providerResult: NotificationProviderResult;
     try {
