@@ -61,6 +61,12 @@ describe('AI capacity policy', () => {
         guard: 'TABIBI_GEMINI_ZERO_BILLING_CONFIRMED',
         secret: 'GEMINI_API_KEY',
         readonlyMarker: '--approval-mode=plan',
+        hardeningMarkers: [
+          '--policy /tmp/tabibi-gemini-policy.toml',
+          'toolName = "*"',
+          'decision = "deny"',
+          'read_many_files',
+        ],
       },
       {
         file: 'mistral-vibe-wake.yml',
@@ -68,6 +74,10 @@ describe('AI capacity policy', () => {
         guard: 'TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED',
         secret: 'MISTRAL_API_KEY',
         readonlyMarker: '--agent plan',
+        hardeningMarkers: [
+          '--enabled-tools grep',
+          '--enabled-tools read_file',
+        ],
       },
     ];
 
@@ -81,6 +91,9 @@ describe('AI capacity policy', () => {
       expect(content).toContain(policy.guard);
       expect(content).toContain(policy.secret);
       expect(content).toContain(policy.readonlyMarker);
+      for (const marker of policy.hardeningMarkers) {
+        expect(content).toContain(marker);
+      }
       expect(content).toMatch(/permissions:\s*[\s\S]*?contents:\s*read/);
       expect(content).not.toMatch(/contents:\s*write/);
       expect(content).not.toMatch(/^\s*schedule\s*:/m);
