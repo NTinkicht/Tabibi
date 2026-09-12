@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "financial_mode": "zero-extra-spend",
   "principles": {
     "roles_belong_to_project": true,
@@ -101,7 +101,14 @@
       "included_capacity": "owner-configured Gemini CLI free/non-billable allowance",
       "paid_fallback": false,
       "production_merge_authority": false,
-      "wake": "interactive gemini CLI in owner Codespace"
+      "wake": "owner-only Issue #11 @gemini-cli GitHub Action when zero-billing guard and secret are configured; interactive Gemini CLI in owner Codespace otherwise",
+      "unattended_wake": {
+        "workflow": ".github/workflows/gemini-cli-wake.yml",
+        "mode": "read-only-plan",
+        "guard_variable": "TABIBI_GEMINI_ZERO_BILLING_CONFIRMED",
+        "credential_secret": "GEMINI_API_KEY",
+        "schedule_allowed": false
+      }
     },
     {
       "id": "mistral-vibe",
@@ -118,10 +125,17 @@
         "scouting",
         "long_context_analysis"
       ],
-      "included_capacity": "existing Mistral Pro subscription allowance",
+      "included_capacity": "owner existing included Mistral plan allowance with PAYG disabled",
       "paid_fallback": false,
       "production_merge_authority": false,
-      "wake": "interactive vibe CLI in owner Codespace"
+      "wake": "owner-only Issue #11 @mistral-vibe GitHub Action when PAYG-disabled guard and secret are configured; interactive Vibe CLI in owner Codespace otherwise",
+      "unattended_wake": {
+        "workflow": ".github/workflows/mistral-vibe-wake.yml",
+        "mode": "read-only-plan",
+        "guard_variable": "TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED",
+        "credential_secret": "MISTRAL_API_KEY",
+        "schedule_allowed": false
+      }
     }
   ],
   "retired_actors": ["gemini_agent", "gemini_chat"],
