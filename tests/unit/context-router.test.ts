@@ -8,21 +8,23 @@ const ROOT = process.cwd();
 const ROUTER = path.join(ROOT, 'scripts', 'context-router.mjs');
 let scratch: string;
 let externalDirs: string[] = [];
+type EnvOverrides = Record<string, string | undefined>;
 
 function relative(file: string) {
   return path.relative(ROOT, file).replaceAll('\\', '/');
 }
 
-function baseEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+function baseEnv(extra: EnvOverrides = {}): NodeJS.ProcessEnv {
   return {
     ...process.env,
     TABIBI_CONTEXT_TEST_MODE: '1',
     TABIBI_CONTEXT_STATE_DIR: path.join(scratch, 'state'),
     ...extra,
+    NODE_ENV: process.env.NODE_ENV,
   };
 }
 
-function runRouter(args: string[], env: NodeJS.ProcessEnv = {}) {
+function runRouter(args: string[], env: EnvOverrides = {}) {
   return spawnSync(process.execPath, [ROUTER, ...args], {
     cwd: ROOT,
     env: baseEnv(env),
@@ -30,7 +32,7 @@ function runRouter(args: string[], env: NodeJS.ProcessEnv = {}) {
   });
 }
 
-function runRouterAsync(args: string[], env: NodeJS.ProcessEnv = {}) {
+function runRouterAsync(args: string[], env: EnvOverrides = {}) {
   return new Promise<{ code: number | null; stdout: string; stderr: string }>(
     (resolvePromise, rejectPromise) => {
       const child = spawn(process.execPath, [ROUTER, ...args], {
