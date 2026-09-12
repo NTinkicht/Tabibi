@@ -6,6 +6,7 @@ Pinned evaluation source:
 
 - repository: `NTinkicht/headroom`
 - synchronized fork head observed on 2026-09-11: `97aa9f6d0fc04619e4e821e7d54611eb9d6b9b81`
+- immutable install artifact: `headroom-ai[all] @ git+https://github.com/NTinkicht/headroom.git@97aa9f6d0fc04619e4e821e7d54611eb9d6b9b81`
 - upstream content merged through `headroomlabs-ai/headroom` commit `04cdf79ab0a8423d88148ba63e960ac6b4007b9c`
 
 Headroom describes itself as a local context-compression layer: tool outputs, logs, files, RAG chunks and conversation history can be compressed on the machine before reaching the LLM, with reversible retrieval/CCR support. The compression stage itself must not require sending Tabibi content to a new paid provider.
@@ -24,6 +25,7 @@ This trial is deliberately separate from the Spotify-inspired **Epic** context-r
 4. **No automatic governance edits.** `headroom learn` may generate suggestions in an isolated/gitignored or review branch context, but must never directly rewrite `AGENTS.md`, `SECURITY.md`, `ARCHITECTURE.md` or coordination protocols on `main`.
 5. **Reversible only.** If compressed output loses a needed fact, the workflow must be able to retrieve/read the original evidence immediately.
 6. **Shadow first.** Until graduation, agents still receive/use the normal authoritative evidence path; Headroom results are measured beside it rather than silently replacing it.
+7. **Exact revision only.** Every trial run must use the pinned `NTinkicht/headroom` commit above. A PyPI/unpinned install, missing VCS provenance, or any different commit is rejected rather than treated as comparable evidence.
 
 ## Initial corpus
 
@@ -79,9 +81,20 @@ A single serious omission in security, privacy, tenant isolation, migration safe
 
 ## Local evaluation
 
-Install in an isolated local environment using the documented Headroom package, then run `headroom doctor` before any evaluation. The supported Python API is `from headroom import compress`; `compress(messages, model=...)` returns compression metrics and compressed messages without itself being the LLM call.
+Use a dedicated local virtual environment and install the exact fork revision, not the floating PyPI package:
 
-A Tabibi helper is provided at `scripts/context/headroom-shadow.py`. It is metrics-only by default and restricts inputs to repository-local allowlisted paths.
+```bash
+python -m venv .venv-headroom-shadow
+# Activate the environment for your platform, then:
+python -m pip install --upgrade pip
+python -m pip install 'headroom-ai[all] @ git+https://github.com/NTinkicht/headroom.git@97aa9f6d0fc04619e4e821e7d54611eb9d6b9b81'
+headroom doctor
+python scripts/context/headroom-shadow.py coordination/TEAM_INTERACTIONS.md
+```
+
+The supported Python API is `from headroom import compress`; `compress(messages, model=...)` returns compression metrics and compressed messages without itself being the LLM call.
+
+A Tabibi helper is provided at `scripts/context/headroom-shadow.py`. It is metrics-only by default and restricts inputs to repository-local allowlisted paths. Before importing Headroom, the helper reads the installed distribution's PEP 610 `direct_url.json` provenance and requires both the approved `NTinkicht/headroom` repository and exact commit `97aa9f6d0fc04619e4e821e7d54611eb9d6b9b81`. Missing provenance or any mismatch fails closed before evaluation.
 
 ## Decision log
 
