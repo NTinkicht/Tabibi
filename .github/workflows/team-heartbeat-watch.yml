@@ -77,15 +77,18 @@ jobs:
           comments = get_all_comments(team_issue)
           latest = {}
           actor_re = re.compile(r'(?mi)^actor:\s*(chatgpt|codex|claude|copilot)\s*$')
-          heartbeat_re = re.compile(r'(?mi)^HEARTBEAT\s*$')
+          activity_re = re.compile(r'(?mi)^(?:HEARTBEAT|CHECKPOINT)\s*$')
           for comment in comments:
               body = comment.get('body') or ''
-              if not heartbeat_re.search(body):
+              if not activity_re.search(body):
                   continue
               m = actor_re.search(body)
               if not m:
                   continue
-              latest[m.group(1).lower()] = comment
+              actor = m.group(1).lower()
+              previous = latest.get(actor)
+              if previous is None or (comment.get('created_at') or '') > (previous.get('created_at') or ''):
+                  latest[actor] = comment
 
           active = {}
           for role, lease in (state.get('role_leases') or {}).items():
@@ -138,7 +141,7 @@ jobs:
               if already_recent:
                   continue
 
-              age_text = 'no heartbeat found' if age_minutes is None else f'latest heartbeat is {age_minutes} minutes old'
+              age_text = 'no heartbeat/checkpoint found' if age_minutes is None else f'latest heartbeat/checkpoint is {age_minutes} minutes old'
               team_body = (
                   f'HEARTBEAT_STALE\n\n{marker}\n'
                   f'actor: {actor}\nroles: {", ".join(roles)}\n'
