@@ -203,7 +203,10 @@ describe('WU30 consent-gated rendered dispatch composition', () => {
   it('renders exactly once after authorization and dispatches exactly one bounded envelope', async () => {
     const dispatchStore = store();
     const notificationRenderer = renderer();
-    const notificationProvider = provider({ kind: 'delivered', code: 'accepted' });
+    const notificationProvider = provider({
+      kind: 'delivered',
+      code: 'accepted',
+    });
 
     await service({
       dispatchStore: dispatchStore.value,
@@ -265,7 +268,10 @@ describe('WU30 consent-gated rendered dispatch composition', () => {
   it('preserves claim fencing after successful rendering and provider execution', async () => {
     const dispatchStore = store({ completed: null });
     const notificationRenderer = renderer();
-    const notificationProvider = provider({ kind: 'delivered', code: 'accepted' });
+    const notificationProvider = provider({
+      kind: 'delivered',
+      code: 'accepted',
+    });
 
     await expect(
       service({
@@ -319,12 +325,18 @@ describe('WU30 consent-gated rendered dispatch composition', () => {
         observer: { record },
       }).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' });
 
-      expect(notificationProvider.dispatch).toHaveBeenCalledWith(renderedEnvelope);
-      expect(JSON.stringify(dispatchStore.completeDispatchAttempt.mock.calls)).not.toContain(
+      expect(notificationProvider.dispatch).toHaveBeenCalledWith(
+        renderedEnvelope,
+      );
+      expect(
+        JSON.stringify(dispatchStore.completeDispatchAttempt.mock.calls),
+      ).not.toContain(renderedEnvelope.body);
+      expect(JSON.stringify(record.mock.calls)).not.toContain(
         renderedEnvelope.body,
       );
-      expect(JSON.stringify(record.mock.calls)).not.toContain(renderedEnvelope.body);
-      expect(JSON.stringify(record.mock.calls)).not.toContain(renderedEnvelope.title);
+      expect(JSON.stringify(record.mock.calls)).not.toContain(
+        renderedEnvelope.title,
+      );
     },
   );
 
