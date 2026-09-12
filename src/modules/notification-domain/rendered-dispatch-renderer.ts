@@ -117,11 +117,13 @@ export class NotificationIntentTemplateInputResolver
           variables: {},
         };
       case 'queue_entry_transferred':
-        return {
-          ...common,
-          templateId: 'queue_entry_transferred.v1',
-          variables: {},
-        };
+        // Guest-transfer delivery requires the fresh post-decryption exchange link
+        // composed by the dedicated secure path. A static transfer notification can
+        // strand the guest after the old credential is invalidated, so fail closed
+        // here until that composition path is explicitly injected into dispatch.
+        throw new Error(
+          'Guest transfer notification requires secure exchange-link composition',
+        );
       default:
         throw new Error('Unsupported notification render event');
     }
