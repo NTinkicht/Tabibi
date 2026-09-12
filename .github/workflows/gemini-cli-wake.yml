@@ -79,6 +79,7 @@ jobs:
           gemini \
             --skip-trust \
             --approval-mode=plan \
+            --exclude-tools run_shell_command,write_file,replace,google_web_search,web_fetch,activate_skill,read_mcp_resource,list_mcp_resources \
             --output-format text \
             --prompt "$(cat /tmp/tabibi-gemini-prompt.txt)" \
             > /tmp/tabibi-gemini-output.txt \
