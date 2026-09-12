@@ -11,6 +11,7 @@ function candidate(intentId: string, eligibleAt = '2026-09-11T00:00:00.000Z') {
 
 describe('NotificationDispatchBatchRunner', () => {
   it('executes selected intents in scanner order and returns aggregate-only counts', async () => {
+    const record = vi.fn();
     const listEligible = vi.fn(async () => [
       candidate('intent-1'),
       candidate('intent-2'),
@@ -30,6 +31,7 @@ describe('NotificationDispatchBatchRunner', () => {
     const runner = new NotificationDispatchBatchRunner(
       { listEligible } satisfies NotificationDispatchEligibilityStore,
       { dispatchOne } satisfies NotificationDispatchExecutor,
+      { record },
     );
 
     const summary = await runner.run({ clinicId: ' clinic-1 ', limit: 3 });
@@ -49,6 +51,14 @@ describe('NotificationDispatchBatchRunner', () => {
       'intent-3',
     ]);
     expect(JSON.stringify(summary)).not.toContain('providerResult');
+    expect(record).toHaveBeenCalledWith({
+      name: 'notification.dispatch.batch',
+      clinicId: 'clinic-1',
+      selected: 3,
+      completed: 1,
+      notClaimed: 1,
+      claimLost: 1,
+    });
   });
 
   it('returns an empty deterministic summary when no intent is eligible', async () => {

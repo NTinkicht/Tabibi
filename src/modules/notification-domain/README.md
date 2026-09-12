@@ -46,3 +46,20 @@ ownership mechanism. The returned batch summary contains aggregate counts only
 provider payloads or patient-sensitive notification data. WU25 deliberately does
 not add a timer, cron process, daemon, queue consumer, real provider network call,
 or cross-clinic scheduler.
+
+## Operational observability contract
+
+Dispatch services accept a `NotificationDispatchObserver` and emit synchronous,
+structured metadata-only events after each authoritative result. Single-intent
+events distinguish `not_claimed`, `claim_lost`, and persisted outcomes. Persisted
+outcomes expose the attempt/max-attempt counters plus `retryScheduled` and
+`exhausted`, allowing retry and dead-letter alerts without reading payloads.
+Bounded runs emit one clinic-scoped aggregate containing only selected/completed/
+not-claimed/claim-lost counts. The default observer is an explicit no-op so the
+domain remains independent of a metrics or logging vendor.
+
+The schema deliberately permits only clinic and intent identifiers, fixed
+categorical outcomes, and numeric/boolean counters. It excludes payloads, event
+content, patient/queue identities, phone numbers, provider codes, claim tokens,
+provider idempotency keys, credentials, and exception messages. These operational
+events are not written to `audit_events`; audit history remains a separate module.

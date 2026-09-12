@@ -1,5 +1,9 @@
 import type { NotificationDispatchExecution } from '@/modules/notification-domain';
 import type { NotificationDispatchEligibleIntent } from '@/modules/notification-outbox/dispatch-eligibility';
+import {
+  noNotificationDispatchObserver,
+  type NotificationDispatchObserver,
+} from '@/modules/notification-domain/observability';
 
 export interface NotificationDispatchEligibilityStore {
   listEligible(input: {
@@ -27,6 +31,7 @@ export class NotificationDispatchBatchRunner {
   constructor(
     private readonly eligibilityStore: NotificationDispatchEligibilityStore,
     private readonly executor: NotificationDispatchExecutor,
+    private readonly observer: NotificationDispatchObserver = noNotificationDispatchObserver,
   ) {}
 
   async run(input: {
@@ -56,6 +61,12 @@ export class NotificationDispatchBatchRunner {
       else if (result.status === 'not_claimed') summary.notClaimed += 1;
       else summary.claimLost += 1;
     }
+
+    this.observer.record({
+      name: 'notification.dispatch.batch',
+      clinicId,
+      ...summary,
+    });
 
     return summary;
   }
