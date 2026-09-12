@@ -93,7 +93,7 @@ describe('six-actor capacity routing', () => {
 
   it('declares standing roles for Gemini CLI and Mistral Vibe', () => {
     const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
-    const actors = new Map(
+    const actors = new Map<string, { standing_role?: string }>(
       registry.actors.map((actor: { id: string; standing_role?: string }) => [
         actor.id,
         actor,
