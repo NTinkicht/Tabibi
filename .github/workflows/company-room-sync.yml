@@ -42,7 +42,8 @@ jobs:
           token = os.environ['GH_TOKEN']
           issue_number = 21
           api = f'https://api.github.com/repos/{repo}'
-          actors = {'chatgpt', 'codex', 'claude', 'gemini_agent', 'gemini_chat'}
+          active_actors = {'chatgpt', 'codex', 'claude', 'copilot'}
+          historical_actors = active_actors | {'gemini_agent', 'gemini_chat'}
 
           def get_json(url):
               req = urllib.request.Request(url, headers={
@@ -65,9 +66,10 @@ jobs:
 
           def actor_for(comment):
               body = comment.get('body') or ''
-              m = re.search(r'(?mi)^actor:\s*(chatgpt|codex|claude|gemini_agent|gemini_chat|gemini)\s*$', body)
+              m = re.search(r'(?mi)^actor:\s*(chatgpt|codex|claude|copilot|gemini_agent|gemini_chat|gemini)\s*$', body)
               if m:
                   actor = m.group(1).lower()
+                  # Historical alias only. Gemini is retired and never appears on the current board.
                   return 'gemini_agent' if actor == 'gemini' else actor
               login = (comment.get('user') or {}).get('login', 'unknown')
               return login
@@ -84,7 +86,7 @@ jobs:
               parsed = {f: (field_res[f].search(body).group(1).strip() if field_res[f].search(body) else '') for f in field_names}
               actor = parsed.get('actor', '').lower()
               if actor == 'gemini': actor = 'gemini_agent'
-              if actor not in actors:
+              if actor not in historical_actors:
                   actor = actor_for(c)
               parsed['actor'] = actor
               parsed['created_at'] = c.get('created_at') or ''
@@ -94,13 +96,15 @@ jobs:
           now = datetime.now(timezone.utc)
           latest = {}
           for s in standups:
-              if s['actor'] in actors:
+              if s['actor'] in active_actors:
                   latest[s['actor']] = s
 
           lines = [
               '# Tabibi Standups', '',
               '> Generated from `STANDUP` posts in Team Room Issue #21. Do not edit manually except to repair the sync.', '',
               f'- Last sync: {now.isoformat()}',
+              '- Current active roster: `chatgpt`, `codex`, `claude`, `copilot`.',
+              '- Historical retired-actor standups remain in the archive only.',
               '- Company playbook: `coordination/COMPANY_OPERATING_SYSTEM.md`', '',
               '## Latest standup board', '',
               '| Actor | Date | Yesterday | Today | Blockers | Risks | Help wanted | Refactor watch | Team note |',
@@ -110,7 +114,7 @@ jobs:
           def cell(v):
               return (v or '—').replace('|','\\|').replace('\n',' ')
 
-          for actor in ['chatgpt','codex','claude','gemini_agent','gemini_chat']:
+          for actor in ['chatgpt','codex','claude','copilot']:
               s = latest.get(actor)
               if not s:
                   lines.append(f'| {actor} | — | — | — | — | — | — | — | — |')
@@ -155,6 +159,7 @@ jobs:
               '# Tabibi Engineering Chat', '',
               '> Generated from conversational/team-learning markers in Team Room Issue #21. This is the readable company chat; `TEAM_INTERACTIONS.md` remains the complete raw mirror.', '',
               f'- Last sync: {now.isoformat()}',
+              '- Current roster: `chatgpt`, `codex`, `claude`, `copilot`; historical retired-actor entries remain preserved.',
               '- Motto: **coffee optional, evidence mandatory.**', '',
           ]
           for c in comments:
