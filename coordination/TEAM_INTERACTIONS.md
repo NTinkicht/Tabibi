@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-11T19:57:34.666661+00:00
+- Last sync: 2026-09-12T08:56:38.916198+00:00
 
 ## Team Room charter
 
@@ -13891,5 +13891,311 @@ CodeRabbit's current review is CHANGES_REQUIRED with unresolved Major findings a
 Do not spend Claude Pro capacity on a duplicate gate for #153. This does not globally alter Tabibi's normal reviewer hierarchy.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639917836
+
+---
+
+### 2026-09-11T19:57:49Z — coderabbitai[bot]
+
+<!-- This is an auto-generated reply by CodeRabbit -->
+`@NTinkicht`, acknowledged.
+
+For PR `#153`, CodeRabbit is the binding independent governance gate. The Claude gate assignment is released for this PR only.
+
+PR `#153` must remain blocked until the Major findings are remediated or disproven with evidence. The final unchanged head must pass exact-head CI and receive a fresh `@coderabbitai full review`. The CodeRabbit final verdict is binding for this PR.
+
+---
+
+<details>
+<summary>✏️ Learnings added</summary>
+
+```
+Learnt from: NTinkicht
+URL: https://github.com/NTinkicht/Tabibi/issues/21
+
+Timestamp: 2026-09-11T19:57:47.213Z
+Learning: For Tabibi PR `#153` only, the owner assigned CodeRabbit as the binding independent governance gate. The prior Claude gate assignment is released for this pull request only. PR `#153` requires remediation or evidence-based disposition of the Headroom reproducibility/revision-verification and shadow-compression Major findings, green exact-head CI, and a fresh `coderabbitai full review` before merge. This exception does not change the normal Tabibi reviewer hierarchy.
+```
+
+> Note: Learnings are effective only in the context of similar code segments. To apply general coding guidelines, please configure [review instructions](https://docs.coderabbit.ai/guides/review-instructions). You can manage existing learnings in the [app](https://app.coderabbit.ai/learnings).
+
+</details>
+
+_You are interacting with an AI system._
+
+
+<!-- <agentComponentType>chat-answer</agentComponentType> -->
+
+<!-- <rawResChunk><answer>`@NTinkicht`, acknowledged.
+
+For PR `#153`, CodeRabbit is the binding independent governance gate. The Claude gate assignment is released for this PR only.
+
+PR `#153` must remain blocked until the Major findings are remediated or disproven with evidence. The final unchanged head must pass exact-head CI and receive a fresh `@coderabbitai full review`. The CodeRabbit final verdict is binding for this PR.
+
+---
+
+<details>
+<summary>✏️ Learnings added</summary>
+
+```
+Learnt from: NTinkicht
+URL: https://github.com/NTinkicht/Tabibi/issues/21
+
+Timestamp: 2026-09-11T19:57:47.213Z
+Learning: For Tabibi PR `#153` only, the owner assigned CodeRabbit as the binding independent governance gate. The prior Claude gate assignment is released for this pull request only. PR `#153` requires remediation or evidence-based disposition of the Headroom reproducibility/revision-verification and shadow-compression Major findings, green exact-head CI, and a fresh `coderabbitai full review` before merge. This exception does not change the normal Tabibi reviewer hierarchy.
+```
+
+> Note: Learnings are effective only in the context of similar code segments. To apply general coding guidelines, please configure [review instructions](https://docs.coderabbit.ai/guides/review-instructions). You can manage existing learnings in the [app](https://app.coderabbit.ai/learnings).
+
+</details>
+
+</answer></rawResChunk> -->
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5639922342
+
+---
+
+### 2026-09-11T22:30:42Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 6350 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5641367574
+
+---
+
+### 2026-09-11T22:30:43Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 1603 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5641367736
+
+---
+
+### 2026-09-11T22:30:45Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5641367914
+
+---
+
+### 2026-09-12T01:03:39Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 6503 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5642395665
+
+---
+
+### 2026-09-12T01:03:40Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 1756 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5642395777
+
+---
+
+### 2026-09-12T01:03:41Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5642395865
+
+---
+
+### 2026-09-12T05:43:43Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=chatgpt work_stream=wu14_active
+actor: chatgpt
+roles: orchestrator
+observation: latest heartbeat is 6783 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5643913895
+
+---
+
+### 2026-09-12T05:43:44Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=codex work_stream=wu14_active
+actor: codex
+roles: implementer
+observation: latest heartbeat is 2036 minutes old; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5643914054
+
+---
+
+### 2026-09-12T05:43:45Z — github-actions[bot]
+
+HEARTBEAT_STALE
+
+WATCHDOG_STALE actor=copilot work_stream=wu14_active
+actor: copilot
+roles: secondary_verifier
+observation: no heartbeat found; threshold is 30 minutes.
+action: orchestrator must reconcile branch/PR/CI activity immediately. If no deterministic work is still progressing, apply role failover rather than waiting for the Product Owner.
+This marker is a watchdog signal, not automatic proof that the actor failed.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5643914140
+
+---
+
+### 2026-09-12T06:29:12Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr153:c228680fbff184f24fa2d9813446e19c762d2851 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #153
+head: c228680fbff184f24fa2d9813446e19c762d2851
+CI_GREEN_HANDOFF — PR #153 exact head `c228680fbff184f24fa2d9813446e19c762d2851` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5644198977
+
+---
+
+### 2026-09-12T06:33:50Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr153:ad7721b3be0585446ddfde8c2d0c1ed5e699881b -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #153
+head: ad7721b3be0585446ddfde8c2d0c1ed5e699881b
+CI_GREEN_HANDOFF — PR #153 exact head `ad7721b3be0585446ddfde8c2d0c1ed5e699881b` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5644221672
+
+---
+
+### 2026-09-12T06:37:47Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr153:9aac278447679b241cd909326f4a07128a767903 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #153
+head: 9aac278447679b241cd909326f4a07128a767903
+CI_GREEN_HANDOFF — PR #153 exact head `9aac278447679b241cd909326f4a07128a767903` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5644239759
+
+---
+
+### 2026-09-12T06:39:58Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr153:4fcff66b7396e73c63d1ca377fe5fd4096a60459 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #153
+head: 4fcff66b7396e73c63d1ca377fe5fd4096a60459
+POST_MERGE_RECONCILE — PR #153 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5644249470
+
+---
+
+### 2026-09-12T07:09:49Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr151:712ceee0263d0d6efd10d0d12c96fa8798041bde -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #151
+head: 712ceee0263d0d6efd10d0d12c96fa8798041bde
+CI_GREEN_HANDOFF — PR #151 exact head `712ceee0263d0d6efd10d0d12c96fa8798041bde` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5644382052
+
+---
+
+### 2026-09-12T07:25:06Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr151:550a3ac70bbd2b8f077cdaa460877299b5386114 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #151
+head: 550a3ac70bbd2b8f077cdaa460877299b5386114
+CI_GREEN_HANDOFF — PR #151 exact head `550a3ac70bbd2b8f077cdaa460877299b5386114` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5644451424
+
+---
+
+### 2026-09-12T07:32:11Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr151:30d2c98d57681716cb73d403ad97e79b6c060df9 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #151
+head: 30d2c98d57681716cb73d403ad97e79b6c060df9
+CI_GREEN_HANDOFF — PR #151 exact head `30d2c98d57681716cb73d403ad97e79b6c060df9` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5644482321
+
+---
+
+### 2026-09-12T08:56:28Z — NTinkicht
+
+CHECKPOINT
+actor: claude
+role: independent adversarial reviewer / merge gate (EPIC-CONTEXT-GATE-001)
+work_stream: PR #151 (Issue #150, zero-extra-cost context router and AI capacity governor)
+what_changed: posted PASS/MERGE_READY on PR #151's exact head 30d2c98d57681716cb73d403ad97e79b6c060df9. Verified by hand-tracing rather than reading: (1) scripts/context-router.mjs's symlink-escape containment (lexical + realpath re-check, both re-validated against sensitive-path patterns, reads use the already-resolved path so there's no re-traversal TOCTOU) against a real symlink test targeting a real external tempdir; (2) the Copilot budget-reservation concurrency design (exclusive wx lock + a separate short-lived wx gate serializing lock-creation/stale-recovery) against two real concurrent-child-process race tests, not mocked timers; (3) the OpenRouter/paid-provider circuit breaker via tests/unit/ai-capacity-policy.test.ts, confirmed non-vacuous since openrouter-review-council.yml and qodo-pr-agent-review.yml (the workflows that carried OPENROUTER_API_KEY) are actually deleted in this diff; (4) the AGENTS.md/CLAUDE.md rewrite is a consolidation, not a weakening -- diffed removed vs. added content directly and confirmed every invariant I'd block on (non-self-gate, Medium+/Major+ reconciliation, GitHub-as-source-of-truth, financial circuit breaker) survives; (5) Issue #150's acceptance criteria are met, including the two WU25 Minor follow-ups being correctly carried into WORK_QUEUE.md rather than dropped.
+evidence: CI green on exact head (run 34680908438, all 3 required jobs); mergeable_state clean; zero open review threads; review posted at https://github.com/NTinkicht/Tabibi/pull/151#pullrequestreview (COMMENT event -- GitHub's API rejected a native APPROVE since this token is the PR author's own account, so the verdict text in the comment is the binding artifact, consistent with how prior gates in this session were posted).
+next_action: PR #151 is ready for the orchestrator/owner's mechanical merge. Two non-blocking notes recorded (a theoretical same-millisecond temp-file-name collision in writeBudgetAtomic I could not construct a real failure for; a suggestion that a second independent reviewer pass the concurrency/security surface if capacity allows, per AGENTS.md's advisory "should" for high-risk concurrency changes -- not blocking my own PASS).
+blocker: none
+
+Separately: WU10 (Issue #104/PR #106) closure was re-verified this session -- the merge (commit 2848474429c611656183881d85c593d07ee585ae) has zero drift from the reviewed/PASSed head for src/ and tests/. That work predates the Company OS v2 restructuring and post-WU25 STATE.json schema change, so it is not represented in the new compact STATE.json (which no longer carries a completed_work history array) -- recording it here for the durable record rather than trying to retrofit the old schema.
+
+---
+_Generated by [Claude Code](https://claude.ai/code)_
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5644868963
 
 ---
