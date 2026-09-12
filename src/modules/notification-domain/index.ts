@@ -6,6 +6,7 @@ import type {
 } from '@/modules/notification-outbox';
 import {
   notificationSuppressionReason,
+  type NotificationDeliveryContext,
   type NotificationDeliveryContextResolver,
   type NotificationSuppressionReason,
 } from '@/modules/notification-domain/delivery-policy';
@@ -192,9 +193,48 @@ export class NotificationDispatchService {
       return { status: 'not_claimed' };
     }
 
-    const currentDeliveryContext = await this.deliveryContext.resolve(
-      claim.intent,
-    );
+    const idempotencyKey = providerIdempotencyKey(claim);
+    let currentDeliveryContext: NotificationDeliveryContext;
+    try {
+      currentDeliveryContext = await this.deliveryContext.resolve(claim.intent);
+    } catch {
+      const resolverResult: NotificationProviderResult = {
+        kind: 'retryable_failure',
+        code: 'delivery_context_failure',
+      };
+      const completed = await this.store.completeDispatchAttempt({
+        clinicId,
+        intentId: claim.intent.id,
+        claimToken: claim.claimToken,
+        outcome: 'failed',
+        outcomeCode: 'delivery_context_failure',
+      });
+
+      if (!completed) {
+        recordNotificationDispatchEvent(this.observer, {
+          name: 'notification.dispatch.claim_lost',
+          clinicId,
+          intentId: claim.intent.id,
+          providerResultKind: resolverResult.kind,
+        });
+        return {
+          status: 'claim_lost',
+          claimToken: claim.claimToken,
+          providerIdempotencyKey: idempotencyKey,
+          providerResult: resolverResult,
+        };
+      }
+
+      recordPersistedOutcome(this.observer, completed);
+      return {
+        status: 'completed',
+        claimToken: claim.claimToken,
+        providerIdempotencyKey: idempotencyKey,
+        providerResult: resolverResult,
+        intent: completed,
+      };
+    }
+
     const suppressionReason = notificationSuppressionReason(
       claim.intent,
       currentDeliveryContext,
@@ -232,12 +272,11 @@ export class NotificationDispatchService {
       };
     }
 
-    const idempotencyKey = providerIdempotencyKey(claim);
     let providerRequest: RenderedNotificationDispatchEnvelope;
     try {
       providerRequest = await this.renderer.renderAuthorized({
         intent: claim.intent,
-        deliveryContext: currentDeliveryContext!,
+        deliveryContext: currentDeliveryContext,
         providerIdempotencyKey: idempotencyKey,
       });
     } catch {
