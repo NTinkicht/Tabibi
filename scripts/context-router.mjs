@@ -145,7 +145,11 @@ function profile(paths) {
     });
   }
   process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);
-  appendMetric({ operation: 'profile', fileCount: rows.length, modelInvoked: false });
+  appendMetric({
+    operation: 'profile',
+    fileCount: rows.length,
+    modelInvoked: false,
+  });
 }
 
 function slice(requested, rawStart, rawCount = '120') {
@@ -176,7 +180,10 @@ function validateBudget(budget) {
   if (budget.hardStop === true) {
     throw new Error('Local Copilot context hard stop is active.');
   }
-  if (!Number.isSafeInteger(budget.remainingUnits) || budget.remainingUnits <= 0) {
+  if (
+    !Number.isSafeInteger(budget.remainingUnits) ||
+    budget.remainingUnits <= 0
+  ) {
     throw new Error('No local Copilot context units remain.');
   }
   return budget;
@@ -326,7 +333,9 @@ function buildEvidence(specs) {
       .slice(start - 1, end)
       .map((line, index) => `${start + index}: ${line}`)
       .join('\n');
-    if (excerpt.length > MAX_FILE_CHARS) excerpt = excerpt.slice(0, MAX_FILE_CHARS);
+    if (excerpt.length > MAX_FILE_CHARS) {
+      excerpt = excerpt.slice(0, MAX_FILE_CHARS);
+    }
     if (total + excerpt.length > MAX_COMPRESS_CHARS) break;
     total += excerpt.length;
     chunks.push(
@@ -363,7 +372,9 @@ function compress(question, specs) {
       { cwd: ROOT, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 },
     );
     if (result.error?.code === 'ENOENT') {
-      throw new Error('Copilot CLI is not installed; use deterministic retrieval instead.');
+      throw new Error(
+        'Copilot CLI is not installed; use deterministic retrieval instead.',
+      );
     }
     if (result.status !== 0) {
       throw new Error(
