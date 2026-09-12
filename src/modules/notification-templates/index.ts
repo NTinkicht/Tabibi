@@ -16,8 +16,11 @@ export type NotificationTemplateDirection = 'rtl' | 'ltr';
 
 type TemplateVariables = {
   'appointment_confirmed.v1': Record<string, never>;
-  'queue_entry_created.v1': { position: number };
-  'estimate_changed_materially.v1': { etaMinutes: number };
+  'queue_entry_created.v1': Record<string, never>;
+  'estimate_changed_materially.v1': {
+    windowStartMinutes: number;
+    windowEndMinutes: number;
+  };
   'turn_approaching.v1': { position: number };
   'patient_called.v1': Record<string, never>;
   'session_delayed.v1': { delayMinutes: number };
@@ -67,22 +70,25 @@ const copies: Record<
   'queue_entry_created.v1': {
     fr: {
       title: 'Ajout à la file d’attente',
-      body: ({ position }) => `Votre position actuelle est ${position}.`,
+      body: () =>
+        'Votre inscription est enregistrée. Le moment de votre passage reste provisoire et peut évoluer.',
     },
     ar: {
       title: 'تمت إضافتك إلى قائمة الانتظار',
-      body: ({ position }) => `ترتيبك الحالي هو ${position}.`,
+      body: () =>
+        'تم تسجيلك في قائمة الانتظار. موعد دورك تقريبي وقد يتغير.',
     },
   },
   'estimate_changed_materially.v1': {
     fr: {
       title: 'Mise à jour de l’attente',
-      body: ({ etaMinutes }) =>
-        `Le temps d’attente estimé est de ${etaMinutes} minutes.`,
+      body: ({ windowStartMinutes, windowEndMinutes }) =>
+        `Votre attente provisoire est estimée entre ${windowStartMinutes} et ${windowEndMinutes} minutes. Cette estimation peut évoluer.`,
     },
     ar: {
       title: 'تحديث وقت الانتظار',
-      body: ({ etaMinutes }) => `وقت الانتظار المقدر هو ${etaMinutes} دقيقة.`,
+      body: ({ windowStartMinutes, windowEndMinutes }) =>
+        `الانتظار التقديري حاليًا بين ${windowStartMinutes} و${windowEndMinutes} دقيقة، وقد يتغير هذا التقدير.`,
     },
   },
   'turn_approaching.v1': {
@@ -149,8 +155,11 @@ const copies: Record<
 
 const variableNames: Record<NotificationTemplateId, readonly string[]> = {
   'appointment_confirmed.v1': [],
-  'queue_entry_created.v1': ['position'],
-  'estimate_changed_materially.v1': ['etaMinutes'],
+  'queue_entry_created.v1': [],
+  'estimate_changed_materially.v1': [
+    'windowStartMinutes',
+    'windowEndMinutes',
+  ],
   'turn_approaching.v1': ['position'],
   'patient_called.v1': [],
   'session_delayed.v1': ['delayMinutes'],
@@ -246,6 +255,13 @@ export function renderNotificationTemplate(
       );
     variables[name] = value as number;
   }
+  if (
+    templateId === 'estimate_changed_materially.v1' &&
+    variables.windowEndMinutes < variables.windowStartMinutes
+  )
+    throw new NotificationTemplateValidationError(
+      'Invalid notification template variables',
+    );
 
   const locale = resolveNotificationTemplateLocale(raw.locale);
   const copy = copies[templateId][locale];
@@ -257,5 +273,47 @@ export function renderNotificationTemplate(
     direction: locale === 'ar' ? 'rtl' : 'ltr',
     title: copy.title,
     body: copy.body(variables),
+  };
+}
+
+/**
+ * The guest transfer exchange URL is decrypted/resolved outside the general
+ * renderer. This narrow composition path accepts only the expected HTTPS
+ * exchange route, preventing arbitrary strings or credentials from crossing
+ * the strict rendering boundary.
+ */
+export function composeGuestTransferExchangeLink(
+  rendered: RenderedNotificationTemplate,
+  exchangeUrl: string,
+): RenderedNotificationTemplate {
+  if (rendered.templateId !== 'queue_entry_transferred.v1')
+    throw new NotificationTemplateValidationError(
+      'Invalid guest transfer notification',
+    );
+
+  let parsed: URL;
+  try {
+    parsed = new URL(exchangeUrl);
+  } catch {
+    throw new NotificationTemplateValidationError(
+      'Invalid guest transfer notification',
+    );
+  }
+
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash ||
+    !/^\/g\/exchange\/[A-Za-z0-9_-]+$/.test(parsed.pathname)
+  )
+    throw new NotificationTemplateValidationError(
+      'Invalid guest transfer notification',
+    );
+
+  return {
+    ...rendered,
+    body: `${rendered.body}\n${parsed.toString()}`,
   };
 }
