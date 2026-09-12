@@ -42,8 +42,10 @@ function payloadRecord(intent: NotificationIntent): Record<string, unknown> {
 function requiredNumber(
   payload: Record<string, unknown>,
   key: string,
+  fallbackKey?: string,
 ): number {
-  const value = payload[key];
+  const value =
+    payload[key] ?? (fallbackKey ? payload[fallbackKey] : undefined);
   if (typeof value !== 'number' || !Number.isFinite(value))
     throw new Error('Missing notification render input');
   return value;
@@ -95,7 +97,9 @@ export class NotificationIntentTemplateInputResolver
           ...common,
           templateId: 'turn_approaching.v1',
           variables: {
-            position: requiredNumber(payload, 'position'),
+            // `places` is a documented read-only compatibility alias for persisted
+            // WU24/WU30 fixtures. New producers must write canonical `position`.
+            position: requiredNumber(payload, 'position', 'places'),
           },
         };
       case 'patient_called':
@@ -115,6 +119,8 @@ export class NotificationIntentTemplateInputResolver
           variables: {},
         };
       case 'queue_entry_transferred':
+        // Guest-transfer delivery requires the fresh post-decryption exchange link.
+        // Fail closed until that secure composition path is explicitly injected.
         throw new Error(
           'Guest transfer notification requires secure exchange-link composition',
         );
