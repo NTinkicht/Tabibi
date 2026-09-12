@@ -183,7 +183,9 @@ export class NotificationDispatchService {
     // Resolve current authorization only after the exact claim and immediately
     // before provider execution. A resolver failure is deliberately not caught:
     // no provider call occurs and the existing claim lease recovery can retry.
-    const currentDeliveryContext = await this.deliveryContext.resolve(claim.intent);
+    const currentDeliveryContext = await this.deliveryContext.resolve(
+      claim.intent,
+    );
     const suppressionReason = notificationSuppressionReason(
       claim.intent,
       currentDeliveryContext,
