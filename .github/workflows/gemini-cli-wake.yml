@@ -229,6 +229,7 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           READY: ${{ steps.preflight.outputs.ready }}
           PREFLIGHT_REASON: ${{ steps.preflight.outputs.reason }}
           ACTOR_EXIT: ${{ steps.actor.outputs.exit_code }}
@@ -236,6 +237,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          if [[ "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" ]]; then
+            # Defense in depth: the model has no secret-reading tool, but scrub the
+            # literal provider credential and common authorization/key renderings
+            # before any model-authored text can reach the public wake-bus comment.
+            python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          source = Path('/tmp/tabibi-gemini-output.txt')
+          target = Path('/tmp/tabibi-gemini-public.txt')
+          text = source.read_text(encoding='utf-8', errors='replace') if source.exists() else ''
+          secret = os.environ.get('GEMINI_API_KEY', '')
+          if secret:
+              text = text.replace(secret, '[REDACTED]')
+          text = re.sub(r'(?i)(authorization\s*:\s*bearer\s+)\S+', r'\1[REDACTED]', text)
+          text = re.sub(r'(?i)((?:GEMINI_API_KEY|GOOGLE_API_KEY)\s*[=:]\s*)\S+', r'\1[REDACTED]', text)
+          target.write_text(text[:50000], encoding='utf-8')
+          PY
+          fi
+
           {
             echo "**gemini-cli unattended wake**"
             echo
@@ -245,7 +268,7 @@ jobs:
               echo "CAPACITY_DEGRADED - ${ACTOR_REASON:-Gemini CLI exited without a usable result}. No paid fallback was attempted."
             else
               echo '```text'
-              head -c 50000 /tmp/tabibi-gemini-output.txt
+              cat /tmp/tabibi-gemini-public.txt
               echo
               echo '```'
             fi
