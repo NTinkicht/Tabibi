@@ -51,9 +51,19 @@ jobs:
               'claude': 'SLACK_CLAUDE_BOT_TOKEN',
               'copilot': 'SLACK_COPILOT_BOT_TOKEN',
           }
+          relay_actor_labels = {
+              'gemini-cli': 'Gemini CLI',
+              'mistral-vibe': 'Mistral Vibe',
+          }
           prefix = ''
           env_name = token_env.get(actor)
-          if not env_name:
+          if actor in relay_actor_labels:
+              env_name = 'SLACK_CHATGPT_BOT_TOKEN'
+              prefix = (
+                  f"*{relay_actor_labels[actor]} (`{actor}`) — relayed by the ChatGPT Slack app; "
+                  "no dedicated Slack credential*\n"
+              )
+          elif not env_name:
               env_name = 'SLACK_CHATGPT_BOT_TOKEN'
               prefix = '*Nassim — Product Owner / trusted Team Room relay*\n'
 
