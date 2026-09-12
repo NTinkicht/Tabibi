@@ -62,11 +62,13 @@ describe('NotificationDispatchBatchRunner', () => {
   });
 
   it('returns an empty deterministic summary when no intent is eligible', async () => {
+    const record = vi.fn();
     const listEligible = vi.fn(async () => []);
     const dispatchOne = vi.fn<NotificationDispatchExecutor['dispatchOne']>();
     const runner = new NotificationDispatchBatchRunner(
       { listEligible },
       { dispatchOne },
+      { record },
     );
 
     await expect(
@@ -78,5 +80,14 @@ describe('NotificationDispatchBatchRunner', () => {
       claimLost: 0,
     });
     expect(dispatchOne).not.toHaveBeenCalled();
+    expect(record).toHaveBeenCalledOnce();
+    expect(record).toHaveBeenCalledWith({
+      name: 'notification.dispatch.batch',
+      clinicId: 'clinic-1',
+      selected: 0,
+      completed: 0,
+      notClaimed: 0,
+      claimLost: 0,
+    });
   });
 });
