@@ -1,0 +1,204 @@
+{
+  "version": 1,
+  "financial_mode": "zero-extra-spend",
+  "principles": {
+    "roles_belong_to_project": true,
+    "one_implementer_per_stream": true,
+    "exact_head_independent_review": true,
+    "paid_fallback_allowed": false
+  },
+  "actors": [
+    {
+      "id": "chatgpt",
+      "active": true,
+      "capabilities": [
+        "orchestration",
+        "architecture",
+        "implementation",
+        "review",
+        "qa",
+        "documentation",
+        "ci_remediation",
+        "merge_execution",
+        "research",
+        "scouting",
+        "long_context_analysis"
+      ],
+      "included_capacity": "ChatGPT Plus",
+      "paid_fallback": false
+    },
+    {
+      "id": "codex",
+      "active": true,
+      "capabilities": [
+        "orchestration",
+        "architecture",
+        "implementation",
+        "review",
+        "qa",
+        "documentation",
+        "ci_remediation",
+        "merge_execution",
+        "research",
+        "scouting",
+        "long_context_analysis"
+      ],
+      "included_capacity": "ChatGPT included Codex capacity",
+      "paid_fallback": false
+    },
+    {
+      "id": "claude",
+      "active": true,
+      "capabilities": [
+        "orchestration",
+        "architecture",
+        "implementation",
+        "review",
+        "qa",
+        "documentation",
+        "ci_remediation",
+        "merge_execution",
+        "research",
+        "scouting",
+        "long_context_analysis"
+      ],
+      "included_capacity": "Claude Pro",
+      "paid_fallback": false
+    },
+    {
+      "id": "copilot",
+      "active": true,
+      "capabilities": [
+        "orchestration",
+        "architecture",
+        "implementation",
+        "review",
+        "qa",
+        "documentation",
+        "ci_remediation",
+        "merge_execution",
+        "research",
+        "scouting",
+        "long_context_analysis"
+      ],
+      "included_capacity": "GitHub Copilot education entitlement",
+      "paid_fallback": false
+    },
+    {
+      "id": "gemini-cli",
+      "active": true,
+      "capabilities": [
+        "orchestration",
+        "architecture",
+        "implementation",
+        "review",
+        "qa",
+        "documentation",
+        "research",
+        "scouting",
+        "long_context_analysis"
+      ],
+      "included_capacity": "owner-configured Gemini CLI free/non-billable allowance",
+      "paid_fallback": false,
+      "production_merge_authority": false,
+      "wake": "interactive gemini CLI in owner Codespace"
+    },
+    {
+      "id": "mistral-vibe",
+      "active": true,
+      "capabilities": [
+        "orchestration",
+        "architecture",
+        "implementation",
+        "review",
+        "qa",
+        "documentation",
+        "ci_remediation",
+        "research",
+        "scouting",
+        "long_context_analysis"
+      ],
+      "included_capacity": "existing Mistral Pro subscription allowance",
+      "paid_fallback": false,
+      "production_merge_authority": false,
+      "wake": "interactive vibe CLI in owner Codespace"
+    }
+  ],
+  "retired_actors": ["gemini_agent", "gemini_chat"],
+  "routing": {
+    "orchestration": [
+      "chatgpt",
+      "claude",
+      "codex",
+      "mistral-vibe",
+      "gemini-cli",
+      "copilot"
+    ],
+    "architecture": [
+      "chatgpt",
+      "claude",
+      "mistral-vibe",
+      "codex",
+      "gemini-cli",
+      "copilot"
+    ],
+    "implementation": [
+      "codex",
+      "claude",
+      "chatgpt",
+      "mistral-vibe",
+      "copilot",
+      "gemini-cli"
+    ],
+    "review": [
+      "claude",
+      "chatgpt",
+      "codex",
+      "gemini-cli",
+      "mistral-vibe",
+      "copilot"
+    ],
+    "qa": [
+      "copilot",
+      "gemini-cli",
+      "claude",
+      "mistral-vibe",
+      "chatgpt",
+      "codex"
+    ],
+    "ci_remediation": ["codex", "claude", "chatgpt", "mistral-vibe", "copilot"],
+    "documentation": [
+      "chatgpt",
+      "gemini-cli",
+      "mistral-vibe",
+      "claude",
+      "codex",
+      "copilot"
+    ],
+    "research": [
+      "gemini-cli",
+      "chatgpt",
+      "claude",
+      "mistral-vibe",
+      "codex",
+      "copilot"
+    ],
+    "scouting": [
+      "gemini-cli",
+      "chatgpt",
+      "mistral-vibe",
+      "claude",
+      "codex",
+      "copilot"
+    ],
+    "long_context_analysis": [
+      "gemini-cli",
+      "claude",
+      "chatgpt",
+      "mistral-vibe",
+      "codex",
+      "copilot"
+    ],
+    "merge_execution": ["codex", "chatgpt", "claude", "copilot"]
+  }
+}

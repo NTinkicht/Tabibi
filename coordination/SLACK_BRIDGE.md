@@ -10,14 +10,18 @@ Slack must not become a second coordination database.
 
 ## Active actor identities
 
-| Actor | Installed Slack app name | Slack manifest | GitHub Actions secret |
+| Actor | Slack representation | Slack manifest | GitHub Actions secret |
 | --- | --- | --- | --- |
-| ChatGPT | `ChatGPT` | `slack/manifests/chatgpt.yml` | `SLACK_CHATGPT_BOT_TOKEN` |
-| Codex | `Codex` | `slack/manifests/codex.yml` | `SLACK_CODEX_BOT_TOKEN` |
-| Claude | `Claude` | `slack/manifests/claude.yml` | `SLACK_CLAUDE_BOT_TOKEN` |
-| GitHub Copilot | `GitHub Copilot` | workspace app | `SLACK_COPILOT_BOT_TOKEN` |
+| ChatGPT | Dedicated `ChatGPT` app | `slack/manifests/chatgpt.yml` | `SLACK_CHATGPT_BOT_TOKEN` |
+| Codex | Dedicated `Codex` app | `slack/manifests/codex.yml` | `SLACK_CODEX_BOT_TOKEN` |
+| Claude | Dedicated `Claude` app | `slack/manifests/claude.yml` | `SLACK_CLAUDE_BOT_TOKEN` |
+| GitHub Copilot | Dedicated workspace app | workspace app | `SLACK_COPILOT_BOT_TOKEN` |
+| Gemini CLI | Clearly labeled relay via the existing ChatGPT Slack app | none | no dedicated secret |
+| Mistral Vibe | Clearly labeled relay via the existing ChatGPT Slack app | none | no dedicated secret |
 
-Gemini Agent and Gemini Chat were retired from the Tabibi operating model on 2026-09-11. Their old Slack app memberships may remain as workspace history, but Tabibi automation no longer onboards, mirrors as, wakes or requires participation from them.
+Gemini CLI and Mistral Vibe are logical Company OS actors, not new Slack applications. Their Team Room checkpoints may be mirrored through the existing ChatGPT Slack credential only when the message is visibly prefixed with the real actor identity and states that it is relayed. This avoids new Slack credentials, new paid services and identity ambiguity.
+
+Gemini Agent and Gemini Chat were retired from the Tabibi operating model on 2026-09-11. Their old Slack app memberships may remain as workspace history, but Tabibi automation no longer onboards, mirrors as, wakes or requires participation from them. They are distinct from the active `gemini-cli` actor.
 
 Never commit or paste raw `xoxb-...` tokens into GitHub, Slack, source files, logs or chat.
 
@@ -49,15 +53,15 @@ Optional social space. No quotas, scheduled nudges, scores, compliance targets o
 
 ## GitHub -> Slack
 
-`.github/workflows/slack-team-room-mirror.yml` mirrors trusted Team Room comments to `#all-tabibi` using the matching active actor Slack token when an `actor:` field identifies `chatgpt`, `codex`, `claude` or `copilot`.
+`.github/workflows/slack-team-room-mirror.yml` mirrors trusted Team Room comments to `#all-tabibi`. `chatgpt`, `codex`, `claude` and `copilot` use their dedicated configured Slack credentials. `gemini-cli` and `mistral-vibe` use a clearly labeled relay through the existing ChatGPT Slack app and do not require additional secrets.
 
 The relay trusts only explicitly allowed GitHub authors. A free-text `actor:` field from an untrusted commenter cannot select an agent Slack identity.
 
-If a comment is not attributed to an active actor, the ChatGPT relay identity is used with a Product Owner/trusted-relay prefix.
+If a trusted comment is not attributed to one of the six active actors, the ChatGPT relay identity is used with a Product Owner/trusted-relay prefix.
 
 ## Slack -> GitHub
 
-`.github/workflows/slack-owner-ingest.yml` may import verified owner messages from `#all-tabibi` into Team Room. Only Nassim's verified Slack member identity has Product Owner authority. Bot messages are ignored so the bridge cannot loop.
+`.github/workflows/slack-owner-ingest.yml` may import verified owner messages from `#all-tabibi` into Team Room. Only Nassim's verified Slack member identity has Product Owner authority. Bot messages are ignored so the bridge cannot loop. The current workflow polls every 30 minutes and is separate from ChatGPT scheduled tasks.
 
 Important conclusions reached in Slack must be promoted to the appropriate GitHub artifact: finding, test idea, process decision, task, lease, PR comment, contract or durable lesson.
 
@@ -67,5 +71,6 @@ Important conclusions reached in Slack must be promoted to the appropriate GitHu
 - Slack messages do not create implementation/review authority by themselves.
 - One canonical implementation stream and one implementer remain mandatory.
 - Do not mirror secrets, credentials, raw patient data or prohibited sensitive material.
+- Relayed messages must identify the logical actor; a relay must never pretend to be a dedicated provider Slack app.
 - Humor must remain workplace-safe and never target patients/medical conditions.
 - If Slack is unavailable, GitHub Team Room remains fully functional and authoritative.

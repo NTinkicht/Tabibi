@@ -1,13 +1,14 @@
 {
   "project": "Tabibi",
-  "phase": "epic_org_002_ready",
-  "state": "pr151_merged_epic_context_001_complete",
-  "current_pr": null,
-  "current_issue": null,
-  "last_actor": "claude",
-  "next_actor": "chatgpt",
-  "next_action": "PR #151 (Issue #150) is merged (commit d935e5f) and closed. Claude independently gated exact head 30d2c98d57681716cb73d403ad97e79b6c060df9 as PASS/MERGE_READY before merge, then verified zero drift between that head and the merge commit across the entire diff (not just coordination files). Note: this STATE.json had reverted to a pre-gate snapshot on the PR151 branch (a 'revert generated sync drift' commit undid the interim update from coordination PR #156) -- reconciled here directly against live GitHub truth rather than trusting the file's own prior content. EPIC-ORG-002 (Issue #154, Spotify-style squads/chapters/guilds and six-actor capacity routing) is now unblocked; EPIC-ACTORS-003 (Issue #155, activate Gemini CLI and Mistral Vibe) is also open and unscoped. Next: ChatGPT to scope/open the canonical implementation stream for one of these.",
-  "operating_model": "four-active-actor-mesh-v9-epic-zero-extra-cost-context-routing",
+  "phase": "epic_six_actor_company_os",
+  "state": "pr158_awaiting_exact_head_ci_and_gate",
+  "current_pr": 158,
+  "current_issue": 154,
+  "related_issue": 155,
+  "last_actor": "chatgpt",
+  "next_actor": "ci_then_eligible_non_author_reviewer",
+  "next_action": "Validate PR #158 on its exact head. If required CI is green, reconcile every reviewer source and obtain an eligible independent non-author exact-head gate, then merge mechanically and close Issues #154/#155.",
+  "operating_model": "six-active-actor-mesh-v10-epic-company-os-v3",
   "binding_protocols": [
     "AGENTS.md",
     "coordination/BOOTSTRAP.md",
@@ -17,6 +18,7 @@
     "coordination/COMPANY_OPERATING_SYSTEM.md",
     "coordination/ROLE_OVERLAY_PROTOCOL.md",
     "coordination/WORK_UNIT_TEMPLATE.md",
+    "coordination/ACTOR_REGISTRY.json",
     "coordination/AI_CAPACITY_POLICY.md",
     "coordination/CONTEXT_ROUTER.md",
     "coordination/HEADROOM_SHADOW_TRIAL.md"
@@ -27,71 +29,84 @@
     "anthropic_api_or_usage_credits": "forbidden",
     "openrouter_or_metered_fallback": "forbidden",
     "copilot_paid_overage": "forbidden",
+    "gemini_paid_api_or_vertex": "forbidden",
+    "mistral_payg_or_extra_credits": "forbidden",
     "automatic_topups": "forbidden"
   },
   "team_room": {
     "issue": 21,
-    "heartbeat_target_minutes": 15,
-    "stale_active_lease_minutes": 30,
-    "active_roster": ["chatgpt", "codex", "claude", "copilot"],
+    "active_roster": [
+      "chatgpt",
+      "codex",
+      "claude",
+      "copilot",
+      "gemini-cli",
+      "mistral-vibe"
+    ],
     "retired_actors": ["gemini_agent", "gemini_chat"],
     "slack_role": "attention_and_culture_only",
     "coffee_corner": "optional_no_quota_no_reminders"
   },
   "agents": {
     "chatgpt": {
-      "capability_status": {
-        "orchestration": "available",
-        "architecture": "available",
-        "implementation": "available",
-        "review": "available_when_non_author",
-        "merge_execution": "available"
-      },
-      "current_activity": "PR #151 merged (commit d935e5f), closing Issue #150/EPIC-CONTEXT-001. Available to scope/open the next Epic slice (EPIC-ORG-002, Issue #154, or EPIC-ACTORS-003, Issue #155)."
+      "status": "active",
+      "current_activity": "PR #158 orchestrator/material author; recused from sole gate."
     },
     "codex": {
-      "capability_status": {
-        "implementation": "available_subject_to_included_plan_capacity",
-        "ci_remediation": "available_subject_to_included_plan_capacity",
-        "merge_execution": "available_subject_to_included_plan_capacity",
-        "review": "available_when_non_author_subject_to_plan_capacity"
-      },
-      "current_activity": "Preferred bounded implementation/CI/mechanical-merge lane after PR #151 handoff; no duplicate stream."
+      "status": "available_subject_to_included_capacity",
+      "current_activity": "No duplicate implementation lease; available for CI/merge failover."
     },
     "claude": {
-      "capability_status": {
-        "review": "available_subject_to_pro_capacity",
-        "adversarial_security_review": "available_subject_to_pro_capacity"
-      },
-      "current_activity": "Gated PR #151 (Issue #150) exact head 30d2c98d57681716cb73d403ad97e79b6c060df9: PASS/MERGE_READY, zero BLOCKER/MAJOR findings. Verified zero drift into merge commit d935e5f. No active lease."
+      "status": "available_subject_to_pro_capacity",
+      "current_activity": "Preferred non-author adversarial gate for PR #158 when concretely available."
     },
     "copilot": {
-      "capability_status": {
-        "qa_test_automation": "available_subject_to_included_education_entitlement",
-        "implementation": "available_subject_to_included_education_entitlement",
-        "review": "available_when_non_author_subject_to_included_education_entitlement",
-        "context_compression": "disabled_by_default_local_opt_in_only"
-      },
-      "current_activity": "QA/Test Automation and eligible non-author PR #151 Code Review; optional Luna compression is infrastructure-only."
+      "status": "available_subject_to_included_entitlement",
+      "current_activity": "QA/Test Automation and eligible non-author review fallback."
     },
-    "coderabbit": {
-      "capability_status": { "review": "supplemental_if_available" },
-      "current_activity": "Supplemental review source; all Medium+/Major findings remain binding for reconciliation, but it is not the default independent actor gate for PR #151."
+    "gemini-cli": {
+      "status": "available_probe_passed",
+      "current_activity": "Scouting/research/long-context/QA/overflow review; free/non-billable local allowance only."
+    },
+    "mistral-vibe": {
+      "status": "available_probe_passed",
+      "current_activity": "Developer reserve/design challenge/QA/overflow review; existing Pro subscription, PAYG disabled."
     }
   },
   "role_leases": {
-    "orchestrator": { "actor": "chatgpt", "status": "active" },
-    "implementer": { "actor": null, "status": "not_assigned" },
-    "gating_reviewer": { "actor": null, "status": "not_assigned" },
-    "merge_executor": { "actor": null, "status": "not_assigned" }
+    "orchestrator": {
+      "actor": "chatgpt",
+      "status": "active",
+      "work_stream": "issues-154-155-pr-158"
+    },
+    "implementer": {
+      "actor": "chatgpt",
+      "status": "implementation_complete_awaiting_ci",
+      "work_stream": "issues-154-155-pr-158"
+    },
+    "gating_reviewer": {
+      "actor": "eligible_non_author",
+      "status": "reserved_after_green_ci",
+      "note": "ChatGPT materially authored PR #158 and cannot self-gate."
+    },
+    "merge_executor": {
+      "actor": "codex_or_chatgpt",
+      "status": "mechanical_after_gates"
+    }
   },
-  "current_work": null,
-  "next_work": {
-    "id": "EPIC-ORG-002",
-    "status": "ready_unscoped",
+  "current_work": {
+    "id": "EPIC-ORG-002+EPIC-ACTORS-003",
+    "status": "implementation_complete_awaiting_ci_and_review",
     "actor": "chatgpt",
-    "scope": "Issue #154: Spotify-style squads, chapters, guilds and six-actor capacity routing, on top of the merged zero-extra-cost context layer.",
-    "sibling_candidate": "EPIC-ACTORS-003 (Issue #155: activate Gemini CLI and Mistral Vibe with zero-extra-spend guardrails) is also open and unscoped."
+    "implementation_pr": 158,
+    "branch": "epic/six-actor-capacity-routing",
+    "scope": "Six-actor Company OS v3, Spotify-inspired squads/chapters/guilds, deterministic actor registry/router, Gemini CLI and Mistral Vibe activation contracts, and zero-extra-spend guardrails.",
+    "role_overlays": ["backend-architect", "code-reviewer"],
+    "role_overlay_reason": "Coordination/runtime policy tooling plus deterministic selection tests requires architecture and independent code/governance review."
+  },
+  "activation_evidence": {
+    "gemini-cli": "probe passed: actor/repo/no-self-gating correct; no intentional repo edits; environment churn inspected/restored",
+    "mistral-vibe": "probe passed: actor/repo/no-self-gating correct; git status clean after probe; existing Pro subscription observed"
   },
   "completed_work_recent": [
     {
@@ -99,35 +114,15 @@
       "issue": 150,
       "implementation_pr": 151,
       "final_gated_head": "30d2c98d57681716cb73d403ad97e79b6c060df9",
-      "merge_commit": "d935e5f",
+      "merge_commit": "d935e5f72c74126f8b01e6a7688a3a96be7c0723",
       "review_verdict": "PASS",
-      "resolved_findings": [
-        "PR151-CR-SYMLINK-BYPASS",
-        "PR151-CR-CONCURRENT-BUDGET",
-        "PR151-CR-SENSITIVE-PATH-CLASSES"
-      ],
-      "merge_verification": "git diff 30d2c98d..d935e5f is completely empty across the entire repository -- zero drift, not limited to reviewed files",
       "status": "merged"
     }
   ],
-  "deferred_minor_followups": [
-    "WU25-FOLLOWUP-ORDER-001",
-    "WU25-FOLLOWUP-TEST-001"
-  ],
-  "headroom": {
-    "mode": "shadow_read_only",
-    "source_repo": "NTinkicht/headroom",
-    "source_head": "97aa9f6d0fc04619e4e821e7d54611eb9d6b9b81",
-    "authoritative": false,
-    "paid_provider_fallback": false,
-    "routing_position": "before_optional_copilot_luna"
-  },
   "product_architect": "chatgpt",
   "deterministic_referee": "ci",
   "open_blockers": 0,
   "open_majors": 0,
-  "open_minors": 0,
   "human_decision_required": false,
-  "pending_findings": [],
-  "review_pending_findings": []
+  "pending_findings": []
 }

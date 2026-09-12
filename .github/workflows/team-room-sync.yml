@@ -24,7 +24,7 @@ jobs:
           ref: main
           fetch-depth: 1
 
-      - name: Mirror Team Room and derive current four-actor status
+      - name: Mirror Team Room and derive current active-actor status
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
@@ -41,7 +41,13 @@ jobs:
           token = os.environ['GH_TOKEN']
           issue_number = 21
           api = f'https://api.github.com/repos/{repo}'
-          active_actors = {'chatgpt', 'codex', 'claude', 'copilot'}
+          registry = json.loads(Path('coordination/ACTOR_REGISTRY.json').read_text(encoding='utf-8'))
+          active_actor_order = [
+              actor['id']
+              for actor in registry.get('actors', [])
+              if actor.get('active') and actor.get('id')
+          ]
+          active_actors = set(active_actor_order)
 
           def get_json(url):
               req = urllib.request.Request(
@@ -107,7 +113,10 @@ jobs:
           latest_activity = {}
           heartbeat_re = re.compile(r'(?mi)^HEARTBEAT\s*$')
           activity_re = re.compile(r'(?mi)^(?:HEARTBEAT|CHECKPOINT)\s*$')
-          actor_re = re.compile(r'(?mi)^actor:\s*(chatgpt|codex|claude|copilot)\s*$')
+          actor_pattern = '|'.join(
+              re.escape(actor) for actor in sorted(active_actors, key=len, reverse=True)
+          )
+          actor_re = re.compile(rf'(?mi)^actor:\s*({actor_pattern})\s*$')
           field_res = {field: re.compile(rf'(?mi)^{re.escape(field)}:\s*(.+?)\s*$') for field in fields}
 
           for comment in comments:
@@ -141,7 +150,7 @@ jobs:
               '> Generated from latest active-roster `HEARTBEAT` details and latest `HEARTBEAT`/`CHECKPOINT` activity in GitHub Issue #21. Do not edit manually except to repair the sync mechanism.',
               '',
               f'- Last sync: {now.isoformat()}',
-              '- Active roster: `chatgpt`, `codex`, `claude`, `copilot`.',
+              '- Active roster: ' + ', '.join(f'`{actor}`' for actor in active_actor_order) + '.',
               '- Stale threshold: 30 minutes for a lease that claims `active`, unless a visible deterministic job is still progressing.',
               '- Retired actors remain visible only in the raw historical transcript.',
               '',
@@ -152,7 +161,7 @@ jobs:
           def cell(value):
               return (value or '—').replace('|', '\\|').replace('\n', ' ')
 
-          for actor in ['chatgpt', 'codex', 'claude', 'copilot']:
+          for actor in active_actor_order:
               item = latest_heartbeat.get(actor)
               activity = latest_activity.get(actor)
               if not item and not activity:
