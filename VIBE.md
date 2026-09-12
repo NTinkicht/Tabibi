@@ -19,13 +19,17 @@ Read `coordination/BOOTSTRAP.md`, `coordination/STATE.json`, `coordination/WORK_
 
 Use only the owner's already-included Mistral plan allowance. PAYG/overage must remain disabled. Do not fund extra credits, auto-top-up or switch to another billable provider.
 
-The only approved unattended provider-key path is `.github/workflows/mistral-vibe-wake.yml`, authorized by Issue #162. It may run only when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`, only from the owner-only Issue #11 wake bus, and only with the `MISTRAL_API_KEY` GitHub Actions secret. Missing guard, missing credential or exhausted included capacity means `CAPACITY_DEGRADED` and role failover.
+The only approved unattended provider-key path is `.github/workflows/mistral-vibe-wake.yml`, authorized by Issue #162. It may run only when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`, only from the owner-only Issue #11 wake bus, and only with the `MISTRAL_API_KEY` GitHub Actions secret. Missing guard, missing credential, unavailable Vibe entitlement or exhausted included capacity means `CAPACITY_DEGRADED` and role failover.
 
 Never commit Vibe/Mistral credentials or local account state.
 
 ## Unattended wake boundary
 
-The default GitHub Actions wake must invoke Vibe with `--agent plan` explicitly. Programmatic Vibe without an explicit agent may otherwise auto-approve tools, which is not acceptable for the unattended lane.
+The default GitHub Actions wake must enforce the read-only lane deterministically at runtime. Mistral documents `enabled_tools` / `--enabled-tools` as an allow-list for programmatic Vibe. The Tabibi wake therefore exposes **only** `grep` and `read_file`, both in the ephemeral Vibe config and on the CLI, and binds Vibe to the checked-out repository with `--workdir`. Shell, write/edit, MCP and other mutation-capable tools are not available in this lane.
+
+Programmatic Vibe may otherwise use its default auto-approve agent, so the tool allow-list is the authority boundary. Expanding that allow-list requires a reviewed governance/code change before use.
+
+The workflow may perform a non-inference Vibe entitlement check before model execution, but it must never print the provider response body or credential. Provider/runtime failures must be reduced to safe classified diagnostics and must not cause paid fallback. Before any model-authored result is posted publicly, the workflow must scrub the literal `MISTRAL_API_KEY` plus common bearer/key renderings as defense in depth.
 
 This wake may inspect repository evidence and report findings back to Issue #11. It must not edit files, run mutating commands, create branches/commits/PRs/reviews, change labels or merge.
 
