@@ -22,7 +22,7 @@ function environment(
 }
 
 describe('clinic-day load rehearsal', () => {
-  it('fails closed without explicit opt-in, in production, and for production-looking databases', () => {
+  it('fails closed for unsafe targets and missing opt-in', () => {
     expect(() =>
       assertLoadRehearsalAllowed(
         environment({ TABIBI_ALLOW_LOAD_REHEARSAL: undefined }),
@@ -62,7 +62,7 @@ describe('clinic-day load rehearsal', () => {
     }
   });
 
-  it('loads bounded configuration and rejects attempts to exceed committed caps', () => {
+  it('enforces bounded configuration caps', () => {
     expect(loadConfig(environment())).toMatchObject({
       seed: 'wu43-clinic-day-v1',
       clinicDayPatients: 12,
@@ -83,7 +83,7 @@ describe('clinic-day load rehearsal', () => {
     ).toThrow(/between 5000 and 60000/);
   });
 
-  it('derives stable opaque identifiers without exposing the seed as an identifier', () => {
+  it('derives stable opaque identifiers', () => {
     const first = deterministicUuid('fixed-seed', 'clinic');
     expect(first).toBe(deterministicUuid('fixed-seed', 'clinic'));
     expect(first).not.toBe(deterministicUuid('fixed-seed', 'doctor'));
@@ -93,7 +93,7 @@ describe('clinic-day load rehearsal', () => {
     expect(deterministicRunKey('fixed-seed')).toHaveLength(16);
   });
 
-  it('redacts sensitive diagnostic values while preserving failure shape', () => {
+  it('redacts sensitive diagnostic values', () => {
     const diagnostic = safeErrorDiagnostic(
       new Error(
         'failed postgresql://user:secret@localhost/tabibi_test for 123e4567-e89b-12d3-a456-426614174000 patient@example.com +971 50 123 4567',
@@ -110,7 +110,7 @@ describe('clinic-day load rehearsal', () => {
     expect(diagnostic).not.toContain('123e4567-e89b-12d3-a456-426614174000');
   });
 
-  it('aggregates only operational metrics and applies deterministic percentile math', () => {
+  it('aggregates operational metrics deterministically', () => {
     const samples = [
       {
         phase: 'clinic_day' as const,
@@ -149,15 +149,13 @@ describe('clinic-day load rehearsal', () => {
       p50Ms: 20,
       p95Ms: 40,
     });
-    expect(summary.byOperation.map((item) => item.operation)).toEqual([
-      'read',
-      'write',
-    ]);
+    const operationNames = summary.byOperation.map((item) => item.operation);
+    expect(operationNames).toEqual(['read', 'write']);
     expect(JSON.stringify(summary)).not.toContain('patient');
     expect(JSON.stringify(summary)).not.toContain('cookie');
   });
 
-  it('fails threshold evaluation for errors, wall-clock overflow, or p95 regression', () => {
+  it('fails regression thresholds', () => {
     const config = loadConfig(environment());
     const healthy = summarizeLoad(
       [
@@ -193,7 +191,7 @@ describe('clinic-day load rehearsal', () => {
     ).toThrow(/p95/i);
   });
 
-  it('executes bounded work without exceeding configured concurrency', async () => {
+  it('bounds concurrent work', async () => {
     let active = 0;
     let maximumActive = 0;
     const completed: number[] = [];
@@ -212,8 +210,7 @@ describe('clinic-day load rehearsal', () => {
     );
 
     expect(maximumActive).toBeLessThanOrEqual(2);
-    expect(completed.sort((left, right) => left - right)).toEqual([
-      0, 1, 2, 3, 4, 5,
-    ]);
+    const sortedCompleted = completed.sort((left, right) => left - right);
+    expect(sortedCompleted).toEqual([0, 1, 2, 3, 4, 5]);
   });
 });
