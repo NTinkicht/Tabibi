@@ -107,6 +107,7 @@ function inboxStore() {
     persist,
     listForSubject: vi.fn(),
     markRead: vi.fn(),
+    unreadCount: vi.fn(),
   } satisfies InAppNotificationInboxStore;
 }
 
