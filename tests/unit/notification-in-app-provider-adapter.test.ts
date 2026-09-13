@@ -16,7 +16,9 @@ import type {
 } from '@/modules/notification-outbox';
 import type { NotificationPreference } from '@/modules/notification-preferences';
 
-function intent(overrides: Partial<NotificationIntent> = {}): NotificationIntent {
+function intent(
+  overrides: Partial<NotificationIntent> = {},
+): NotificationIntent {
   return {
     id: 'intent-in-app-1',
     clinicId: 'clinic-1',
@@ -128,65 +130,59 @@ function deliveryContext(currentPreference: NotificationPreference) {
 }
 
 describe('WU33 in-app provider adapter composition', () => {
-  it(
-    'persists one bounded inbox write for authorized in_app dispatch through the existing service',
-    async () => {
-      const inbox = inboxStore();
-      const adapter = new InAppNotificationProviderAdapter(inbox, scope);
-      const dispatch = vi.spyOn(adapter, 'dispatch');
+  it('persists one bounded inbox write for authorized in_app dispatch through the existing service', async () => {
+    const inbox = inboxStore();
+    const adapter = new InAppNotificationProviderAdapter(inbox, scope);
+    const dispatch = vi.spyOn(adapter, 'dispatch');
 
-      const result = await new NotificationDispatchService(
-        dispatchStore('delivered'),
-        adapter,
-        deliveryContext(preference()),
-        60_000,
-        undefined,
-        renderer(),
-      ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-in-app-1' });
+    const result = await new NotificationDispatchService(
+      dispatchStore('delivered'),
+      adapter,
+      deliveryContext(preference()),
+      60_000,
+      undefined,
+      renderer(),
+    ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-in-app-1' });
 
-      expect(result).toMatchObject({ status: 'completed' });
-      expect(dispatch).toHaveBeenCalledTimes(1);
-      expect(inbox.persist).toHaveBeenCalledTimes(1);
-      expect(inbox.persist).toHaveBeenCalledWith(
-        expect.objectContaining({
-          clinicId: 'clinic-1',
-          subjectKind: 'visit_patient',
-          subjectId: 'patient-1',
-          envelope: expect.objectContaining({
-            channel: 'in_app',
-            providerIdempotencyKey: 'notification:intent-in-app-1',
-          }),
+    expect(result).toMatchObject({ status: 'completed' });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(inbox.persist).toHaveBeenCalledTimes(1);
+    expect(inbox.persist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clinicId: 'clinic-1',
+        subjectKind: 'visit_patient',
+        subjectId: 'patient-1',
+        envelope: expect.objectContaining({
+          channel: 'in_app',
+          providerIdempotencyKey: 'notification:intent-in-app-1',
         }),
-      );
-    },
-  );
+      }),
+    );
+  });
 
-  it(
-    'invokes neither renderer nor adapter when current consent is revoked',
-    async () => {
-      const inbox = inboxStore();
-      const adapter = new InAppNotificationProviderAdapter(inbox, scope);
-      const dispatch = vi.spyOn(adapter, 'dispatch');
-      const notificationRenderer = renderer();
+  it('invokes neither renderer nor adapter when current consent is revoked', async () => {
+    const inbox = inboxStore();
+    const adapter = new InAppNotificationProviderAdapter(inbox, scope);
+    const dispatch = vi.spyOn(adapter, 'dispatch');
+    const notificationRenderer = renderer();
 
-      const result = await new NotificationDispatchService(
-        dispatchStore('suppressed'),
-        adapter,
-        deliveryContext(preference({ consentState: 'revoked' })),
-        60_000,
-        undefined,
-        notificationRenderer,
-      ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-in-app-1' });
+    const result = await new NotificationDispatchService(
+      dispatchStore('suppressed'),
+      adapter,
+      deliveryContext(preference({ consentState: 'revoked' })),
+      60_000,
+      undefined,
+      notificationRenderer,
+    ).dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-in-app-1' });
 
-      expect(result).toMatchObject({
-        status: 'suppressed',
-        suppressionReason: 'consent_revoked',
-      });
-      expect(notificationRenderer.renderAuthorized).not.toHaveBeenCalled();
-      expect(dispatch).not.toHaveBeenCalled();
-      expect(inbox.persist).not.toHaveBeenCalled();
-    },
-  );
+    expect(result).toMatchObject({
+      status: 'suppressed',
+      suppressionReason: 'consent_revoked',
+    });
+    expect(notificationRenderer.renderAuthorized).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(inbox.persist).not.toHaveBeenCalled();
+  });
 
   it('rejects non-in_app envelopes without persistence', async () => {
     const inbox = inboxStore();
