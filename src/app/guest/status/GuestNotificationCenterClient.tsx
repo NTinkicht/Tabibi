@@ -53,7 +53,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     empty: 'No notifications yet.',
     markRead: 'Mark as read',
     markingRead: 'Marking as read…',
-    markReadFailed: 'Could not mark this notification as read. Please try again.',
+    markReadFailed:
+      'Could not mark this notification as read. Please try again.',
     accessUnavailable: 'Notifications are unavailable for this guest session.',
     throttled: 'Too many requests. Please try again shortly.',
     unavailable: 'Notifications are temporarily unavailable.',
@@ -128,7 +129,9 @@ async function fetchInbox(signal?: AbortSignal): Promise<ViewState | null> {
     if (response.status === 429) return { kind: 'throttled' };
     if (!response.ok) return { kind: 'error' };
 
-    const snapshot = normalizeSnapshot((await response.json()) as InboxSnapshot);
+    const snapshot = normalizeSnapshot(
+      (await response.json()) as InboxSnapshot,
+    );
     if (signal?.aborted) return null;
     return {
       kind: 'ready',

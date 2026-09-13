@@ -124,7 +124,9 @@ test('guest notification center refreshes a mounted visible page and only counts
   await expect(page.getByText('Unread: 1')).toBeVisible();
   await expect(page.getByText(secondNotification.title)).toHaveCount(0);
 
-  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event('visibilitychange')),
+  );
 
   await expect(page.getByText(secondNotification.title)).toBeVisible();
   await expect(page.getByText('Unread: 1')).toBeVisible();
@@ -169,7 +171,9 @@ test('guest notification center exposes a retryable mark-read failure without le
   const markRead = page.getByRole('button', { name: 'Mark as read' });
   await markRead.click();
   await expect(
-    page.getByText('Could not mark this notification as read. Please try again.'),
+    page.getByText(
+      'Could not mark this notification as read. Please try again.',
+    ),
   ).toBeVisible();
   await expect(markRead).toBeEnabled();
   expect(readRequestUrl).not.toMatch(/clinic|patient|account|subject/i);
@@ -177,7 +181,9 @@ test('guest notification center exposes a retryable mark-read failure without le
   await markRead.click();
   await expect(page.getByText('Unread: 0')).toBeVisible();
   await expect(
-    page.getByText('Could not mark this notification as read. Please try again.'),
+    page.getByText(
+      'Could not mark this notification as read. Please try again.',
+    ),
   ).toHaveCount(0);
   expect(attempts).toBe(2);
 });
