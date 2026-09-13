@@ -31,6 +31,7 @@ const committedMigrations = [
   '0023_notification_suppressed_state.sql',
   '0024_notification_suppression_constraints.sql',
   '0025_notification_inbox.sql',
+  '0026_notification_inbox_read_state.sql',
 ];
 
 beforeAll(async () => {
@@ -154,7 +155,7 @@ describe('committed migration chain', () => {
       guest_credentials: 'guest_credentials',
       guest_status_rate_limits: 'guest_status_rate_limit_buckets',
       notification_outbox: 'notification_outbox',
-      notification_pending_idx: 'notification_outbox_pending_target_idx',
+      notification_pending_idx: 'notification_outbox_dispatch_claim_eligible_idx',
       notification_preferences: 'notification_preferences',
       notification_preference_receipts: 'notification_preference_receipts',
       appointment_source_allowed: true,
