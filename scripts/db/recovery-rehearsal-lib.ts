@@ -54,7 +54,11 @@ export function assertRecoveryRehearsalAllowed(
 }
 
 export function assertNonProductionSourceDatabase(databaseName: string): void {
-  if (!/(^|[_-])(test|dev|stage|staging|local|sandbox)([_-]|$)/i.test(databaseName)) {
+  if (
+    !/(^|[_-])(test|dev|stage|staging|local|sandbox)([_-]|$)/i.test(
+      databaseName,
+    )
+  ) {
     throw new Error(
       'Recovery rehearsal source database name must explicitly identify a non-production environment',
     );
@@ -94,12 +98,10 @@ export function databaseUrlForDatabase(
 }
 
 export function commandEnvironment(
-  base: NodeJS.ProcessEnv,
+  base: Readonly<Record<string, string | undefined>>,
   target: PostgreSqlCommandTarget,
 ): NodeJS.ProcessEnv {
-  return target.password
-    ? { ...base, PGPASSWORD: target.password }
-    : { ...base };
+  return target.password ? { ...base, PGPASSWORD: target.password } : { ...base };
 }
 
 export function pgDumpArgs(
