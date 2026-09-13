@@ -61,6 +61,21 @@ async function readCoreTableCounts(client: Client) {
   return counts;
 }
 
+async function dropRehearsalDatabase(
+  adminUrl: string,
+  rehearsalDatabaseName: string,
+): Promise<void> {
+  const cleanupClient = new Client({ connectionString: adminUrl });
+  try {
+    await cleanupClient.connect();
+    await cleanupClient.query(
+      `DROP DATABASE ${quoteIdentifier(rehearsalDatabaseName)} WITH (FORCE)`,
+    );
+  } finally {
+    await cleanupClient.end().catch(() => undefined);
+  }
+}
+
 async function main(): Promise<void> {
   assertRecoveryRehearsalAllowed(process.env);
   const sourceUrl = process.env.DATABASE_URL;
@@ -90,6 +105,7 @@ async function main(): Promise<void> {
   let rehearsalClient: Client | null = null;
   let adminConnected = false;
   let targetCreated = false;
+  let runError: unknown;
 
   try {
     await sourceClient.connect();
@@ -140,19 +156,43 @@ async function main(): Promise<void> {
     process.stdout.write(
       `Database recovery rehearsal passed: ${sourceMigrations.length} migrations and ${Object.keys(sourceCounts).length} bounded table counts verified.\n`,
     );
+  } catch (error) {
+    runError = error;
   } finally {
     if (rehearsalClient) await rehearsalClient.end().catch(() => undefined);
     await sourceClient.end().catch(() => undefined);
-    if (targetCreated && adminConnected) {
-      await adminClient
-        .query(
-          `DROP DATABASE ${quoteIdentifier(rehearsalDatabaseName)} WITH (FORCE)`,
-        )
-        .catch(() => undefined);
-    }
     if (adminConnected) await adminClient.end().catch(() => undefined);
-    await rm(workingDirectory, { recursive: true, force: true });
+
+    if (targetCreated) {
+      try {
+        await dropRehearsalDatabase(adminUrl, rehearsalDatabaseName);
+      } catch {
+        console.error(
+          `Database recovery rehearsal cleanup failed: rehearsal database ${rehearsalDatabaseName} may require manual removal.`,
+        );
+        if (!runError) {
+          runError = new Error(
+            'Database recovery rehearsal failed because the isolated database could not be removed',
+          );
+        }
+      }
+    }
+
+    try {
+      await rm(workingDirectory, { recursive: true, force: true });
+    } catch {
+      console.error(
+        'Database recovery rehearsal cleanup failed: temporary dump files may require manual removal.',
+      );
+      if (!runError) {
+        runError = new Error(
+          'Database recovery rehearsal failed because temporary dump files could not be removed',
+        );
+      }
+    }
   }
+
+  if (runError) throw runError;
 }
 
 main().catch((error) => {
