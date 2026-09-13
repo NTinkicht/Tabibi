@@ -105,11 +105,7 @@ async function liveBearer() {
   const access = new GuestAccessService(pool);
   const issuedAt = new Date();
   const issued = await access.issue(target, ids.actor, issuedAt);
-  return access.consume(
-    issued.exchangeId,
-    target,
-    new Date(issuedAt.getTime() + 1000),
-  );
+  return access.consume(issued.exchangeId, target, issuedAt);
 }
 
 function deferred() {
@@ -192,14 +188,18 @@ describe('WU36 guest-bound notification inbox', () => {
     });
     const service = new GuestNotificationInboxService(pool);
 
-    await pool.query('UPDATE guest_credentials SET revoked_at=now()');
+    await pool.query(
+      'UPDATE guest_credentials SET revoked_at=GREATEST(now(), issued_at)',
+    );
     await expect(service.getSnapshot(credential.bearer, 20)).rejects.toBeInstanceOf(
       GuestAccessRejectedError,
     );
 
     await pool.query(
       `UPDATE guest_credentials
-          SET revoked_at=NULL, expires_at=now() - interval '1 second'`,
+          SET revoked_at=NULL,
+              issued_at=now() - interval '2 minutes',
+              expires_at=now() - interval '1 minute'`,
     );
     await expect(service.markRead(credential.bearer, own.id)).rejects.toBeInstanceOf(
       GuestAccessRejectedError,
@@ -207,7 +207,7 @@ describe('WU36 guest-bound notification inbox', () => {
 
     await pool.query(
       `UPDATE guest_credentials
-          SET expires_at=now() + interval '1 hour'`,
+          SET issued_at=now(), expires_at=now() + interval '1 hour'`,
     );
     await pool.query("UPDATE queue_entries SET state='completed' WHERE id=$1", [
       ids.targetEntry,
@@ -244,7 +244,9 @@ describe('WU36 guest-bound notification inbox', () => {
 
     const snapshotPromise = service.getSnapshot(credential.bearer, 20);
     await entered.promise;
-    const revokePromise = pool.query('UPDATE guest_credentials SET revoked_at=now()');
+    const revokePromise = pool.query(
+      'UPDATE guest_credentials SET revoked_at=GREATEST(now(), issued_at)',
+    );
     await expectStillBlocked(revokePromise);
 
     resume.resolve();
@@ -276,7 +278,9 @@ describe('WU36 guest-bound notification inbox', () => {
 
     const markPromise = service.markRead(credential.bearer, own.id);
     await entered.promise;
-    const revokePromise = pool.query('UPDATE guest_credentials SET revoked_at=now()');
+    const revokePromise = pool.query(
+      'UPDATE guest_credentials SET revoked_at=GREATEST(now(), issued_at)',
+    );
     await expectStillBlocked(revokePromise);
 
     resume.resolve();
