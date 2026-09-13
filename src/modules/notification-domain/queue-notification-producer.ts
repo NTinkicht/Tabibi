@@ -93,6 +93,10 @@ function payloadFor(
         ...common,
         position: finiteNonNegative(notification.position, 'Queue position'),
       };
+    default:
+      throw new QueueNotificationProducerValidationError(
+        'Unsupported queue notification event',
+      );
   }
 }
 
