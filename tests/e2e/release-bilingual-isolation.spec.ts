@@ -3,9 +3,7 @@ import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import { QueueService } from '@/modules/queue';
 
-test('release scenario keeps Arabic and French public queues clinic-isolated', async ({
-  page,
-}) => {
+test('release scenario keeps Arabic and French public queues clinic-isolated', async ({ page }) => {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const ids = {
     clinicA: randomUUID(),
