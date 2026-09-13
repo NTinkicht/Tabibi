@@ -84,10 +84,30 @@ describe('clinic-day load rehearsal', () => {
 
   it('aggregates only operational metrics and applies deterministic percentile math', () => {
     const samples = [
-      { phase: 'clinic_day' as const, operation: 'read', ok: true, durationMs: 10 },
-      { phase: 'clinic_day' as const, operation: 'read', ok: true, durationMs: 20 },
-      { phase: 'burst' as const, operation: 'write', ok: true, durationMs: 30 },
-      { phase: 'burst' as const, operation: 'write', ok: false, durationMs: 40 },
+      {
+        phase: 'clinic_day' as const,
+        operation: 'read',
+        ok: true,
+        durationMs: 10,
+      },
+      {
+        phase: 'clinic_day' as const,
+        operation: 'read',
+        ok: true,
+        durationMs: 20,
+      },
+      {
+        phase: 'burst' as const,
+        operation: 'write',
+        ok: true,
+        durationMs: 30,
+      },
+      {
+        phase: 'burst' as const,
+        operation: 'write',
+        ok: false,
+        durationMs: 40,
+      },
     ];
     const summary = summarizeLoad(samples, 1_000);
 
@@ -101,7 +121,10 @@ describe('clinic-day load rehearsal', () => {
       p50Ms: 20,
       p95Ms: 40,
     });
-    expect(summary.byOperation.map((item) => item.operation)).toEqual(['read', 'write']);
+    expect(summary.byOperation.map((item) => item.operation)).toEqual([
+      'read',
+      'write',
+    ]);
     expect(JSON.stringify(summary)).not.toContain('patient');
     expect(JSON.stringify(summary)).not.toContain('cookie');
   });
@@ -110,7 +133,12 @@ describe('clinic-day load rehearsal', () => {
     const config = loadConfig(environment());
     const healthy = summarizeLoad(
       [
-        { phase: 'clinic_day', operation: 'read', ok: true, durationMs: 20 },
+        {
+          phase: 'clinic_day',
+          operation: 'read',
+          ok: true,
+          durationMs: 20,
+        },
         { phase: 'burst', operation: 'write', ok: true, durationMs: 30 },
       ],
       100,
@@ -142,15 +170,22 @@ describe('clinic-day load rehearsal', () => {
     let maximumActive = 0;
     const completed: number[] = [];
 
-    await runBounded([0, 1, 2, 3, 4, 5], 2, Date.now() + 5_000, async (item) => {
-      active += 1;
-      maximumActive = Math.max(maximumActive, active);
-      await Promise.resolve();
-      completed.push(item);
-      active -= 1;
-    });
+    await runBounded(
+      [0, 1, 2, 3, 4, 5],
+      2,
+      Date.now() + 5_000,
+      async (item) => {
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        await Promise.resolve();
+        completed.push(item);
+        active -= 1;
+      },
+    );
 
     expect(maximumActive).toBeLessThanOrEqual(2);
-    expect(completed.sort((left, right) => left - right)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(completed.sort((left, right) => left - right)).toEqual([
+      0, 1, 2, 3, 4, 5,
+    ]);
   });
 });
