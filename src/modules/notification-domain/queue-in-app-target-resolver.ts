@@ -11,7 +11,10 @@ interface QueueTargetRow {
 }
 
 const terminalQueueEntryStates = new Set(['completed', 'cancelled', 'no_show']);
-const terminalNotificationEvents = new Set(['queue_entry_cancelled', 'session_cancelled']);
+const terminalNotificationEvents = new Set([
+  'queue_entry_cancelled',
+  'session_cancelled',
+]);
 
 /**
  * Resolves one queue-backed notification intent to the exact visit-patient
