@@ -1,0 +1,24 @@
+name: WU36 format diagnostic
+
+on:
+  push:
+    branches:
+      - wu36-guest-inbox-api
+
+permissions:
+  contents: read
+
+jobs:
+  exact-prettier-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Emit exact pinned Prettier diff
+        run: |
+          npx prettier@3.6.2 --write tests/api/guest-inbox.test.ts tests/integration/guest-notification-inbox.test.ts tests/unit/guest-notification-inbox-service.test.ts
+          git diff -- tests/api/guest-inbox.test.ts tests/integration/guest-notification-inbox.test.ts tests/unit/guest-notification-inbox-service.test.ts
