@@ -60,7 +60,9 @@ test('guest notification center renders unread items and marks one exact item re
   });
 
   await page.goto('/guest/status');
-  await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Notifications' }),
+  ).toBeVisible();
   await expect(page.getByText('Unread: 1')).toBeVisible();
   await expect(page.getByText(notification.title)).toBeVisible();
   await expect(page.getByText(notification.body)).toBeVisible();
@@ -70,7 +72,9 @@ test('guest notification center renders unread items and marks one exact item re
 
   await page.getByRole('button', { name: 'Mark as read' }).click();
   await expect(page.getByText('Unread: 0')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Mark as read' })).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Mark as read' }),
+  ).toHaveCount(0);
   expect(readRequestUrl).toContain(`/api/guest/inbox/${notification.id}/read`);
   expect(readRequestUrl).not.toMatch(/clinic|patient|account|subject/i);
 
@@ -80,13 +84,21 @@ test('guest notification center renders unread items and marks one exact item re
       ...Object.values(sessionStorage),
     ]),
   ).toEqual([]);
-  expect(await page.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  expect(
+    await page.evaluate(async () => (await indexedDB.databases()).length),
+  ).toBe(0);
 });
 
-test('guest notification center fails closed for revoked guest access', async ({ page }) => {
+test('guest notification center fails closed for revoked guest access', async ({
+  page,
+}) => {
   await routeStatus(page);
   await page.route('**/api/guest/inbox?limit=20', async (route) => {
-    await route.fulfill({ status: 401, contentType: 'application/json', body: '{}' });
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: '{}',
+    });
   });
 
   await page.goto('/guest/status');
@@ -96,13 +108,19 @@ test('guest notification center fails closed for revoked guest access', async ({
   await expect(page.getByText(notification.title)).toHaveCount(0);
 });
 
-test('guest notification center exposes bounded retry for throttling', async ({ page }) => {
+test('guest notification center exposes bounded retry for throttling', async ({
+  page,
+}) => {
   await routeStatus(page);
   let requests = 0;
   await page.route('**/api/guest/inbox?limit=20', async (route) => {
     requests += 1;
     if (requests === 1) {
-      await route.fulfill({ status: 429, contentType: 'application/json', body: '{}' });
+      await route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: '{}',
+      });
       return;
     }
     await route.fulfill({
@@ -113,7 +131,9 @@ test('guest notification center exposes bounded retry for throttling', async ({ 
   });
 
   await page.goto('/guest/status');
-  await expect(page.getByText('Too many requests. Please try again shortly.')).toBeVisible();
+  await expect(
+    page.getByText('Too many requests. Please try again shortly.'),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Retry' }).click();
   await expect(page.getByText('No notifications yet.')).toBeVisible();
   expect(requests).toBe(2);
