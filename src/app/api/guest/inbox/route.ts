@@ -106,7 +106,10 @@ export async function GET(request: Request): Promise<Response> {
     if (!(await withinRateLimit(pool, bearer))) {
       return Response.json(
         { error: 'Too many requests' },
-        { status: 429, headers: { ...SECURITY_HEADERS, 'retry-after': '60' } },
+        {
+          status: 429,
+          headers: { ...SECURITY_HEADERS, 'retry-after': '60' },
+        },
       );
     }
     if (!bearer) throw new GuestAccessRejectedError();
