@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 type SupportedLocale = 'en' | 'fr' | 'ar';
 
@@ -91,6 +91,34 @@ function subscribeToGuestLocale(): () => void {
   return () => undefined;
 }
 
+async function fetchInbox(signal?: AbortSignal): Promise<ViewState | null> {
+  try {
+    const response = await fetch('/api/guest/inbox?limit=20', {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { accept: 'application/json' },
+      signal,
+    });
+    if (signal?.aborted) return null;
+    if (response.status === 401) return { kind: 'signed_out' };
+    if (response.status === 429) return { kind: 'throttled' };
+    if (!response.ok) return { kind: 'error' };
+
+    const snapshot = (await response.json()) as InboxSnapshot;
+    if (signal?.aborted) return null;
+    return { kind: 'ready', snapshot, pendingItemId: null };
+  } catch (error) {
+    if (
+      signal?.aborted ||
+      (error instanceof DOMException && error.name === 'AbortError')
+    ) {
+      return null;
+    }
+    return { kind: 'error' };
+  }
+}
+
 export function GuestNotificationCenterClient() {
   const [state, setState] = useState<ViewState>({ kind: 'loading' });
   const locale = useSyncExternalStore<SupportedLocale>(
@@ -101,51 +129,18 @@ export function GuestNotificationCenterClient() {
   const copy = COPY[locale];
   const direction = locale === 'ar' ? 'rtl' : 'ltr';
 
-  const load = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const response = await fetch('/api/guest/inbox?limit=20', {
-        method: 'GET',
-        cache: 'no-store',
-        credentials: 'same-origin',
-        headers: { accept: 'application/json' },
-        signal,
-      });
-      if (signal?.aborted) return;
-      if (response.status === 401) {
-        setState({ kind: 'signed_out' });
-        return;
-      }
-      if (response.status === 429) {
-        setState({ kind: 'throttled' });
-        return;
-      }
-      if (!response.ok) {
-        setState({ kind: 'error' });
-        return;
-      }
-      const snapshot = (await response.json()) as InboxSnapshot;
-      if (signal?.aborted) return;
-      setState({ kind: 'ready', snapshot, pendingItemId: null });
-    } catch (error) {
-      if (
-        signal?.aborted ||
-        (error instanceof DOMException && error.name === 'AbortError')
-      ) {
-        return;
-      }
-      setState({ kind: 'error' });
-    }
-  }, []);
-
   useEffect(() => {
     const controller = new AbortController();
-    void load(controller.signal);
+    void fetchInbox(controller.signal).then((nextState) => {
+      if (nextState) setState(nextState);
+    });
     return () => controller.abort();
-  }, [load]);
+  }, []);
 
-  const retryLoad = () => {
+  const retryLoad = async () => {
     setState({ kind: 'loading' });
-    void load();
+    const nextState = await fetchInbox();
+    if (nextState) setState(nextState);
   };
 
   const markRead = async (itemId: string) => {
@@ -209,7 +204,7 @@ export function GuestNotificationCenterClient() {
       {state.kind === 'throttled' ? (
         <div role="status">
           <p>{copy.throttled}</p>
-          <button type="button" onClick={retryLoad}>
+          <button type="button" onClick={() => void retryLoad()}>
             {copy.retry}
           </button>
         </div>
@@ -217,7 +212,7 @@ export function GuestNotificationCenterClient() {
       {state.kind === 'error' ? (
         <div role="alert">
           <p>{copy.unavailable}</p>
-          <button type="button" onClick={retryLoad}>
+          <button type="button" onClick={() => void retryLoad()}>
             {copy.retry}
           </button>
         </div>
