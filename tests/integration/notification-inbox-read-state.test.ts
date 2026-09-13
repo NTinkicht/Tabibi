@@ -49,85 +49,79 @@ const ownScope = {
 };
 
 describe('in-app notification inbox read state', () => {
-  it(
-    'marks one exact-subject item read and preserves the first timestamp on retry',
-    async () => {
-      const repository = new InAppNotificationInboxRepository(pool);
-      const created = await repository.persist({
-        ...ownScope,
-        envelope: envelope(),
-      });
-      expect(created.readAt).toBeNull();
+  it('marks one exact-subject item read and preserves the first timestamp on retry', async () => {
+    const repository = new InAppNotificationInboxRepository(pool);
+    const created = await repository.persist({
+      ...ownScope,
+      envelope: envelope(),
+    });
+    expect(created.readAt).toBeNull();
 
-      const first = await repository.markRead({
+    const first = await repository.markRead({
+      ...ownScope,
+      itemId: created.id,
+    });
+    expect(first?.readAt).toEqual(expect.any(String));
+
+    const second = await repository.markRead({
+      ...ownScope,
+      itemId: created.id,
+    });
+    expect(second?.readAt).toBe(first?.readAt);
+
+    const listed = await repository.listForSubject({
+      ...ownScope,
+      limit: 10,
+    });
+    expect(listed).toEqual([second]);
+
+    const stored = await pool.query<{ read_at: Date | null }>(
+      'SELECT read_at FROM notification_inbox_items WHERE id=$1',
+      [created.id],
+    );
+    expect(stored.rows[0]?.read_at?.toISOString()).toBe(first?.readAt);
+  });
+
+  it('fails closed for wrong clinic, subject, kind, and unknown item without mutation', async () => {
+    const repository = new InAppNotificationInboxRepository(pool);
+    const created = await repository.persist({
+      ...ownScope,
+      envelope: envelope(),
+    });
+
+    await expect(
+      repository.markRead({
         ...ownScope,
+        clinicId: ids.clinicB,
         itemId: created.id,
-      });
-      expect(first?.readAt).toEqual(expect.any(String));
-
-      const second = await repository.markRead({
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      repository.markRead({
         ...ownScope,
+        subjectId: ids.patientA2,
         itemId: created.id,
-      });
-      expect(second?.readAt).toBe(first?.readAt);
-
-      const listed = await repository.listForSubject({
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      repository.markRead({
+        clinicId: ids.clinicA,
+        subjectKind: 'account',
+        subjectId: ids.patientA,
+        itemId: created.id,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      repository.markRead({
         ...ownScope,
-        limit: 10,
-      });
-      expect(listed).toEqual([second]);
+        itemId: randomUUID(),
+      }),
+    ).resolves.toBeNull();
 
-      const stored = await pool.query<{ read_at: Date | null }>(
-        'SELECT read_at FROM notification_inbox_items WHERE id=$1',
-        [created.id],
-      );
-      expect(stored.rows[0]?.read_at?.toISOString()).toBe(first?.readAt);
-    },
-  );
-
-  it(
-    'fails closed for wrong clinic, subject, kind, and unknown item without mutation',
-    async () => {
-      const repository = new InAppNotificationInboxRepository(pool);
-      const created = await repository.persist({
-        ...ownScope,
-        envelope: envelope(),
-      });
-
-      await expect(
-        repository.markRead({
-          ...ownScope,
-          clinicId: ids.clinicB,
-          itemId: created.id,
-        }),
-      ).resolves.toBeNull();
-      await expect(
-        repository.markRead({
-          ...ownScope,
-          subjectId: ids.patientA2,
-          itemId: created.id,
-        }),
-      ).resolves.toBeNull();
-      await expect(
-        repository.markRead({
-          clinicId: ids.clinicA,
-          subjectKind: 'account',
-          subjectId: ids.patientA,
-          itemId: created.id,
-        }),
-      ).resolves.toBeNull();
-      await expect(
-        repository.markRead({
-          ...ownScope,
-          itemId: randomUUID(),
-        }),
-      ).resolves.toBeNull();
-
-      const stored = await pool.query<{ read_at: Date | null }>(
-        'SELECT read_at FROM notification_inbox_items WHERE id=$1',
-        [created.id],
-      );
-      expect(stored.rows[0]?.read_at).toBeNull();
-    },
-  );
+    const stored = await pool.query<{ read_at: Date | null }>(
+      'SELECT read_at FROM notification_inbox_items WHERE id=$1',
+      [created.id],
+    );
+    expect(stored.rows[0]?.read_at).toBeNull();
+  });
 });
