@@ -119,6 +119,7 @@ test('keeps bilingual public queues clinic-isolated', async ({ page }) => {
       registrationA.patient.id,
       registrationA.entry.id,
       registrationB.patient.id,
+      registrationB.entry.id,
     ]) {
       expect(arabicBody).not.toContain(hidden);
     }
@@ -141,6 +142,7 @@ test('keeps bilingual public queues clinic-isolated', async ({ page }) => {
       registrationB.patient.id,
       registrationB.entry.id,
       registrationA.patient.id,
+      registrationA.entry.id,
     ]) {
       expect(frenchBody).not.toContain(hidden);
     }
