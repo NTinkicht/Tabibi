@@ -52,7 +52,7 @@ function fixture() {
   guestAccessMocks.authenticatedGuestCredentialId.mockReturnValue(credentialId);
   const authorize = vi.fn().mockResolvedValue(target);
   const release = vi.fn();
-  const query = vi.fn(async (text: string) => {
+  const query = vi.fn(async (text: string, _values?: unknown[]) => {
     if (text.startsWith('BEGIN') || text === 'COMMIT' || text === 'ROLLBACK') {
       return { rows: [] };
     }
@@ -120,7 +120,7 @@ describe('GuestNotificationInboxService', () => {
 
   it('fails closed and rolls back when the signed credential cannot resolve a locked target', async () => {
     const { service, authorize, query, release } = fixture();
-    query.mockImplementation(async (text: string) => {
+    query.mockImplementation(async (text: string, _values?: unknown[]) => {
       if (text.startsWith('BEGIN') || text === 'ROLLBACK') return { rows: [] };
       if (text.includes('FROM guest_credentials credential')) return { rows: [] };
       throw new Error(`Unexpected query: ${text}`);
