@@ -75,9 +75,7 @@ test('guest notification center renders unread items and marks one exact item re
   await expect(page.getByRole('button', { name: 'Mark as read' })).toHaveCount(
     0,
   );
-  expect(readRequestUrl).toContain(
-    `/api/guest/inbox/${notification.id}/read`,
-  );
+  expect(readRequestUrl).toContain(`/api/guest/inbox/${notification.id}/read`);
   expect(readRequestUrl).not.toMatch(/clinic|patient|account|subject/i);
 
   expect(
