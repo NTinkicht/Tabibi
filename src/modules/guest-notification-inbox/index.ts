@@ -172,7 +172,12 @@ export class GuestNotificationInboxService {
     itemId: string,
   ): Promise<InAppNotificationInboxItem | null> {
     return this.inAuthorizedTransaction(bearer, async (client, scope) => {
-      const values = [itemId, scope.clinicId, scope.subjectKind, scope.subjectId];
+      const values = [
+        itemId,
+        scope.clinicId,
+        scope.subjectKind,
+        scope.subjectId,
+      ];
       const updated = await client.query<InboxRow>(
         `UPDATE notification_inbox_items
             SET read_at=now()
