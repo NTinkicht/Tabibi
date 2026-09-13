@@ -1,8 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
-import type {
-  RenderedNotificationDispatchEnvelope,
-} from '@/modules/notification-domain/rendered-dispatch-envelope';
+import type { RenderedNotificationDispatchEnvelope } from '@/modules/notification-domain/rendered-dispatch-envelope';
 import type { NotificationPreferenceSubjectKind } from '@/modules/notification-preferences';
 import type {
   NotificationTemplateDirection,
