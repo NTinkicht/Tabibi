@@ -196,10 +196,10 @@ describe('queue in-app production composition', () => {
       queueCreated(ids.clinicA, ids.queueEntryA, 'wu38-event-terminal'),
     );
 
-    await pool.query(`UPDATE queue_entries SET state='cancelled' WHERE id=$1 AND clinic_id=$2`, [
-      ids.queueEntryA,
-      ids.clinicA,
-    ]);
+    await pool.query(
+      `UPDATE queue_entries SET state='cancelled' WHERE id=$1 AND clinic_id=$2`,
+      [ids.queueEntryA, ids.clinicA],
+    );
 
     const service = createQueueInAppNotificationDispatchService(pool);
     const result = await service.dispatchOne({
