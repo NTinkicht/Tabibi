@@ -86,66 +86,57 @@ function fixture() {
 }
 
 describe('GuestNotificationInboxService', () => {
-  it(
-    'holds authorization locks and reads items/count from one repeatable-read transaction',
-    async () => {
-      const { service, authorize, query, release } = fixture();
+  it('holds authorization locks and reads items/count from one repeatable-read transaction', async () => {
+    const { service, authorize, query, release } = fixture();
 
-      const snapshot = await service.getSnapshot(bearer, 20);
+    const snapshot = await service.getSnapshot(bearer, 20);
 
-      expect(snapshot.items).toHaveLength(1);
-      expect(snapshot.unreadCount).toBe(1);
-      expect(snapshot.items[0]?.subjectId).toBe(patientId);
-      expect(query.mock.calls[0]?.[0]).toBe(
-        'BEGIN ISOLATION LEVEL REPEATABLE READ',
-      );
-      expect(query.mock.calls[1]?.[0]).toContain(
-        'FOR SHARE OF credential, entry, session',
-      );
-      expect(query.mock.calls[1]?.[1]).toEqual([credentialId]);
-      expect(authorize).toHaveBeenCalledWith(bearer);
-      expect(query).toHaveBeenCalledWith('COMMIT');
-      expect(release).toHaveBeenCalledOnce();
-    },
-  );
+    expect(snapshot.items).toHaveLength(1);
+    expect(snapshot.unreadCount).toBe(1);
+    expect(snapshot.items[0]?.subjectId).toBe(patientId);
+    expect(query.mock.calls[0]?.[0]).toBe(
+      'BEGIN ISOLATION LEVEL REPEATABLE READ',
+    );
+    expect(query.mock.calls[1]?.[0]).toContain(
+      'FOR SHARE OF credential, entry, session',
+    );
+    expect(query.mock.calls[1]?.[1]).toEqual([credentialId]);
+    expect(authorize).toHaveBeenCalledWith(bearer);
+    expect(query).toHaveBeenCalledWith('COMMIT');
+    expect(release).toHaveBeenCalledOnce();
+  });
 
-  it(
-    'marks read only while the same credential/entry/session locks are held',
-    async () => {
-      const { service, query } = fixture();
+  it('marks read only while the same credential/entry/session locks are held', async () => {
+    const { service, query } = fixture();
 
-      const item = await service.markRead(bearer, itemId);
+    const item = await service.markRead(bearer, itemId);
 
-      expect(item?.id).toBe(itemId);
-      expect(item?.readAt).toBe('2026-09-13T00:01:00.000Z');
-      expect(query.mock.calls[1]?.[0]).toContain(
-        'FOR SHARE OF credential, entry, session',
-      );
-      expect(
-        query.mock.calls.some(([text]) =>
-          String(text).includes('UPDATE notification_inbox_items'),
-        ),
-      ).toBe(true);
-      expect(query).toHaveBeenCalledWith('COMMIT');
-    },
-  );
+    expect(item?.id).toBe(itemId);
+    expect(item?.readAt).toBe('2026-09-13T00:01:00.000Z');
+    expect(query.mock.calls[1]?.[0]).toContain(
+      'FOR SHARE OF credential, entry, session',
+    );
+    expect(
+      query.mock.calls.some(([text]) =>
+        String(text).includes('UPDATE notification_inbox_items'),
+      ),
+    ).toBe(true);
+    expect(query).toHaveBeenCalledWith('COMMIT');
+  });
 
-  it(
-    'fails closed and rolls back when the signed credential cannot resolve a locked target',
-    async () => {
-      const { service, authorize, query, release } = fixture();
-      query.mockImplementation(async (text: string, _values?: unknown[]) => {
-        if (text.startsWith('BEGIN') || text === 'ROLLBACK') return { rows: [] };
-        if (text.includes('FROM guest_credentials credential')) return { rows: [] };
-        throw new Error(`Unexpected query: ${text}`);
-      });
+  it('fails closed and rolls back when the signed credential cannot resolve a locked target', async () => {
+    const { service, authorize, query, release } = fixture();
+    query.mockImplementation(async (text: string, _values?: unknown[]) => {
+      if (text.startsWith('BEGIN') || text === 'ROLLBACK') return { rows: [] };
+      if (text.includes('FROM guest_credentials credential')) return { rows: [] };
+      throw new Error(`Unexpected query: ${text}`);
+    });
 
-      await expect(service.getSnapshot(bearer, 20)).rejects.toBeInstanceOf(
-        GuestAccessRejectedError,
-      );
-      expect(authorize).not.toHaveBeenCalled();
-      expect(query).toHaveBeenCalledWith('ROLLBACK');
-      expect(release).toHaveBeenCalledOnce();
-    },
-  );
+    await expect(service.getSnapshot(bearer, 20)).rejects.toBeInstanceOf(
+      GuestAccessRejectedError,
+    );
+    expect(authorize).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledWith('ROLLBACK');
+    expect(release).toHaveBeenCalledOnce();
+  });
 });
