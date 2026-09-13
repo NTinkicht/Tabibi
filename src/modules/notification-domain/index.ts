@@ -62,9 +62,15 @@ export type NotificationProviderResult =
 
 export type NotificationProviderRequest = RenderedNotificationDispatchEnvelope;
 
+export interface NotificationProviderDispatchContext {
+  clinicId: string;
+  deliveryContext: NotificationDeliveryContext;
+}
+
 export interface NotificationProviderAdapter {
   dispatch(
     request: NotificationProviderRequest,
+    context?: NotificationProviderDispatchContext,
   ): Promise<NotificationProviderResult>;
 }
 
@@ -326,9 +332,14 @@ export class NotificationDispatchService {
 
     let providerResult: NotificationProviderResult;
     try {
-      providerResult = normalizeProviderResult(
-        await this.provider.dispatch(providerRequest),
-      );
+      const rawProviderResult =
+        providerRequest.channel === 'in_app'
+          ? await this.provider.dispatch(providerRequest, {
+              clinicId: claim.intent.clinicId,
+              deliveryContext: currentDeliveryContext!,
+            })
+          : await this.provider.dispatch(providerRequest);
+      providerResult = normalizeProviderResult(rawProviderResult);
     } catch {
       providerResult = { kind: 'unknown', code: 'provider_exception' };
     }
