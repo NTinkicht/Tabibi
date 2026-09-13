@@ -215,29 +215,33 @@ describe('queue in-app production composition', () => {
     ).resolves.toHaveLength(0);
   });
 
-  it('fails closed when an outbox intent points at a queue entry from another clinic', async () => {
+  it('rejects a cross-clinic queue target before dispatch or inbox persistence', async () => {
     await enableInApp(ids.clinicA, ids.patientA, 'wu38-pref-cross-clinic');
 
     const outbox = new NotificationOutboxRepository(pool);
-    const intent = await outbox.enqueue({
-      clinicId: ids.clinicA,
-      queueEntryId: ids.queueEntryB,
-      logicalTargetKey: `queue-entry:${ids.queueEntryB}`,
-      eventKey: 'queue_entry_created',
-      intentVersion: 1,
-      idempotencyKey: 'wu38-cross-clinic-intent',
-      payload: { locale: 'fr' },
+    await expect(
+      outbox.enqueue({
+        clinicId: ids.clinicA,
+        queueEntryId: ids.queueEntryB,
+        logicalTargetKey: `queue-entry:${ids.queueEntryB}`,
+        eventKey: 'queue_entry_created',
+        intentVersion: 1,
+        idempotencyKey: 'wu38-cross-clinic-intent',
+        payload: { locale: 'fr' },
+      }),
+    ).rejects.toMatchObject({
+      code: '23503',
+      constraint: 'notification_outbox_queue_entry_id_clinic_id_fkey',
     });
 
-    const result = await createQueueInAppNotificationDispatchService(
-      pool,
-    ).dispatchOne({ clinicId: ids.clinicA, intentId: intent.id });
-
-    expect(result).toMatchObject({
-      status: 'suppressed',
-      suppressionReason: 'delivery_context_missing',
-      intent: { state: 'suppressed' },
-    });
+    await expect(
+      pool.query<{ count: number }>(
+        `SELECT count(*)::int AS count
+           FROM notification_outbox
+          WHERE clinic_id=$1 AND idempotency_key=$2`,
+        [ids.clinicA, 'wu38-cross-clinic-intent'],
+      ),
+    ).resolves.toMatchObject({ rows: [{ count: 0 }] });
 
     const inbox = new InAppNotificationInboxRepository(pool);
     await expect(
