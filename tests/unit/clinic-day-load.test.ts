@@ -7,6 +7,7 @@ import {
   loadConfig,
   percentile,
   runBounded,
+  safeErrorDiagnostic,
   summarizeLoad,
 } from '../../scripts/load/clinic-day-lib';
 
@@ -36,19 +37,29 @@ describe('clinic-day load rehearsal', () => {
       ),
     ).toThrow(/production/i);
 
-    expect(() =>
-      assertLoadRehearsalAllowed(
-        environment(),
-        'postgresql://user:pass@localhost/tabibi',
-      ),
-    ).toThrow(/explicitly marked/i);
+    for (const database of ['tabibi', 'prod_latest', 'attestation']) {
+      expect(() =>
+        assertLoadRehearsalAllowed(
+          environment(),
+          `postgresql://user:pass@localhost/${database}`,
+        ),
+      ).toThrow(/explicitly marked/i);
+    }
 
-    expect(() =>
-      assertLoadRehearsalAllowed(
-        environment(),
-        'postgresql://user:pass@localhost/tabibi_stage',
-      ),
-    ).not.toThrow();
+    for (const database of [
+      'tabibi_test',
+      'tabibi-dev',
+      'tabibi_stage',
+      'local_tabibi',
+      'tabibi-sandbox',
+    ]) {
+      expect(() =>
+        assertLoadRehearsalAllowed(
+          environment(),
+          `postgresql://user:pass@localhost/${database}`,
+        ),
+      ).not.toThrow();
+    }
   });
 
   it('loads bounded configuration and rejects attempts to exceed committed caps', () => {
@@ -80,6 +91,23 @@ describe('clinic-day load rehearsal', () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
     expect(deterministicRunKey('fixed-seed')).toHaveLength(16);
+  });
+
+  it('redacts sensitive diagnostic values while preserving failure shape', () => {
+    const diagnostic = safeErrorDiagnostic(
+      new Error(
+        'failed postgresql://user:secret@localhost/tabibi_test for 123e4567-e89b-12d3-a456-426614174000 patient@example.com +971 50 123 4567',
+      ),
+    );
+
+    expect(diagnostic).toContain('Error: failed');
+    expect(diagnostic).toContain('[database-url]');
+    expect(diagnostic).toContain('[uuid]');
+    expect(diagnostic).toContain('[email]');
+    expect(diagnostic).toContain('[phone]');
+    expect(diagnostic).not.toContain('secret');
+    expect(diagnostic).not.toContain('patient@example.com');
+    expect(diagnostic).not.toContain('123e4567-e89b-12d3-a456-426614174000');
   });
 
   it('aggregates only operational metrics and applies deterministic percentile math', () => {
