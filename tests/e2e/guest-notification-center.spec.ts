@@ -148,7 +148,11 @@ test('guest notification center exposes a retryable mark-read failure without le
     attempts += 1;
     readRequestUrl = route.request().url();
     if (attempts === 1) {
-      await route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: '{}',
+      });
       return;
     }
     await route.fulfill({
