@@ -3,6 +3,11 @@ import type {
   NotificationIntent,
 } from '@/modules/notification-outbox';
 
+const LOGICAL_TARGET_PREFIX = 'queue-entry:';
+const MAX_LOGICAL_TARGET_KEY_LENGTH = 160;
+const MAX_QUEUE_ENTRY_ID_LENGTH =
+  MAX_LOGICAL_TARGET_KEY_LENGTH - LOGICAL_TARGET_PREFIX.length;
+
 export type SupportedQueueNotificationEvent =
   | {
       eventKey: 'queue_entry_created';
@@ -44,10 +49,11 @@ export class QueueNotificationProducerValidationError extends Error {}
 
 function requiredId(value: string, label: string, maxLength: number): string {
   const normalized = value.trim();
-  if (!normalized || normalized.length > maxLength)
+  if (!normalized || normalized.length > maxLength) {
     throw new QueueNotificationProducerValidationError(
       `${label} is required and must be at most ${maxLength} characters`,
     );
+  }
   return normalized;
 }
 
@@ -57,10 +63,20 @@ function localePayload(locale: string | null | undefined) {
 }
 
 function finiteNonNegative(value: number, label: string): number {
-  if (!Number.isFinite(value) || value < 0)
+  if (!Number.isFinite(value) || value < 0) {
     throw new QueueNotificationProducerValidationError(
       `${label} must be a finite non-negative number`,
     );
+  }
+  return value;
+}
+
+function positiveSafeInteger(value: number, label: string): number {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new QueueNotificationProducerValidationError(
+      `${label} must be a positive safe integer`,
+    );
+  }
   return value;
 }
 
@@ -82,16 +98,17 @@ function payloadFor(
         notification.windowEndMinutes,
         'Window end minutes',
       );
-      if (windowEndMinutes < windowStartMinutes)
+      if (windowEndMinutes < windowStartMinutes) {
         throw new QueueNotificationProducerValidationError(
           'Window end minutes must not precede window start minutes',
         );
+      }
       return { ...common, windowStartMinutes, windowEndMinutes };
     }
     case 'turn_approaching':
       return {
         ...common,
-        position: finiteNonNegative(notification.position, 'Queue position'),
+        position: positiveSafeInteger(notification.position, 'Queue position'),
       };
     default:
       throw new QueueNotificationProducerValidationError(
@@ -110,19 +127,23 @@ export class QueueNotificationProducer {
 
   async produce(raw: QueueNotificationSourceEvent): Promise<NotificationIntent> {
     const clinicId = requiredId(raw.clinicId, 'Clinic id', 160);
-    const queueEntryId = requiredId(raw.queueEntryId, 'Queue entry id', 160);
+    const queueEntryId = requiredId(
+      raw.queueEntryId,
+      'Queue entry id',
+      MAX_QUEUE_ENTRY_ID_LENGTH,
+    );
     const sourceEventId = requiredId(raw.sourceEventId, 'Source event id', 96);
-    if (!Number.isSafeInteger(raw.sourceVersion) || raw.sourceVersion <= 0)
-      throw new QueueNotificationProducerValidationError(
-        'Source version must be a positive safe integer',
-      );
+    const sourceVersion = positiveSafeInteger(
+      raw.sourceVersion,
+      'Source version',
+    );
 
     return this.store.enqueue({
       clinicId,
       queueEntryId,
-      logicalTargetKey: `queue-entry:${queueEntryId}`,
+      logicalTargetKey: `${LOGICAL_TARGET_PREFIX}${queueEntryId}`,
       eventKey: raw.notification.eventKey,
-      intentVersion: raw.sourceVersion,
+      intentVersion: sourceVersion,
       idempotencyKey: `queue-event:${sourceEventId}`,
       payload: payloadFor(raw.notification),
     });
