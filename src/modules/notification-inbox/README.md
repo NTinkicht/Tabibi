@@ -6,9 +6,9 @@ WU33 adds a zero-network `in_app` delivery adapter and durable PostgreSQL inbox 
 
 `NotificationDispatchService` remains the owner of claim/fencing, current preference and consent evaluation, suppression, rendering, retry classification, and completion. The in-app adapter is invoked only after that service has authorized and rendered the delivery.
 
-For `in_app`, composition must bind `InAppNotificationProviderAdapter` to exactly one routing scope: `clinicId`, `subjectKind`, and `subjectId`. The adapter receives only the WU30 rendered dispatch envelope. Routing identity is constructor-bound and is deliberately not added to `RenderedNotificationDispatchEnvelope`, so the external-provider boundary remains free of clinic, patient, and account identifiers.
+For `in_app`, routing identity is derived on every dispatch from the freshly authorized delivery context (`clinicId`, `subjectKind`, and `subjectId`) supplied separately from the rendered provider envelope. The adapter stores no constructor-bound subject scope. This prevents adapter reuse from misattributing one subject's message to another while keeping `RenderedNotificationDispatchEnvelope` free of clinic, patient, and account identifiers for external-provider compatibility.
 
-An authorized dispatch persists through `InAppNotificationInboxStore.persist()`. Exact retries reuse the deterministic provider idempotency key and return `delivered` without creating a second row. Reuse of the same clinic/idempotency key for different logical content is rejected. Unexpected persistence failures return a bounded `unknown` result so the existing outbox lifecycle can retry without persisting exception text.
+An authorized dispatch persists through `InAppNotificationInboxStore.persist()`. Exact retries reuse the deterministic provider idempotency key and return `delivered` without creating a second row. Reuse of the same clinic/idempotency key for different logical content is rejected. Missing or mismatched in-app routing context fails closed, and unexpected persistence failures return a bounded `unknown` result so the existing outbox lifecycle can retry without persisting exception text.
 
 Suppressed or unauthorized intents never invoke the renderer or the adapter. This keeps the WU27 final consent/preference gate authoritative.
 
