@@ -118,7 +118,24 @@ export async function GET(request: Request): Promise<Response> {
       bearer,
       boundedLimit(request),
     );
-    return Response.json(snapshot, { status: 200, headers: SECURITY_HEADERS });
+    const responseSnapshot = {
+      unreadCount: snapshot.unreadCount,
+      items: snapshot.items.map(
+        ({ id, locale, direction, title, body, createdAt, readAt }) => ({
+          id,
+          locale,
+          direction,
+          title,
+          body,
+          createdAt,
+          readAt,
+        }),
+      ),
+    };
+    return Response.json(responseSnapshot, {
+      status: 200,
+      headers: SECURITY_HEADERS,
+    });
   } catch (error) {
     const rejected = error instanceof GuestAccessRejectedError;
     if (!rejected) getLogger().error('guest inbox read failed');
