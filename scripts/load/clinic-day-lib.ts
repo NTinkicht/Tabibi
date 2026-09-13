@@ -151,10 +151,7 @@ export function safeErrorDiagnostic(error: unknown): string {
 
 export function deterministicUuid(seed: string, label: string): string {
   const bytes = Buffer.from(
-    createHash('sha256')
-      .update(`${seed}:${label}`)
-      .digest()
-      .subarray(0, 16),
+    createHash('sha256').update(`${seed}:${label}`).digest().subarray(0, 16),
   );
   bytes[6] = (bytes[6]! & 0x0f) | 0x40;
   bytes[8] = (bytes[8]! & 0x3f) | 0x80;
