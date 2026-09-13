@@ -30,6 +30,7 @@ const committedMigrations = [
   '0022_notification_preferences.sql',
   '0023_notification_suppressed_state.sql',
   '0024_notification_suppression_constraints.sql',
+  '0025_notification_inbox.sql',
 ];
 
 beforeAll(async () => {
