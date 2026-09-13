@@ -42,12 +42,6 @@ jobs:
       - name: Formatting
         run: npm run format
 
-      - name: Prettier diagnostic diff
-        if: ${{ failure() }}
-        run: |
-          ./node_modules/.bin/prettier --write scripts/load/clinic-day-lib.ts tests/unit/clinic-day-load.test.ts
-          git --no-pager diff -- scripts/load/clinic-day-lib.ts tests/unit/clinic-day-load.test.ts
-
       - name: Lint
         run: npm run lint
 
