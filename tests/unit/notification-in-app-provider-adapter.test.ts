@@ -3,11 +3,9 @@ import {
   NotificationDispatchService,
   type NotificationDispatchRenderer,
   type NotificationDispatchStore,
+  type NotificationProviderDispatchContext,
 } from '@/modules/notification-domain';
-import {
-  InAppNotificationProviderAdapter,
-  type InAppNotificationRoutingScope,
-} from '@/modules/notification-inbox/provider-adapter';
+import { InAppNotificationProviderAdapter } from '@/modules/notification-inbox/provider-adapter';
 import type { InAppNotificationInboxStore } from '@/modules/notification-inbox';
 import type {
   CompleteNotificationDispatchInput,
@@ -112,18 +110,12 @@ function inboxStore() {
   } satisfies InAppNotificationInboxStore;
 }
 
-const scope: InAppNotificationRoutingScope = {
-  clinicId: 'clinic-1',
-  subjectKind: 'visit_patient',
-  subjectId: 'patient-1',
-};
-
 function deliveryContext(currentPreference: NotificationPreference) {
   return {
     resolve: vi.fn(async () => ({
       target: {
         subjectKind: 'visit_patient' as const,
-        subjectId: 'patient-1',
+        subjectId: currentPreference.subjectId,
         channel: 'in_app' as const,
       },
       preference: currentPreference,
@@ -131,10 +123,28 @@ function deliveryContext(currentPreference: NotificationPreference) {
   };
 }
 
+function providerContext(
+  subjectId: string,
+  clinicId = 'clinic-1',
+): NotificationProviderDispatchContext {
+  const currentPreference = preference({ clinicId, subjectId });
+  return {
+    clinicId,
+    deliveryContext: {
+      target: {
+        subjectKind: 'visit_patient',
+        subjectId,
+        channel: 'in_app',
+      },
+      preference: currentPreference,
+    },
+  };
+}
+
 describe('WU33 in-app provider adapter composition', () => {
   it('persists one bounded inbox write for authorized in_app dispatch through the existing service', async () => {
     const inbox = inboxStore();
-    const adapter = new InAppNotificationProviderAdapter(inbox, scope);
+    const adapter = new InAppNotificationProviderAdapter(inbox);
     const dispatch = vi.spyOn(adapter, 'dispatch');
 
     const result = await new NotificationDispatchService(
@@ -148,6 +158,19 @@ describe('WU33 in-app provider adapter composition', () => {
 
     expect(result).toMatchObject({ status: 'completed' });
     expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: 'in_app' }),
+      expect.objectContaining({
+        clinicId: 'clinic-1',
+        deliveryContext: expect.objectContaining({
+          target: expect.objectContaining({
+            subjectKind: 'visit_patient',
+            subjectId: 'patient-1',
+            channel: 'in_app',
+          }),
+        }),
+      }),
+    );
     expect(inbox.persist).toHaveBeenCalledTimes(1);
     expect(inbox.persist).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -162,9 +185,52 @@ describe('WU33 in-app provider adapter composition', () => {
     );
   });
 
+  it('routes repeated adapter use from each per-dispatch authorized subject', async () => {
+    const inbox = inboxStore();
+    const adapter = new InAppNotificationProviderAdapter(inbox);
+    const baseEnvelope = {
+      channel: 'in_app' as const,
+      locale: 'fr' as const,
+      direction: 'ltr' as const,
+      templateId: 'turn_approaching.v1' as const,
+      title: 'Votre tour approche',
+      body: 'Il reste 2 passage(s) avant votre tour.',
+    };
+
+    await adapter.dispatch(
+      {
+        ...baseEnvelope,
+        providerIdempotencyKey: 'notification:intent-patient-1',
+      },
+      providerContext('patient-1'),
+    );
+    await adapter.dispatch(
+      {
+        ...baseEnvelope,
+        providerIdempotencyKey: 'notification:intent-patient-2',
+      },
+      providerContext('patient-2'),
+    );
+
+    expect(inbox.persist).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        clinicId: 'clinic-1',
+        subjectId: 'patient-1',
+      }),
+    );
+    expect(inbox.persist).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        clinicId: 'clinic-1',
+        subjectId: 'patient-2',
+      }),
+    );
+  });
+
   it('invokes neither renderer nor adapter when the current in_app preference is disabled', async () => {
     const inbox = inboxStore();
-    const adapter = new InAppNotificationProviderAdapter(inbox, scope);
+    const adapter = new InAppNotificationProviderAdapter(inbox);
     const dispatch = vi.spyOn(adapter, 'dispatch');
     const notificationRenderer = renderer();
 
@@ -188,18 +254,21 @@ describe('WU33 in-app provider adapter composition', () => {
 
   it('rejects non-in_app envelopes without persistence', async () => {
     const inbox = inboxStore();
-    const adapter = new InAppNotificationProviderAdapter(inbox, scope);
+    const adapter = new InAppNotificationProviderAdapter(inbox);
 
     await expect(
-      adapter.dispatch({
-        channel: 'sms',
-        locale: 'fr',
-        direction: 'ltr',
-        templateId: 'turn_approaching.v1',
-        title: 'Votre tour approche',
-        body: 'Il reste 2 passage(s) avant votre tour.',
-        providerIdempotencyKey: 'notification:intent-in-app-1',
-      }),
+      adapter.dispatch(
+        {
+          channel: 'sms',
+          locale: 'fr',
+          direction: 'ltr',
+          templateId: 'turn_approaching.v1',
+          title: 'Votre tour approche',
+          body: 'Il reste 2 passage(s) avant votre tour.',
+          providerIdempotencyKey: 'notification:intent-in-app-1',
+        },
+        providerContext('patient-1'),
+      ),
     ).resolves.toEqual({
       kind: 'terminal_failure',
       code: 'in_app_channel_mismatch',
