@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { InAppNotificationInboxRepository } from '@/modules/notification-inbox';
-import type { RenderedNotificationDispatchEnvelope } from '@/modules/notification-domain';
+import type {
+  RenderedNotificationDispatchEnvelope,
+} from '@/modules/notification-domain';
 import { migrate } from '../../scripts/db/lib';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
