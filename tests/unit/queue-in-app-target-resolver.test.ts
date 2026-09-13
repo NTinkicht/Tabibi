@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { QueueInAppNotificationTargetResolver } from '@/modules/notification-domain/queue-in-app-target-resolver';
 import type { NotificationIntent } from '@/modules/notification-outbox';
 
-function intent(overrides: Partial<NotificationIntent> = {}): NotificationIntent {
+function intent(
+  overrides: Partial<NotificationIntent> = {},
+): NotificationIntent {
   return {
     id: 'intent-1',
     clinicId: 'clinic-1',
@@ -67,6 +69,8 @@ describe('QueueInAppNotificationTargetResolver', () => {
     await expect(missing.resolver.resolveTarget(intent())).resolves.toBeNull();
 
     const noPatient = fixture([{ patient_id: null }]);
-    await expect(noPatient.resolver.resolveTarget(intent())).resolves.toBeNull();
+    await expect(
+      noPatient.resolver.resolveTarget(intent()),
+    ).resolves.toBeNull();
   });
 });
