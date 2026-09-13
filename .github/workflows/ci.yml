@@ -91,10 +91,10 @@ jobs:
       - name: Run PostgreSQL integration tests
         run: npm run test:integration
 
-      - name: Install PostgreSQL client tools
+      - name: Install PostgreSQL 16 client tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client-16
 
       - name: Rehearse PostgreSQL backup and restore
         env:
