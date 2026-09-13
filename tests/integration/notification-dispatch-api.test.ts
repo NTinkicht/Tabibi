@@ -204,19 +204,46 @@ describe('notification dispatch HTTP boundary', () => {
   });
 
   it('rejects malformed clinic ids before dispatch state can change', async () => {
+    await enableInApp(ids.clinicA, ids.patientA, 'wu41-pref-malformed-clinic');
+    const intent = await produce(
+      ids.clinicA,
+      ids.queueEntryA,
+      'wu41-event-malformed-clinic',
+    );
+    const before = await pool.query<{
+      state: string;
+      dispatch_attempt_count: number;
+    }>(
+      `SELECT state, dispatch_attempt_count
+         FROM notification_outbox
+        WHERE id=$1`,
+      [intent.id],
+    );
+    expect(before.rows[0]).toMatchObject({
+      state: 'pending',
+      dispatch_attempt_count: 0,
+    });
+
     const response = await POST(request('not-a-uuid'), context('not-a-uuid'));
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ error: 'invalid_request' });
     expect(response.headers.get('cache-control')).toBe('no-store');
 
-    const outboxCount = await pool.query<{ count: string }>(
-      'SELECT count(*)::text AS count FROM notification_outbox',
+    const after = await pool.query<{
+      state: string;
+      dispatch_attempt_count: number;
+    }>(
+      `SELECT state, dispatch_attempt_count
+         FROM notification_outbox
+        WHERE id=$1`,
+      [intent.id],
     );
+    expect(after.rows[0]).toEqual(before.rows[0]);
+
     const inboxCount = await pool.query<{ count: string }>(
       'SELECT count(*)::text AS count FROM notification_inbox_items',
     );
-    expect(outboxCount.rows[0]?.count).toBe('0');
     expect(inboxCount.rows[0]?.count).toBe('0');
   });
 
