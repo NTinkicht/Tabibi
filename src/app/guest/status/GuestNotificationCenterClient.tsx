@@ -1,6 +1,12 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 
 type SupportedLocale = 'en' | 'fr' | 'ar';
 
@@ -115,6 +121,33 @@ function normalizeSnapshot(snapshot: InboxSnapshot): InboxSnapshot {
   };
 }
 
+function mergeFetchedState(current: ViewState, next: ViewState): ViewState {
+  if (current.kind !== 'ready' || next.kind !== 'ready') return next;
+
+  const currentItems = new Map(
+    current.snapshot.items.map((item) => [item.id, item] as const),
+  );
+  const items = next.snapshot.items.map((item) => {
+    const currentItem = currentItems.get(item.id);
+    // Read acknowledgement is monotonic. A GET that started before mark-read
+    // completed must never restore an already-read item to unread locally.
+    return currentItem?.readAt && item.readAt === null
+      ? { ...item, readAt: currentItem.readAt }
+      : item;
+  });
+
+  return {
+    kind: 'ready',
+    snapshot: {
+      items,
+      unreadCount: items.filter((item) => item.readAt === null).length,
+    },
+    // Background refresh must not make a still-running mark-read appear finished.
+    pendingItemId: current.pendingItemId,
+    actionError: current.actionError,
+  };
+}
+
 async function fetchInbox(signal?: AbortSignal): Promise<ViewState | null> {
   try {
     const response = await fetch(`/api/guest/inbox?limit=${INBOX_LIMIT}`, {
@@ -152,6 +185,7 @@ async function fetchInbox(signal?: AbortSignal): Promise<ViewState | null> {
 
 export function GuestNotificationCenterClient() {
   const [state, setState] = useState<ViewState>({ kind: 'loading' });
+  const loadSequence = useRef(0);
   const locale = useSyncExternalStore<SupportedLocale>(
     subscribeToGuestLocale,
     detectGuestLocale,
@@ -160,14 +194,20 @@ export function GuestNotificationCenterClient() {
   const copy = COPY[locale];
   const direction = locale === 'ar' ? 'rtl' : 'ltr';
 
+  const loadInbox = useCallback(async (signal?: AbortSignal) => {
+    const sequence = ++loadSequence.current;
+    const nextState = await fetchInbox(signal);
+    if (!nextState || sequence !== loadSequence.current) return;
+    setState((current) => mergeFetchedState(current, nextState));
+  }, []);
+
   useEffect(() => {
     let controller = new AbortController();
 
     const refresh = async () => {
       controller.abort();
       controller = new AbortController();
-      const nextState = await fetchInbox(controller.signal);
-      if (nextState) setState(nextState);
+      await loadInbox(controller.signal);
     };
 
     void refresh();
@@ -184,17 +224,20 @@ export function GuestNotificationCenterClient() {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       controller.abort();
     };
-  }, []);
+  }, [loadInbox]);
 
   const retryLoad = async () => {
     setState({ kind: 'loading' });
-    const nextState = await fetchInbox();
-    if (nextState) setState(nextState);
+    await loadInbox();
   };
 
   const markRead = async (itemId: string) => {
     if (state.kind !== 'ready' || state.pendingItemId) return;
-    setState({ ...state, pendingItemId: itemId, actionError: false });
+    setState((current) =>
+      current.kind === 'ready' && current.pendingItemId === null
+        ? { ...current, pendingItemId: itemId, actionError: false }
+        : current,
+    );
     try {
       const response = await fetch(
         `/api/guest/inbox/${encodeURIComponent(itemId)}/read`,
@@ -214,24 +257,35 @@ export function GuestNotificationCenterClient() {
         return;
       }
       if (!response.ok) {
-        setState({ ...state, pendingItemId: null, actionError: true });
+        setState((current) =>
+          current.kind === 'ready'
+            ? { ...current, pendingItemId: null, actionError: true }
+            : current,
+        );
         return;
       }
       const updated = (await response.json()) as NotificationItem;
-      const items = state.snapshot.items.map((item) =>
-        item.id === itemId ? { ...item, readAt: updated.readAt } : item,
-      );
-      setState({
-        kind: 'ready',
-        pendingItemId: null,
-        actionError: false,
-        snapshot: {
-          unreadCount: items.filter((item) => item.readAt === null).length,
-          items,
-        },
+      setState((current) => {
+        if (current.kind !== 'ready') return current;
+        const items = current.snapshot.items.map((item) =>
+          item.id === itemId ? { ...item, readAt: updated.readAt } : item,
+        );
+        return {
+          kind: 'ready',
+          pendingItemId: null,
+          actionError: false,
+          snapshot: {
+            unreadCount: items.filter((item) => item.readAt === null).length,
+            items,
+          },
+        };
       });
     } catch {
-      setState({ ...state, pendingItemId: null, actionError: true });
+      setState((current) =>
+        current.kind === 'ready'
+          ? { ...current, pendingItemId: null, actionError: true }
+          : current,
+      );
     }
   };
 
