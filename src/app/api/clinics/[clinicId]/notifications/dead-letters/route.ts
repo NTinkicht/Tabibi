@@ -25,10 +25,11 @@ export async function GET(
     const { limit } = querySchema.parse({
       limit: new URL(request.url).searchParams.get('limit') ?? undefined,
     });
-    const deadLetters =
-      await new NotificationDeadLetterObservabilityRepository(
-        pool,
-      ).listRecentForClinic({ clinicId: scope.clinicId, limit });
+    const repository = new NotificationDeadLetterObservabilityRepository(pool);
+    const deadLetters = await repository.listRecentForClinic({
+      clinicId: scope.clinicId,
+      limit,
+    });
 
     return { status: 200, body: { deadLetters } };
   });
