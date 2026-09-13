@@ -30,8 +30,12 @@ describe('database recovery rehearsal safety helpers', () => {
   });
 
   it('requires the source database name to identify a non-production environment', () => {
-    expect(() => assertNonProductionSourceDatabase('tabibi_test')).not.toThrow();
-    expect(() => assertNonProductionSourceDatabase('tabibi-staging')).not.toThrow();
+    expect(() =>
+      assertNonProductionSourceDatabase('tabibi_test'),
+    ).not.toThrow();
+    expect(() =>
+      assertNonProductionSourceDatabase('tabibi-staging'),
+    ).not.toThrow();
     expect(() => assertNonProductionSourceDatabase('tabibi_prod')).toThrow(
       /non-production/i,
     );
