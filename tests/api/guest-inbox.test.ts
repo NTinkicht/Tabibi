@@ -80,22 +80,35 @@ describe('guest inbox API', () => {
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
     expect(getSnapshot).toHaveBeenCalledWith(bearer, 50);
     expect(getSnapshot).toHaveBeenCalledTimes(1);
-    await expect(response.json()).resolves.toEqual({ items: [item], unreadCount: 1 });
+    await expect(response.json()).resolves.toEqual({
+      items: [item],
+      unreadCount: 1,
+    });
   });
 
   it('rejects a missing bearer before inbox lookup with hardened headers', async () => {
-    const response = await GET(new Request('https://tabibi.test/api/guest/inbox'));
+    const response = await GET(
+      new Request('https://tabibi.test/api/guest/inbox'),
+    );
 
     expect(response.status).toBe(401);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(response.headers.get('content-security-policy')).toContain("default-src 'none'");
+    expect(response.headers.get('content-security-policy')).toContain(
+      "default-src 'none'",
+    );
     expect(getSnapshot).not.toHaveBeenCalled();
   });
 
   it('marks one validated item id read using only the bearer-derived service scope', async () => {
-    markRead.mockResolvedValue({ ...item, readAt: '2026-09-13T07:00:00.000Z' });
+    markRead.mockResolvedValue({
+      ...item,
+      readAt: '2026-09-13T07:00:00.000Z',
+    });
 
-    const response = await POST(request(`/api/guest/inbox/${itemId}/read`), context());
+    const response = await POST(
+      request(`/api/guest/inbox/${itemId}/read`),
+      context(),
+    );
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
@@ -109,13 +122,20 @@ describe('guest inbox API', () => {
       context('not-an-id'),
     );
     expect(malformed.status).toBe(404);
-    await expect(malformed.json()).resolves.toEqual({ error: 'Notification not found' });
+    await expect(malformed.json()).resolves.toEqual({
+      error: 'Notification not found',
+    });
     expect(markRead).not.toHaveBeenCalled();
 
     markRead.mockResolvedValue(null);
-    const foreign = await POST(request(`/api/guest/inbox/${itemId}/read`), context());
+    const foreign = await POST(
+      request(`/api/guest/inbox/${itemId}/read`),
+      context(),
+    );
     expect(foreign.status).toBe(404);
-    await expect(foreign.json()).resolves.toEqual({ error: 'Notification not found' });
+    await expect(foreign.json()).resolves.toEqual({
+      error: 'Notification not found',
+    });
   });
 
   it('throttles before guest inbox access when the shared bucket is exhausted', async () => {
