@@ -92,8 +92,8 @@ test('concurrent refresh cannot clobber an in-flight mark-read or lose a newly a
   await expect(
     page.getByRole('button', { name: 'Marking as read…' }),
   ).toHaveCount(0);
-  await expect(
-    page.getByRole('button', { name: 'Mark as read' }),
-  ).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Mark as read' })).toHaveCount(
+    1,
+  );
   expect(inboxRequests).toBeGreaterThanOrEqual(2);
 });
