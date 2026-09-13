@@ -27,12 +27,7 @@ test('keeps bilingual public queues clinic-isolated', async ({ page }) => {
         ($2,'release-browser-reception-b','Reception B'),
         ($3,'release-browser-doctor-a','Doctor A'),
         ($4,'release-browser-doctor-b','Doctor B')`,
-      [
-        ids.receptionistA,
-        ids.receptionistB,
-        ids.doctorUserA,
-        ids.doctorUserB,
-      ],
+      [ids.receptionistA, ids.receptionistB, ids.doctorUserA, ids.doctorUserB],
     );
     await pool.query(
       `INSERT INTO clinics(id,tenant_key,name) VALUES
