@@ -25,15 +25,19 @@ export class InAppNotificationProviderAdapter
 
   async dispatch(
     request: RenderedNotificationDispatchEnvelope,
-    context: NotificationProviderDispatchContext,
+    context?: NotificationProviderDispatchContext,
   ): Promise<NotificationProviderResult> {
     if (
       request.channel !== 'in_app' ||
+      !context ||
       context.deliveryContext.target.channel !== 'in_app'
     )
       return {
         kind: 'terminal_failure',
-        code: 'in_app_channel_mismatch',
+        code:
+          request.channel === 'in_app'
+            ? 'in_app_delivery_context_mismatch'
+            : 'in_app_channel_mismatch',
       };
 
     const clinicId = context.clinicId.trim();
