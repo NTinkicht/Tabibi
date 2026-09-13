@@ -53,6 +53,14 @@ export function assertRecoveryRehearsalAllowed(
   }
 }
 
+export function assertNonProductionSourceDatabase(databaseName: string): void {
+  if (!/(^|[_-])(test|dev|stage|staging|local|sandbox)([_-]|$)/i.test(databaseName)) {
+    throw new Error(
+      'Recovery rehearsal source database name must explicitly identify a non-production environment',
+    );
+  }
+}
+
 export function buildRehearsalDatabaseName(
   sourceDatabaseName: string,
   suffix: string,
