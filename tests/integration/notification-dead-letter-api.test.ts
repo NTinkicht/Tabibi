@@ -131,72 +131,66 @@ describe('notification dead-letter HTTP boundary', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
 
-  it(
-    'returns only bounded privacy-minimal dead letters for an authorized clinic',
-    async () => {
-      const older = await deadLetter(
-        ids.clinicA,
-        'older',
-        'provider_timeout',
-        '2026-09-13T10:00:00Z',
-      );
-      const newer = await deadLetter(
-        ids.clinicA,
-        'newer',
-        'provider_unknown',
-        '2026-09-13T11:00:00Z',
-      );
-      await deadLetter(
-        ids.clinicB,
-        'other-clinic',
-        'other_clinic_failure',
-        '2026-09-13T12:00:00Z',
-      );
-      await enqueue(ids.clinicA, 'still-pending');
+  it('returns only bounded privacy-minimal dead letters for an authorized clinic', async () => {
+    const older = await deadLetter(
+      ids.clinicA,
+      'older',
+      'provider_timeout',
+      '2026-09-13T10:00:00Z',
+    );
+    const newer = await deadLetter(
+      ids.clinicA,
+      'newer',
+      'provider_unknown',
+      '2026-09-13T11:00:00Z',
+    );
+    await deadLetter(
+      ids.clinicB,
+      'other-clinic',
+      'other_clinic_failure',
+      '2026-09-13T12:00:00Z',
+    );
+    await enqueue(ids.clinicA, 'still-pending');
 
-      const response = await GET(
-        request(ids.clinicA, '?limit=1'),
-        context(ids.clinicA),
-      );
+    const response = await GET(
+      request(ids.clinicA, '?limit=1'),
+      context(ids.clinicA),
+    );
 
-      expect(response.status).toBe(200);
-      expect(response.headers.get('cache-control')).toBe('no-store');
-      const body = (await response.json()) as {
-        deadLetters: Array<Record<string, unknown>>;
-      };
-      expect(body.deadLetters).toEqual([
-        {
-          intentId: newer.id,
-          eventKey: 'turn_approaching',
-          queueEntryId: null,
-          outcomeCode: 'provider_unknown',
-          attemptCount: 1,
-          maxAttempts: 1,
-          outcomeAt: '2026-09-13T11:00:00.000Z',
-        },
-      ]);
-      expect(body.deadLetters).not.toContainEqual(
-        expect.objectContaining({ intentId: older.id }),
-      );
-      const serialized = JSON.stringify(body);
-      expect(serialized).not.toContain('private rendered body');
-      expect(serialized).not.toContain('+971500000000');
-      expect(serialized).not.toContain('patient-private:');
-      expect(serialized).not.toContain('private-idempotency:');
-      expect(serialized).not.toContain('other_clinic_failure');
-    },
-  );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const body = (await response.json()) as {
+      deadLetters: Array<Record<string, unknown>>;
+    };
+    expect(body.deadLetters).toEqual([
+      {
+        intentId: newer.id,
+        eventKey: 'turn_approaching',
+        queueEntryId: null,
+        outcomeCode: 'provider_unknown',
+        attemptCount: 1,
+        maxAttempts: 1,
+        outcomeAt: '2026-09-13T11:00:00.000Z',
+      },
+    ]);
+    expect(body.deadLetters).not.toContainEqual(
+      expect.objectContaining({ intentId: older.id }),
+    );
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('private rendered body');
+    expect(serialized).not.toContain('+971500000000');
+    expect(serialized).not.toContain('patient-private:');
+    expect(serialized).not.toContain('private-idempotency:');
+    expect(serialized).not.toContain('other_clinic_failure');
+  });
 
-  it(
-    'fails closed for a clinic where the authenticated staff member has no allowed membership',
-    async () => {
-      const response = await GET(request(ids.clinicB), context(ids.clinicB));
+  it('fails closed for a clinic where the authenticated staff member has no allowed membership', async () => {
+    const response = await GET(request(ids.clinicB), context(ids.clinicB));
 
-      expect(response.status).toBe(403);
-      expect(await response.json()).toMatchObject({ error: 'forbidden' });
-      expect(response.headers.get('cache-control')).toBe('no-store');
-    },
-  );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: 'forbidden' });
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
 
   it('rejects invalid limits before querying the observability repository', async () => {
     const response = await GET(
