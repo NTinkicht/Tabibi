@@ -59,7 +59,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     empty: 'Aucune notification pour le moment.',
     markRead: 'Marquer comme lue',
     markingRead: 'Marquage en cours…',
-    accessUnavailable: 'Les notifications ne sont pas disponibles pour cette session invitée.',
+    accessUnavailable:
+      'Les notifications ne sont pas disponibles pour cette session invitée.',
     throttled: 'Trop de requêtes. Veuillez réessayer dans un instant.',
     unavailable: 'Les notifications sont temporairement indisponibles.',
     retry: 'Réessayer',
@@ -127,7 +128,10 @@ export function GuestNotificationCenterClient() {
       if (signal?.aborted) return;
       setState({ kind: 'ready', snapshot, pendingItemId: null });
     } catch (error) {
-      if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+      if (
+        signal?.aborted ||
+        (error instanceof DOMException && error.name === 'AbortError')
+      ) {
         return;
       }
       setState({ kind: 'error' });
@@ -144,12 +148,15 @@ export function GuestNotificationCenterClient() {
     if (state.kind !== 'ready' || state.pendingItemId) return;
     setState({ ...state, pendingItemId: itemId });
     try {
-      const response = await fetch(`/api/guest/inbox/${encodeURIComponent(itemId)}/read`, {
-        method: 'POST',
-        cache: 'no-store',
-        credentials: 'same-origin',
-        headers: { accept: 'application/json' },
-      });
+      const response = await fetch(
+        `/api/guest/inbox/${encodeURIComponent(itemId)}/read`,
+        {
+          method: 'POST',
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: { accept: 'application/json' },
+        },
+      );
       if (response.status === 401) {
         setState({ kind: 'signed_out' });
         return;
@@ -163,11 +170,16 @@ export function GuestNotificationCenterClient() {
         return;
       }
       const updated = (await response.json()) as NotificationItem;
+      const wasUnread =
+        state.snapshot.items.find((item) => item.id === itemId)?.readAt === null;
       setState({
         kind: 'ready',
         pendingItemId: null,
         snapshot: {
-          unreadCount: Math.max(0, state.snapshot.unreadCount - (state.snapshot.items.find((item) => item.id === itemId)?.readAt ? 0 : 1)),
+          unreadCount: Math.max(
+            0,
+            state.snapshot.unreadCount - (wasUnread ? 1 : 0),
+          ),
           items: state.snapshot.items.map((item) =>
             item.id === itemId ? { ...item, readAt: updated.readAt } : item,
           ),
@@ -179,20 +191,30 @@ export function GuestNotificationCenterClient() {
   };
 
   return (
-    <section lang={locale} dir={direction} aria-labelledby="guest-notification-heading">
+    <aside
+      lang={locale}
+      dir={direction}
+      aria-labelledby="guest-notification-heading"
+    >
       <h2 id="guest-notification-heading">{copy.heading}</h2>
       {state.kind === 'loading' ? <p role="status">{copy.loading}</p> : null}
-      {state.kind === 'signed_out' ? <p role="status">{copy.accessUnavailable}</p> : null}
+      {state.kind === 'signed_out' ? (
+        <p role="status">{copy.accessUnavailable}</p>
+      ) : null}
       {state.kind === 'throttled' ? (
         <div role="status">
           <p>{copy.throttled}</p>
-          <button type="button" onClick={() => void load()}>{copy.retry}</button>
+          <button type="button" onClick={() => void load()}>
+            {copy.retry}
+          </button>
         </div>
       ) : null}
       {state.kind === 'error' ? (
         <div role="alert">
           <p>{copy.unavailable}</p>
-          <button type="button" onClick={() => void load()}>{copy.retry}</button>
+          <button type="button" onClick={() => void load()}>
+            {copy.retry}
+          </button>
         </div>
       ) : null}
       {state.kind === 'ready' ? (
@@ -209,7 +231,9 @@ export function GuestNotificationCenterClient() {
                   <article>
                     <h3>{item.title}</h3>
                     <p>{item.body}</p>
-                    <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time>
+                    <time dateTime={item.createdAt}>
+                      {new Date(item.createdAt).toLocaleString()}
+                    </time>
                     {item.readAt === null ? (
                       <p>
                         <button
@@ -229,6 +253,6 @@ export function GuestNotificationCenterClient() {
           </ul>
         </>
       ) : null}
-    </section>
+    </aside>
   );
 }
