@@ -60,6 +60,15 @@ function toInboxItem(row: InboxRow): InAppNotificationInboxItem {
   };
 }
 
+function isSerializationFailure(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === '40001'
+  );
+}
+
 /**
  * Guest-facing application boundary for the durable in-app inbox.
  *
@@ -171,38 +180,46 @@ export class GuestNotificationInboxService {
     bearer: string,
     itemId: string,
   ): Promise<InAppNotificationInboxItem | null> {
-    return this.inAuthorizedTransaction(bearer, async (client, scope) => {
-      const values = [
-        itemId,
-        scope.clinicId,
-        scope.subjectKind,
-        scope.subjectId,
-      ];
-      const updated = await client.query<InboxRow>(
-        `UPDATE notification_inbox_items
-            SET read_at=now()
-          WHERE id=$1
-            AND clinic_id=$2
-            AND subject_kind=$3
-            AND patient_id=$4
-            AND account_user_id IS NULL
-            AND read_at IS NULL
-         RETURNING ${inboxColumns}`,
-        values,
-      );
-      if (updated.rows[0]) return toInboxItem(updated.rows[0]);
+    const operation = () =>
+      this.inAuthorizedTransaction(bearer, async (client, scope) => {
+        const values = [
+          itemId,
+          scope.clinicId,
+          scope.subjectKind,
+          scope.subjectId,
+        ];
+        const updated = await client.query<InboxRow>(
+          `UPDATE notification_inbox_items
+              SET read_at=now()
+            WHERE id=$1
+              AND clinic_id=$2
+              AND subject_kind=$3
+              AND patient_id=$4
+              AND account_user_id IS NULL
+              AND read_at IS NULL
+           RETURNING ${inboxColumns}`,
+          values,
+        );
+        if (updated.rows[0]) return toInboxItem(updated.rows[0]);
 
-      const existing = await client.query<InboxRow>(
-        `SELECT ${inboxColumns}
-           FROM notification_inbox_items
-          WHERE id=$1
-            AND clinic_id=$2
-            AND subject_kind=$3
-            AND patient_id=$4
-            AND account_user_id IS NULL`,
-        values,
-      );
-      return existing.rows[0] ? toInboxItem(existing.rows[0]) : null;
-    });
+        const existing = await client.query<InboxRow>(
+          `SELECT ${inboxColumns}
+             FROM notification_inbox_items
+            WHERE id=$1
+              AND clinic_id=$2
+              AND subject_kind=$3
+              AND patient_id=$4
+              AND account_user_id IS NULL`,
+          values,
+        );
+        return existing.rows[0] ? toInboxItem(existing.rows[0]) : null;
+      });
+
+    try {
+      return await operation();
+    } catch (error) {
+      if (!isSerializationFailure(error)) throw error;
+      return operation();
+    }
   }
 }
