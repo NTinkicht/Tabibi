@@ -160,7 +160,7 @@ describe('WU33 in-app provider adapter composition', () => {
     );
   });
 
-  it('invokes neither renderer nor adapter when current consent is revoked', async () => {
+  it('invokes neither renderer nor adapter when the current in_app preference is disabled', async () => {
     const inbox = inboxStore();
     const adapter = new InAppNotificationProviderAdapter(inbox, scope);
     const dispatch = vi.spyOn(adapter, 'dispatch');
@@ -169,7 +169,7 @@ describe('WU33 in-app provider adapter composition', () => {
     const result = await new NotificationDispatchService(
       dispatchStore('suppressed'),
       adapter,
-      deliveryContext(preference({ consentState: 'revoked' })),
+      deliveryContext(preference({ preferenceState: 'disabled' })),
       60_000,
       undefined,
       notificationRenderer,
@@ -177,7 +177,7 @@ describe('WU33 in-app provider adapter composition', () => {
 
     expect(result).toMatchObject({
       status: 'suppressed',
-      suppressionReason: 'consent_revoked',
+      suppressionReason: 'preference_disabled',
     });
     expect(notificationRenderer.renderAuthorized).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
