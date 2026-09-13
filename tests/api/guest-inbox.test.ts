@@ -34,7 +34,11 @@ vi.mock('@/platform/observability/logger', () => ({
 import { POST } from '@/app/api/guest/inbox/[itemId]/read/route';
 import { GET } from '@/app/api/guest/inbox/route';
 
-const bearer = '00000000-0000-4000-8000-000000000010.secret.signature';
+const bearer = [
+  '00000000-0000-4000-8000-000000000010',
+  'secret',
+  'signature',
+].join('.');
 const credentialId = '00000000-0000-4000-8000-000000000010';
 const itemId = '00000000-0000-4000-8000-000000000011';
 const item = {
@@ -42,6 +46,22 @@ const item = {
   clinicId: '00000000-0000-4000-8000-000000000001',
   subjectKind: 'visit_patient',
   subjectId: '00000000-0000-4000-8000-000000000004',
+  providerIdempotencyKey: 'provider-routing-key',
+  templateId: 'turn_approaching_v1',
+  locale: 'fr',
+  direction: 'ltr',
+  title: 'Votre tour approche',
+  body: 'Veuillez vous préparer.',
+  createdAt: '2026-09-13T07:00:00.000Z',
+  readAt: null,
+};
+const publicItem = {
+  id: itemId,
+  locale: 'fr',
+  direction: 'ltr',
+  title: 'Votre tour approche',
+  body: 'Veuillez vous préparer.',
+  createdAt: '2026-09-13T07:00:00.000Z',
   readAt: null,
 };
 
@@ -66,7 +86,7 @@ describe('guest inbox API', () => {
     query.mockResolvedValue({ rows: [{ allowed: true }] });
   });
 
-  it('passes only the bearer and bounded limit to the inbox service and returns no-store', async () => {
+  it('passes only the bearer and bounded limit to the inbox service and returns a privacy-minimal no-store response', async () => {
     getSnapshot.mockResolvedValue({ items: [item], unreadCount: 1 });
 
     const response = await GET(
@@ -81,7 +101,7 @@ describe('guest inbox API', () => {
     expect(getSnapshot).toHaveBeenCalledWith(bearer, 50);
     expect(getSnapshot).toHaveBeenCalledTimes(1);
     await expect(response.json()).resolves.toEqual({
-      items: [item],
+      items: [publicItem],
       unreadCount: 1,
     });
   });
@@ -99,11 +119,9 @@ describe('guest inbox API', () => {
     expect(getSnapshot).not.toHaveBeenCalled();
   });
 
-  it('marks one validated item id read using only the bearer-derived service scope', async () => {
-    markRead.mockResolvedValue({
-      ...item,
-      readAt: '2026-09-13T07:00:00.000Z',
-    });
+  it('marks one validated item id read using only the bearer-derived service scope and returns only public item fields', async () => {
+    const readAt = '2026-09-13T07:05:00.000Z';
+    markRead.mockResolvedValue({ ...item, readAt });
 
     const response = await POST(
       request(`/api/guest/inbox/${itemId}/read`),
@@ -114,6 +132,7 @@ describe('guest inbox API', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(markRead).toHaveBeenCalledWith(bearer, itemId);
     expect(markRead).toHaveBeenCalledTimes(1);
+    await expect(response.json()).resolves.toEqual({ ...publicItem, readAt });
   });
 
   it('uses the same generic not-found response for malformed and wrong-scope item ids', async () => {

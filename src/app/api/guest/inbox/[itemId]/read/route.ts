@@ -130,7 +130,11 @@ export async function POST(
       );
     }
 
-    return Response.json(item, { status: 200, headers: SECURITY_HEADERS });
+    const { id, locale, direction, title, body, createdAt, readAt } = item;
+    return Response.json(
+      { id, locale, direction, title, body, createdAt, readAt },
+      { status: 200, headers: SECURITY_HEADERS },
+    );
   } catch (error) {
     const rejected = error instanceof GuestAccessRejectedError;
     if (!rejected) getLogger().error('guest inbox mark-read failed');
