@@ -73,9 +73,12 @@ describe('database recovery rehearsal safety helpers', () => {
       ]),
     ).toBe(false);
 
-    expect(rowCountsMatch({ clinics: '2', users: '4' }, { clinics: '2', users: '4' })).toBe(
-      true,
-    );
+    expect(
+      rowCountsMatch(
+        { clinics: '2', users: '4' },
+        { clinics: '2', users: '4' },
+      ),
+    ).toBe(true);
     expect(rowCountsMatch({ clinics: '2' }, { clinics: '3' })).toBe(false);
   });
 });
