@@ -92,7 +92,11 @@ async function withinRateLimit(
       UNTRUSTED_INGRESS_LIMIT,
     );
   }
-  return consumeBucket(pool, `guest-inbox:credential:${credentialId}`, CREDENTIAL_LIMIT);
+  return consumeBucket(
+    pool,
+    `guest-inbox:credential:${credentialId}`,
+    CREDENTIAL_LIMIT,
+  );
 }
 
 export async function GET(request: Request): Promise<Response> {
