@@ -61,6 +61,25 @@ code. `queue_entry_transferred` deliberately fails closed until the dedicated se
 post-decryption exchange-link composition is injected, preventing a transfer from
 being reported delivered without the guest's replacement access path.
 
+WU32 introduces `QueueNotificationProducer` as the single production-facing
+boundary from already-authoritative queue lifecycle events into the durable outbox.
+It supports only `queue_entry_created`, `estimate_changed_materially`,
+`turn_approaching`, `patient_called`, and `queue_entry_cancelled`. Each source event
+uses `queue-event:<sourceEventId>` as its clinic-scoped idempotency key, the queue
+entry as its logical target, and the authoritative source version as the outbox
+intent version. Replaying the same source event therefore returns the same persisted
+intent, while a stale version is rejected by the existing outbox ordering rules.
+Newer intents supersede only states already eligible for supersession in the outbox;
+terminal intents are never rewritten or revived. Guest `queue_entry_transferred`
+and every other unsupported lifecycle event fail closed before persistence.
+
+The WU32 producer owns no destination or contact lookup, consent decision,
+rendering, provider call, credential, or external network dependency. Producer
+payloads remain deliberately bounded and use canonical `position`, never legacy
+`places`. PostgreSQL integration coverage verifies replay/idempotency,
+supersession/stale rejection, clinic isolation, and guest-transfer fail-closed
+behavior through the real outbox repository.
+
 WU25 adds a deterministic, clinic-scoped discovery and bounded execution layer.
 `NotificationDispatchEligibilityRepository` returns only intent identifiers and
 their eligibility timestamp; it never returns notification payloads. It excludes

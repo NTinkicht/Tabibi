@@ -36,6 +36,13 @@ export {
   type NotificationSuppressionReason,
 } from '@/modules/notification-domain/delivery-policy';
 export {
+  QueueNotificationProducer,
+  QueueNotificationProducerValidationError,
+  type QueueNotificationIntentStore,
+  type QueueNotificationSourceEvent,
+  type SupportedQueueNotificationEvent,
+} from '@/modules/notification-domain/queue-notification-producer';
+export {
   createRenderedNotificationDispatchEnvelope,
   type RenderedNotificationDispatchEnvelope,
 } from '@/modules/notification-domain/rendered-dispatch-envelope';
