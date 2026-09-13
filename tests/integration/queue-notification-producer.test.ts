@@ -171,12 +171,7 @@ describe('queue notification producer with PostgreSQL outbox', () => {
 
     await expect(
       producer.produce(
-        turnApproaching(
-          ids.clinicA,
-          ids.queueEntryA,
-          'queue-event-stale',
-          1,
-        ),
+        turnApproaching(ids.clinicA, ids.queueEntryA, 'queue-event-stale', 1),
       ),
     ).rejects.toBeInstanceOf(NotificationOutboxConflictError);
   });
