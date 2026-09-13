@@ -79,11 +79,14 @@ async function main(): Promise<void> {
     throw new Error('Refusing to restore over the source database');
   }
 
-  const workingDirectory = await mkdtemp(join(tmpdir(), 'tabibi-recovery-rehearsal-'));
+  const workingDirectory = await mkdtemp(
+    join(tmpdir(), 'tabibi-recovery-rehearsal-'),
+  );
   const dumpPath = join(workingDirectory, 'tabibi.dump');
   const sourceClient = new Client({ connectionString: sourceUrl });
   const adminClient = new Client({ connectionString: adminUrl });
   let rehearsalClient: Client | null = null;
+  let adminConnected = false;
   let targetCreated = false;
 
   try {
@@ -99,12 +102,15 @@ async function main(): Promise<void> {
     await assertDumpExists(dumpPath);
 
     await adminClient.connect();
+    adminConnected = true;
     const existing = await adminClient.query(
       'SELECT 1 FROM pg_database WHERE datname=$1',
       [rehearsalDatabaseName],
     );
     if (existing.rowCount) {
-      throw new Error('Generated rehearsal database already exists; refusing to reuse it');
+      throw new Error(
+        'Generated rehearsal database already exists; refusing to reuse it',
+      );
     }
     await adminClient.query(
       `CREATE DATABASE ${quoteIdentifier(rehearsalDatabaseName)}`,
@@ -135,19 +141,21 @@ async function main(): Promise<void> {
   } finally {
     if (rehearsalClient) await rehearsalClient.end().catch(() => undefined);
     await sourceClient.end().catch(() => undefined);
-    if (targetCreated) {
-      if (!adminClient.connectionParameters) await adminClient.connect();
+    if (targetCreated && adminConnected) {
       await adminClient
-        .query(`DROP DATABASE ${quoteIdentifier(rehearsalDatabaseName)} WITH (FORCE)`)
+        .query(
+          `DROP DATABASE ${quoteIdentifier(rehearsalDatabaseName)} WITH (FORCE)`,
+        )
         .catch(() => undefined);
     }
-    await adminClient.end().catch(() => undefined);
+    if (adminConnected) await adminClient.end().catch(() => undefined);
     await rm(workingDirectory, { recursive: true, force: true });
   }
 }
 
 main().catch((error) => {
-  const message = error instanceof Error ? error.message : 'Unknown recovery rehearsal error';
+  const message =
+    error instanceof Error ? error.message : 'Unknown recovery rehearsal error';
   console.error(`Database recovery rehearsal failed: ${message}`);
   process.exitCode = 1;
 });
