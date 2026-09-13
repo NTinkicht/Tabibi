@@ -142,21 +142,33 @@ async function main(): Promise<void> {
     const clinicRegistrations = new Array<RegistrationResult | undefined>(
       config.clinicDayPatients,
     );
-    const clinicIndexes = Array.from({ length: config.clinicDayPatients }, (_, index) => index);
+    const clinicIndexes = Array.from(
+      { length: config.clinicDayPatients },
+      (_, index) => index,
+    );
 
-    await runBounded(clinicIndexes, config.concurrency, deadline, async (index) => {
-      clinicRegistrations[index] = await timed('clinic_day', 'register_walk_in', () =>
-        queue.registerWalkIn(scope, synthetic.sessionId, {
-          privateDisplayName: `Synthetic Clinic Day ${index + 1}`,
-          preferredLocale: index % 2 === 0 ? 'ar' : 'fr',
-          idempotencyKey: `wu43-day-register-${namespace}-${index}`,
-          correlationId: `wu43-day-${index}`,
-        }),
-      );
-    });
+    await runBounded(
+      clinicIndexes,
+      config.concurrency,
+      deadline,
+      async (index) => {
+        clinicRegistrations[index] = await timed(
+          'clinic_day',
+          'register_walk_in',
+          () =>
+            queue.registerWalkIn(scope, synthetic.sessionId, {
+              privateDisplayName: `Synthetic Clinic Day ${index + 1}`,
+              preferredLocale: index % 2 === 0 ? 'ar' : 'fr',
+              idempotencyKey: `wu43-day-register-${namespace}-${index}`,
+              correlationId: `wu43-day-${index}`,
+            }),
+        );
+      },
+    );
 
     const successfulClinicRegistrations = clinicRegistrations.filter(
-      (registration): registration is RegistrationResult => registration !== undefined,
+      (registration): registration is RegistrationResult =>
+        registration !== undefined,
     );
 
     const readIndexes = Array.from(
@@ -184,14 +196,20 @@ async function main(): Promise<void> {
       },
     );
 
-    const progressCandidates = [...successfulClinicRegistrations]
-      .sort((left, right) => left.entry.registrationOrder - right.entry.registrationOrder)
-      .slice(0, Math.min(4, successfulClinicRegistrations.length));
+    const operational = await timed('clinic_day', 'list_operational', () =>
+      queue.listOperational(scope, synthetic.sessionId),
+    );
+    const progressCandidates =
+      operational?.entries
+        .filter((entry) => entry.state === 'checked_in')
+        .slice(0, 4) ?? [];
 
     for (const [index, registration] of progressCandidates.entries()) {
-      if (Date.now() > deadline) throw new Error('Load rehearsal exceeded wall-clock deadline');
+      if (Date.now() > deadline) {
+        throw new Error('Load rehearsal exceeded wall-clock deadline');
+      }
       const call = await timed('clinic_day', 'call_patient', () =>
-        queue.command(scope, synthetic.sessionId, registration.entry.id, {
+        queue.command(scope, synthetic.sessionId, registration.id, {
           command: 'call',
           idempotencyKey: `wu43-day-call-${namespace}-${index}`,
           correlationId: `wu43-day-call-${index}`,
@@ -199,7 +217,7 @@ async function main(): Promise<void> {
       );
       if (!call) continue;
       const started = await timed('clinic_day', 'start_consultation', () =>
-        queue.command(scope, synthetic.sessionId, registration.entry.id, {
+        queue.command(scope, synthetic.sessionId, registration.id, {
           command: 'start_consultation',
           idempotencyKey: `wu43-day-start-${namespace}-${index}`,
           correlationId: `wu43-day-start-${index}`,
@@ -207,7 +225,7 @@ async function main(): Promise<void> {
       );
       if (!started) continue;
       await timed('clinic_day', 'complete_consultation', () =>
-        queue.command(scope, synthetic.sessionId, registration.entry.id, {
+        queue.command(scope, synthetic.sessionId, registration.id, {
           command: 'complete_consultation',
           idempotencyKey: `wu43-day-complete-${namespace}-${index}`,
           correlationId: `wu43-day-complete-${index}`,
@@ -215,21 +233,35 @@ async function main(): Promise<void> {
       );
     }
 
-    const burstRegistrations = new Array<RegistrationResult | undefined>(config.burstPatients);
-    const burstIndexes = Array.from({ length: config.burstPatients }, (_, index) => index);
-    await runBounded(burstIndexes, config.concurrency, deadline, async (index) => {
-      burstRegistrations[index] = await timed('burst', 'register_walk_in', () =>
-        queue.registerWalkIn(scope, synthetic.sessionId, {
-          privateDisplayName: `Synthetic Burst ${index + 1}`,
-          preferredLocale: index % 2 === 0 ? 'fr' : 'ar',
-          idempotencyKey: `wu43-burst-register-${namespace}-${index}`,
-          correlationId: `wu43-burst-${index}`,
-        }),
-      );
-    });
+    const burstRegistrations = new Array<RegistrationResult | undefined>(
+      config.burstPatients,
+    );
+    const burstIndexes = Array.from(
+      { length: config.burstPatients },
+      (_, index) => index,
+    );
+    await runBounded(
+      burstIndexes,
+      config.concurrency,
+      deadline,
+      async (index) => {
+        burstRegistrations[index] = await timed(
+          'burst',
+          'register_walk_in',
+          () =>
+            queue.registerWalkIn(scope, synthetic.sessionId, {
+              privateDisplayName: `Synthetic Burst ${index + 1}`,
+              preferredLocale: index % 2 === 0 ? 'fr' : 'ar',
+              idempotencyKey: `wu43-burst-register-${namespace}-${index}`,
+              correlationId: `wu43-burst-${index}`,
+            }),
+        );
+      },
+    );
 
     const successfulBurstRegistrations = burstRegistrations.filter(
-      (registration): registration is RegistrationResult => registration !== undefined,
+      (registration): registration is RegistrationResult =>
+        registration !== undefined,
     );
 
     await runBounded(
@@ -283,13 +315,13 @@ async function main(): Promise<void> {
     );
 
     await runBounded(burstIndexes, config.concurrency, deadline, async () => {
-      await timed('burst', 'list_waiting', () => queue.listWaiting(scope, synthetic.sessionId));
+      await timed('burst', 'list_waiting', () =>
+        queue.listWaiting(scope, synthetic.sessionId),
+      );
     });
 
     const durationMs = Date.now() - workloadStarted;
     const summary = summarizeLoad(samples, durationMs);
-    assertLoadThresholds(summary, config);
-
     process.stdout.write(
       `${JSON.stringify({
         kind: 'tabibi_clinic_day_load_summary',
@@ -300,13 +332,15 @@ async function main(): Promise<void> {
         summary,
       })}\n`,
     );
+    assertLoadThresholds(summary, config);
   } finally {
     await pool.end();
   }
 }
 
 main().catch((error) => {
-  const message = error instanceof Error ? error.message : 'unknown load rehearsal error';
+  const message =
+    error instanceof Error ? error.message : 'unknown load rehearsal error';
   console.error(`Clinic-day load rehearsal failed: ${message}`);
   process.exitCode = 1;
 });
