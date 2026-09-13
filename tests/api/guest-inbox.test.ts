@@ -115,11 +115,9 @@ describe('guest inbox API', () => {
     expect(getSnapshot).not.toHaveBeenCalled();
   });
 
-  it('marks one validated item id read using only the bearer-derived service scope', async () => {
-    markRead.mockResolvedValue({
-      ...item,
-      readAt: '2026-09-13T07:00:00.000Z',
-    });
+  it('marks one validated item id read using only the bearer-derived service scope and returns only public item fields', async () => {
+    const readAt = '2026-09-13T07:05:00.000Z';
+    markRead.mockResolvedValue({ ...item, readAt });
 
     const response = await POST(
       request(`/api/guest/inbox/${itemId}/read`),
@@ -130,6 +128,7 @@ describe('guest inbox API', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(markRead).toHaveBeenCalledWith(bearer, itemId);
     expect(markRead).toHaveBeenCalledTimes(1);
+    await expect(response.json()).resolves.toEqual({ ...publicItem, readAt });
   });
 
   it('uses the same generic not-found response for malformed and wrong-scope item ids', async () => {
