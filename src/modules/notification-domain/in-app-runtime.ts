@@ -3,10 +3,12 @@ import {
   NotificationDispatchService,
   NotificationPreferenceDeliveryContextResolver,
 } from '@/modules/notification-domain';
+import { NotificationDispatchBatchRunner } from '@/modules/notification-domain/dispatch-batch';
 import { QueueInAppNotificationTargetResolver } from '@/modules/notification-domain/queue-in-app-target-resolver';
 import { InAppNotificationInboxRepository } from '@/modules/notification-inbox';
 import { InAppNotificationProviderAdapter } from '@/modules/notification-inbox/provider-adapter';
 import { NotificationOutboxRepository } from '@/modules/notification-outbox';
+import { NotificationDispatchEligibilityRepository } from '@/modules/notification-outbox/dispatch-eligibility';
 import { NotificationPreferenceRepository } from '@/modules/notification-preferences';
 
 /**
@@ -34,4 +36,18 @@ export function createQueueInAppNotificationDispatchService(
   const provider = new InAppNotificationProviderAdapter(inbox);
 
   return new NotificationDispatchService(outbox, provider, deliveryContext);
+}
+
+/**
+ * Production composition for one bounded clinic-scoped in-app dispatch batch.
+ * Eligibility discovery remains read-only; every selected intent still crosses the
+ * existing single-intent claim/fencing, consent, render and provider boundaries.
+ */
+export function createQueueInAppNotificationDispatchBatchRunner(
+  pool: Pool,
+): NotificationDispatchBatchRunner {
+  const eligibility = new NotificationDispatchEligibilityRepository(pool);
+  const dispatch = createQueueInAppNotificationDispatchService(pool);
+
+  return new NotificationDispatchBatchRunner(eligibility, dispatch);
 }
