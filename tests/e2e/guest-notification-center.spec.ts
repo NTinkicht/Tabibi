@@ -92,7 +92,9 @@ test(
   },
 );
 
-test('guest notification center fails closed for revoked guest access', async ({ page }) => {
+test('guest notification center fails closed for revoked guest access', async ({
+  page,
+}) => {
   await routeStatus(page);
   await page.route('**/api/guest/inbox?limit=20', async (route) => {
     await route.fulfill({
@@ -109,7 +111,9 @@ test('guest notification center fails closed for revoked guest access', async ({
   await expect(page.getByText(notification.title)).toHaveCount(0);
 });
 
-test('guest notification center exposes bounded retry for throttling', async ({ page }) => {
+test('guest notification center exposes bounded retry for throttling', async ({
+  page,
+}) => {
   await routeStatus(page);
   let requests = 0;
   await page.route('**/api/guest/inbox?limit=20', async (route) => {
