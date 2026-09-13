@@ -64,7 +64,7 @@ describe('QueueNotificationProducer', () => {
     expect(enqueue).not.toHaveBeenCalled();
   });
 
-  it('rejects invalid versions and invalid estimate windows before persistence', async () => {
+  it('rejects invalid versions, positions, windows, and oversized target ids', async () => {
     const enqueue = vi.fn();
     const producer = new QueueNotificationProducer({
       enqueue,
@@ -84,6 +84,19 @@ describe('QueueNotificationProducer', () => {
       producer.produce({
         clinicId: 'clinic-1',
         queueEntryId: 'queue-1',
+        sourceEventId: 'event-position-1',
+        sourceVersion: 1,
+        notification: {
+          eventKey: 'turn_approaching',
+          position: 1.5,
+        },
+      }),
+    ).rejects.toBeInstanceOf(QueueNotificationProducerValidationError);
+
+    await expect(
+      producer.produce({
+        clinicId: 'clinic-1',
+        queueEntryId: 'queue-1',
         sourceEventId: 'event-2',
         sourceVersion: 2,
         notification: {
@@ -91,6 +104,16 @@ describe('QueueNotificationProducer', () => {
           windowStartMinutes: 20,
           windowEndMinutes: 10,
         },
+      }),
+    ).rejects.toBeInstanceOf(QueueNotificationProducerValidationError);
+
+    await expect(
+      producer.produce({
+        clinicId: 'clinic-1',
+        queueEntryId: 'q'.repeat(149),
+        sourceEventId: 'event-3',
+        sourceVersion: 3,
+        notification: { eventKey: 'queue_entry_created' },
       }),
     ).rejects.toBeInstanceOf(QueueNotificationProducerValidationError);
 
