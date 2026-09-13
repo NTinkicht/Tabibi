@@ -221,10 +221,9 @@ describe('WU36 guest-bound notification inbox', () => {
       "UPDATE queue_entries SET state='in_consultation' WHERE id=$1",
       [ids.targetEntry],
     );
-    await pool.query(
-      "UPDATE queue_entries SET state='completed' WHERE id=$1",
-      [ids.targetEntry],
-    );
+    await pool.query("UPDATE queue_entries SET state='completed' WHERE id=$1", [
+      ids.targetEntry,
+    ]);
     await expect(
       service.getSnapshot(credential.bearer, 20),
     ).rejects.toBeInstanceOf(GuestAccessRejectedError);
