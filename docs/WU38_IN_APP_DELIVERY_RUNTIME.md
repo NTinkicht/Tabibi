@@ -15,7 +15,7 @@ WU38 closes the runtime-composition gap between durable queue notification inten
 5. The security-fixed `InAppNotificationProviderAdapter`.
 6. `InAppNotificationInboxRepository` for idempotent, clinic- and exact-subject-scoped persistence.
 
-The caller of the composed service supplies only `clinicId` and `intentId`. Patient, account, subject-kind and contact identity are not caller-selectable. Unknown, missing, inconsistent, or cross-clinic queue targets fail closed before inbox persistence.
+The caller of the composed service supplies only `clinicId` and `intentId`. Patient, account, subject-kind and contact identity are not caller-selectable. Missing or inconsistent queue targets fail closed in the resolver, while the existing composite queue/outbox foreign key prevents a cross-clinic queue target from being persisted in the first place.
 
 ## Trigger boundary
 
@@ -33,4 +33,4 @@ PostgreSQL integration coverage proves:
 - the item lands only in the exact patient inbox for the correct clinic;
 - replaying the same delivered intent cannot create another inbox item;
 - missing preference is suppressed before inbox persistence;
-- a cross-clinic queue-entry target fails closed as missing delivery context and writes no inbox row.
+- a cross-clinic `(queue_entry_id, clinic_id)` pair is rejected by the database before dispatch, with zero outbox or inbox persistence.
