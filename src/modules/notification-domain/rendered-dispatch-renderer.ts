@@ -97,6 +97,8 @@ export class NotificationIntentTemplateInputResolver
           ...common,
           templateId: 'turn_approaching.v1',
           variables: {
+            // `places` is a documented read-only compatibility alias for persisted
+            // WU24/WU30 fixtures. New producers must write canonical `position`.
             position: requiredNumber(payload, 'position', 'places'),
           },
         };
@@ -117,10 +119,8 @@ export class NotificationIntentTemplateInputResolver
           variables: {},
         };
       case 'queue_entry_transferred':
-        // Guest-transfer delivery requires the fresh post-decryption exchange link
-        // composed by the dedicated secure path. A static transfer notification can
-        // strand the guest after the old credential is invalidated, so fail closed
-        // here until that composition path is explicitly injected into dispatch.
+        // Guest-transfer delivery requires the fresh post-decryption exchange link.
+        // Fail closed until that secure composition path is explicitly injected.
         throw new Error(
           'Guest transfer notification requires secure exchange-link composition',
         );

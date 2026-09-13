@@ -443,9 +443,9 @@ describe('NotificationDispatchService', () => {
     expect(smsProvider.dispatch).toHaveBeenCalledOnce();
   });
 
-  it('never invokes provider when the authorization resolver fails', async () => {
+  it('persists bounded retry when authorization resolution fails', async () => {
     const notificationProvider = provider({ kind: 'delivered' });
-    const dispatchStore = store();
+    const dispatchStore = store({ completed: intent({ state: 'failed' }) });
     const service = new NotificationDispatchService(
       dispatchStore.value,
       notificationProvider.value,
@@ -458,9 +458,21 @@ describe('NotificationDispatchService', () => {
 
     await expect(
       service.dispatchOne({ clinicId: 'clinic-1', intentId: 'intent-1' }),
-    ).rejects.toThrow('preference database unavailable');
+    ).resolves.toMatchObject({
+      status: 'completed',
+      providerResult: {
+        kind: 'retryable_failure',
+        code: 'delivery_context_failure',
+      },
+    });
     expect(notificationProvider.dispatch).not.toHaveBeenCalled();
-    expect(dispatchStore.completeDispatchAttempt).not.toHaveBeenCalled();
+    expect(dispatchStore.completeDispatchAttempt).toHaveBeenCalledWith({
+      clinicId: 'clinic-1',
+      intentId: 'intent-1',
+      claimToken: 'claim-token-1',
+      outcome: 'failed',
+      outcomeCode: 'delivery_context_failure',
+    });
   });
 
   it('emits categorical not-claimed and claim-lost events without fence secrets', async () => {
