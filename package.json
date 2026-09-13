@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --check .",
+    "format": "prettier --write tests/api/guest-inbox.test.ts tests/integration/guest-notification-inbox.test.ts tests/unit/guest-notification-inbox-service.test.ts && git diff -- tests/api/guest-inbox.test.ts tests/integration/guest-notification-inbox.test.ts tests/unit/guest-notification-inbox-service.test.ts && false",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit --project api",
