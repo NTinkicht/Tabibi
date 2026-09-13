@@ -185,6 +185,29 @@ describe('WU36 guest-bound notification inbox', () => {
     });
   });
 
+  it('keeps concurrent same-item mark-read retries idempotent', async () => {
+    const credential = await liveBearer();
+    const repository = new InAppNotificationInboxRepository(pool);
+    const own = await repository.persist({
+      clinicId: ids.clinic,
+      subjectKind: 'visit_patient',
+      subjectId: ids.targetPatient,
+      envelope: envelope('wu36-concurrent-read'),
+    });
+    const service = new GuestNotificationInboxService(pool);
+
+    const [first, second] = await Promise.all([
+      service.markRead(credential.bearer, own.id),
+      service.markRead(credential.bearer, own.id),
+    ]);
+
+    expect(first?.readAt).not.toBeNull();
+    expect(second?.readAt).toBe(first?.readAt);
+    await expect(
+      service.getSnapshot(credential.bearer, 20),
+    ).resolves.toMatchObject({ unreadCount: 0 });
+  });
+
   it('rejects revoked, expired and terminal guest access without inbox mutation', async () => {
     const credential = await liveBearer();
     const repository = new InAppNotificationInboxRepository(pool);
