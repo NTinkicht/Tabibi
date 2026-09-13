@@ -48,6 +48,8 @@ export interface InAppNotificationInboxStore {
   markRead(
     input: InAppNotificationInboxSubjectScope & { itemId: string },
   ): Promise<InAppNotificationInboxItem | null>;
+
+  unreadCount(input: InAppNotificationInboxSubjectScope): Promise<number>;
 }
 
 export class InAppNotificationInboxValidationError extends Error {}
@@ -317,5 +319,21 @@ export class InAppNotificationInboxRepository
       values,
     );
     return existing.rows[0] ? toInboxItem(existing.rows[0]) : null;
+  }
+
+  async unreadCount(raw: InAppNotificationInboxSubjectScope): Promise<number> {
+    const input = validateSubjectScope(raw);
+    const { patientId, accountUserId } = subjectIds(input);
+    const result = await this.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+         FROM notification_inbox_items
+        WHERE clinic_id=$1
+          AND subject_kind=$2
+          AND patient_id IS NOT DISTINCT FROM $3::uuid
+          AND account_user_id IS NOT DISTINCT FROM $4::uuid
+          AND read_at IS NULL`,
+      [input.clinicId, input.subjectKind, patientId, accountUserId],
+    );
+    return Number(result.rows[0]?.count ?? 0);
   }
 }
