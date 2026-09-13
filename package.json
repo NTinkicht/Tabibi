@@ -22,7 +22,8 @@
     "db:migrate": "tsx scripts/db/migrate.ts",
     "db:seed": "tsx scripts/db/seed.ts",
     "db:reset:test": "tsx scripts/db/reset-test.ts",
-    "db:rehearse-recovery": "tsx scripts/db/rehearse-backup-restore.ts"
+    "db:rehearse-recovery": "tsx scripts/db/rehearse-backup-restore.ts",
+    "db:clinic-day-load": "tsx scripts/load/clinic-day.ts"
   },
   "dependencies": {
     "next": "16.3.4",
