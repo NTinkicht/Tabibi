@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assertNonProductionSourceDatabase,
   assertRecoveryRehearsalAllowed,
   buildRehearsalDatabaseName,
   commandEnvironment,
@@ -26,6 +27,17 @@ describe('database recovery rehearsal safety helpers', () => {
         NODE_ENV: 'test',
       }),
     ).not.toThrow();
+  });
+
+  it('requires the source database name to identify a non-production environment', () => {
+    expect(() => assertNonProductionSourceDatabase('tabibi_test')).not.toThrow();
+    expect(() => assertNonProductionSourceDatabase('tabibi-staging')).not.toThrow();
+    expect(() => assertNonProductionSourceDatabase('tabibi_prod')).toThrow(
+      /non-production/i,
+    );
+    expect(() => assertNonProductionSourceDatabase('tabibi')).toThrow(
+      /non-production/i,
+    );
   });
 
   it('keeps database passwords out of command arguments', () => {
