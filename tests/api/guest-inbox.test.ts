@@ -66,100 +66,85 @@ describe('guest inbox API', () => {
     query.mockResolvedValue({ rows: [{ allowed: true }] });
   });
 
-  it(
-    'passes only the bearer and bounded limit to the inbox service and returns no-store',
-    async () => {
-      getSnapshot.mockResolvedValue({ items: [item], unreadCount: 1 });
+  it('passes only the bearer and bounded limit to the inbox service and returns no-store', async () => {
+    getSnapshot.mockResolvedValue({ items: [item], unreadCount: 1 });
 
-      const response = await GET(
-        request(
-          '/api/guest/inbox?limit=999&clinicId=attacker&subjectId=attacker&subjectKind=account',
-        ),
-      );
+    const response = await GET(
+      request(
+        '/api/guest/inbox?limit=999&clinicId=attacker&subjectId=attacker&subjectKind=account',
+      ),
+    );
 
-      expect(response.status).toBe(200);
-      expect(response.headers.get('cache-control')).toBe('no-store');
-      expect(response.headers.get('referrer-policy')).toBe('no-referrer');
-      expect(getSnapshot).toHaveBeenCalledWith(bearer, 50);
-      expect(getSnapshot).toHaveBeenCalledTimes(1);
-      await expect(response.json()).resolves.toEqual({
-        items: [item],
-        unreadCount: 1,
-      });
-    },
-  );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(getSnapshot).toHaveBeenCalledWith(bearer, 50);
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
+    await expect(response.json()).resolves.toEqual({
+      items: [item],
+      unreadCount: 1,
+    });
+  });
 
-  it(
-    'rejects a missing bearer before inbox lookup with hardened headers',
-    async () => {
-      const response = await GET(
-        new Request('https://tabibi.test/api/guest/inbox'),
-      );
+  it('rejects a missing bearer before inbox lookup with hardened headers', async () => {
+    const response = await GET(
+      new Request('https://tabibi.test/api/guest/inbox'),
+    );
 
-      expect(response.status).toBe(401);
-      expect(response.headers.get('cache-control')).toBe('no-store');
-      expect(response.headers.get('content-security-policy')).toContain(
-        "default-src 'none'",
-      );
-      expect(getSnapshot).not.toHaveBeenCalled();
-    },
-  );
+    expect(response.status).toBe(401);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('content-security-policy')).toContain(
+      "default-src 'none'",
+    );
+    expect(getSnapshot).not.toHaveBeenCalled();
+  });
 
-  it(
-    'marks one validated item id read using only the bearer-derived service scope',
-    async () => {
-      markRead.mockResolvedValue({
-        ...item,
-        readAt: '2026-09-13T07:00:00.000Z',
-      });
+  it('marks one validated item id read using only the bearer-derived service scope', async () => {
+    markRead.mockResolvedValue({
+      ...item,
+      readAt: '2026-09-13T07:00:00.000Z',
+    });
 
-      const response = await POST(
-        request(`/api/guest/inbox/${itemId}/read`),
-        context(),
-      );
+    const response = await POST(
+      request(`/api/guest/inbox/${itemId}/read`),
+      context(),
+    );
 
-      expect(response.status).toBe(200);
-      expect(response.headers.get('cache-control')).toBe('no-store');
-      expect(markRead).toHaveBeenCalledWith(bearer, itemId);
-      expect(markRead).toHaveBeenCalledTimes(1);
-    },
-  );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(markRead).toHaveBeenCalledWith(bearer, itemId);
+    expect(markRead).toHaveBeenCalledTimes(1);
+  });
 
-  it(
-    'uses the same generic not-found response for malformed and wrong-scope item ids',
-    async () => {
-      const malformed = await POST(
-        request('/api/guest/inbox/not-an-id/read'),
-        context('not-an-id'),
-      );
-      expect(malformed.status).toBe(404);
-      await expect(malformed.json()).resolves.toEqual({
-        error: 'Notification not found',
-      });
-      expect(markRead).not.toHaveBeenCalled();
+  it('uses the same generic not-found response for malformed and wrong-scope item ids', async () => {
+    const malformed = await POST(
+      request('/api/guest/inbox/not-an-id/read'),
+      context('not-an-id'),
+    );
+    expect(malformed.status).toBe(404);
+    await expect(malformed.json()).resolves.toEqual({
+      error: 'Notification not found',
+    });
+    expect(markRead).not.toHaveBeenCalled();
 
-      markRead.mockResolvedValue(null);
-      const foreign = await POST(
-        request(`/api/guest/inbox/${itemId}/read`),
-        context(),
-      );
-      expect(foreign.status).toBe(404);
-      await expect(foreign.json()).resolves.toEqual({
-        error: 'Notification not found',
-      });
-    },
-  );
+    markRead.mockResolvedValue(null);
+    const foreign = await POST(
+      request(`/api/guest/inbox/${itemId}/read`),
+      context(),
+    );
+    expect(foreign.status).toBe(404);
+    await expect(foreign.json()).resolves.toEqual({
+      error: 'Notification not found',
+    });
+  });
 
-  it(
-    'throttles before guest inbox access when the shared bucket is exhausted',
-    async () => {
-      query.mockResolvedValue({ rows: [{ allowed: false }] });
+  it('throttles before guest inbox access when the shared bucket is exhausted', async () => {
+    query.mockResolvedValue({ rows: [{ allowed: false }] });
 
-      const response = await GET(request('/api/guest/inbox'));
+    const response = await GET(request('/api/guest/inbox'));
 
-      expect(response.status).toBe(429);
-      expect(response.headers.get('retry-after')).toBe('60');
-      expect(getSnapshot).not.toHaveBeenCalled();
-    },
-  );
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('60');
+    expect(getSnapshot).not.toHaveBeenCalled();
+  });
 });
