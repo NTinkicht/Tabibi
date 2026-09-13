@@ -60,14 +60,18 @@ function integerFromEnvironment(
   if (raw === undefined || raw === '') return fallback;
   const value = Number(raw);
   if (!Number.isInteger(value) || value < minimum || value > maximum) {
-    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}`);
+    throw new Error(
+      `${name} must be an integer between ${minimum} and ${maximum}`,
+    );
   }
   return value;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): ClinicDayLoadConfig {
   const seed = env.TABIBI_LOAD_SEED?.trim() || 'wu43-clinic-day-v1';
-  if (seed.length > 80) throw new Error('TABIBI_LOAD_SEED must be at most 80 characters');
+  if (seed.length > 80) {
+    throw new Error('TABIBI_LOAD_SEED must be at most 80 characters');
+  }
 
   return {
     seed,
@@ -78,8 +82,20 @@ export function loadConfig(env: NodeJS.ProcessEnv): ClinicDayLoadConfig {
       4,
       50,
     ),
-    burstPatients: integerFromEnvironment(env, 'TABIBI_LOAD_BURST_PATIENTS', 6, 2, 20),
-    concurrency: integerFromEnvironment(env, 'TABIBI_LOAD_CONCURRENCY', 4, 1, 8),
+    burstPatients: integerFromEnvironment(
+      env,
+      'TABIBI_LOAD_BURST_PATIENTS',
+      6,
+      2,
+      20,
+    ),
+    concurrency: integerFromEnvironment(
+      env,
+      'TABIBI_LOAD_CONCURRENCY',
+      4,
+      1,
+      8,
+    ),
     maxDurationMs: integerFromEnvironment(
       env,
       'TABIBI_LOAD_MAX_DURATION_MS',
@@ -87,7 +103,13 @@ export function loadConfig(env: NodeJS.ProcessEnv): ClinicDayLoadConfig {
       5_000,
       60_000,
     ),
-    maxP95Ms: integerFromEnvironment(env, 'TABIBI_LOAD_MAX_P95_MS', 4_000, 100, 10_000),
+    maxP95Ms: integerFromEnvironment(
+      env,
+      'TABIBI_LOAD_MAX_P95_MS',
+      4_000,
+      100,
+      10_000,
+    ),
   };
 }
 
@@ -96,7 +118,9 @@ export function assertLoadRehearsalAllowed(
   databaseUrl: string,
 ): void {
   if (env[LOAD_OPT_IN] !== '1') {
-    throw new Error(`Load rehearsal is disabled; set ${LOAD_OPT_IN}=1 explicitly`);
+    throw new Error(
+      `Load rehearsal is disabled; set ${LOAD_OPT_IN}=1 explicitly`,
+    );
   }
   if (env.NODE_ENV === 'production') {
     throw new Error('Load rehearsal refuses to run with NODE_ENV=production');
@@ -106,8 +130,13 @@ export function assertLoadRehearsalAllowed(
   if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
     throw new Error('DATABASE_URL must use postgres:// or postgresql://');
   }
-  const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, '')).toLowerCase();
-  if (!databaseName || !NON_PRODUCTION_MARKERS.some((marker) => databaseName.includes(marker))) {
+  const databaseName = decodeURIComponent(
+    parsed.pathname.replace(/^\//, ''),
+  ).toLowerCase();
+  if (
+    !databaseName ||
+    !NON_PRODUCTION_MARKERS.some((marker) => databaseName.includes(marker))
+  ) {
     throw new Error(
       'Load rehearsal requires a database name explicitly marked test/dev/stage/staging/local/sandbox',
     );
@@ -115,7 +144,12 @@ export function assertLoadRehearsalAllowed(
 }
 
 export function deterministicUuid(seed: string, label: string): string {
-  const bytes = Buffer.from(createHash('sha256').update(`${seed}:${label}`).digest().subarray(0, 16));
+  const bytes = Buffer.from(
+    createHash('sha256')
+      .update(`${seed}:${label}`)
+      .digest()
+      .subarray(0, 16),
+  );
   bytes[6] = (bytes[6]! & 0x0f) | 0x40;
   bytes[8] = (bytes[8]! & 0x3f) | 0x80;
   const hex = bytes.toString('hex');
@@ -129,11 +163,17 @@ export function deterministicRunKey(seed: string): string {
 export function percentile(values: readonly number[], ratio: number): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((left, right) => left - right);
-  const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * ratio) - 1);
+  const index = Math.min(
+    sorted.length - 1,
+    Math.ceil(sorted.length * ratio) - 1,
+  );
   return Math.round(sorted[Math.max(0, index)]! * 100) / 100;
 }
 
-function metricsFor(operation: string, samples: readonly LoadSample[]): OperationMetrics {
+function metricsFor(
+  operation: string,
+  samples: readonly LoadSample[],
+): OperationMetrics {
   const relevant = samples.filter((sample) => sample.operation === operation);
   const durations = relevant.map((sample) => sample.durationMs);
   const errors = relevant.filter((sample) => !sample.ok).length;
@@ -148,17 +188,24 @@ function metricsFor(operation: string, samples: readonly LoadSample[]): Operatio
   };
 }
 
-export function summarizeLoad(samples: readonly LoadSample[], durationMs: number): LoadSummary {
+export function summarizeLoad(
+  samples: readonly LoadSample[],
+  durationMs: number,
+): LoadSummary {
   const durations = samples.map((sample) => sample.durationMs);
   const errors = samples.filter((sample) => !sample.ok).length;
-  const operations = [...new Set(samples.map((sample) => sample.operation))].sort();
+  const operations = [
+    ...new Set(samples.map((sample) => sample.operation)),
+  ].sort();
   return {
     operations: samples.length,
     errors,
     errorRate: samples.length === 0 ? 0 : errors / samples.length,
     durationMs,
     throughputPerSecond:
-      durationMs <= 0 ? 0 : Math.round((samples.length / (durationMs / 1_000)) * 100) / 100,
+      durationMs <= 0
+        ? 0
+        : Math.round((samples.length / (durationMs / 1_000)) * 100) / 100,
     p50Ms: percentile(durations, 0.5),
     p95Ms: percentile(durations, 0.95),
     p99Ms: percentile(durations, 0.99),
@@ -170,7 +217,9 @@ export function assertLoadThresholds(
   summary: LoadSummary,
   config: ClinicDayLoadConfig,
 ): void {
-  if (summary.operations === 0) throw new Error('Load rehearsal produced no operations');
+  if (summary.operations === 0) {
+    throw new Error('Load rehearsal produced no operations');
+  }
   if (summary.errors > 0) {
     throw new Error(`Load rehearsal recorded ${summary.errors} failed operations`);
   }
@@ -180,7 +229,9 @@ export function assertLoadThresholds(
     );
   }
   if (summary.p95Ms > config.maxP95Ms) {
-    throw new Error(`Load rehearsal p95 exceeded regression threshold: ${summary.p95Ms}ms`);
+    throw new Error(
+      `Load rehearsal p95 exceeded regression threshold: ${summary.p95Ms}ms`,
+    );
   }
 }
 
@@ -191,12 +242,17 @@ export async function runBounded<T>(
   work: (item: T, index: number) => Promise<void>,
 ): Promise<void> {
   let cursor = 0;
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (cursor < items.length) {
-      if (Date.now() > deadlineMs) throw new Error('Load rehearsal exceeded wall-clock deadline');
-      const index = cursor++;
-      await work(items[index]!, index);
-    }
-  });
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (cursor < items.length) {
+        if (Date.now() > deadlineMs) {
+          throw new Error('Load rehearsal exceeded wall-clock deadline');
+        }
+        const index = cursor++;
+        await work(items[index]!, index);
+      }
+    },
+  );
   await Promise.all(workers);
 }
