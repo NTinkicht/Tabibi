@@ -70,9 +70,9 @@ test('guest notification center renders unread items and marks one exact item re
 
   await page.getByRole('button', { name: 'Mark as read' }).click();
   await expect(page.getByText('Unread: 0')).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: 'Mark as read' }),
-  ).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Mark as read' })).toHaveCount(
+    0,
+  );
   expect(readRequestUrl).toContain(
     `/api/guest/inbox/${notification.id}/read`,
   );
