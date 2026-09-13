@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 type SupportedLocale = 'en' | 'fr' | 'ar';
 
@@ -176,8 +171,7 @@ export function GuestNotificationCenterClient() {
       }
       const updated = (await response.json()) as NotificationItem;
       const wasUnread =
-        state.snapshot.items.find((item) => item.id === itemId)?.readAt ===
-        null;
+        state.snapshot.items.find((item) => item.id === itemId)?.readAt === null;
       setState({
         kind: 'ready',
         pendingItemId: null,
