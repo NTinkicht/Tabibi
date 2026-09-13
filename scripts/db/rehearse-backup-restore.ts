@@ -167,7 +167,8 @@ async function main(): Promise<void> {
     );
     throwIfTerminationRequested();
     const snapshot = snapshotResult.rows[0]?.snapshot;
-    if (!snapshot) throw new Error('Unable to export PostgreSQL source snapshot');
+    if (!snapshot)
+      throw new Error('Unable to export PostgreSQL source snapshot');
 
     const sourceMigrations = await readMigrationMetadata(sourceClient);
     const sourceCounts = await readCoreTableCounts(sourceClient);
