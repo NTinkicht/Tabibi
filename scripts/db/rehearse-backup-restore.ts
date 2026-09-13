@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,23 +19,66 @@ import {
   rowCountsMatch,
 } from './recovery-rehearsal-lib';
 
+let activeChild: ChildProcess | null = null;
+let terminationSignal: NodeJS.Signals | null = null;
+
+function throwIfTerminationRequested(): void {
+  if (terminationSignal) {
+    throw new Error(
+      `Database recovery rehearsal interrupted by ${terminationSignal}; cleanup was attempted`,
+    );
+  }
+}
+
+function installTerminationHandlers(): () => void {
+  const requestTermination = (signal: NodeJS.Signals) => {
+    terminationSignal ??= signal;
+    if (activeChild && !activeChild.killed) {
+      activeChild.kill(signal);
+    }
+  };
+  const onSigint = () => requestTermination('SIGINT');
+  const onSigterm = () => requestTermination('SIGTERM');
+
+  process.on('SIGINT', onSigint);
+  process.on('SIGTERM', onSigterm);
+  return () => {
+    process.off('SIGINT', onSigint);
+    process.off('SIGTERM', onSigterm);
+  };
+}
+
 async function runCommand(
   command: string,
   args: string[],
   env: NodeJS.ProcessEnv,
 ): Promise<void> {
+  throwIfTerminationRequested();
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, { env, stdio: 'inherit' });
-    child.on('error', reject);
-    child.on('exit', (code, signal) => {
+    const child = spawn(command, args, {
+      env,
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    activeChild = child;
+
+    // Consume but never echo child diagnostics. PostgreSQL errors can include
+    // values from rejected rows, so raw stderr is outside the logging boundary.
+    child.stderr?.on('data', () => undefined);
+    child.once('error', (error) => {
+      if (activeChild === child) activeChild = null;
+      reject(error);
+    });
+    child.once('exit', (code, signal) => {
+      if (activeChild === child) activeChild = null;
       if (code === 0) return resolve();
       reject(
         new Error(
-          `${command} failed${signal ? ` with signal ${signal}` : ` with exit code ${code ?? 'unknown'}`}`,
+          `${command} failed${signal ? ` with signal ${signal}` : ` with exit code ${code ?? 'unknown'}`}; PostgreSQL diagnostics were suppressed`,
         ),
       );
     });
   });
+  throwIfTerminationRequested();
 }
 
 async function readMigrationMetadata(client: Client) {
@@ -52,10 +95,12 @@ async function readCoreTableCounts(client: Client) {
       'SELECT to_regclass($1)::text AS relation',
       [`public.${table}`],
     );
+    throwIfTerminationRequested();
     if (!exists.rows[0]?.relation) continue;
     const result = await client.query<{ count: string }>(
       `SELECT count(*)::text AS count FROM ${quoteIdentifier(table)}`,
     );
+    throwIfTerminationRequested();
     counts[table] = result.rows[0]?.count ?? '0';
   }
   return counts;
@@ -77,6 +122,8 @@ async function dropRehearsalDatabase(
 }
 
 async function main(): Promise<void> {
+  terminationSignal = null;
+  const removeTerminationHandlers = installTerminationHandlers();
   assertRecoveryRehearsalAllowed(process.env);
   const sourceUrl = process.env.DATABASE_URL;
   if (!sourceUrl) throw new Error('DATABASE_URL is required');
@@ -103,28 +150,46 @@ async function main(): Promise<void> {
   const sourceClient = new Client({ connectionString: sourceUrl });
   const adminClient = new Client({ connectionString: adminUrl });
   let rehearsalClient: Client | null = null;
+  let sourceTransactionOpen = false;
   let adminConnected = false;
   let targetCreated = false;
   let runError: unknown;
 
   try {
     await sourceClient.connect();
+    throwIfTerminationRequested();
+    await sourceClient.query(
+      'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
+    );
+    sourceTransactionOpen = true;
+    const snapshotResult = await sourceClient.query<{ snapshot: string }>(
+      'SELECT pg_export_snapshot() AS snapshot',
+    );
+    throwIfTerminationRequested();
+    const snapshot = snapshotResult.rows[0]?.snapshot;
+    if (!snapshot) throw new Error('Unable to export PostgreSQL source snapshot');
+
     const sourceMigrations = await readMigrationMetadata(sourceClient);
     const sourceCounts = await readCoreTableCounts(sourceClient);
 
     await runCommand(
       'pg_dump',
-      pgDumpArgs(sourceTarget, dumpPath),
+      pgDumpArgs(sourceTarget, dumpPath, snapshot),
       commandEnvironment(process.env, sourceTarget),
     );
     await assertDumpExists(dumpPath);
+    await sourceClient.query('COMMIT');
+    sourceTransactionOpen = false;
+    throwIfTerminationRequested();
 
     await adminClient.connect();
     adminConnected = true;
+    throwIfTerminationRequested();
     const existing = await adminClient.query(
       'SELECT 1 FROM pg_database WHERE datname=$1',
       [rehearsalDatabaseName],
     );
+    throwIfTerminationRequested();
     if (existing.rowCount) {
       throw new Error(
         'Generated rehearsal database already exists; refusing to reuse it',
@@ -134,6 +199,7 @@ async function main(): Promise<void> {
       `CREATE DATABASE ${quoteIdentifier(rehearsalDatabaseName)}`,
     );
     targetCreated = true;
+    throwIfTerminationRequested();
 
     await runCommand(
       'pg_restore',
@@ -143,6 +209,7 @@ async function main(): Promise<void> {
 
     rehearsalClient = new Client({ connectionString: rehearsalUrl });
     await rehearsalClient.connect();
+    throwIfTerminationRequested();
     const restoredMigrations = await readMigrationMetadata(rehearsalClient);
     const restoredCounts = await readCoreTableCounts(rehearsalClient);
 
@@ -159,7 +226,11 @@ async function main(): Promise<void> {
   } catch (error) {
     runError = error;
   } finally {
+    activeChild = null;
     if (rehearsalClient) await rehearsalClient.end().catch(() => undefined);
+    if (sourceTransactionOpen) {
+      await sourceClient.query('ROLLBACK').catch(() => undefined);
+    }
     await sourceClient.end().catch(() => undefined);
     if (adminConnected) await adminClient.end().catch(() => undefined);
 
@@ -190,6 +261,7 @@ async function main(): Promise<void> {
         );
       }
     }
+    removeTerminationHandlers();
   }
 
   if (runError) throw runError;
