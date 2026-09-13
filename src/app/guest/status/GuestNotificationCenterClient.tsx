@@ -1,6 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 
 type SupportedLocale = 'en' | 'fr' | 'ar';
 
