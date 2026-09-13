@@ -50,7 +50,9 @@ export function assertRecoveryRehearsalAllowed(
     );
   }
   if (env.NODE_ENV === 'production') {
-    throw new Error('Recovery rehearsal refuses to run with NODE_ENV=production');
+    throw new Error(
+      'Recovery rehearsal refuses to run with NODE_ENV=production',
+    );
   }
 }
 
