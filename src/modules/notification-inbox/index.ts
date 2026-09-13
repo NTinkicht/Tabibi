@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
-import type { RenderedNotificationDispatchEnvelope } from '@/modules/notification-domain/rendered-dispatch-envelope';
+import type {
+  RenderedNotificationDispatchEnvelope,
+} from '@/modules/notification-domain/rendered-dispatch-envelope';
 import type { NotificationPreferenceSubjectKind } from '@/modules/notification-preferences';
 import type {
   NotificationTemplateDirection,
@@ -143,7 +145,11 @@ function validateReadScope(input: {
     throw new InAppNotificationInboxValidationError(
       'Notification subject kind is not supported',
     );
-  if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 100)
+  if (
+    !Number.isSafeInteger(input.limit) ||
+    input.limit < 1 ||
+    input.limit > 100
+  )
     throw new InAppNotificationInboxValidationError(
       'Inbox read limit must be between 1 and 100',
     );
