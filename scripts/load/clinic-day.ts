@@ -14,6 +14,7 @@ import {
   loadConfig,
   type LoadSample,
   runBounded,
+  safeErrorDiagnostic,
   summarizeLoad,
 } from './clinic-day-lib';
 
@@ -114,13 +115,16 @@ async function main(): Promise<void> {
         durationMs: performance.now() - started,
       });
       return value;
-    } catch {
+    } catch (error) {
       samples.push({
         phase,
         operation,
         ok: false,
         durationMs: performance.now() - started,
       });
+      console.error(
+        `Load operation failed [${phase}/${operation}]: ${safeErrorDiagnostic(error)}`,
+      );
       return undefined;
     }
   };
