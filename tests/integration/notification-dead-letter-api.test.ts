@@ -1,13 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import { GET } from '@/app/api/clinics/[clinicId]/notifications/dead-letters/route';
 import { NotificationOutboxRepository } from '@/modules/notification-outbox';
