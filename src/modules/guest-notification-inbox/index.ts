@@ -31,8 +31,9 @@ export class GuestNotificationInboxService {
   constructor(
     private readonly pool: Pool,
     private readonly guestAccess = new GuestAccessService(pool),
-    private readonly inbox: InAppNotificationInboxStore =
-      new InAppNotificationInboxRepository(pool),
+    private readonly inbox: InAppNotificationInboxStore = new InAppNotificationInboxRepository(
+      pool,
+    ),
   ) {}
 
   private async authorizedScope(bearer: string): Promise<GuestInboxScope> {
