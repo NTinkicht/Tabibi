@@ -32,62 +32,65 @@ async function routeStatus(page: import('@playwright/test').Page) {
   });
 }
 
-test('guest notification center renders unread items and marks one exact item read without browser persistence', async ({ page }) => {
-  await routeStatus(page);
-  let inboxUrl = '';
-  let readRequestUrl = '';
+test(
+  'guest notification center renders unread items and marks one exact item read without browser persistence',
+  async ({ page }) => {
+    await routeStatus(page);
+    let inboxUrl = '';
+    let readRequestUrl = '';
 
-  await page.route('**/api/guest/inbox?limit=20', async (route) => {
-    inboxUrl = route.request().url();
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ unreadCount: 1, items: [notification] }),
+    await page.route('**/api/guest/inbox?limit=20', async (route) => {
+      inboxUrl = route.request().url();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ unreadCount: 1, items: [notification] }),
+      });
     });
-  });
-  await page.route('**/api/guest/inbox/*/read', async (route) => {
-    readRequestUrl = route.request().url();
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ...notification,
-        readAt: '2026-09-13T09:02:00.000Z',
-      }),
+    await page.route('**/api/guest/inbox/*/read', async (route) => {
+      readRequestUrl = route.request().url();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...notification,
+          readAt: '2026-09-13T09:02:00.000Z',
+        }),
+      });
     });
-  });
 
-  await page.goto('/guest/status');
-  await expect(
-    page.getByRole('heading', { name: 'Notifications' }),
-  ).toBeVisible();
-  await expect(page.getByText('Unread: 1')).toBeVisible();
-  await expect(page.getByText(notification.title)).toBeVisible();
-  await expect(page.getByText(notification.body)).toBeVisible();
+    await page.goto('/guest/status');
+    await expect(
+      page.getByRole('heading', { name: 'Notifications' }),
+    ).toBeVisible();
+    await expect(page.getByText('Unread: 1')).toBeVisible();
+    await expect(page.getByText(notification.title)).toBeVisible();
+    await expect(page.getByText(notification.body)).toBeVisible();
 
-  expect(inboxUrl).toContain('/api/guest/inbox?limit=20');
-  expect(inboxUrl).not.toMatch(/clinic|patient|account|subject/i);
+    expect(inboxUrl).toContain('/api/guest/inbox?limit=20');
+    expect(inboxUrl).not.toMatch(/clinic|patient|account|subject/i);
 
-  await page.getByRole('button', { name: 'Mark as read' }).click();
-  await expect(page.getByText('Unread: 0')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Mark as read' })).toHaveCount(
-    0,
-  );
-  expect(readRequestUrl).toContain(
-    `/api/guest/inbox/${notification.id}/read`,
-  );
-  expect(readRequestUrl).not.toMatch(/clinic|patient|account|subject/i);
+    await page.getByRole('button', { name: 'Mark as read' }).click();
+    await expect(page.getByText('Unread: 0')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Mark as read' })).toHaveCount(
+      0,
+    );
+    expect(readRequestUrl).toContain(
+      `/api/guest/inbox/${notification.id}/read`,
+    );
+    expect(readRequestUrl).not.toMatch(/clinic|patient|account|subject/i);
 
-  expect(
-    await page.evaluate(() => [
-      ...Object.values(localStorage),
-      ...Object.values(sessionStorage),
-    ]),
-  ).toEqual([]);
-  expect(
-    await page.evaluate(async () => (await indexedDB.databases()).length),
-  ).toBe(0);
-});
+    expect(
+      await page.evaluate(() => [
+        ...Object.values(localStorage),
+        ...Object.values(sessionStorage),
+      ]),
+    ).toEqual([]);
+    expect(
+      await page.evaluate(async () => (await indexedDB.databases()).length),
+    ).toBe(0);
+  },
+);
 
 test('guest notification center fails closed for revoked guest access', async ({ page }) => {
   await routeStatus(page);
