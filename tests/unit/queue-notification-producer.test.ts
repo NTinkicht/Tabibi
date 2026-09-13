@@ -9,10 +9,10 @@ import {
 describe('QueueNotificationProducer', () => {
   it('maps a supported event to one bounded canonical outbox intent using position', async () => {
     const storedIntent = { id: 'intent-1' } as never;
-    const enqueue = vi.fn(async () => storedIntent);
-    const producer = new QueueNotificationProducer({
-      enqueue,
-    } satisfies QueueNotificationIntentStore);
+    const enqueue = vi.fn<QueueNotificationIntentStore['enqueue']>(
+      async () => storedIntent,
+    );
+    const producer = new QueueNotificationProducer({ enqueue });
 
     await expect(
       producer.produce({
@@ -38,14 +38,13 @@ describe('QueueNotificationProducer', () => {
       idempotencyKey: 'queue-event:event-9',
       payload: { locale: 'fr', position: 2 },
     });
-    expect(JSON.stringify(enqueue.mock.calls[0]?.[0])).not.toContain('places');
+    const [enqueueInput] = enqueue.mock.calls[0]!;
+    expect(JSON.stringify(enqueueInput)).not.toContain('places');
   });
 
   it('fails closed before enqueue for guest transfer or any unsupported lifecycle event', async () => {
-    const enqueue = vi.fn();
-    const producer = new QueueNotificationProducer({
-      enqueue,
-    } as QueueNotificationIntentStore);
+    const enqueue = vi.fn<QueueNotificationIntentStore['enqueue']>();
+    const producer = new QueueNotificationProducer({ enqueue });
 
     const unsupported = {
       clinicId: 'clinic-1',
@@ -65,10 +64,8 @@ describe('QueueNotificationProducer', () => {
   });
 
   it('rejects invalid versions, positions, windows, and oversized target ids', async () => {
-    const enqueue = vi.fn();
-    const producer = new QueueNotificationProducer({
-      enqueue,
-    } as QueueNotificationIntentStore);
+    const enqueue = vi.fn<QueueNotificationIntentStore['enqueue']>();
+    const producer = new QueueNotificationProducer({ enqueue });
 
     await expect(
       producer.produce({
