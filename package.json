@@ -21,7 +21,8 @@
     "test:e2e": "playwright test",
     "db:migrate": "tsx scripts/db/migrate.ts",
     "db:seed": "tsx scripts/db/seed.ts",
-    "db:reset:test": "tsx scripts/db/reset-test.ts"
+    "db:reset:test": "tsx scripts/db/reset-test.ts",
+    "db:rehearse-recovery": "tsx scripts/db/rehearse-backup-restore.ts"
   },
   "dependencies": {
     "next": "16.3.4",
