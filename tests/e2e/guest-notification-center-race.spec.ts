@@ -97,3 +97,78 @@ test('concurrent refresh cannot clobber an in-flight mark-read or lose a newly a
   );
   expect(inboxRequests).toBeGreaterThanOrEqual(2);
 });
+
+test('stale refresh that started before mark-read cannot restore an acknowledged item to unread', async ({
+  page,
+}) => {
+  await page.route('**/api/guest/status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(activeStatus),
+    });
+  });
+
+  let inboxRequests = 0;
+  let releaseRefresh!: () => void;
+  const heldRefresh = new Promise<void>((resolve) => {
+    releaseRefresh = resolve;
+  });
+  let refreshStarted!: () => void;
+  const refreshStartedPromise = new Promise<void>((resolve) => {
+    refreshStarted = resolve;
+  });
+
+  await page.route('**/api/guest/inbox?limit=50', async (route) => {
+    inboxRequests += 1;
+    if (inboxRequests === 1) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ unreadCount: 1, items: [notification] }),
+      });
+      return;
+    }
+
+    refreshStarted();
+    await heldRefresh;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ unreadCount: 1, items: [notification] }),
+    });
+  });
+
+  await page.route('**/api/guest/inbox/*/read', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...notification,
+        readAt: '2026-09-13T09:04:00.000Z',
+      }),
+    });
+  });
+
+  await page.goto('/guest/status');
+  await expect(page.getByText('Unread: 1')).toBeVisible();
+
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event('visibilitychange')),
+  );
+  await refreshStartedPromise;
+
+  await page.getByRole('button', { name: 'Mark as read' }).click();
+  await expect(page.getByText('Unread: 0')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mark as read' })).toHaveCount(
+    0,
+  );
+
+  releaseRefresh();
+
+  await expect(page.getByText('Unread: 0')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mark as read' })).toHaveCount(
+    0,
+  );
+  expect(inboxRequests).toBe(2);
+});
