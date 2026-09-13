@@ -144,10 +144,7 @@ export function safeErrorDiagnostic(error: unknown): string {
       /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
       '[uuid]',
     )
-    .replace(
-      /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
-      '[email]',
-    )
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[email]')
     .replace(/\+?\d[\d\s().-]{6,}\d/g, '[phone]');
   return `${name}: ${sanitized.slice(0, 200)}`;
 }
@@ -230,7 +227,9 @@ export function assertLoadThresholds(
     throw new Error('Load rehearsal produced no operations');
   }
   if (summary.errors > 0) {
-    throw new Error(`Load rehearsal recorded ${summary.errors} failed operations`);
+    throw new Error(
+      `Load rehearsal recorded ${summary.errors} failed operations`,
+    );
   }
   if (summary.durationMs > config.maxDurationMs) {
     throw new Error(
