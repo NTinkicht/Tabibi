@@ -7,7 +7,11 @@ import type { NotificationIntent } from '@/modules/notification-outbox';
 
 interface QueueTargetRow {
   patient_id: string | null;
+  state: string | null;
 }
+
+const terminalQueueEntryStates = new Set(['completed', 'cancelled', 'no_show']);
+const terminalNotificationEvents = new Set(['queue_entry_cancelled', 'session_cancelled']);
 
 /**
  * Resolves one queue-backed notification intent to the exact visit-patient
@@ -28,13 +32,20 @@ export class QueueInAppNotificationTargetResolver
     if (intent.logicalTargetKey !== `queue-entry:${queueEntryId}`) return null;
 
     const result = await this.pool.query<QueueTargetRow>(
-      `SELECT patient_id
+      `SELECT patient_id, state
          FROM queue_entries
         WHERE id=$1 AND clinic_id=$2`,
       [queueEntryId, clinicId],
     );
-    const patientId = result.rows[0]?.patient_id?.trim() ?? '';
+    const row = result.rows[0];
+    const patientId = row?.patient_id?.trim() ?? '';
     if (!patientId) return null;
+    if (
+      row?.state &&
+      terminalQueueEntryStates.has(row.state) &&
+      !terminalNotificationEvents.has(intent.eventKey)
+    )
+      return null;
 
     return {
       subjectKind: 'visit_patient',
