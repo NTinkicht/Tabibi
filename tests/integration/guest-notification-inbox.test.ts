@@ -112,6 +112,41 @@ async function liveBearer() {
   );
 }
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+class PausingGuestAccessService extends GuestAccessService {
+  constructor(
+    testPool: Pool,
+    private readonly entered: ReturnType<typeof deferred>,
+    private readonly resume: Promise<void>,
+  ) {
+    super(testPool);
+  }
+
+  override async authorize(
+    ...args: Parameters<GuestAccessService['authorize']>
+  ): ReturnType<GuestAccessService['authorize']> {
+    const authorized = await super.authorize(...args);
+    this.entered.resolve();
+    await this.resume;
+    return authorized;
+  }
+}
+
+async function expectStillBlocked(promise: Promise<unknown>) {
+  const state = await Promise.race([
+    promise.then(() => 'settled'),
+    new Promise<'blocked'>((resolve) => setTimeout(() => resolve('blocked'), 50)),
+  ]);
+  expect(state).toBe('blocked');
+}
+
 describe('WU36 guest-bound notification inbox', () => {
   it('lists/counts only the patient behind the authorized queue entry and marks only that scope read', async () => {
     const credential = await liveBearer();
@@ -189,5 +224,67 @@ describe('WU36 guest-bound notification inbox', () => {
     });
     expect(stored).toHaveLength(1);
     expect(stored[0]?.readAt).toBeNull();
+  });
+
+  it('serializes credential revocation behind an authorized snapshot', async () => {
+    const credential = await liveBearer();
+    const repository = new InAppNotificationInboxRepository(pool);
+    const own = await repository.persist({
+      clinicId: ids.clinic,
+      subjectKind: 'visit_patient',
+      subjectId: ids.targetPatient,
+      envelope: envelope('wu36-race-read'),
+    });
+    const entered = deferred();
+    const resume = deferred();
+    const service = new GuestNotificationInboxService(
+      pool,
+      new PausingGuestAccessService(pool, entered, resume.promise),
+    );
+
+    const snapshotPromise = service.getSnapshot(credential.bearer, 20);
+    await entered.promise;
+    const revokePromise = pool.query('UPDATE guest_credentials SET revoked_at=now()');
+    await expectStillBlocked(revokePromise);
+
+    resume.resolve();
+    await expect(snapshotPromise).resolves.toMatchObject({
+      items: [{ id: own.id }],
+      unreadCount: 1,
+    });
+    await revokePromise;
+    await expect(service.getSnapshot(credential.bearer, 20)).rejects.toBeInstanceOf(
+      GuestAccessRejectedError,
+    );
+  });
+
+  it('serializes credential revocation behind an authorized mark-read', async () => {
+    const credential = await liveBearer();
+    const repository = new InAppNotificationInboxRepository(pool);
+    const own = await repository.persist({
+      clinicId: ids.clinic,
+      subjectKind: 'visit_patient',
+      subjectId: ids.targetPatient,
+      envelope: envelope('wu36-race-read-state'),
+    });
+    const entered = deferred();
+    const resume = deferred();
+    const service = new GuestNotificationInboxService(
+      pool,
+      new PausingGuestAccessService(pool, entered, resume.promise),
+    );
+
+    const markPromise = service.markRead(credential.bearer, own.id);
+    await entered.promise;
+    const revokePromise = pool.query('UPDATE guest_credentials SET revoked_at=now()');
+    await expectStillBlocked(revokePromise);
+
+    resume.resolve();
+    const marked = await markPromise;
+    expect(marked?.readAt).not.toBeNull();
+    await revokePromise;
+    await expect(service.markRead(credential.bearer, own.id)).rejects.toBeInstanceOf(
+      GuestAccessRejectedError,
+    );
   });
 });
