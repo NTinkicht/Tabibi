@@ -44,7 +44,7 @@ describe('database recovery rehearsal safety helpers', () => {
     );
   });
 
-  it('keeps database passwords out of command arguments', () => {
+  it('keeps database passwords out of command arguments and pins the dump snapshot', () => {
     const target = parsePostgreSqlTarget(
       'postgresql://tabibi:s3cret@127.0.0.1:5432/tabibi_test?sslmode=disable',
     );
@@ -54,11 +54,12 @@ describe('database recovery rehearsal safety helpers', () => {
     expect(target.password).toBe('s3cret');
     expect(commandEnvironment({}, target).PGPASSWORD).toBe('s3cret');
 
-    const dumpArgs = pgDumpArgs(target, '/tmp/tabibi.dump');
+    const dumpArgs = pgDumpArgs(target, '/tmp/tabibi.dump', '00000003-1');
     const restoreArgs = pgRestoreArgs(target, '/tmp/tabibi.dump');
     expect(dumpArgs.join(' ')).not.toContain('s3cret');
     expect(restoreArgs.join(' ')).not.toContain('s3cret');
     expect(dumpArgs).toContain('--no-owner');
+    expect(dumpArgs).toContain('--snapshot=00000003-1');
     expect(restoreArgs).toContain('--exit-on-error');
   });
 
