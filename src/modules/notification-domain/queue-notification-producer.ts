@@ -125,7 +125,9 @@ function payloadFor(
 export class QueueNotificationProducer {
   constructor(private readonly store: QueueNotificationIntentStore) {}
 
-  async produce(raw: QueueNotificationSourceEvent): Promise<NotificationIntent> {
+  async produce(
+    raw: QueueNotificationSourceEvent,
+  ): Promise<NotificationIntent> {
     const clinicId = requiredId(raw.clinicId, 'Clinic id', 160);
     const queueEntryId = requiredId(
       raw.queueEntryId,
