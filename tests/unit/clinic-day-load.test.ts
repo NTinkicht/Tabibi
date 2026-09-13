@@ -172,10 +172,7 @@ describe('clinic-day load rehearsal', () => {
     expect(() => assertLoadThresholds(healthy, config)).not.toThrow();
 
     expect(() =>
-      assertLoadThresholds(
-        { ...healthy, errors: 1, errorRate: 0.5 },
-        config,
-      ),
+      assertLoadThresholds({ ...healthy, errors: 1, errorRate: 0.5 }, config),
     ).toThrow(/failed operations/i);
     expect(() =>
       assertLoadThresholds(
@@ -184,10 +181,7 @@ describe('clinic-day load rehearsal', () => {
       ),
     ).toThrow(/wall-clock/i);
     expect(() =>
-      assertLoadThresholds(
-        { ...healthy, p95Ms: config.maxP95Ms + 1 },
-        config,
-      ),
+      assertLoadThresholds({ ...healthy, p95Ms: config.maxP95Ms + 1 }, config),
     ).toThrow(/p95/i);
   });
 
