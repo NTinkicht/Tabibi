@@ -199,7 +199,7 @@ describe('notification dispatch HTTP boundary', () => {
       context(ids.clinicA),
     );
     expect(crossOrigin.status).toBe(403);
-    expect(await crossOrigin.json()).toMatchObject({ error: 'forbidden' });
+    expect(await crossOrigin.json()).toMatchObject({ error: 'csrf_rejected' });
     expect(crossOrigin.headers.get('cache-control')).toBe('no-store');
   });
 
