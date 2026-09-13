@@ -102,7 +102,6 @@ export function GuestNotificationCenterClient() {
   const direction = locale === 'ar' ? 'rtl' : 'ltr';
 
   const load = useCallback(async (signal?: AbortSignal) => {
-    setState({ kind: 'loading' });
     try {
       const response = await fetch('/api/guest/inbox?limit=20', {
         method: 'GET',
@@ -143,6 +142,11 @@ export function GuestNotificationCenterClient() {
     void load(controller.signal);
     return () => controller.abort();
   }, [load]);
+
+  const retryLoad = () => {
+    setState({ kind: 'loading' });
+    void load();
+  };
 
   const markRead = async (itemId: string) => {
     if (state.kind !== 'ready' || state.pendingItemId) return;
@@ -205,7 +209,7 @@ export function GuestNotificationCenterClient() {
       {state.kind === 'throttled' ? (
         <div role="status">
           <p>{copy.throttled}</p>
-          <button type="button" onClick={() => void load()}>
+          <button type="button" onClick={retryLoad}>
             {copy.retry}
           </button>
         </div>
@@ -213,7 +217,7 @@ export function GuestNotificationCenterClient() {
       {state.kind === 'error' ? (
         <div role="alert">
           <p>{copy.unavailable}</p>
-          <button type="button" onClick={() => void load()}>
+          <button type="button" onClick={retryLoad}>
             {copy.retry}
           </button>
         </div>
