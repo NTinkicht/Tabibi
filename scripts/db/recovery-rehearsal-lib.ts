@@ -27,7 +27,8 @@ export function parsePostgreSqlTarget(raw: string): PostgreSqlCommandTarget {
   }
 
   const databaseName = decodeURIComponent(url.pathname.replace(/^\//, ''));
-  if (!databaseName) throw new Error('DATABASE_URL must include a database name');
+  if (!databaseName)
+    throw new Error('DATABASE_URL must include a database name');
 
   const password = url.password ? decodeURIComponent(url.password) : undefined;
   url.password = '';
@@ -75,7 +76,10 @@ export function quoteIdentifier(value: string): string {
   return `"${value.replaceAll('"', '""')}"`;
 }
 
-export function databaseUrlForDatabase(raw: string, databaseName: string): string {
+export function databaseUrlForDatabase(
+  raw: string,
+  databaseName: string,
+): string {
   const url = new URL(raw);
   url.pathname = `/${encodeURIComponent(databaseName)}`;
   return url.toString();
@@ -85,10 +89,15 @@ export function commandEnvironment(
   base: NodeJS.ProcessEnv,
   target: PostgreSqlCommandTarget,
 ): NodeJS.ProcessEnv {
-  return target.password ? { ...base, PGPASSWORD: target.password } : { ...base };
+  return target.password
+    ? { ...base, PGPASSWORD: target.password }
+    : { ...base };
 }
 
-export function pgDumpArgs(target: PostgreSqlCommandTarget, dumpPath: string): string[] {
+export function pgDumpArgs(
+  target: PostgreSqlCommandTarget,
+  dumpPath: string,
+): string[] {
   return [
     '--format=custom',
     '--no-owner',
