@@ -1,10 +1,10 @@
+import type { RenderedNotificationDispatchEnvelope } from '@/modules/notification-domain/rendered-dispatch-envelope';
 import type { NotificationPreferenceSubjectKind } from '@/modules/notification-preferences';
 import type {
   NotificationTemplateDirection,
   NotificationTemplateId,
   NotificationTemplateLocale,
 } from '@/modules/notification-templates';
-import type { RenderedNotificationDispatchEnvelope } from '@/modules/notification-domain';
 
 export interface InAppNotificationInboxItem {
   id: string;
