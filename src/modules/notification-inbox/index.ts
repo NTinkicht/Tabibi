@@ -20,6 +20,7 @@ export interface InAppNotificationInboxItem {
   title: string;
   body: string;
   createdAt: string;
+  readAt: string | null;
 }
 
 export interface PersistInAppNotificationInput {
@@ -29,17 +30,24 @@ export interface PersistInAppNotificationInput {
   envelope: RenderedNotificationDispatchEnvelope;
 }
 
+export interface InAppNotificationInboxSubjectScope {
+  clinicId: string;
+  subjectKind: NotificationPreferenceSubjectKind;
+  subjectId: string;
+}
+
 export interface InAppNotificationInboxStore {
   persist(
     input: PersistInAppNotificationInput,
   ): Promise<InAppNotificationInboxItem>;
 
-  listForSubject(input: {
-    clinicId: string;
-    subjectKind: NotificationPreferenceSubjectKind;
-    subjectId: string;
-    limit: number;
-  }): Promise<InAppNotificationInboxItem[]>;
+  listForSubject(
+    input: InAppNotificationInboxSubjectScope & { limit: number },
+  ): Promise<InAppNotificationInboxItem[]>;
+
+  markRead(
+    input: InAppNotificationInboxSubjectScope & { itemId: string },
+  ): Promise<InAppNotificationInboxItem | null>;
 }
 
 export class InAppNotificationInboxValidationError extends Error {}
@@ -58,10 +66,11 @@ interface InboxRow {
   title: string;
   body: string;
   created_at: Date;
+  read_at: Date | null;
 }
 
 const inboxColumns = `id, clinic_id, subject_kind, patient_id, account_user_id,
-  provider_idempotency_key, template_id, locale, direction, title, body, created_at`;
+  provider_idempotency_key, template_id, locale, direction, title, body, created_at, read_at`;
 
 function toInboxItem(row: InboxRow): InAppNotificationInboxItem {
   return {
@@ -76,6 +85,7 @@ function toInboxItem(row: InboxRow): InAppNotificationInboxItem {
     title: row.title,
     body: row.body,
     createdAt: row.created_at.toISOString(),
+    readAt: row.read_at?.toISOString() ?? null,
   };
 }
 
@@ -127,12 +137,9 @@ export function validateInAppNotificationWrite(
   };
 }
 
-function validateReadScope(input: {
-  clinicId: string;
-  subjectKind: NotificationPreferenceSubjectKind;
-  subjectId: string;
-  limit: number;
-}) {
+function validateSubjectScope<T extends InAppNotificationInboxSubjectScope>(
+  input: T,
+): T {
   const clinicId = input.clinicId.trim();
   const subjectId = input.subjectId.trim();
   if (!clinicId || !subjectId)
@@ -143,15 +150,41 @@ function validateReadScope(input: {
     throw new InAppNotificationInboxValidationError(
       'Notification subject kind is not supported',
     );
+  return { ...input, clinicId, subjectId };
+}
+
+function validateReadScope(
+  input: InAppNotificationInboxSubjectScope & { limit: number },
+) {
+  const scoped = validateSubjectScope(input);
   if (
-    !Number.isSafeInteger(input.limit) ||
-    input.limit < 1 ||
-    input.limit > 100
+    !Number.isSafeInteger(scoped.limit) ||
+    scoped.limit < 1 ||
+    scoped.limit > 100
   )
     throw new InAppNotificationInboxValidationError(
       'Inbox read limit must be between 1 and 100',
     );
-  return { ...input, clinicId, subjectId };
+  return scoped;
+}
+
+function validateMarkReadScope(
+  input: InAppNotificationInboxSubjectScope & { itemId: string },
+) {
+  const scoped = validateSubjectScope(input);
+  const itemId = scoped.itemId.trim();
+  if (!itemId)
+    throw new InAppNotificationInboxValidationError(
+      'Inbox item id is required',
+    );
+  return { ...scoped, itemId };
+}
+
+function subjectIds(input: InAppNotificationInboxSubjectScope) {
+  return {
+    patientId: input.subjectKind === 'visit_patient' ? input.subjectId : null,
+    accountUserId: input.subjectKind === 'account' ? input.subjectId : null,
+  };
 }
 
 function sameLogicalWrite(
@@ -182,10 +215,7 @@ export class InAppNotificationInboxRepository
     raw: PersistInAppNotificationInput,
   ): Promise<InAppNotificationInboxItem> {
     const input = validateInAppNotificationWrite(raw);
-    const patientId =
-      input.subjectKind === 'visit_patient' ? input.subjectId : null;
-    const accountUserId =
-      input.subjectKind === 'account' ? input.subjectId : null;
+    const { patientId, accountUserId } = subjectIds(input);
     const id = randomUUID();
 
     const inserted = await this.pool.query<InboxRow>(
@@ -225,17 +255,11 @@ export class InAppNotificationInboxRepository
     return toInboxItem(row);
   }
 
-  async listForSubject(raw: {
-    clinicId: string;
-    subjectKind: NotificationPreferenceSubjectKind;
-    subjectId: string;
-    limit: number;
-  }): Promise<InAppNotificationInboxItem[]> {
+  async listForSubject(
+    raw: InAppNotificationInboxSubjectScope & { limit: number },
+  ): Promise<InAppNotificationInboxItem[]> {
     const input = validateReadScope(raw);
-    const patientId =
-      input.subjectKind === 'visit_patient' ? input.subjectId : null;
-    const accountUserId =
-      input.subjectKind === 'account' ? input.subjectId : null;
+    const { patientId, accountUserId } = subjectIds(input);
     const result = await this.pool.query<InboxRow>(
       `SELECT ${inboxColumns}
          FROM notification_inbox_items
@@ -254,5 +278,44 @@ export class InAppNotificationInboxRepository
       ],
     );
     return result.rows.map(toInboxItem);
+  }
+
+  async markRead(
+    raw: InAppNotificationInboxSubjectScope & { itemId: string },
+  ): Promise<InAppNotificationInboxItem | null> {
+    const input = validateMarkReadScope(raw);
+    const { patientId, accountUserId } = subjectIds(input);
+    const values = [
+      input.itemId,
+      input.clinicId,
+      input.subjectKind,
+      patientId,
+      accountUserId,
+    ];
+    const updated = await this.pool.query<InboxRow>(
+      `UPDATE notification_inbox_items
+          SET read_at=now()
+        WHERE id=$1
+          AND clinic_id=$2
+          AND subject_kind=$3
+          AND patient_id IS NOT DISTINCT FROM $4::uuid
+          AND account_user_id IS NOT DISTINCT FROM $5::uuid
+          AND read_at IS NULL
+       RETURNING ${inboxColumns}`,
+      values,
+    );
+    if (updated.rows[0]) return toInboxItem(updated.rows[0]);
+
+    const existing = await this.pool.query<InboxRow>(
+      `SELECT ${inboxColumns}
+         FROM notification_inbox_items
+        WHERE id=$1
+          AND clinic_id=$2
+          AND subject_kind=$3
+          AND patient_id IS NOT DISTINCT FROM $4::uuid
+          AND account_user_id IS NOT DISTINCT FROM $5::uuid`,
+      values,
+    );
+    return existing.rows[0] ? toInboxItem(existing.rows[0]) : null;
   }
 }

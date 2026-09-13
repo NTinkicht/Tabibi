@@ -101,10 +101,12 @@ function inboxStore() {
     title: input.envelope.title,
     body: input.envelope.body,
     createdAt: '2026-09-13T00:01:00.000Z',
+    readAt: null,
   }));
   return {
     persist,
     listForSubject: vi.fn(),
+    markRead: vi.fn(),
   } satisfies InAppNotificationInboxStore;
 }
 
