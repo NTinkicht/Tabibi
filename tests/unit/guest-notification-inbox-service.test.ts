@@ -128,7 +128,8 @@ describe('GuestNotificationInboxService', () => {
     const { service, authorize, query, release } = fixture();
     query.mockImplementation(async (text: string, _values?: unknown[]) => {
       if (text.startsWith('BEGIN') || text === 'ROLLBACK') return { rows: [] };
-      if (text.includes('FROM guest_credentials credential')) return { rows: [] };
+      if (text.includes('FROM guest_credentials credential'))
+        return { rows: [] };
       throw new Error(`Unexpected query: ${text}`);
     });
 
