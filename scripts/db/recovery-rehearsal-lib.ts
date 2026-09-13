@@ -27,8 +27,9 @@ export function parsePostgreSqlTarget(raw: string): PostgreSqlCommandTarget {
   }
 
   const databaseName = decodeURIComponent(url.pathname.replace(/^\//, ''));
-  if (!databaseName)
+  if (!databaseName) {
     throw new Error('DATABASE_URL must include a database name');
+  }
 
   const password = url.password ? decodeURIComponent(url.password) : undefined;
   url.password = '';
@@ -107,11 +108,13 @@ export function commandEnvironment(
 export function pgDumpArgs(
   target: PostgreSqlCommandTarget,
   dumpPath: string,
+  snapshot?: string,
 ): string[] {
   return [
     '--format=custom',
     '--no-owner',
     '--no-acl',
+    ...(snapshot ? [`--snapshot=${snapshot}`] : []),
     '--file',
     dumpPath,
     '--dbname',
