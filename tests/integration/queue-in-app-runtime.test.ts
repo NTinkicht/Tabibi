@@ -187,6 +187,41 @@ describe('queue in-app production composition', () => {
     ).resolves.toHaveLength(0);
   });
 
+  it('suppresses a pending non-terminal notification after its queue entry becomes terminal', async () => {
+    await enableInApp(ids.clinicA, ids.patientA, 'wu38-pref-terminal');
+
+    const outbox = new NotificationOutboxRepository(pool);
+    const producer = new QueueNotificationProducer(outbox);
+    const intent = await producer.produce(
+      queueCreated(ids.clinicA, ids.queueEntryA, 'wu38-event-terminal'),
+    );
+
+    await pool.query(`UPDATE queue_entries SET state='cancelled' WHERE id=$1 AND clinic_id=$2`, [
+      ids.queueEntryA,
+      ids.clinicA,
+    ]);
+
+    const service = createQueueInAppNotificationDispatchService(pool);
+    const result = await service.dispatchOne({
+      clinicId: ids.clinicA,
+      intentId: intent.id,
+    });
+
+    expect(result).toMatchObject({
+      status: 'suppressed',
+      suppressionReason: 'delivery_context_missing',
+      intent: { id: intent.id, state: 'suppressed' },
+    });
+    await expect(
+      new InAppNotificationInboxRepository(pool).listForSubject({
+        clinicId: ids.clinicA,
+        subjectKind: 'visit_patient',
+        subjectId: ids.patientA,
+        limit: 20,
+      }),
+    ).resolves.toHaveLength(0);
+  });
+
   it('suppresses before inbox persistence when the current in-app preference is missing', async () => {
     const outbox = new NotificationOutboxRepository(pool);
     const producer = new QueueNotificationProducer(outbox);
