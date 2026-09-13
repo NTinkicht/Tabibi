@@ -128,77 +128,79 @@ async function progressToCompleted(
 }
 
 describe('WU46 two-clinic release acceptance isolation', () => {
-  it('progresses two real clinic queues independently and rejects cross-clinic mutation', async () => {
-    const queue = new QueueService(pool);
-    const registrationA = await queue.registerWalkIn(
-      scopeA,
-      ids.sessionA,
-      registrationInput('Patient A', 'fr', 'clinic-a-register'),
-    );
-    const registrationB = await queue.registerWalkIn(
-      scopeB,
-      ids.sessionB,
-      registrationInput('المريض ب', 'ar', 'clinic-b-register'),
-    );
+  it(
+    'progresses two real clinic queues independently and rejects cross-clinic mutation',
+    async () => {
+      const queue = new QueueService(pool);
+      const registrationA = await queue.registerWalkIn(
+        scopeA,
+        ids.sessionA,
+        registrationInput('Patient A', 'fr', 'clinic-a-register'),
+      );
+      const registrationB = await queue.registerWalkIn(
+        scopeB,
+        ids.sessionB,
+        registrationInput('المريض ب', 'ar', 'clinic-b-register'),
+      );
 
-    expect(registrationA.entry.state).toBe('waiting');
-    expect(registrationB.entry.state).toBe('waiting');
-    expect(registrationA.patient.id).not.toBe(registrationB.patient.id);
+      expect(registrationA.entry.state).toBe('waiting');
+      expect(registrationB.entry.state).toBe('waiting');
+      expect(registrationA.patient.id).not.toBe(registrationB.patient.id);
 
-    expect(await queue.listWaiting(scopeA, ids.sessionA)).toHaveLength(1);
-    expect(await queue.listWaiting(scopeB, ids.sessionB)).toHaveLength(1);
+      expect(await queue.listWaiting(scopeA, ids.sessionA)).toHaveLength(1);
+      expect(await queue.listWaiting(scopeB, ids.sessionB)).toHaveLength(1);
 
-    await expect(
-      queue.command(scopeA, ids.sessionB, registrationB.entry.id, {
-        command: 'check_in',
-        idempotencyKey: 'clinic-a-cross-mutation',
-        correlationId: 'clinic-a-cross-mutation',
-      }),
-    ).rejects.toBeInstanceOf(QueueConflictError);
-    await expect(
-      queue.command(scopeB, ids.sessionA, registrationA.entry.id, {
-        command: 'check_in',
-        idempotencyKey: 'clinic-b-cross-mutation',
-        correlationId: 'clinic-b-cross-mutation',
-      }),
-    ).rejects.toBeInstanceOf(QueueConflictError);
+      await expect(
+        queue.command(scopeA, ids.sessionB, registrationB.entry.id, {
+          command: 'check_in',
+          idempotencyKey: 'clinic-a-cross-mutation',
+          correlationId: 'clinic-a-cross-mutation',
+        }),
+      ).rejects.toBeInstanceOf(QueueConflictError);
+      await expect(
+        queue.command(scopeB, ids.sessionA, registrationA.entry.id, {
+          command: 'check_in',
+          idempotencyKey: 'clinic-b-cross-mutation',
+          correlationId: 'clinic-b-cross-mutation',
+        }),
+      ).rejects.toBeInstanceOf(QueueConflictError);
 
-    const beforeProgress = await pool.query<{
-      clinic_id: string;
-      state: string;
-      count: string;
-    }>(
-      `SELECT clinic_id::text, state::text, count(*)::text count
+      const beforeProgress = await pool.query<{
+        clinic_id: string;
+        state: string;
+        count: string;
+      }>(
+        `SELECT clinic_id::text, state::text, count(*)::text count
          FROM queue_entries
         GROUP BY clinic_id, state
         ORDER BY clinic_id`,
-    );
-    expect(beforeProgress.rows).toEqual(
-      expect.arrayContaining([
-        { clinic_id: ids.clinicA, state: 'waiting', count: '1' },
-        { clinic_id: ids.clinicB, state: 'waiting', count: '1' },
-      ]),
-    );
+      );
+      expect(beforeProgress.rows).toEqual(
+        expect.arrayContaining([
+          { clinic_id: ids.clinicA, state: 'waiting', count: '1' },
+          { clinic_id: ids.clinicB, state: 'waiting', count: '1' },
+        ]),
+      );
 
-    await progressToCompleted(
-      scopeA,
-      ids.sessionA,
-      registrationA.entry.id,
-      'clinic-a',
-    );
-    await progressToCompleted(
-      scopeB,
-      ids.sessionB,
-      registrationB.entry.id,
-      'clinic-b',
-    );
+      await progressToCompleted(
+        scopeA,
+        ids.sessionA,
+        registrationA.entry.id,
+        'clinic-a',
+      );
+      await progressToCompleted(
+        scopeB,
+        ids.sessionB,
+        registrationB.entry.id,
+        'clinic-b',
+      );
 
-    const persisted = await pool.query<{
-      clinic_id: string;
-      completed_entries: string;
-      patients: string;
-    }>(
-      `SELECT clinic.id::text clinic_id,
+      const persisted = await pool.query<{
+        clinic_id: string;
+        completed_entries: string;
+        patients: string;
+      }>(
+        `SELECT clinic.id::text clinic_id,
               count(DISTINCT entry.id)::text completed_entries,
               count(DISTINCT patient.id)::text patients
          FROM clinics clinic
@@ -209,21 +211,22 @@ describe('WU46 two-clinic release acceptance isolation', () => {
         WHERE clinic.id IN ($1,$2)
         GROUP BY clinic.id
         ORDER BY clinic.id`,
-      [ids.clinicA, ids.clinicB],
-    );
+        [ids.clinicA, ids.clinicB],
+      );
 
-    expect(persisted.rows).toEqual(
-      expect.arrayContaining([
-        { clinic_id: ids.clinicA, completed_entries: '1', patients: '1' },
-        { clinic_id: ids.clinicB, completed_entries: '1', patients: '1' },
-      ]),
-    );
+      expect(persisted.rows).toEqual(
+        expect.arrayContaining([
+          { clinic_id: ids.clinicA, completed_entries: '1', patients: '1' },
+          { clinic_id: ids.clinicB, completed_entries: '1', patients: '1' },
+        ]),
+      );
 
-    const crossClinicReceipts = await pool.query<{ count: number }>(
-      `SELECT count(*)::int count
+      const crossClinicReceipts = await pool.query<{ count: number }>(
+        `SELECT count(*)::int count
          FROM queue_command_receipts
         WHERE idempotency_key IN ('clinic-a-cross-mutation','clinic-b-cross-mutation')`,
-    );
-    expect(crossClinicReceipts.rows[0]!.count).toBe(0);
-  });
+      );
+      expect(crossClinicReceipts.rows[0]!.count).toBe(0);
+    },
+  );
 });
