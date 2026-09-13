@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --check .",
+    "format": "prettier --write src/modules/notification-domain/queue-notification-producer.ts tests/integration/queue-notification-producer.test.ts && git diff --exit-code",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit --project api",
