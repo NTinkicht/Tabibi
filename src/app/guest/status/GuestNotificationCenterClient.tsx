@@ -79,6 +79,8 @@ const COPY: Record<SupportedLocale, Copy> = {
   },
 };
 
+const LIVE_REFRESH_MS = 20_000;
+
 function detectGuestLocale(): SupportedLocale {
   if (typeof navigator === 'undefined') return 'en';
   const locale = navigator.language.toLowerCase();
@@ -130,11 +132,34 @@ export function GuestNotificationCenterClient() {
   const direction = locale === 'ar' ? 'rtl' : 'ltr';
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetchInbox(controller.signal).then((nextState) => {
-      if (nextState) setState(nextState);
-    });
-    return () => controller.abort();
+    let active = true;
+    const refresh = async () => {
+      if (document.visibilityState === 'hidden') return;
+      const nextState = await fetchInbox();
+      if (!active || !nextState) return;
+      setState((current) => {
+        if (current.kind === 'ready' && current.pendingItemId !== null) {
+          return current;
+        }
+        return nextState;
+      });
+    };
+
+    void refresh();
+    const intervalId = window.setInterval(() => void refresh(), LIVE_REFRESH_MS);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    const refreshOnFocus = () => void refresh();
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshOnFocus);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshOnFocus);
+    };
   }, []);
 
   const retryLoad = async () => {
@@ -190,6 +215,11 @@ export function GuestNotificationCenterClient() {
     }
   };
 
+  const reachableUnreadCount =
+    state.kind === 'ready'
+      ? state.snapshot.items.filter((item) => item.readAt === null).length
+      : 0;
+
   return (
     <aside
       lang={locale}
@@ -220,7 +250,7 @@ export function GuestNotificationCenterClient() {
       {state.kind === 'ready' ? (
         <>
           <p aria-live="polite">
-            <strong>{copy.unread}:</strong> {state.snapshot.unreadCount}
+            <strong>{copy.unread}:</strong> {reachableUnreadCount}
           </p>
           {state.snapshot.items.length === 0 ? <p>{copy.empty}</p> : null}
           <ul>
