@@ -89,6 +89,50 @@ test('guest notification center renders unread items and marks one exact item re
   ).toBe(0);
 });
 
+test('guest notification center refreshes while the waiting page remains mounted', async ({
+  page,
+}) => {
+  await routeStatus(page);
+  let requests = 0;
+  await page.route('**/api/guest/inbox?limit=20', async (route) => {
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        requests === 1
+          ? { unreadCount: 0, items: [] }
+          : { unreadCount: 1, items: [notification] },
+      ),
+    });
+  });
+
+  await page.goto('/guest/status');
+  await expect(page.getByText('No notifications yet.')).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByText(notification.title)).toBeVisible();
+  await expect(page.getByText('Unread: 1')).toBeVisible();
+  expect(requests).toBeGreaterThanOrEqual(2);
+});
+
+test('guest notification center counts only unread items reachable in the bounded rendered window', async ({
+  page,
+}) => {
+  await routeStatus(page);
+  await page.route('**/api/guest/inbox?limit=20', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ unreadCount: 37, items: [notification] }),
+    });
+  });
+
+  await page.goto('/guest/status');
+  await expect(page.getByText(notification.title)).toBeVisible();
+  await expect(page.getByText('Unread: 1')).toBeVisible();
+  await expect(page.getByText('Unread: 37')).toHaveCount(0);
+});
+
 test('guest notification center fails closed for revoked guest access', async ({
   page,
 }) => {
