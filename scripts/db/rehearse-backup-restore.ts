@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { Client } from 'pg';
 import {
   assertDumpExists,
+  assertNonProductionSourceDatabase,
   assertRecoveryRehearsalAllowed,
   buildRehearsalDatabaseName,
   commandEnvironment,
@@ -66,6 +67,7 @@ async function main(): Promise<void> {
   if (!sourceUrl) throw new Error('DATABASE_URL is required');
 
   const sourceTarget = parsePostgreSqlTarget(sourceUrl);
+  assertNonProductionSourceDatabase(sourceTarget.databaseName);
   const suffix = `${Date.now().toString(36)}${process.pid.toString(36)}`;
   const rehearsalDatabaseName = buildRehearsalDatabaseName(
     sourceTarget.databaseName,
