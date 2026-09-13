@@ -40,14 +40,8 @@ export interface LoadSummary {
   byOperation: OperationMetrics[];
 }
 
-const NON_PRODUCTION_MARKERS = [
-  'test',
-  'dev',
-  'stage',
-  'staging',
-  'local',
-  'sandbox',
-];
+const NON_PRODUCTION_DATABASE_PATTERN =
+  /(^|[_-])(test|dev|stage|staging|local|sandbox)([_-]|$)/i;
 
 function integerFromEnvironment(
   env: NodeJS.ProcessEnv,
@@ -133,14 +127,29 @@ export function assertLoadRehearsalAllowed(
   const databaseName = decodeURIComponent(
     parsed.pathname.replace(/^\//, ''),
   ).toLowerCase();
-  if (
-    !databaseName ||
-    !NON_PRODUCTION_MARKERS.some((marker) => databaseName.includes(marker))
-  ) {
+  if (!databaseName || !NON_PRODUCTION_DATABASE_PATTERN.test(databaseName)) {
     throw new Error(
       'Load rehearsal requires a database name explicitly marked test/dev/stage/staging/local/sandbox',
     );
   }
+}
+
+export function safeErrorDiagnostic(error: unknown): string {
+  const name = error instanceof Error ? error.name : 'UnknownError';
+  const raw =
+    error instanceof Error ? error.message : 'Unknown load operation failure';
+  const sanitized = raw
+    .replace(/postgres(?:ql)?:\/\/[^\s]+/gi, '[database-url]')
+    .replace(
+      /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+      '[uuid]',
+    )
+    .replace(
+      /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
+      '[email]',
+    )
+    .replace(/\+?\d[\d\s().-]{6,}\d/g, '[phone]');
+  return `${name}: ${sanitized.slice(0, 200)}`;
 }
 
 export function deterministicUuid(seed: string, label: string): string {
