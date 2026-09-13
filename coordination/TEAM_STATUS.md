@@ -2,7 +2,7 @@
 
 > Generated from latest active-roster `HEARTBEAT` details and latest `HEARTBEAT`/`CHECKPOINT` activity in GitHub Issue #21. Do not edit manually except to repair the sync mechanism.
 
-- Last sync: 2026-09-13T20:48:01.595010+00:00
+- Last sync: 2026-09-13T20:48:25.318003+00:00
 - Active roster: `chatgpt`, `codex`, `claude`, `copilot`, `gemini-cli`, `mistral-vibe`.
 - Stale threshold: 30 minutes for a lease that claims `active`, unless a visible deterministic job is still progressing.
 - Retired actors remain visible only in the raw historical transcript.
