@@ -42,6 +42,22 @@ const item = {
   clinicId: '00000000-0000-4000-8000-000000000001',
   subjectKind: 'visit_patient',
   subjectId: '00000000-0000-4000-8000-000000000004',
+  providerIdempotencyKey: 'provider-secret-routing-key',
+  templateId: 'turn_approaching_v1',
+  locale: 'fr',
+  direction: 'ltr',
+  title: 'Votre tour approche',
+  body: 'Veuillez vous préparer.',
+  createdAt: '2026-09-13T07:00:00.000Z',
+  readAt: null,
+};
+const publicItem = {
+  id: itemId,
+  locale: 'fr',
+  direction: 'ltr',
+  title: 'Votre tour approche',
+  body: 'Veuillez vous préparer.',
+  createdAt: '2026-09-13T07:00:00.000Z',
   readAt: null,
 };
 
@@ -66,7 +82,7 @@ describe('guest inbox API', () => {
     query.mockResolvedValue({ rows: [{ allowed: true }] });
   });
 
-  it('passes only the bearer and bounded limit to the inbox service and returns no-store', async () => {
+  it('passes only the bearer and bounded limit to the inbox service and returns a privacy-minimal no-store response', async () => {
     getSnapshot.mockResolvedValue({ items: [item], unreadCount: 1 });
 
     const response = await GET(
@@ -81,7 +97,7 @@ describe('guest inbox API', () => {
     expect(getSnapshot).toHaveBeenCalledWith(bearer, 50);
     expect(getSnapshot).toHaveBeenCalledTimes(1);
     await expect(response.json()).resolves.toEqual({
-      items: [item],
+      items: [publicItem],
       unreadCount: 1,
     });
   });
