@@ -209,6 +209,9 @@ describe('WU36 guest-bound notification inbox', () => {
       `UPDATE guest_credentials
           SET issued_at=now(), expires_at=now() + interval '1 hour'`,
     );
+    await pool.query("UPDATE queue_entries SET state='in_consultation' WHERE id=$1", [
+      ids.targetEntry,
+    ]);
     await pool.query("UPDATE queue_entries SET state='completed' WHERE id=$1", [
       ids.targetEntry,
     ]);
