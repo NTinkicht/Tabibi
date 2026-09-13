@@ -28,13 +28,7 @@ beforeEach(async () => {
   await pool.query(
     `INSERT INTO patient_operational_records(id,clinic_id,private_display_name) VALUES
        ($1,$4,'Private A'),($2,$4,'Private A2'),($3,$5,'Private B')`,
-    [
-      ids.patientA,
-      ids.patientA2,
-      ids.patientB,
-      ids.clinicA,
-      ids.clinicB,
-    ],
+    [ids.patientA, ids.patientA2, ids.patientB, ids.clinicA, ids.clinicB],
   );
 });
 afterAll(() => pool.end());
