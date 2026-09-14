@@ -32,6 +32,7 @@ const committedMigrations = [
   '0024_notification_suppression_constraints.sql',
   '0025_notification_inbox.sql',
   '0026_notification_inbox_read_state.sql',
+  '0027_public_guest_booking.sql',
 ];
 
 beforeAll(async () => {

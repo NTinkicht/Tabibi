@@ -4,11 +4,13 @@ import {
   createHash,
   randomBytes,
 } from 'node:crypto';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 
 const VERSION = 'v1';
 const IV_BYTES = 12;
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
+
+type AvailabilityQueryable = Pick<Pool | PoolClient, 'query'>;
 
 export interface AvailabilitySelection {
   serviceDate: string;
@@ -23,6 +25,18 @@ export interface AvailabilitySelectionInput {
   startsAt: string;
   endsAt: string;
 }
+
+/**
+ * Server-only durable target for a validated selection reference.
+ *
+ * This type contains private domain identifiers and must never be serialized by
+ * public routes. It exists so mutation services can bind authoritative writes to
+ * the exact clinic/doctor/session tuple after the opaque reference has been
+ * cryptographically validated and re-checked against current database truth.
+ */
+export interface RevalidatedAvailabilitySelection
+  extends AvailabilitySelection,
+    AvailabilitySelectionInput {}
 
 interface SelectionClaims extends AvailabilitySelectionInput {
   version: 1;
@@ -56,7 +70,7 @@ export class PublicAvailabilitySelectionService {
   }
 
   async issue(input: AvailabilitySelectionInput): Promise<string | null> {
-    const current = await this.loadCurrent(input);
+    const current = await this.loadCurrent(input, this.pool);
     if (current === null) return null;
 
     const now = this.clock().getTime();
@@ -83,12 +97,41 @@ export class PublicAvailabilitySelectionService {
   }
 
   async resolve(reference: string): Promise<AvailabilitySelection | null> {
+    const current = await this.resolveForMutation(reference);
+    if (current === null) return null;
+    return {
+      serviceDate: current.serviceDate,
+      startsAt: current.startsAt,
+      endsAt: current.endsAt,
+    };
+  }
+
+  /**
+   * Resolve an opaque reference for a server-side mutation boundary.
+   *
+   * Passing a transaction client makes decryption, expiry validation, and the
+   * durable clinic/doctor/session revalidation part of the caller's mutation
+   * transaction. The returned identifiers remain server-only.
+   */
+  async resolveForMutation(
+    reference: string,
+    db: AvailabilityQueryable = this.pool,
+  ): Promise<RevalidatedAvailabilitySelection | null> {
     const claims = this.decode(reference);
     if (claims === null || this.clock().getTime() >= claims.expiresAt) {
       return null;
     }
 
-    return this.loadCurrent(claims);
+    const current = await this.loadCurrent(claims, db);
+    if (current === null) return null;
+    return {
+      clinicId: claims.clinicId,
+      doctorId: claims.doctorId,
+      sessionId: claims.sessionId,
+      serviceDate: current.serviceDate,
+      startsAt: current.startsAt,
+      endsAt: current.endsAt,
+    };
   }
 
   private decode(reference: string): SelectionClaims | null {
@@ -133,8 +176,9 @@ export class PublicAvailabilitySelectionService {
 
   private async loadCurrent(
     input: AvailabilitySelectionInput,
+    db: AvailabilityQueryable,
   ): Promise<AvailabilitySelection | null> {
-    const result = await this.pool.query<AvailabilityRow>(
+    const result = await db.query<AvailabilityRow>(
       `SELECT session.service_date::text AS service_date,
               session.starts_at,
               session.ends_at
