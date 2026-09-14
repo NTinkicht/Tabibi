@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { getLogger } from '@/platform/observability/logger';
 
-const correlationPattern = /^[A-Za-z0-9._-]{1,128}$/;
+export const correlationPattern = /^[A-Za-z0-9._-]{1,128}$/;
 
 export function correlationId(request: Request): string {
   const supplied = request.headers.get('x-request-id');

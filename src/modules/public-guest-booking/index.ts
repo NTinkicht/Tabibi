@@ -13,6 +13,7 @@ import {
 } from '@/modules/guest-access';
 import { PublicAvailabilitySelectionService } from '@/modules/public-availability-selection';
 import { inTransaction } from '@/platform/database/transaction';
+import { correlationPattern } from '@/platform/http/request-context';
 
 const ACTIVE_SESSION_STATES = ['planned', 'open', 'paused'];
 const ACCESS_TTL_MS = 24 * 60 * 60 * 1_000;
@@ -100,9 +101,9 @@ function normalizeInput(input: PublicGuestBookingInput): NormalizedInput {
       'Idempotency key is required and must be at most 128 characters',
     );
   }
-  if (input.correlationId.length < 1 || input.correlationId.length > 128) {
+  if (!correlationPattern.test(input.correlationId)) {
     throw new PublicGuestBookingValidationError(
-      'Correlation id is required and must be at most 128 characters',
+      'Correlation id must be 1-128 characters of letters, digits, ".", "_", or "-"',
     );
   }
   if (!input.selectionReference || input.selectionReference.length > 4096) {
