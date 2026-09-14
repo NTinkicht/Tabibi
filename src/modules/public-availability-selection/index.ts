@@ -106,7 +106,11 @@ export class PublicAvailabilitySelectionService {
       const iv = Buffer.from(ivEncoded, 'base64url');
       const ciphertext = Buffer.from(ciphertextEncoded, 'base64url');
       const tag = Buffer.from(tagEncoded, 'base64url');
-      if (iv.length !== IV_BYTES || tag.length !== 16 || ciphertext.length === 0) {
+      if (
+        iv.length !== IV_BYTES ||
+        tag.length !== 16 ||
+        ciphertext.length === 0
+      ) {
         return null;
       }
 
@@ -176,7 +180,10 @@ function isSelectionClaims(value: unknown): value is SelectionClaims {
     'startsAt',
     'version',
   ].sort();
-  if (keys.length !== expected.length || keys.some((key, i) => key !== expected[i])) {
+  if (
+    keys.length !== expected.length ||
+    keys.some((key, i) => key !== expected[i])
+  ) {
     return false;
   }
 
