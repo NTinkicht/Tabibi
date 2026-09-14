@@ -304,6 +304,15 @@ describe('WU61 public guest booking cancellation', () => {
     const service = new PublicGuestBookingCancellationService(pool, () => now);
     const before = await state(first);
 
+    await pool.query('UPDATE queue_entries SET priority_order=1 WHERE id=$1', [
+      first.queueEntryId,
+    ]);
+    await pool.query('UPDATE queue_entries SET priority_order=2 WHERE id=$1', [
+      second.queueEntryId,
+    ]);
+    expect((await state(first))?.priority_order).toBe('1');
+    expect((await state(second))?.priority_order).toBe('2');
+
     await expect(
       Promise.all([
         service.cancel(first.bearer),
