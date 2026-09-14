@@ -45,7 +45,9 @@ export class PublicAvailabilitySelectionService {
     private readonly ttlMs: number = DEFAULT_TTL_MS,
   ) {
     if (Buffer.byteLength(secret, 'utf8') < 32) {
-      throw new Error('Availability selection secret must be at least 32 bytes');
+      throw new Error(
+        'Availability selection secret must be at least 32 bytes',
+      );
     }
     if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
       throw new Error('Availability selection TTL must be positive');
