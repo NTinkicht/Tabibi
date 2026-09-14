@@ -10,8 +10,7 @@ import {
 } from '@/modules/public-guest-booking-status';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
-const selectionSecret =
-  'wu60-selection-secret-that-is-deliberately-long-enough';
+const selectionSecret = 'wu60-selection-secret-that-is-deliberately-long-enough';
 const now = new Date('2099-02-01T00:00:00.000Z');
 
 beforeAll(async () => migrate());
@@ -138,7 +137,11 @@ async function mutationCounts() {
 describe('WU60 public guest booking status', () => {
   it('returns an allow-listed localized projection and repeated reads are mutation-free', async () => {
     const booking = await createBooking('1001', 'ar');
-    const service = new PublicGuestBookingStatusService(pool, undefined, () => now);
+    const service = new PublicGuestBookingStatusService(
+      pool,
+      undefined,
+      () => now,
+    );
     const before = await mutationCounts();
 
     const first = await service.get(booking.bearer);
@@ -186,6 +189,12 @@ describe('WU60 public guest booking status', () => {
         booking.appointmentId,
         appointmentState,
       ]);
+      if (queueState === 'completed') {
+        await pool.query(
+          `UPDATE queue_entries SET state='in_consultation' WHERE id=$1`,
+          [booking.queueEntryId],
+        );
+      }
       await pool.query('UPDATE queue_entries SET state=$2 WHERE id=$1', [
         booking.queueEntryId,
         queueState,
@@ -207,7 +216,11 @@ describe('WU60 public guest booking status', () => {
 
   it('fails closed for tampered, expired, and revoked capabilities with one external error type', async () => {
     const booking = await createBooking('3001');
-    const service = new PublicGuestBookingStatusService(pool, undefined, () => now);
+    const service = new PublicGuestBookingStatusService(
+      pool,
+      undefined,
+      () => now,
+    );
     const parts = booking.bearer.split('.');
     expect(parts).toHaveLength(3);
     const tampered = `${parts[0]}.${parts[1]}.${'A'.repeat(43)}`;
@@ -216,17 +229,22 @@ describe('WU60 public guest booking status', () => {
       PublicGuestBookingStatusRejectedError,
     );
 
-    await pool.query('UPDATE guest_credentials SET expires_at=$1', [
-      new Date(now.getTime() - 1),
-    ]);
+    await pool.query(
+      'UPDATE guest_credentials SET issued_at=$1, expires_at=$2',
+      [new Date(now.getTime() - 120_000), new Date(now.getTime() - 1)],
+    );
     await expect(service.get(booking.bearer)).rejects.toBeInstanceOf(
       PublicGuestBookingStatusRejectedError,
     );
 
-    await pool.query('UPDATE guest_credentials SET expires_at=$1, revoked_at=$2', [
-      new Date(now.getTime() + 60_000),
-      now,
-    ]);
+    await pool.query(
+      'UPDATE guest_credentials SET issued_at=$1, expires_at=$2, revoked_at=$3',
+      [
+        now,
+        new Date(now.getTime() + 60_000),
+        new Date(now.getTime() + 1),
+      ],
+    );
     await expect(service.get(booking.bearer)).rejects.toBeInstanceOf(
       PublicGuestBookingStatusRejectedError,
     );
@@ -244,7 +262,11 @@ describe('WU60 public guest booking status', () => {
       [second.queueEntryId],
     );
 
-    const service = new PublicGuestBookingStatusService(pool, undefined, () => now);
+    const service = new PublicGuestBookingStatusService(
+      pool,
+      undefined,
+      () => now,
+    );
     const firstStatus = await service.get(first.bearer);
     const secondStatus = await service.get(second.bearer);
 
