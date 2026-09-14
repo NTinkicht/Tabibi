@@ -314,7 +314,9 @@ export class PublicGuestBookingService {
     ) => Promise<void>,
   ) {}
 
-  async book(rawInput: PublicGuestBookingInput): Promise<PublicGuestBookingResult> {
+  async book(
+    rawInput: PublicGuestBookingInput,
+  ): Promise<PublicGuestBookingResult> {
     const input = normalizeInput(rawInput);
 
     return inTransaction(this.pool, async (client) => {
@@ -387,13 +389,18 @@ export class PublicGuestBookingService {
           WHERE session_id = $1`,
         [selection.sessionId],
       );
-      const registrationOrder = Number(orderResult.rows[0]?.next_order ?? '1');
+      const registrationOrder = Number(
+        orderResult.rows[0]?.next_order ?? '1',
+      );
       const patientId = randomUUID();
       const queueEntryId = randomUUID();
       const appointmentId = randomUUID();
       const credentialId = randomUUID();
       const bearerSecret = randomBytes(32).toString('base64url');
-      const guestBearer = `${credentialId}.${bearerSecret}.${bearerSignature(credentialId, bearerSecret)}`;
+      const guestBearer = `${credentialId}.${bearerSecret}.${bearerSignature(
+        credentialId,
+        bearerSecret,
+      )}`;
       const now = this.clock();
       const guestAccessExpiresAt = new Date(now.getTime() + ACCESS_TTL_MS);
 
