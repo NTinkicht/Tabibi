@@ -38,26 +38,37 @@ describe('opaque public availability selection reference', () => {
     const clinicId = randomUUID();
     const doctorId = randomUUID();
     const doctorUserId = randomUUID();
+    const alternateDoctorId = randomUUID();
+    const alternateDoctorUserId = randomUUID();
     const sessionId = randomUUID();
     const startsAt = '2099-03-01T08:00:00.000Z';
     const endsAt = '2099-03-01T09:00:00.000Z';
     let now = new Date('2099-02-01T00:00:00.000Z');
 
     await pool.query(
-      `INSERT INTO users (id, auth_subject, display_name) VALUES ($1, $2, 'Private Doctor Name')`,
-      [doctorUserId, `wu58-user-${doctorUserId}`],
+      `INSERT INTO users (id, auth_subject, display_name) VALUES
+        ($1, $2, 'Private Doctor Name'),
+        ($3, $4, 'Alternate Private Doctor Name')`,
+      [
+        doctorUserId,
+        `wu58-user-${doctorUserId}`,
+        alternateDoctorUserId,
+        `wu58-user-${alternateDoctorUserId}`,
+      ],
     );
     await pool.query(
       `INSERT INTO clinics (id, tenant_key, name, status) VALUES ($1, $2, 'Private Clinic Name', 'active')`,
       [clinicId, `wu58-tenant-${clinicId}`],
     );
     await pool.query(
-      `INSERT INTO doctor_profiles (id, user_id, display_name) VALUES ($1, $2, 'Private Doctor Name')`,
-      [doctorId, doctorUserId],
+      `INSERT INTO doctor_profiles (id, user_id, display_name) VALUES
+        ($1, $2, 'Private Doctor Name'),
+        ($3, $4, 'Alternate Private Doctor Name')`,
+      [doctorId, doctorUserId, alternateDoctorId, alternateDoctorUserId],
     );
     await pool.query(
-      `INSERT INTO doctor_clinics (clinic_id, doctor_id) VALUES ($1, $2)`,
-      [clinicId, doctorId],
+      `INSERT INTO doctor_clinics (clinic_id, doctor_id) VALUES ($1, $2), ($1, $3)`,
+      [clinicId, doctorId, alternateDoctorId],
     );
     await pool.query(
       `INSERT INTO consultation_sessions
@@ -96,8 +107,11 @@ describe('opaque public availability selection reference', () => {
       clinicId,
       doctorId,
       doctorUserId,
+      alternateDoctorId,
+      alternateDoctorUserId,
       sessionId,
       'Private Doctor Name',
+      'Alternate Private Doctor Name',
       'Private Clinic Name',
       `wu58-tenant-${clinicId}`,
     ]) {
@@ -118,14 +132,26 @@ describe('opaque public availability selection reference', () => {
       clinicId,
     ]);
 
+    await expect(
+      pool.query(
+        `DELETE FROM doctor_clinics WHERE clinic_id = $1 AND doctor_id = $2`,
+        [clinicId, doctorId],
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+    expect(await service.resolve(reference!)).toEqual({
+      serviceDate: '2099-03-01',
+      startsAt,
+      endsAt,
+    });
+
     await pool.query(
-      `DELETE FROM doctor_clinics WHERE clinic_id = $1 AND doctor_id = $2`,
-      [clinicId, doctorId],
+      `UPDATE consultation_sessions SET doctor_id = $2 WHERE id = $1`,
+      [sessionId, alternateDoctorId],
     );
     expect(await service.resolve(reference!)).toBeNull();
     await pool.query(
-      `INSERT INTO doctor_clinics (clinic_id, doctor_id) VALUES ($1, $2)`,
-      [clinicId, doctorId],
+      `UPDATE consultation_sessions SET doctor_id = $2 WHERE id = $1`,
+      [sessionId, doctorId],
     );
 
     await pool.query(
