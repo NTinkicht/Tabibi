@@ -3,6 +3,10 @@ import {
   AppointmentValidationError,
 } from '@/modules/appointment';
 import { AuthorizationError } from '@/modules/identity';
+import {
+  PublicGuestBookingRejectedError,
+  PublicGuestBookingValidationError,
+} from '@/modules/public-guest-booking';
 import { QueueConflictError, QueueValidationError } from '@/modules/queue';
 import { ReceptionistDashboardNotFoundError } from '@/modules/receptionist-dashboard';
 import {
@@ -53,6 +57,7 @@ export async function operationalJson(
       error instanceof AppointmentValidationError ||
       error instanceof SessionValidationError ||
       error instanceof QueueValidationError ||
+      error instanceof PublicGuestBookingValidationError ||
       error instanceof ZodError ||
       error instanceof SyntaxError
     ) {
@@ -62,6 +67,7 @@ export async function operationalJson(
       error instanceof AppointmentConflictError ||
       error instanceof SessionConflictError ||
       error instanceof QueueConflictError ||
+      error instanceof PublicGuestBookingRejectedError ||
       isPostgresCheckConflict(error)
     ) {
       status = 409;
