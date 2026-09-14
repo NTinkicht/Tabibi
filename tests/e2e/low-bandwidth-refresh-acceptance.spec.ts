@@ -263,20 +263,19 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
       correlationId: `wu50-public-call-${run}`,
     });
     await page.reload();
-    await expect(
-      page.getByText(publicPatient.entry.publicDisplayLabel),
-    ).toBeVisible();
-    await expect(
-      page.getByText(publicPatient.entry.publicDisplayLabel),
-    ).toContainText(publicPatient.entry.publicDisplayLabel);
+    const publicRow = page
+      .locator('li')
+      .filter({ hasText: publicPatient.entry.publicDisplayLabel });
+    await expect(publicRow).toContainText('تم النداء');
     body = await page.locator('body').innerText();
     expect(body).not.toContain(other.entry.publicDisplayLabel);
 
     await page.goto(`/waiting-room/${clinicId}/${sessionId}?lang=fr`);
     await expect(page.locator('main')).toHaveAttribute('dir', 'ltr');
-    await expect(
-      page.getByText(publicPatient.entry.publicDisplayLabel),
-    ).toBeVisible();
+    const publicRowFr = page
+      .locator('li')
+      .filter({ hasText: publicPatient.entry.publicDisplayLabel });
+    await expect(publicRowFr).toContainText('Appelé');
     body = await page.locator('body').innerText();
     expect(body).not.toContain(publicPatient.patient.privateDisplayName);
     expect(body).not.toContain(publicPatient.patient.id);
