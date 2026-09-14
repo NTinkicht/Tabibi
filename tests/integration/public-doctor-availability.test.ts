@@ -169,7 +169,9 @@ describe('public doctor availability', () => {
       expect(serialized).not.toContain(forbidden);
     }
 
-    expect(await service.listForDoctor(inactiveClinic, hiddenDoctor)).toEqual([]);
+    expect(await service.listForDoctor(inactiveClinic, hiddenDoctor)).toEqual(
+      [],
+    );
     expect(await service.listForDoctor(clinicA, doctorB)).toEqual([]);
   });
 
