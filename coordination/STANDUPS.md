@@ -2,7 +2,7 @@
 
 > Generated from `STANDUP` posts in Team Room Issue #21. Do not edit manually except to repair the sync.
 
-- Last sync: 2026-09-14T06:52:30.226610+00:00
+- Last sync: 2026-09-14T06:54:50.698221+00:00
 - Current active roster: `chatgpt`, `codex`, `claude`, `copilot`, `gemini-cli`, `mistral-vibe`.
 - Historical retired-actor standups remain in the archive only.
 - Company playbook: `coordination/COMPANY_OPERATING_SYSTEM.md`
