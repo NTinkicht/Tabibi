@@ -7,6 +7,7 @@ const workflowDirectory = path.join(process.cwd(), '.github', 'workflows');
 const globallyForbiddenWorkflowPatterns = [
   { label: 'OpenRouter provider reference', pattern: /openrouter/i },
   { label: 'OpenRouter repository secret', pattern: /OPENROUTER_API_KEY/ },
+  { label: 'OpenRouter PR-Agent key', pattern: /OPENROUTER__KEY/ },
   { label: 'Google/Vertex API key route', pattern: /GOOGLE_API_KEY/ },
   {
     label: 'Vertex AI paid route',
