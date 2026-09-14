@@ -100,7 +100,9 @@ describe('POST /api/public/bookings', () => {
       requestId: 'wu59-route-request-1',
     });
 
-    const extraField = await POST(request({ ...validBody, clinicId: 'private-id' }));
+    const extraField = await POST(
+      request({ ...validBody, clinicId: 'private-id' }),
+    );
     expect(extraField.status).toBe(400);
     expect(await extraField.json()).toEqual({
       status: 'rejected',
@@ -110,7 +112,9 @@ describe('POST /api/public/bookings', () => {
   });
 
   it('maps validation and authoritative rejection to the same non-oracular response', async () => {
-    book.mockRejectedValueOnce(new PublicGuestBookingValidationError('private detail'));
+    book.mockRejectedValueOnce(
+      new PublicGuestBookingValidationError('private detail'),
+    );
     const validation = await POST(request());
 
     book.mockRejectedValueOnce(new PublicGuestBookingRejectedError());

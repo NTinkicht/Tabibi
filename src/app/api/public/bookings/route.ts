@@ -67,11 +67,13 @@ export async function POST(request: Request): Promise<Response> {
         pool,
         publicSelectionSecret(),
       );
-      const result = await new PublicGuestBookingService(pool, selections).book({
-        ...parsed.data,
-        idempotencyKey,
-        correlationId: requestId,
-      });
+      const result = await new PublicGuestBookingService(pool, selections).book(
+        {
+          ...parsed.data,
+          idempotencyKey,
+          correlationId: requestId,
+        },
+      );
 
       return {
         body: {
