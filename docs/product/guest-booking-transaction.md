@@ -29,9 +29,11 @@ The mutation must be atomic. Failure after partial work must not leave orphan pa
 
 ## Idempotency and concurrency
 
-A bounded public idempotency key is required. Same key plus materially identical request must replay the same logical result. Same key plus materially different input must conflict without additional mutation.
+A bounded client-generated public idempotency key is required. The durable booking-receipt record must enforce a database-level uniqueness constraint scoped to the resolved clinic and idempotency key, and must persist a privacy-safe fingerprint of the material request used for replay comparison.
 
-Concurrent equivalent submissions must serialize or otherwise converge to one logical booking only. The design must not rely on a check-then-insert race outside the transaction.
+Same clinic/key plus a materially identical request must replay the same logical public result without creating additional patient, appointment, queue, capability, receipt, or audit state. Same clinic/key plus materially different input must return a generic conflict and create no additional state. The conflict response must not reveal whether or what prior booking exists, and must not expose any prior guest data.
+
+Concurrent equivalent submissions must converge through the database uniqueness boundary rather than a check-then-insert race. The implementation must perform the receipt claim and operational mutation in the same transaction; when a concurrent unique conflict is observed, it must re-read the committed receipt, compare the privacy-safe request fingerprint, and return either the existing logical replay or the same generic conflict. A transaction failure before commit must roll back the receipt together with every operational mutation.
 
 ## Privacy
 
@@ -47,10 +49,10 @@ PostgreSQL integration tests must prove:
 2. expired, malformed, tampered, terminal, inactive-clinic, association-drift, and window-drift references cause zero operational mutation;
 3. cross-clinic/doctor/session substitution cannot succeed;
 4. identical idempotent replay returns the same logical result without duplicates;
-5. changed material input under a reused key conflicts without extra mutation;
-6. concurrent equivalent requests converge to one booking;
+5. changed material input under a reused key conflicts without extra mutation and without disclosing the original booking;
+6. concurrent equivalent requests converge to one booking through the database uniqueness boundary;
 7. locale and contact-preference validation are enforced;
-8. failure during the transaction rolls back partial state;
+8. failure during the transaction rolls back partial receipt and operational state;
 9. public result/error serialization leaks none of the forbidden identifiers/private fields;
 10. audit evidence is privacy-safe and identifies the source as guest/public;
 11. tests are deterministic and have no external network dependency.
