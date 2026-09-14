@@ -62,9 +62,8 @@ export class PublicGuestBookingStatusService {
   ): Promise<PublicGuestBookingStatusResult> {
     let target;
     try {
-      target = await this.guestAccess.authorize(
+      target = await this.guestAccess.authorizeForStatusRead(
         bearer,
-        undefined,
         this.clock(),
         signal,
       );
