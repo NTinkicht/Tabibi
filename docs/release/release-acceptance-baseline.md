@@ -36,7 +36,7 @@ The acceptance scenario must ultimately demonstrate these phases in order:
 | Low-bandwidth / resilient refresh behavior across the full release scenario | GAP | Notification/status refresh regressions exist, but no full clinic-day release proof is claimed | Add bounded delayed-response or reconnect assertions without external network dependencies. |
 | Threat-model refresh tied to the final release surface | GAP | Existing security design material is not treated as a current release sign-off by this matrix | Produce a final threat-model delta after the release suite stabilizes. |
 | Deployment/rollback runbook for the release candidate | GAP | Recovery rehearsal exists, but deployment cutover/rollback is not claimed complete here | Add deterministic deployment prerequisites, rollback triggers, and post-rollback verification steps. |
-| Product analytics limited to operational/product metrics without clinical profiling | GAP | No release sign-off evidence is claimed by this matrix | Define the allowed metric set and negative constraints before release. |
+| Product analytics limited to operational/product metrics without clinical profiling | PASS | `docs/release/privacy-constrained-product-analytics.md` defines the repository-controlled allowlist/denylist, guest-exchange exclusion, small-cohort constraints, fail-closed payload rules, and a 90-day maximum retention lifecycle | PASS is effective for a candidate head only when CI is green on that exact head and one eligible non-author reviewer confirms no Medium+/Major+/High+/Critical/Blocker privacy or profiling finding remains. Any later analytics emitter must add negative payload/leakage tests before remaining PASS. |
 
 ## Go/no-go rules
 
