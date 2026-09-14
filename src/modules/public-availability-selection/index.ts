@@ -4,11 +4,13 @@ import {
   createHash,
   randomBytes,
 } from 'node:crypto';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 
 const VERSION = 'v1';
 const IV_BYTES = 12;
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
+
+type AvailabilityQueryable = Pick<Pool | PoolClient, 'query'>;
 
 export interface AvailabilitySelection {
   serviceDate: string;
@@ -68,7 +70,7 @@ export class PublicAvailabilitySelectionService {
   }
 
   async issue(input: AvailabilitySelectionInput): Promise<string | null> {
-    const current = await this.loadCurrent(input);
+    const current = await this.loadCurrent(input, this.pool);
     if (current === null) return null;
 
     const now = this.clock().getTime();
@@ -107,19 +109,20 @@ export class PublicAvailabilitySelectionService {
   /**
    * Resolve an opaque reference for a server-side mutation boundary.
    *
-   * The decrypted claims are never trusted by themselves: every identifier and
-   * window is revalidated against current durable truth before this method
-   * returns. Callers must keep the returned identifiers server-side.
+   * Passing a transaction client makes decryption, expiry validation, and the
+   * durable clinic/doctor/session revalidation part of the caller's mutation
+   * transaction. The returned identifiers remain server-only.
    */
   async resolveForMutation(
     reference: string,
+    db: AvailabilityQueryable = this.pool,
   ): Promise<RevalidatedAvailabilitySelection | null> {
     const claims = this.decode(reference);
     if (claims === null || this.clock().getTime() >= claims.expiresAt) {
       return null;
     }
 
-    const current = await this.loadCurrent(claims);
+    const current = await this.loadCurrent(claims, db);
     if (current === null) return null;
     return {
       clinicId: claims.clinicId,
@@ -173,8 +176,9 @@ export class PublicAvailabilitySelectionService {
 
   private async loadCurrent(
     input: AvailabilitySelectionInput,
+    db: AvailabilityQueryable,
   ): Promise<AvailabilitySelection | null> {
-    const result = await this.pool.query<AvailabilityRow>(
+    const result = await db.query<AvailabilityRow>(
       `SELECT session.service_date::text AS service_date,
               session.starts_at,
               session.ends_at
