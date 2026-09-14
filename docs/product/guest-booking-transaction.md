@@ -1,0 +1,66 @@
+# WU59 — Guest booking transaction from opaque availability reference
+
+Parent epic: #2  
+Issue: #250
+
+## Goal
+
+Allow an unauthenticated guest to turn a valid WU58 opaque availability selection into exactly one booked appointment and queue entry without exposing or trusting raw internal clinic, doctor, session, patient, tenant, membership, audit, or queue identifiers.
+
+This slice is the mutation boundary between public discovery/availability and the existing appointment/guest-access foundations. It must preserve privacy, tenant isolation, idempotency, concurrency safety, Arabic/French locale handling, and current appointment-domain invariants.
+
+## Authoritative inputs
+
+The public client supplies an opaque WU58 selection reference plus bounded guest booking data. Raw clinic/doctor/session UUIDs are never authoritative public inputs.
+
+The server must resolve and revalidate the selection against current durable truth inside the booking transaction. A reference that is expired, tampered, stale, points to an inactive clinic, no longer matches the doctor association/window, or targets a terminal session must fail closed before operational mutation.
+
+## Guest patient boundary
+
+The booking flow may create the minimum clinic-scoped `patient_operational_records` row needed for the guest booking. It must not create an account user merely to complete a guest booking.
+
+Public guest fields must be explicitly allow-listed and validated. At minimum the design must keep locale constrained to `ar` or `fr`, enforce contact-preference requirements, and avoid returning private display/contact fields.
+
+## Atomic mutation
+
+A successful request creates or binds one clinic-scoped patient operational record as required, one appointment, one queue entry, privacy-safe audit evidence, and one guest-access capability that can be used by the already-existing guest status path.
+
+The mutation must be atomic. Failure after partial work must not leave orphan patient, appointment, queue, receipt, guest-capability, or audit state.
+
+## Idempotency and concurrency
+
+A bounded public idempotency key is required. Same key plus materially identical request must replay the same logical result. Same key plus materially different input must conflict without additional mutation.
+
+Concurrent equivalent submissions must serialize or otherwise converge to one logical booking only. The design must not rely on a check-then-insert race outside the transaction.
+
+## Privacy
+
+Public success/error responses must not serialize raw clinic, doctor, session, appointment, patient, queue, tenant, membership, audit, or account-user IDs. They must not echo private patient name/contact values or decrypted WU58 claims.
+
+Audit metadata must record only what operators need to establish a guest/public booking event and correlation/idempotency lineage. Raw guest contact values and opaque selection claims must not be copied into audit metadata.
+
+## Required executable evidence
+
+PostgreSQL integration tests must prove:
+
+1. a valid request creates exactly one logical patient/appointment/queue booking and usable guest capability;
+2. expired, malformed, tampered, terminal, inactive-clinic, association-drift, and window-drift references cause zero operational mutation;
+3. cross-clinic/doctor/session substitution cannot succeed;
+4. identical idempotent replay returns the same logical result without duplicates;
+5. changed material input under a reused key conflicts without extra mutation;
+6. concurrent equivalent requests converge to one booking;
+7. locale and contact-preference validation are enforced;
+8. failure during the transaction rolls back partial state;
+9. public result/error serialization leaks none of the forbidden identifiers/private fields;
+10. audit evidence is privacy-safe and identifies the source as guest/public;
+11. tests are deterministic and have no external network dependency.
+
+## Governance
+
+Exactly one canonical stream: `wu59-guest-booking-transaction` and its single PR.
+
+Initial material contract author: ChatGPT. Mechanical GitHub executor: ChatGPT connector. ChatGPT is recused from being the final non-author gate for materially authored work.
+
+Mistral Vibe is the preferred routine first-pass exact-head reviewer when its included-capacity path is concretely operational. Every Medium+/Major+/High+/Critical/Blocker finding is merge-blocking until reconciled. This slice crosses privacy, capability, idempotency, and concurrency boundaries, so Claude is preferred for escalation/final gate when available. Codex and Copilot remain eligible complementary/failover actors subject to concrete capacity and authorship independence. Gemini CLI/Mistral unattended Issue #11 lanes remain read-only.
+
+Zero-extra-cost only: no paid APIs, PAYG/overage/credits, Vertex, OpenRouter, auto-topups, or retired Gemini Agent/Chat.
