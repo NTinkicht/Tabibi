@@ -298,32 +298,41 @@ describe('WU61 public guest booking cancellation', () => {
     expect((await cancellationAudits(booking)).rows).toHaveLength(1);
   });
 
-  it('serializes concurrent cancellation of two distinct prioritized bookings in one session', async () => {
-    const first = await createBooking('2101');
-    const second = await createBookingInSession(first, '2102');
-    const service = new PublicGuestBookingCancellationService(pool, () => now);
-    const before = await state(first);
+  it(
+    'serializes concurrent cancellation of two distinct prioritized bookings in one session',
+    async () => {
+      const first = await createBooking('2101');
+      const second = await createBookingInSession(first, '2102');
+      const service = new PublicGuestBookingCancellationService(pool, () => now);
+      const before = await state(first);
 
-    await expect(
-      Promise.all([service.cancel(first.bearer), service.cancel(second.bearer)]),
-    ).resolves.toEqual([{ status: 'cancelled' }, { status: 'cancelled' }]);
+      await expect(
+        Promise.all([
+          service.cancel(first.bearer),
+          service.cancel(second.bearer),
+        ]),
+      ).resolves.toEqual([
+        { status: 'cancelled' },
+        { status: 'cancelled' },
+      ]);
 
-    expect(await state(first)).toMatchObject({
-      appointment_status: 'cancelled',
-      queue_state: 'cancelled',
-      priority_order: null,
-    });
-    expect(await state(second)).toMatchObject({
-      appointment_status: 'cancelled',
-      queue_state: 'cancelled',
-      priority_order: null,
-    });
-    expect(Number((await state(first))?.queue_order_version)).toBe(
-      Number(before?.queue_order_version) + 2,
-    );
-    expect((await cancellationAudits(first)).rows).toHaveLength(1);
-    expect((await cancellationAudits(second)).rows).toHaveLength(1);
-  });
+      expect(await state(first)).toMatchObject({
+        appointment_status: 'cancelled',
+        queue_state: 'cancelled',
+        priority_order: null,
+      });
+      expect(await state(second)).toMatchObject({
+        appointment_status: 'cancelled',
+        queue_state: 'cancelled',
+        priority_order: null,
+      });
+      expect(Number((await state(first))?.queue_order_version)).toBe(
+        Number(before?.queue_order_version) + 2,
+      );
+      expect((await cancellationAudits(first)).rows).toHaveLength(1);
+      expect((await cancellationAudits(second)).rows).toHaveLength(1);
+    },
+  );
 
   it('keeps another booking isolated from a valid cancellation', async () => {
     const first = await createBooking('3001');
