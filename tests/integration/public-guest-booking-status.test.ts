@@ -10,7 +10,8 @@ import {
 } from '@/modules/public-guest-booking-status';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
-const selectionSecret = 'wu60-selection-secret-that-is-deliberately-long-enough';
+const selectionSecret =
+  'wu60-selection-secret-that-is-deliberately-long-enough';
 const now = new Date('2099-02-01T00:00:00.000Z');
 
 beforeAll(async () => migrate());
