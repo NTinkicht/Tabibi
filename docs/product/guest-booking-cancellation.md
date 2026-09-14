@@ -20,6 +20,7 @@ All public failures use one generic non-oracular shape. Public success serializa
 - valid capability cancels exactly its bound appointment and queue entry;
 - repeated cancellation is idempotent;
 - concurrent duplicate cancellation converges safely;
+- concurrent cancellation of distinct prioritized bookings in one session must exercise the priority-cohort path under session-row-first locking without deadlock or partial mutation;
 - booking-A capability cannot cancel booking B;
 - cross-clinic/cross-tenant substitution and durable association drift cannot mutate state;
 - malformed, tampered, expired, and revoked credentials produce the same safe rejection and zero writes;
