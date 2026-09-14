@@ -80,7 +80,10 @@ export class PublicGuestBookingCheckInService {
           FOR UPDATE`,
         [target.session_id, target.clinic_id],
       );
-      if (!session.rows[0] || !['open', 'paused'].includes(session.rows[0].status))
+      if (
+        !session.rows[0] ||
+        !['open', 'paused'].includes(session.rows[0].status)
+      )
         throw new PublicGuestBookingCheckInRejectedError();
 
       const result = await client.query<CheckInRow>(
