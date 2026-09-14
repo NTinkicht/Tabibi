@@ -178,11 +178,11 @@ test('rehearses one bounded bilingual clinic day without tenant or patient leaka
     });
 
     const initial = await queue.listOperational(scope, ids.session);
-    expect(initial.entries.filter((entry) => entry.state === 'checked_in').map((entry) => entry.id)).toEqual([
-      scheduled.entry.id,
-      walkIn.entry.id,
-      noShow.entry.id,
-    ]);
+    expect(
+      initial.entries
+        .filter((entry) => entry.state === 'checked_in')
+        .map((entry) => entry.id),
+    ).toEqual([scheduled.entry.id, walkIn.entry.id, noShow.entry.id]);
 
     await notificationProducer.produce({
       clinicId: ids.clinic,
@@ -300,9 +300,9 @@ test('rehearses one bounded bilingual clinic day without tenant or patient leaka
     expect(
       notifications.rows.every((row) => row.clinic_id === ids.clinic),
     ).toBe(true);
-    expect(
-      JSON.stringify(notifications.rows),
-    ).not.toContain(scheduledPrivateName);
+    expect(JSON.stringify(notifications.rows)).not.toContain(
+      scheduledPrivateName,
+    );
     expect(JSON.stringify(notifications.rows)).not.toContain(walkInPrivateName);
     expect(JSON.stringify(notifications.rows)).not.toContain(otherPrivateName);
 
@@ -320,10 +320,14 @@ test('rehearses one bounded bilingual clinic day without tenant or patient leaka
       },
     ]);
 
-    await page.goto(`/operations/${ids.clinic}/sessions/${ids.session}/queue?locale=ar`);
+    await page.goto(
+      `/operations/${ids.clinic}/sessions/${ids.session}/queue?locale=ar`,
+    );
     const main = page.locator('main');
     await expect(main).toHaveAttribute('dir', 'rtl');
-    await expect(page.getByRole('heading', { name: 'قائمة المرضى بدون موعد' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'قائمة المرضى بدون موعد' }),
+    ).toBeVisible();
 
     const frenchButton = page.getByRole('button', { name: 'Français' });
     await frenchButton.focus();
