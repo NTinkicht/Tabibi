@@ -148,7 +148,9 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
     await page.goto(
       `/operations/${clinicId}/sessions/${sessionId}/queue?locale=ar`,
     );
-    const row = page.locator('article.queueRow').filter({ hasText: privateName });
+    const row = page
+      .locator('article.queueRow')
+      .filter({ hasText: privateName });
     await expect(row).toContainText('حاضر');
     await expect(page.locator('main')).toHaveAttribute('dir', 'rtl');
 
