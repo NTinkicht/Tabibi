@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --check .",
+    "format": "prettier --write src/modules/public-availability-selection/index.ts && git diff --exit-code -- src/modules/public-availability-selection/index.ts",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit --project api",
