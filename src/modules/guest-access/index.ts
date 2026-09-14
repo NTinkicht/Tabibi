@@ -114,7 +114,8 @@ export function authenticatedGuestCredentialId(bearer: string): string | null {
   return authenticatedBearer(bearer)?.credentialId.toLowerCase() ?? null;
 }
 
-function verifierMatches(
+/** Timing-safe comparison for a presented guest secret and persisted verifier. */
+export function verifierMatches(
   storedVerifier: string,
   bearerSecret: string,
 ): boolean {
