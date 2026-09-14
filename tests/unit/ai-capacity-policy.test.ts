@@ -79,6 +79,7 @@ describe('AI capacity policy', () => {
         readonlyMarker: '--enabled-tools grep',
         hardeningMarkers: [
           '--enabled-tools read_file',
+          '--auto-approve',
           'enabled_tools = ["grep", "read_file"]',
           '--workdir "$GITHUB_WORKSPACE"',
           'https://console.mistral.ai/api/vibe/whoami',
@@ -130,11 +131,34 @@ describe('AI capacity policy', () => {
 
     expect(enabledTools).toEqual(['grep', 'read_file']);
     expect(content).toContain('enabled_tools = ["grep", "read_file"]');
+    expect(content).toContain('--auto-approve');
     expect(content).toContain('--workdir "$GITHUB_WORKSPACE"');
     expect(content).not.toContain('--agent plan');
     expect(content).toContain("text.replace(secret, '[REDACTED]')");
     expect(content).toContain(
       'PAYG remains disabled and no paid fallback was attempted',
     );
+  });
+
+  it('classifies Mistral runtime failures without conflating them with capacity', () => {
+    const workflowPath = path.join(workflowDirectory, 'mistral-vibe-wake.yml');
+    const content = fs.readFileSync(workflowPath, 'utf8');
+
+    expect(content).toContain('status="AUTH_BLOCKED"');
+    expect(content).toContain('status="ENTITLEMENT_BLOCKED"');
+    expect(content).toContain('status="CAPACITY_DEGRADED"');
+    expect(content).toContain('status="WAKE_TIMEOUT"');
+    expect(content).toContain('status="CLI_INCOMPATIBLE"');
+    expect(content).toContain('status="EXECUTION_FAILED"');
+    expect(content).toContain(
+      'reason="Mistral Vibe runtime failed with an unclassified nonzero exit"',
+    );
+    expect(content).toContain(
+      'reason="Mistral included capacity is unavailable or exhausted"',
+    );
+    expect(content).toContain(
+      '${ACTOR_STATUS:-EXECUTION_FAILED} - ${ACTOR_REASON:-Mistral Vibe exited without a usable result}',
+    );
+    expect(content).not.toContain('CAPACITY_DEGRADED - ${ACTOR_REASON');
   });
 });

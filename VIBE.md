@@ -37,7 +37,7 @@ Read `coordination/BOOTSTRAP.md`, `coordination/STATE.json`, `coordination/WORK_
 
 Use only the owner's already-included Mistral plan allowance. PAYG/overage must remain disabled. Do not fund extra credits, auto-top-up or switch to another billable provider.
 
-The only approved unattended provider-key path is `.github/workflows/mistral-vibe-wake.yml`, authorized by Issue #162. It may run only when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`, only from the owner-only Issue #11 wake bus, and only with the `MISTRAL_API_KEY` GitHub Actions secret. Missing guard, missing credential, unavailable Vibe entitlement or exhausted included capacity means `CAPACITY_DEGRADED` and role failover.
+The only approved unattended provider-key path is `.github/workflows/mistral-vibe-wake.yml`, authorized by Issue #162. It may run only when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`, only from the owner-only Issue #11 wake bus, and only with the `MISTRAL_API_KEY` GitHub Actions secret. The wake must fail closed with a precise safe status: missing spend guard is `CONFIG_BLOCKED`, missing/rejected credential is `AUTH_BLOCKED`, rejected Vibe entitlement is `ENTITLEMENT_BLOCKED`, exhausted included allowance is `CAPACITY_DEGRADED`, and unrelated runtime failures must retain their own non-capacity classification. Every blocked state triggers role failover without paid fallback.
 
 Never commit Vibe/Mistral credentials or local account state.
 
@@ -45,7 +45,7 @@ Never commit Vibe/Mistral credentials or local account state.
 
 The default GitHub Actions wake must enforce the read-only lane deterministically at runtime. Mistral documents `enabled_tools` / `--enabled-tools` as an allow-list for programmatic Vibe. The Tabibi wake therefore exposes **only** `grep` and `read_file`, both in the ephemeral Vibe config and on the CLI, and binds Vibe to the checked-out repository with `--workdir`. Shell, write/edit, MCP and other mutation-capable tools are not available in this lane.
 
-Programmatic Vibe may otherwise use its default auto-approve agent, so the tool allow-list is the authority boundary. Expanding that allow-list requires a reviewed governance/code change before use.
+Programmatic Vibe does not auto-approve tool calls by default. The unattended wake therefore passes `--auto-approve` explicitly so the already-allowlisted `grep` and `read_file` calls can execute without an interactive prompt. The read-only tool allow-list remains the authority boundary; `--auto-approve` does not authorize tools that were not exposed. Expanding that allow-list requires a reviewed governance/code change before use.
 
 The workflow may perform a non-inference Vibe entitlement check before model execution, but it must never print the provider response body or credential. Provider/runtime failures must be reduced to safe classified diagnostics and must not cause paid fallback. Before any model-authored result is posted publicly, the workflow must scrub the literal `MISTRAL_API_KEY` plus common bearer/key renderings as defense in depth.
 

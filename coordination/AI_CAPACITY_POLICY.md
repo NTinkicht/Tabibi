@@ -57,13 +57,13 @@ A strong actor may always request more original evidence when correctness requir
 ## Fail-closed degradation
 
 - Gemini guard missing, quota exhausted, credential unavailable or billing uncertainty -> `CAPACITY_DEGRADED`; do not switch to paid Gemini/Vertex.
-- Mistral guard missing, allowance exhausted or credential unavailable -> `CAPACITY_DEGRADED`; PAYG stays off.
+- Mistral failures keep their actual class: missing spend guard -> `CONFIG_BLOCKED`; missing/rejected credential -> `AUTH_BLOCKED`; rejected Vibe entitlement -> `ENTITLEMENT_BLOCKED`; exhausted included allowance or explicit rate/quota signal -> `CAPACITY_DEGRADED`; wake timeout -> `WAKE_TIMEOUT`; incompatible CLI -> `CLI_INCOMPATIBLE`; unrelated nonzero runtime -> `EXECUTION_FAILED`. Every class fails closed and PAYG stays off.
 - Copilot compression unavailable -> deterministic retrieval/Headroom/targeted reads.
 - Codex implementation limited -> fail over to already-included eligible implementation capacity.
 - Claude review limited -> another eligible independent non-author reviewer; never weaken a security/concurrency gate.
 - Any provider limit -> deterministic evidence, another included actor, bounded scope reduction or wait for reset.
 
-Never turn `CAPACITY_DEGRADED` into a paid-provider call.
+Never turn any degraded/blocked actor state into a paid-provider call.
 
 ## Copilot context allowance
 
