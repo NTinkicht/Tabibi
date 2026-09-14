@@ -87,7 +87,9 @@ function normalizeInput(input: PublicGuestBookingInput): NormalizedInput {
     throw new PublicGuestBookingValidationError('Unsupported locale');
   }
   if (!['none', 'phone', 'email'].includes(input.contactPreference)) {
-    throw new PublicGuestBookingValidationError('Unsupported contact preference');
+    throw new PublicGuestBookingValidationError(
+      'Unsupported contact preference',
+    );
   }
   if (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 128) {
     throw new PublicGuestBookingValidationError(
@@ -389,9 +391,7 @@ export class PublicGuestBookingService {
           WHERE session_id = $1`,
         [selection.sessionId],
       );
-      const registrationOrder = Number(
-        orderResult.rows[0]?.next_order ?? '1',
-      );
+      const registrationOrder = Number(orderResult.rows[0]?.next_order ?? '1');
       const patientId = randomUUID();
       const queueEntryId = randomUUID();
       const appointmentId = randomUUID();
