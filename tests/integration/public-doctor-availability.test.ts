@@ -178,60 +178,63 @@ describe('public doctor availability', () => {
     },
   );
 
-  it('keeps same-name clinics and doctors isolated by internal association', async () => {
-    const clinicA = randomUUID();
-    const clinicB = randomUUID();
-    const doctorA = randomUUID();
-    const doctorB = randomUUID();
-    const userA = randomUUID();
-    const userB = randomUUID();
-    const sessionA = randomUUID();
-    const sessionB = randomUUID();
+  it(
+    'keeps same-name clinics and doctors isolated by internal association',
+    async () => {
+      const clinicA = randomUUID();
+      const clinicB = randomUUID();
+      const doctorA = randomUUID();
+      const doctorB = randomUUID();
+      const userA = randomUUID();
+      const userB = randomUUID();
+      const sessionA = randomUUID();
+      const sessionB = randomUUID();
 
-    await pool.query(
-      `INSERT INTO users (id, auth_subject, display_name) VALUES
+      await pool.query(
+        `INSERT INTO users (id, auth_subject, display_name) VALUES
         ($1, $2, 'Same User'), ($3, $4, 'Same User')`,
-      [userA, `wu57-same-a-${userA}`, userB, `wu57-same-b-${userB}`],
-    );
-    await pool.query(
-      `INSERT INTO clinics (id, tenant_key, name) VALUES
+        [userA, `wu57-same-a-${userA}`, userB, `wu57-same-b-${userB}`],
+      );
+      await pool.query(
+        `INSERT INTO clinics (id, tenant_key, name) VALUES
         ($1, $2, 'Same Clinic'), ($3, $4, 'Same Clinic')`,
-      [clinicA, `wu57-same-a-${clinicA}`, clinicB, `wu57-same-b-${clinicB}`],
-    );
-    await pool.query(
-      `INSERT INTO doctor_profiles (id, user_id, display_name) VALUES
+        [clinicA, `wu57-same-a-${clinicA}`, clinicB, `wu57-same-b-${clinicB}`],
+      );
+      await pool.query(
+        `INSERT INTO doctor_profiles (id, user_id, display_name) VALUES
         ($1, $2, 'Same Doctor'), ($3, $4, 'Same Doctor')`,
-      [doctorA, userA, doctorB, userB],
-    );
-    await pool.query(
-      `INSERT INTO doctor_clinics (clinic_id, doctor_id) VALUES ($1, $2), ($3, $4)`,
-      [clinicA, doctorA, clinicB, doctorB],
-    );
-    await pool.query(
-      `INSERT INTO consultation_sessions
+        [doctorA, userA, doctorB, userB],
+      );
+      await pool.query(
+        `INSERT INTO doctor_clinics (clinic_id, doctor_id) VALUES ($1, $2), ($3, $4)`,
+        [clinicA, doctorA, clinicB, doctorB],
+      );
+      await pool.query(
+        `INSERT INTO consultation_sessions
         (id, clinic_id, doctor_id, service_date, starts_at, ends_at, status)
        VALUES
         ($1, $2, $3, '2099-02-01', '2099-02-01T08:00:00Z', '2099-02-01T09:00:00Z', 'planned'),
         ($4, $5, $6, '2099-02-01', '2099-02-01T12:00:00Z', '2099-02-01T13:00:00Z', 'planned')`,
-      [sessionA, clinicA, doctorA, sessionB, clinicB, doctorB],
-    );
+        [sessionA, clinicA, doctorA, sessionB, clinicB, doctorB],
+      );
 
-    const service = new PublicDoctorAvailabilityService(pool);
-    expect(await service.listForDoctor(clinicA, doctorA)).toEqual([
-      {
-        serviceDate: '2099-02-01',
-        startsAt: '2099-02-01T08:00:00.000Z',
-        endsAt: '2099-02-01T09:00:00.000Z',
-      },
-    ]);
-    expect(await service.listForDoctor(clinicB, doctorB)).toEqual([
-      {
-        serviceDate: '2099-02-01',
-        startsAt: '2099-02-01T12:00:00.000Z',
-        endsAt: '2099-02-01T13:00:00.000Z',
-      },
-    ]);
-    expect(await service.listForDoctor(clinicA, doctorB)).toEqual([]);
-    expect(await service.listForDoctor(clinicB, doctorA)).toEqual([]);
-  });
+      const service = new PublicDoctorAvailabilityService(pool);
+      expect(await service.listForDoctor(clinicA, doctorA)).toEqual([
+        {
+          serviceDate: '2099-02-01',
+          startsAt: '2099-02-01T08:00:00.000Z',
+          endsAt: '2099-02-01T09:00:00.000Z',
+        },
+      ]);
+      expect(await service.listForDoctor(clinicB, doctorB)).toEqual([
+        {
+          serviceDate: '2099-02-01',
+          startsAt: '2099-02-01T12:00:00.000Z',
+          endsAt: '2099-02-01T13:00:00.000Z',
+        },
+      ]);
+      expect(await service.listForDoctor(clinicA, doctorB)).toEqual([]);
+      expect(await service.listForDoctor(clinicB, doctorA)).toEqual([]);
+    },
+  );
 });
