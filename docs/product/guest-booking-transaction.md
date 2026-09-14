@@ -15,6 +15,14 @@ The public client supplies an opaque WU58 selection reference plus bounded guest
 
 The server must resolve and revalidate the selection against current durable truth inside the booking transaction. A reference that is expired, tampered, stale, points to an inactive clinic, no longer matches the doctor association/window, or targets a terminal session must fail closed before operational mutation.
 
+## Public HTTP boundary
+
+The application exposes `POST /api/public/bookings` as the guest mutation boundary. The JSON body is a strict allow-list containing only the opaque selection reference and bounded guest booking fields. The client supplies a bounded opaque `Idempotency-Key` header; request correlation uses the shared `x-request-id` convention and replaces unsafe caller values with a generated safe correlation identifier.
+
+Expected validation, stale/tampered-reference, and idempotency-conflict failures serialize to the same generic public rejection shape so the route does not become an oracle for hidden selection or prior-booking state. Successful responses serialize only `serviceDate`, `startsAt`, `endsAt`, `queueLabel`, `guestBearer`, and `guestAccessExpiresAt`, and are marked `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
+
+The WU58 selection encryption material is supplied through the protected runtime setting `PUBLIC_AVAILABILITY_SELECTION_SECRET` (minimum 32 bytes); it has no production source default and must not be logged or returned through public responses.
+
 ## Guest patient boundary
 
 The booking flow may create the minimum clinic-scoped `patient_operational_records` row needed for the guest booking. It must not create an account user merely to complete a guest booking.
