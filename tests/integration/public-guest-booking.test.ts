@@ -365,6 +365,55 @@ describe('public guest booking transaction', () => {
     expect(await counts()).toEqual(zeroCounts);
   });
 
+  it('rejects correlation ids that could smuggle guest PII before any mutation', async () => {
+    const now = new Date('2099-02-01T00:00:00.000Z');
+    const seeded = await seed(now);
+    const service = new PublicGuestBookingService(
+      pool,
+      seeded.selections,
+      () => now,
+    );
+
+    const unsafeCorrelationIds = [
+      'guest@example.com',
+      '+213555010101',
+      'Private Guest Name',
+      'has spaces',
+      'semi;colon',
+    ];
+    for (const [index, unsafeCorrelationId] of unsafeCorrelationIds.entries()) {
+      await expect(
+        service.book({
+          ...input(seeded.reference, `unsafe-correlation-${index}`),
+          correlationId: unsafeCorrelationId,
+        }),
+      ).rejects.toBeInstanceOf(PublicGuestBookingValidationError);
+    }
+    expect(await counts()).toEqual(zeroCounts);
+
+    const safeResult = await service.book({
+      ...input(seeded.reference, 'safe-correlation'),
+      correlationId: 'wu59-safe.correlation_id-1',
+    });
+    expect(safeResult.guestBearer.split('.')).toHaveLength(3);
+    expect(await counts()).toEqual({
+      receipts: '1',
+      patients: '1',
+      appointments: '1',
+      entries: '1',
+      credentials: '1',
+      audits: '1',
+    });
+
+    const audit = await pool.query<{ metadata: Record<string, unknown> }>(
+      `SELECT metadata FROM audit_events WHERE clinic_id = $1`,
+      [seeded.clinicId],
+    );
+    expect(audit.rows[0]?.metadata).toMatchObject({
+      correlationId: 'wu59-safe.correlation_id-1',
+    });
+  });
+
   it('converges concurrent equivalents and rolls back every row after a late failure', async () => {
     const now = new Date('2099-02-01T00:00:00.000Z');
     const seeded = await seed(now);
