@@ -152,7 +152,7 @@ async function cancellationAudits(booking: SeededBooking) {
        FROM audit_events
       WHERE clinic_id=$1 AND entity_id=$2
         AND action='public_guest_appointment_cancelled'
-      ORDER BY created_at`,
+      ORDER BY occurred_at`,
     [booking.clinicId, booking.appointmentId],
   );
 }
@@ -299,8 +299,14 @@ describe('WU61 public guest booking cancellation', () => {
 
     const expiredBooking = await createBooking('5002');
     await pool.query(
-      'UPDATE guest_credentials SET expires_at=$2 WHERE queue_entry_id=$1',
-      [expiredBooking.queueEntryId, new Date(now.getTime() - 1)],
+      `UPDATE guest_credentials
+          SET issued_at=$2, expires_at=$3
+        WHERE queue_entry_id=$1`,
+      [
+        expiredBooking.queueEntryId,
+        new Date(now.getTime() - 2_000),
+        new Date(now.getTime() - 1_000),
+      ],
     );
     await expect(service.cancel(expiredBooking.bearer)).rejects.toBeInstanceOf(
       PublicGuestBookingCancellationRejectedError,
