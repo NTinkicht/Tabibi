@@ -213,7 +213,7 @@ describe('public guest booking transaction', () => {
     });
   });
 
-  it('fails closed before mutation for tampered and stale cross-tenant selections', async () => {
+  it('fails closed before mutation for tampered and stale selections', async () => {
     const now = new Date('2099-02-01T00:00:00.000Z');
     const seeded = await seed(now);
     const service = new PublicGuestBookingService(
@@ -234,11 +234,14 @@ describe('public guest booking transaction', () => {
     expect(await counts()).toEqual(zeroCounts);
 
     await pool.query(
-      `DELETE FROM doctor_clinics WHERE clinic_id = $1 AND doctor_id = $2`,
-      [seeded.clinicId, seeded.doctorId],
+      `UPDATE consultation_sessions
+          SET starts_at = starts_at + interval '5 minutes',
+              ends_at = ends_at + interval '5 minutes'
+        WHERE id = $1 AND clinic_id = $2`,
+      [seeded.sessionId, seeded.clinicId],
     );
     await expect(
-      service.book(input(seeded.reference, 'association-drift')),
+      service.book(input(seeded.reference, 'window-drift')),
     ).rejects.toBeInstanceOf(PublicGuestBookingRejectedError);
     expect(await counts()).toEqual(zeroCounts);
   });
