@@ -206,10 +206,13 @@ describe('public guest booking HTTP route', () => {
   it('rejects non-allowlisted public body fields before mutation', async () => {
     const seeded = await seed();
     const response = await guestBookingRoute(
-      postRequest(body(seeded.reference, { correlationId: 'guest@example.com' }), {
-        'idempotency-key': 'route-extra-field',
-        'x-request-id': 'route-extra-field-request',
-      }),
+      postRequest(
+        body(seeded.reference, { correlationId: 'guest@example.com' }),
+        {
+          'idempotency-key': 'route-extra-field',
+          'x-request-id': 'route-extra-field-request',
+        },
+      ),
     );
 
     expect(response.status).toBe(400);
