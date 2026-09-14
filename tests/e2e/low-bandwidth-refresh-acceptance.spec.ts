@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
+import { QueueNotificationProducer } from '@/modules/notification-domain';
+import { NotificationOutboxRepository } from '@/modules/notification-outbox';
 import { QueueService } from '@/modules/queue';
 import { createStaffSessionToken } from '@/platform/http/staff-auth';
 
@@ -98,6 +100,9 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
     );
 
     const queue = new QueueService(pool);
+    const notificationProducer = new QueueNotificationProducer(
+      new NotificationOutboxRepository(pool),
+    );
     const scope = { clinicId, actorUserId: receptionistId };
     const otherScope = {
       clinicId: otherClinicId,
@@ -119,6 +124,13 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
       command: 'check_in',
       idempotencyKey: `wu50-checkin-${run}`,
       correlationId: `wu50-checkin-${run}`,
+    });
+    const notification = await notificationProducer.produce({
+      clinicId,
+      queueEntryId: patient.entry.id,
+      sourceEventId: `wu50-refresh-guard-${run}`,
+      sourceVersion: 1,
+      notification: { eventKey: 'queue_entry_created', locale: 'ar' },
     });
 
     const secret =
@@ -154,10 +166,19 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
     await expect(row).toContainText('حاضر');
     await expect(page.locator('main')).toHaveAttribute('dir', 'rtl');
 
-    const outboxBefore = await pool.query<{ count: string }>(
-      'SELECT COUNT(*)::text AS count FROM notification_outbox WHERE clinic_id=$1',
-      [clinicId],
+    const outboxBefore = await pool.query<{
+      state: string;
+      dispatch_attempt_count: number;
+    }>(
+      `SELECT state::text, dispatch_attempt_count
+         FROM notification_outbox
+        WHERE id=$1 AND clinic_id=$2`,
+      [notification.id, clinicId],
     );
+    expect(outboxBefore.rows[0]).toEqual({
+      state: 'pending',
+      dispatch_attempt_count: 0,
+    });
 
     let commandRequests = 0;
     await page.route(
@@ -201,11 +222,16 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
     await expect(page.locator('body')).not.toContainText(other.entry.id);
     await expect(page.locator('body')).not.toContainText(otherClinicId);
 
-    const outboxAfter = await pool.query<{ count: string }>(
-      'SELECT COUNT(*)::text AS count FROM notification_outbox WHERE clinic_id=$1',
-      [clinicId],
+    const outboxAfter = await pool.query<{
+      state: string;
+      dispatch_attempt_count: number;
+    }>(
+      `SELECT state::text, dispatch_attempt_count
+         FROM notification_outbox
+        WHERE id=$1 AND clinic_id=$2`,
+      [notification.id, clinicId],
     );
-    expect(outboxAfter.rows[0]?.count).toBe(outboxBefore.rows[0]?.count);
+    expect(outboxAfter.rows[0]).toEqual(outboxBefore.rows[0]);
 
     const publicPatient = await queue.registerWalkIn(scope, sessionId, {
       privateDisplayName: `WU50 Public Private ${run}`,
@@ -229,11 +255,23 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
     expect(body).not.toContain(publicPatient.patient.id);
     expect(body).not.toContain(publicPatient.entry.id);
     expect(body).not.toContain(otherPrivateName);
+    expect(body).not.toContain(other.entry.publicDisplayLabel);
 
+    await queue.command(scope, sessionId, publicPatient.entry.id, {
+      command: 'call',
+      idempotencyKey: `wu50-public-call-${run}`,
+      correlationId: `wu50-public-call-${run}`,
+    });
     await page.reload();
     await expect(
       page.getByText(publicPatient.entry.publicDisplayLabel),
     ).toBeVisible();
+    await expect(
+      page.getByText(publicPatient.entry.publicDisplayLabel),
+    ).toContainText(publicPatient.entry.publicDisplayLabel);
+    body = await page.locator('body').innerText();
+    expect(body).not.toContain(other.entry.publicDisplayLabel);
+
     await page.goto(`/waiting-room/${clinicId}/${sessionId}?lang=fr`);
     await expect(page.locator('main')).toHaveAttribute('dir', 'ltr');
     await expect(
@@ -243,6 +281,7 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
     expect(body).not.toContain(publicPatient.patient.privateDisplayName);
     expect(body).not.toContain(publicPatient.patient.id);
     expect(body).not.toContain(publicPatient.entry.id);
+    expect(body).not.toContain(other.entry.publicDisplayLabel);
   } finally {
     await pool.end();
   }
