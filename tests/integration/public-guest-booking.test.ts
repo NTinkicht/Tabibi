@@ -10,7 +10,8 @@ import {
 } from '@/modules/public-guest-booking';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
-const selectionSecret = 'wu59-selection-secret-that-is-deliberately-long-enough';
+const selectionSecret =
+  'wu59-selection-secret-that-is-deliberately-long-enough';
 
 beforeAll(async () => migrate());
 beforeEach(async () => {
@@ -41,10 +42,10 @@ async function seed(now: Date) {
     `INSERT INTO doctor_profiles (id, user_id, display_name) VALUES ($1, $2, 'Private Doctor')`,
     [doctorId, doctorUserId],
   );
-  await pool.query(`INSERT INTO doctor_clinics (clinic_id, doctor_id) VALUES ($1, $2)`, [
-    clinicId,
-    doctorId,
-  ]);
+  await pool.query(
+    `INSERT INTO doctor_clinics (clinic_id, doctor_id) VALUES ($1, $2)`,
+    [clinicId, doctorId],
+  );
   await pool.query(
     `INSERT INTO consultation_sessions
        (id, clinic_id, doctor_id, service_date, starts_at, ends_at, status)
@@ -57,9 +58,23 @@ async function seed(now: Date) {
     () => now,
     60_000,
   );
-  const reference = await selections.issue({ clinicId, doctorId, sessionId, startsAt, endsAt });
+  const reference = await selections.issue({
+    clinicId,
+    doctorId,
+    sessionId,
+    startsAt,
+    endsAt,
+  });
   if (!reference) throw new Error('selection reference not issued');
-  return { clinicId, doctorId, sessionId, startsAt, endsAt, selections, reference };
+  return {
+    clinicId,
+    doctorId,
+    sessionId,
+    startsAt,
+    endsAt,
+    selections,
+    reference,
+  };
 }
 
 function input(reference: string, idempotencyKey = 'guest-booking-1') {
@@ -90,46 +105,120 @@ describe('public guest booking transaction', () => {
   it('creates one privacy-safe booking and replays the same usable capability', async () => {
     const now = new Date('2099-02-01T00:00:00.000Z');
     const seeded = await seed(now);
-    const service = new PublicGuestBookingService(pool, seeded.selections, () => now);
+    const service = new PublicGuestBookingService(
+      pool,
+      seeded.selections,
+      () => now,
+    );
     const result = await service.book(input(seeded.reference));
 
-    expect(result).toMatchObject({ serviceDate: '2099-03-01', startsAt: seeded.startsAt, endsAt: seeded.endsAt });
+    expect(result).toMatchObject({
+      serviceDate: '2099-03-01',
+      startsAt: seeded.startsAt,
+      endsAt: seeded.endsAt,
+    });
     expect(result.queueLabel).toMatch(/^W-[A-F0-9]{10}$/);
     expect(result.guestBearer.split('.')).toHaveLength(3);
-    expect(await counts()).toEqual({ receipts: '1', patients: '1', appointments: '1', entries: '1', credentials: '1', audits: '1' });
+    expect(await counts()).toEqual({
+      receipts: '1',
+      patients: '1',
+      appointments: '1',
+      entries: '1',
+      credentials: '1',
+      audits: '1',
+    });
 
     const serialized = JSON.stringify(result);
-    for (const forbidden of [seeded.clinicId, seeded.doctorId, seeded.sessionId, 'Private Guest Name', '+213555010101', 'guest@example.com']) {
+    for (const forbidden of [
+      seeded.clinicId,
+      seeded.doctorId,
+      seeded.sessionId,
+      'Private Guest Name',
+      '+213555010101',
+      'guest@example.com',
+    ]) {
       expect(serialized).not.toContain(forbidden);
     }
 
-    const target = await new GuestAccessService(pool).authorize(result.guestBearer, undefined, now);
-    expect(target).toMatchObject({ clinicId: seeded.clinicId, sessionId: seeded.sessionId });
+    const target = await new GuestAccessService(pool).authorize(
+      result.guestBearer,
+      undefined,
+      now,
+    );
+    expect(target).toMatchObject({
+      clinicId: seeded.clinicId,
+      sessionId: seeded.sessionId,
+    });
 
     expect(await service.book(input(seeded.reference))).toEqual(result);
-    expect(await counts()).toEqual({ receipts: '1', patients: '1', appointments: '1', entries: '1', credentials: '1', audits: '1' });
+    expect(await counts()).toEqual({
+      receipts: '1',
+      patients: '1',
+      appointments: '1',
+      entries: '1',
+      credentials: '1',
+      audits: '1',
+    });
 
     await expect(
-      service.book({ ...input(seeded.reference), privateDisplayName: 'Changed Guest' }),
+      service.book({
+        ...input(seeded.reference),
+        privateDisplayName: 'Changed Guest',
+      }),
     ).rejects.toBeInstanceOf(PublicGuestBookingRejectedError);
-    expect(await counts()).toEqual({ receipts: '1', patients: '1', appointments: '1', entries: '1', credentials: '1', audits: '1' });
+    expect(await counts()).toEqual({
+      receipts: '1',
+      patients: '1',
+      appointments: '1',
+      entries: '1',
+      credentials: '1',
+      audits: '1',
+    });
   });
 
   it('converges concurrent equivalents and rolls back every row after a late failure', async () => {
     const now = new Date('2099-02-01T00:00:00.000Z');
     const seeded = await seed(now);
-    const service = new PublicGuestBookingService(pool, seeded.selections, () => now);
+    const service = new PublicGuestBookingService(
+      pool,
+      seeded.selections,
+      () => now,
+    );
     const concurrentInput = input(seeded.reference, 'concurrent-booking');
-    const [first, second] = await Promise.all([service.book(concurrentInput), service.book(concurrentInput)]);
+    const [first, second] = await Promise.all([
+      service.book(concurrentInput),
+      service.book(concurrentInput),
+    ]);
     expect(second).toEqual(first);
-    expect(await counts()).toEqual({ receipts: '1', patients: '1', appointments: '1', entries: '1', credentials: '1', audits: '1' });
+    expect(await counts()).toEqual({
+      receipts: '1',
+      patients: '1',
+      appointments: '1',
+      entries: '1',
+      credentials: '1',
+      audits: '1',
+    });
 
     await pool.query(`TRUNCATE public_guest_booking_receipts, guest_credentials, audit_events,
       appointments, queue_entries, patient_operational_records CASCADE`);
-    const failing = new PublicGuestBookingService(pool, seeded.selections, () => now, async () => {
-      throw new Error('injected late failure');
+    const failing = new PublicGuestBookingService(
+      pool,
+      seeded.selections,
+      () => now,
+      async () => {
+        throw new Error('injected late failure');
+      },
+    );
+    await expect(
+      failing.book(input(seeded.reference, 'rollback-booking')),
+    ).rejects.toThrow('injected late failure');
+    expect(await counts()).toEqual({
+      receipts: '0',
+      patients: '0',
+      appointments: '0',
+      entries: '0',
+      credentials: '0',
+      audits: '0',
     });
-    await expect(failing.book(input(seeded.reference, 'rollback-booking'))).rejects.toThrow('injected late failure');
-    expect(await counts()).toEqual({ receipts: '0', patients: '0', appointments: '0', entries: '0', credentials: '0', audits: '0' });
   });
 });
