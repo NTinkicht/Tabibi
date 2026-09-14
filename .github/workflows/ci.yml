@@ -40,6 +40,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: WU59 formatter diagnostic
+        run: |
+          npx prettier --write src/app/api/public/bookings/route.ts tests/api/public-guest-booking.test.ts
+          git diff -- src/app/api/public/bookings/route.ts tests/api/public-guest-booking.test.ts
+
       - name: Formatting
         run: npm run format
 
