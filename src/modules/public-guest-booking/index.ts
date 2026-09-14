@@ -2,11 +2,15 @@ import {
   createCipheriv,
   createDecipheriv,
   createHash,
-  createHmac,
   randomBytes,
   randomUUID,
 } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
+import {
+  bearerSignature,
+  guestBearerSigningSecret,
+  verifier,
+} from '@/modules/guest-access';
 import { PublicAvailabilitySelectionService } from '@/modules/public-availability-selection';
 import { inTransaction } from '@/platform/database/transaction';
 
@@ -179,30 +183,10 @@ function idempotencyHash(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
-function guestSigningSecret(): string {
-  const value = process.env.GUEST_BEARER_SIGNING_SECRET;
-  if (!value || value.length < 32) {
-    throw new Error(
-      'GUEST_BEARER_SIGNING_SECRET must contain at least 32 characters',
-    );
-  }
-  return value;
-}
-
-function credentialVerifier(secret: string): string {
-  return createHash('sha256').update(secret, 'utf8').digest('hex');
-}
-
-function bearerSignature(credentialId: string, bearerSecret: string): string {
-  return createHmac('sha256', guestSigningSecret())
-    .update(`${credentialId}.${bearerSecret}`, 'utf8')
-    .digest('base64url');
-}
-
 function receiptEncryptionKey(): Buffer {
   return createHash('sha256')
     .update('tabibi-public-guest-booking-replay\0', 'utf8')
-    .update(guestSigningSecret(), 'utf8')
+    .update(guestBearerSigningSecret(), 'utf8')
     .digest();
 }
 
@@ -458,7 +442,7 @@ export class PublicGuestBookingService {
           selection.clinicId,
           selection.sessionId,
           queueEntryId,
-          credentialVerifier(bearerSecret),
+          verifier(bearerSecret),
           now,
           guestAccessExpiresAt,
         ],

@@ -46,11 +46,13 @@ function secret(): string {
   return randomBytes(32).toString('base64url');
 }
 
-function verifier(value: string): string {
+/** Shared sha256 hex digest used for both exchange and bearer verifiers. */
+export function verifier(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
-function guestBearerSigningSecret(): string {
+/** Sole source of truth for the guest bearer HMAC signing secret. */
+export function guestBearerSigningSecret(): string {
   const signingSecret = process.env.GUEST_BEARER_SIGNING_SECRET;
   if (!signingSecret || signingSecret.length < 32) {
     throw new Error(
@@ -60,7 +62,11 @@ function guestBearerSigningSecret(): string {
   return signingSecret;
 }
 
-function bearerSignature(credentialId: string, bearerSecret: string): string {
+/** Sole source of truth for the guest bearer signature construction. */
+export function bearerSignature(
+  credentialId: string,
+  bearerSecret: string,
+): string {
   return createHmac('sha256', guestBearerSigningSecret())
     .update(`${credentialId}.${bearerSecret}`, 'utf8')
     .digest('base64url');
