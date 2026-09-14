@@ -240,11 +240,7 @@ describe('WU60 public guest booking status', () => {
 
     await pool.query(
       'UPDATE guest_credentials SET issued_at=$1, expires_at=$2, revoked_at=$3',
-      [
-        now,
-        new Date(now.getTime() + 60_000),
-        new Date(now.getTime() + 1),
-      ],
+      [now, new Date(now.getTime() + 60_000), new Date(now.getTime() + 1)],
     );
     await expect(service.get(booking.bearer)).rejects.toBeInstanceOf(
       PublicGuestBookingStatusRejectedError,
