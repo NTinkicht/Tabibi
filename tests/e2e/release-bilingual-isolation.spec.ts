@@ -23,17 +23,31 @@ test('keeps bilingual public queues clinic-isolated', async ({ page }) => {
   try {
     await pool.query(
       `INSERT INTO users(id,auth_subject,display_name) VALUES
-        ($1,'release-browser-reception-a','Reception A'),
-        ($2,'release-browser-reception-b','Reception B'),
-        ($3,'release-browser-doctor-a','Doctor A'),
-        ($4,'release-browser-doctor-b','Doctor B')`,
-      [ids.receptionistA, ids.receptionistB, ids.doctorUserA, ids.doctorUserB],
+        ($1,$5,'Reception A'),
+        ($2,$6,'Reception B'),
+        ($3,$7,'Doctor A'),
+        ($4,$8,'Doctor B')`,
+      [
+        ids.receptionistA,
+        ids.receptionistB,
+        ids.doctorUserA,
+        ids.doctorUserB,
+        `release-browser-reception-a-${ids.receptionistA}`,
+        `release-browser-reception-b-${ids.receptionistB}`,
+        `release-browser-doctor-a-${ids.doctorUserA}`,
+        `release-browser-doctor-b-${ids.doctorUserB}`,
+      ],
     );
     await pool.query(
       `INSERT INTO clinics(id,tenant_key,name) VALUES
-        ($1,'release-browser-clinic-a','Release Clinic A'),
-        ($2,'release-browser-clinic-b','Release Clinic B')`,
-      [ids.clinicA, ids.clinicB],
+        ($1,$3,'Release Clinic A'),
+        ($2,$4,'Release Clinic B')`,
+      [
+        ids.clinicA,
+        ids.clinicB,
+        `release-browser-clinic-a-${ids.clinicA}`,
+        `release-browser-clinic-b-${ids.clinicB}`,
+      ],
     );
     await pool.query(
       `INSERT INTO clinic_memberships(clinic_id,user_id,role) VALUES
