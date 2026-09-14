@@ -42,6 +42,12 @@ type ParsedBearer = {
   signature: string;
 };
 
+type AuthorizedBearerRow = {
+  target: GuestTarget;
+  entryState: string;
+  sessionStatus: string;
+};
+
 function secret(): string {
   return randomBytes(32).toString('base64url');
 }
@@ -301,12 +307,12 @@ export class GuestAccessService {
     });
   }
 
-  async authorize(
+  private async resolveBearer(
     bearer: string,
-    expectedTarget?: GuestTarget,
-    now = new Date(),
+    expectedTarget: GuestTarget | undefined,
+    now: Date,
     signal?: AbortSignal,
-  ): Promise<GuestTarget> {
+  ): Promise<AuthorizedBearerRow> {
     const parsed = authenticatedBearer(bearer);
     if (!parsed) throw new GuestAccessRejectedError();
 
@@ -346,14 +352,50 @@ export class GuestAccessService {
     if (
       row.revoked_at ||
       row.expires_at <= now ||
-      !ACTIVE_ENTRY_STATES.includes(row.entry_state) ||
-      !ACTIVE_SESSION_STATES.includes(row.session_status) ||
       (expectedTarget &&
         (expectedTarget.clinicId !== target.clinicId ||
           expectedTarget.sessionId !== target.sessionId ||
           expectedTarget.queueEntryId !== target.queueEntryId))
     )
       throw new GuestAccessRejectedError();
-    return target;
+
+    return {
+      target,
+      entryState: row.entry_state,
+      sessionStatus: row.session_status,
+    };
+  }
+
+  async authorize(
+    bearer: string,
+    expectedTarget?: GuestTarget,
+    now = new Date(),
+    signal?: AbortSignal,
+  ): Promise<GuestTarget> {
+    const resolved = await this.resolveBearer(
+      bearer,
+      expectedTarget,
+      now,
+      signal,
+    );
+    if (
+      !ACTIVE_ENTRY_STATES.includes(resolved.entryState) ||
+      !ACTIVE_SESSION_STATES.includes(resolved.sessionStatus)
+    )
+      throw new GuestAccessRejectedError();
+    return resolved.target;
+  }
+
+  /**
+   * Authenticate a guest capability for privacy-safe read-only status access.
+   * Credential validity, expiry, revocation, signature and scope remain strict,
+   * while terminal queue/session lifecycle states remain readable.
+   */
+  async authorizeForStatusRead(
+    bearer: string,
+    now = new Date(),
+    signal?: AbortSignal,
+  ): Promise<GuestTarget> {
+    return (await this.resolveBearer(bearer, undefined, now, signal)).target;
   }
 }
