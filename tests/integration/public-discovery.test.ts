@@ -134,11 +134,11 @@ describe('public clinic and doctor discovery', () => {
     );
 
     const result = await new PublicDiscoveryService(pool).listClinics();
-    expect(result.find((clinic) => clinic.name === 'Alpha Clinic')?.doctors).toEqual([
-      { displayName: 'Doctor Alpha' },
-    ]);
-    expect(result.find((clinic) => clinic.name === 'Beta Clinic')?.doctors).toEqual([
-      { displayName: 'Doctor Beta' },
-    ]);
+    expect(
+      result.find((clinic) => clinic.name === 'Alpha Clinic')?.doctors,
+    ).toEqual([{ displayName: 'Doctor Alpha' }]);
+    expect(
+      result.find((clinic) => clinic.name === 'Beta Clinic')?.doctors,
+    ).toEqual([{ displayName: 'Doctor Beta' }]);
   });
 });
