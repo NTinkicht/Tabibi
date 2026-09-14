@@ -1,5 +1,8 @@
 import type { Pool } from 'pg';
-import { GuestAccessRejectedError, GuestAccessService } from '@/modules/guest-access';
+import {
+  GuestAccessRejectedError,
+  GuestAccessService,
+} from '@/modules/guest-access';
 import { abortableQuery } from '@/platform/database/abortable-query';
 
 export type PublicGuestBookingLifecycleState =
