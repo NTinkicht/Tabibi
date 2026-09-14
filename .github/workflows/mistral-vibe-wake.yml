@@ -130,14 +130,15 @@ jobs:
           EOF
           printf '\nDispatch text:\n%s\n' "$DISPATCH_BODY" >> /tmp/tabibi-mistral-prompt.txt
 
-          # Programmatic Vibe no longer auto-approves tool calls. Explicitly approve
-          # only the tools already constrained by both read-only allow-lists below.
-          # Shell/write/edit/MCP tools are not exposed to this process.
+          # Programmatic Vibe otherwise falls back to broad auto-approval. Select
+          # the built-in read-only plan agent explicitly: it auto-approves safe
+          # repository reads, while reads outside --workdir still require approval.
+          # The CLI and config additionally expose only grep + read_file.
           set +e
           timeout --signal=TERM --kill-after=15s 600s \
             vibe \
               --trust \
-              --auto-approve \
+              --agent plan \
               --workdir "$GITHUB_WORKSPACE" \
               --enabled-tools grep \
               --enabled-tools read_file \

@@ -79,7 +79,7 @@ describe('AI capacity policy', () => {
         readonlyMarker: '--enabled-tools grep',
         hardeningMarkers: [
           '--enabled-tools read_file',
-          '--auto-approve',
+          '--agent plan',
           'enabled_tools = ["grep", "read_file"]',
           '--workdir "$GITHUB_WORKSPACE"',
           'https://console.mistral.ai/api/vibe/whoami',
@@ -131,9 +131,10 @@ describe('AI capacity policy', () => {
 
     expect(enabledTools).toEqual(['grep', 'read_file']);
     expect(content).toContain('enabled_tools = ["grep", "read_file"]');
-    expect(content).toContain('--auto-approve');
+    expect(content).toContain('--agent plan');
+    expect(content).not.toContain('--auto-approve');
+    expect(content).not.toContain('--yolo');
     expect(content).toContain('--workdir "$GITHUB_WORKSPACE"');
-    expect(content).not.toContain('--agent plan');
     expect(content).toContain("text.replace(secret, '[REDACTED]')");
     expect(content).toContain(
       'PAYG remains disabled and no paid fallback was attempted',
