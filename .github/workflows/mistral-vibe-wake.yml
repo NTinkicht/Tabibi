@@ -35,11 +35,13 @@ jobs:
           set -euo pipefail
           if [[ "${PAYG_DISABLED_CONFIRMED:-}" != "true" ]]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "status=CONFIG_BLOCKED" >> "$GITHUB_OUTPUT"
             echo "reason=Mistral PAYG-disabled repository guard is not confirmed" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [[ -z "${PROVIDER_KEY:-}" ]]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "status=AUTH_BLOCKED" >> "$GITHUB_OUTPUT"
             echo "reason=Mistral credential is not configured" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -61,15 +63,27 @@ jobs:
 
           if [[ "$curl_code" != "0" ]]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "status=PREFLIGHT_UNAVAILABLE" >> "$GITHUB_OUTPUT"
             echo "reason=Mistral Vibe entitlement could not be verified" >> "$GITHUB_OUTPUT"
           elif [[ "$http_status" == "200" ]]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "status=OK" >> "$GITHUB_OUTPUT"
             echo "reason=ready" >> "$GITHUB_OUTPUT"
-          elif [[ "$http_status" == "401" || "$http_status" == "403" ]]; then
+          elif [[ "$http_status" == "401" ]]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "status=AUTH_BLOCKED" >> "$GITHUB_OUTPUT"
             echo "reason=Mistral credential is not authorized for Vibe Code (HTTP ${http_status})" >> "$GITHUB_OUTPUT"
+          elif [[ "$http_status" == "403" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "status=ENTITLEMENT_BLOCKED" >> "$GITHUB_OUTPUT"
+            echo "reason=Mistral Vibe entitlement was rejected (HTTP ${http_status})" >> "$GITHUB_OUTPUT"
+          elif [[ "$http_status" == "429" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "status=CAPACITY_DEGRADED" >> "$GITHUB_OUTPUT"
+            echo "reason=Mistral included capacity is unavailable or exhausted" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "status=PREFLIGHT_FAILED" >> "$GITHUB_OUTPUT"
             echo "reason=Mistral Vibe entitlement check returned HTTP ${http_status}" >> "$GITHUB_OUTPUT"
           fi
 
@@ -116,13 +130,14 @@ jobs:
           EOF
           printf '\nDispatch text:\n%s\n' "$DISPATCH_BODY" >> /tmp/tabibi-mistral-prompt.txt
 
-          # Mistral documents enabled_tools as an allow-list. Enforce it twice:
-          # in ephemeral config and on the CLI, and bind the working directory to
-          # the checked-out repository. No shell/write tool is exposed to Vibe.
+          # Programmatic Vibe no longer auto-approves tool calls. Explicitly approve
+          # only the tools already constrained by both read-only allow-lists below.
+          # Shell/write/edit/MCP tools are not exposed to this process.
           set +e
           timeout --signal=TERM --kill-after=15s 600s \
             vibe \
               --trust \
+              --auto-approve \
               --workdir "$GITHUB_WORKSPACE" \
               --enabled-tools grep \
               --enabled-tools read_file \
@@ -135,26 +150,39 @@ jobs:
           code=$?
           set -e
 
+          status="OK"
           reason="ready"
-          if [[ "$code" == "124" ]]; then
+          if [[ "$code" == "0" ]] && ! grep -Eq '[^[:space:]]' /tmp/tabibi-mistral-output.txt; then
+            code=70
+            status="EXECUTION_FAILED"
+            reason="Mistral Vibe returned no usable result"
+          elif [[ "$code" == "124" ]]; then
+            status="WAKE_TIMEOUT"
             reason="Mistral Vibe exceeded the 10-minute actor time limit"
           elif [[ "$code" != "0" ]]; then
             if grep -Eqi '401|unauthori[sz]ed|invalid[^[:alnum:]]*(api[^[:alnum:]]*)?key|authentication' /tmp/tabibi-mistral-error.txt; then
+              status="AUTH_BLOCKED"
               reason="Mistral credential was rejected by the Vibe runtime"
             elif grep -Eqi '403|forbidden|entitlement|permission denied' /tmp/tabibi-mistral-error.txt; then
+              status="ENTITLEMENT_BLOCKED"
               reason="Mistral Vibe entitlement was rejected by the runtime"
             elif grep -Eqi '429|rate.?limit|quota|usage[^[:alnum:]]*limit|capacity' /tmp/tabibi-mistral-error.txt; then
+              status="CAPACITY_DEGRADED"
               reason="Mistral included capacity is unavailable or exhausted"
             elif grep -Eqi 'trust|trusted folder|workspace' /tmp/tabibi-mistral-error.txt; then
+              status="WORKSPACE_TRUST_FAILED"
               reason="Mistral Vibe workspace trust initialization failed"
             elif grep -Eqi 'no such option|unknown option|unrecognized|usage:' /tmp/tabibi-mistral-error.txt; then
+              status="CLI_INCOMPATIBLE"
               reason="Mistral Vibe CLI invocation is incompatible with the pinned version"
             else
+              status="EXECUTION_FAILED"
               reason="Mistral Vibe runtime failed with an unclassified nonzero exit"
             fi
           fi
 
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
           echo "failure_reason=$reason" >> "$GITHUB_OUTPUT"
 
       - name: Post Mistral result
@@ -163,8 +191,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           READY: ${{ steps.preflight.outputs.ready }}
+          PREFLIGHT_STATUS: ${{ steps.preflight.outputs.status }}
           PREFLIGHT_REASON: ${{ steps.preflight.outputs.reason }}
           ACTOR_EXIT: ${{ steps.actor.outputs.exit_code }}
+          ACTOR_STATUS: ${{ steps.actor.outputs.status }}
           ACTOR_REASON: ${{ steps.actor.outputs.failure_reason }}
         shell: bash
         run: |
@@ -195,9 +225,9 @@ jobs:
             echo "**mistral-vibe unattended wake**"
             echo
             if [[ "${READY:-false}" != "true" ]]; then
-              echo "CAPACITY_DEGRADED - ${PREFLIGHT_REASON:-preflight failed}. No paid fallback was attempted."
+              echo "${PREFLIGHT_STATUS:-PREFLIGHT_FAILED} - ${PREFLIGHT_REASON:-preflight failed}. No paid fallback was attempted."
             elif [[ "${ACTOR_EXIT:-1}" != "0" ]]; then
-              echo "CAPACITY_DEGRADED - ${ACTOR_REASON:-Mistral Vibe exited without a usable result}. PAYG remains disabled and no paid fallback was attempted."
+              echo "${ACTOR_STATUS:-EXECUTION_FAILED} - ${ACTOR_REASON:-Mistral Vibe exited without a usable result}. PAYG remains disabled and no paid fallback was attempted."
             else
               echo '```text'
               cat /tmp/tabibi-mistral-public.txt
