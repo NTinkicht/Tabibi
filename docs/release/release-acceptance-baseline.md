@@ -1,6 +1,6 @@
 # Tabibi release acceptance baseline
 
-WU45 established Epic #7 release hardening as one auditable go/no-go checklist. WU54 reconciles that checklist against the merged WU46-WU53 repository evidence. This document remains deliberately conservative: an item is **PASS** only when deterministic repository evidence already exists and is executable or directly inspectable.
+WU45 established Epic #7 release hardening as one auditable go/no-go checklist. WU54 reconciled that checklist against the merged WU46-WU53 repository evidence, and WU55 closes the remaining keyboard-reachability gap with deterministic browser evidence. This document remains deliberately conservative: an item is **PASS** only when deterministic repository evidence already exists and is executable or directly inspectable.
 
 No real patient data, external provider traffic, paid APIs, PAYG/overage, credits, Vertex, OpenRouter, or auto-topups are permitted by this baseline.
 
@@ -32,7 +32,7 @@ The acceptance scenario must demonstrate these phases in order:
 | Cross-clinic and cross-patient isolation across the complete release scenario | PASS | WU46 two-clinic integration isolation proof; WU47 `tests/e2e/release-bilingual-isolation.spec.ts`; WU49 bilingual full-day acceptance | Any later release-path change must preserve explicit negative cross-clinic/cross-patient assertions. |
 | Arabic full-flow release acceptance | PASS | WU47 bilingual public release proof; WU48 receptionist bilingual acceptance; WU49 `tests/e2e/bilingual-full-day-clinic-acceptance.spec.ts` and `tests/e2e/bilingual-full-day-public-proof.spec.ts` | Arabic/RTL behavior must be exercised, not inferred, on the release candidate head. |
 | French full-flow release acceptance | PASS | WU47 bilingual public release proof; WU48 receptionist bilingual acceptance; WU49 `tests/e2e/bilingual-full-day-clinic-acceptance.spec.ts` and `tests/e2e/bilingual-full-day-public-proof.spec.ts` | French/LTR behavior must be exercised, not inferred, on the release candidate head. |
-| Accessibility / keyboard navigation on release-critical receptionist and patient/public flows | GAP | WU48 `tests/e2e/receptionist-bilingual-accessibility.spec.ts`; WU49 bilingual full-day/public acceptance currently prove keyboard activation only after programmatic `focus()`, not keyboard-only reachability through the tab order | Before PASS, the release rehearsal must navigate to release-critical controls using keyboard input (for example Tab/Shift+Tab), then activate them and assert semantic/focus state without programmatic focus shortcuts. |
+| Accessibility / keyboard navigation on release-critical receptionist and patient/public flows | PASS | WU55 `tests/e2e/receptionist-bilingual-accessibility.spec.ts` uses bounded real browser `Tab` traversal before keyboard activation; `tests/e2e/guest-notification-center.spec.ts` proves keyboard reachability/activation for interactive guest `Mark as read` and `Retry` controls; `tests/e2e/bilingual-full-day-public-proof.spec.ts` proves the waiting-room projection is semantic display-only in Arabic and French | Candidate release CI must preserve real keyboard reachability without programmatic focus shortcuts; any new release-critical interactive control requires equivalent keyboard-reachability evidence. |
 | Low-bandwidth / resilient refresh behavior across the release scenario | PASS | WU50 `tests/e2e/low-bandwidth-refresh-acceptance.spec.ts`; `docs/release/low-bandwidth-refresh-acceptance.md` | Delayed refresh/reload must not duplicate mutations, regress terminal state, or weaken privacy/isolation. |
 | Threat-model refresh tied to the final release surface | PASS | WU51 `docs/release/release-threat-model-delta.md` | Any material release-surface change requires a corresponding threat-model delta before release. |
 | Deployment/rollback runbook for the release candidate | PASS | WU52 `docs/release/deployment-cutover-rollback-runbook.md` | Cutover/rollback must preserve exact-head gates, privacy stop conditions, and separate application rollback from schema recovery. |
@@ -56,6 +56,10 @@ A release candidate becomes **GO-ELIGIBLE** only when all required rows are PASS
 
 ## WU54 reconciliation boundary
 
-WU54 changes no product behavior and creates no competing release suite. It only aligns this matrix with already merged WU46-WU53 evidence. The reconciled matrix is valid only after required CI is green on the exact WU54 head and one eligible non-author reviewer confirms that no row is marked PASS without concrete repository evidence.
+WU54 changed no product behavior and created no competing release suite. It aligned this matrix with already merged WU46-WU53 evidence and deliberately kept keyboard reachability as GAP because the existing browser tests used programmatic `focus()` shortcuts.
+
+## WU55 keyboard-reachability boundary
+
+WU55 changes no production behavior unless deterministic browser execution exposes a real tab-order defect. Its acceptance proof must reach release-critical receptionist controls and interactive guest-notification controls through real browser keyboard traversal, confirm focus before keyboard activation, retain bilingual/privacy/isolation assertions, and keep the public waiting-room projection explicitly semantic/display-only. The PASS row is valid only after required CI is green on the exact WU55 head and one eligible non-author reviewer confirms the evidence without self-gating.
 
 Material author: ChatGPT. Mechanical GitHub executor: ChatGPT connector. ChatGPT is recused from the final gate.

@@ -1,8 +1,23 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { Pool } from 'pg';
 import { QueueService } from '@/modules/queue';
 import { createStaffSessionToken } from '@/platform/http/staff-auth';
+
+async function tabTo(page: Page, target: Locator, maxTabs = 64) {
+  for (let attempt = 0; attempt < maxTabs; attempt += 1) {
+    await page.keyboard.press('Tab');
+    if (
+      await target.evaluate((element) => element === document.activeElement)
+    ) {
+      return;
+    }
+  }
+
+  throw new Error(
+    `Target was not keyboard-reachable within ${maxTabs} Tab presses`,
+  );
+}
 
 test('receptionist queue stays clinic-scoped, private, bilingual, and keyboard operable', async ({
   page,
@@ -168,21 +183,21 @@ test('receptionist queue stays clinic-scoped, private, bilingual, and keyboard o
     const reorder = page
       .getByRole('button', { name: 'تقديم / إعادة ترتيب (مدقّق)' })
       .nth(1);
-    await reorder.focus();
+    await tabTo(page, reorder);
     await expect(reorder).toBeFocused();
-    const answers = ['1', 'WU48 keyboard acceptance'];
+    const answers = ['1', 'WU55 keyboard acceptance'];
     page.on('dialog', (dialog) => void dialog.accept(answers.shift()));
     const reorderResponse = page.waitForResponse((response) =>
       response.url().endsWith('/reorder'),
     );
-    await reorder.press('Enter');
+    await page.keyboard.press('Enter');
     expect((await reorderResponse).status()).toBe(200);
     await expect(page.getByText('ترتيب الخدمة #1')).toBeVisible();
 
     const frenchButton = page.getByRole('button', { name: 'Français' });
-    await frenchButton.focus();
+    await tabTo(page, frenchButton);
     await expect(frenchButton).toBeFocused();
-    await frenchButton.press('Enter');
+    await page.keyboard.press('Enter');
     await expect(main).toHaveAttribute('dir', 'ltr');
     await expect(
       page.getByRole('heading', {

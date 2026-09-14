@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const activeStatus = {
   generatedAt: '2026-09-13T09:00:00Z',
@@ -29,7 +29,22 @@ const secondNotification = {
   createdAt: '2026-09-13T09:02:00.000Z',
 };
 
-async function routeStatus(page: import('@playwright/test').Page) {
+async function tabTo(page: Page, target: Locator, maxTabs = 64) {
+  for (let attempt = 0; attempt < maxTabs; attempt += 1) {
+    await page.keyboard.press('Tab');
+    if (
+      await target.evaluate((element) => element === document.activeElement)
+    ) {
+      return;
+    }
+  }
+
+  throw new Error(
+    `Target was not keyboard-reachable within ${maxTabs} Tab presses`,
+  );
+}
+
+async function routeStatus(page: Page) {
   await page.route('**/api/guest/status', async (route) => {
     await route.fulfill({
       status: 200,
@@ -77,11 +92,12 @@ test('guest notification center renders unread items and marks one exact item re
   expect(inboxUrl).toContain('/api/guest/inbox?limit=50');
   expect(inboxUrl).not.toMatch(/clinic|patient|account|subject/i);
 
-  await page.getByRole('button', { name: 'Mark as read' }).click();
+  const markRead = page.getByRole('button', { name: 'Mark as read' });
+  await tabTo(page, markRead);
+  await expect(markRead).toBeFocused();
+  await page.keyboard.press('Enter');
   await expect(page.getByText('Unread: 0')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Mark as read' })).toHaveCount(
-    0,
-  );
+  await expect(markRead).toHaveCount(0);
   expect(readRequestUrl).toContain(`/api/guest/inbox/${notification.id}/read`);
   expect(readRequestUrl).not.toMatch(/clinic|patient|account|subject/i);
 
@@ -233,7 +249,10 @@ test('guest notification center exposes bounded retry for throttling', async ({
   await expect(
     page.getByText('Too many requests. Please try again shortly.'),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Retry' }).click();
+  const retry = page.getByRole('button', { name: 'Retry' });
+  await tabTo(page, retry);
+  await expect(retry).toBeFocused();
+  await page.keyboard.press('Enter');
   await expect(page.getByText('No notifications yet.')).toBeVisible();
   expect(requests).toBe(2);
 });

@@ -66,7 +66,44 @@ test('proves the WU49 bilingual public projection renders a real row without pri
     );
 
     await page.goto(`/waiting-room/${clinicId}/${sessionId}`);
-    await expect(page.locator('main')).toHaveAttribute('dir', 'rtl');
+    const publicMain = page.locator('main');
+    const interactiveWithinProjection = publicMain.locator(
+      [
+        'a[href]',
+        'area[href]',
+        'button',
+        'input:not([type="hidden"])',
+        'select',
+        'textarea',
+        'summary',
+        'audio[controls]',
+        'video[controls]',
+        '[contenteditable]:not([contenteditable="false"])',
+        '[tabindex]:not([tabindex="-1"])',
+        '[role="button"]',
+        '[role="link"]',
+        '[role="checkbox"]',
+        '[role="radio"]',
+        '[role="switch"]',
+        '[role="combobox"]',
+        '[role="listbox"]',
+        '[role="option"]',
+        '[role="textbox"]',
+        '[role="searchbox"]',
+        '[role="slider"]',
+        '[role="spinbutton"]',
+        '[role="menuitem"]',
+        '[role="menuitemcheckbox"]',
+        '[role="menuitemradio"]',
+        '[role="tab"]',
+        '[role="treeitem"]',
+      ].join(', '),
+    );
+    await expect(publicMain).toHaveAttribute('dir', 'rtl');
+    await expect(
+      page.getByRole('list', { name: 'قاعة الانتظار' }),
+    ).toBeVisible();
+    await expect(interactiveWithinProjection).toHaveCount(0);
     await expect(
       page.getByText(registration.entry.publicDisplayLabel),
     ).toBeVisible();
@@ -76,7 +113,11 @@ test('proves the WU49 bilingual public projection renders a real row without pri
     expect(arabicBody).not.toContain(registration.entry.id);
 
     await page.goto(`/waiting-room/${clinicId}/${sessionId}?lang=fr`);
-    await expect(page.locator('main')).toHaveAttribute('dir', 'ltr');
+    await expect(publicMain).toHaveAttribute('dir', 'ltr');
+    await expect(
+      page.getByRole('list', { name: "Salle d'attente" }),
+    ).toBeVisible();
+    await expect(interactiveWithinProjection).toHaveCount(0);
     await expect(
       page.getByText(registration.entry.publicDisplayLabel),
     ).toBeVisible();
