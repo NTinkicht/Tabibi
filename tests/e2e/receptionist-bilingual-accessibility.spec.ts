@@ -1,10 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-  expect,
-  test,
-  type Locator,
-  type Page,
-} from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { Pool } from 'pg';
 import { QueueService } from '@/modules/queue';
 import { createStaffSessionToken } from '@/platform/http/staff-auth';
@@ -19,7 +14,9 @@ async function tabTo(page: Page, target: Locator, maxTabs = 64) {
     }
   }
 
-  throw new Error(`Target was not keyboard-reachable within ${maxTabs} Tab presses`);
+  throw new Error(
+    `Target was not keyboard-reachable within ${maxTabs} Tab presses`,
+  );
 }
 
 test('receptionist queue stays clinic-scoped, private, bilingual, and keyboard operable', async ({
