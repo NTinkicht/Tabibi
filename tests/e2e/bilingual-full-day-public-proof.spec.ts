@@ -68,7 +68,36 @@ test('proves the WU49 bilingual public projection renders a real row without pri
     await page.goto(`/waiting-room/${clinicId}/${sessionId}`);
     const publicMain = page.locator('main');
     const interactiveWithinProjection = publicMain.locator(
-      'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      [
+        'a[href]',
+        'area[href]',
+        'button',
+        'input:not([type="hidden"])',
+        'select',
+        'textarea',
+        'summary',
+        'audio[controls]',
+        'video[controls]',
+        '[contenteditable]:not([contenteditable="false"])',
+        '[tabindex]:not([tabindex="-1"])',
+        '[role="button"]',
+        '[role="link"]',
+        '[role="checkbox"]',
+        '[role="radio"]',
+        '[role="switch"]',
+        '[role="combobox"]',
+        '[role="listbox"]',
+        '[role="option"]',
+        '[role="textbox"]',
+        '[role="searchbox"]',
+        '[role="slider"]',
+        '[role="spinbutton"]',
+        '[role="menuitem"]',
+        '[role="menuitemcheckbox"]',
+        '[role="menuitemradio"]',
+        '[role="tab"]',
+        '[role="treeitem"]',
+      ].join(', '),
     );
     await expect(publicMain).toHaveAttribute('dir', 'rtl');
     await expect(
