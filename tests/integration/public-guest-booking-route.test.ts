@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
-import { POST as guestBookingRoute } from '@/app/api/public/guest-bookings/route';
+import { POST as guestBookingRoute } from '@/app/api/public/bookings/route';
 import { GuestAccessService } from '@/modules/guest-access';
 import { PublicAvailabilitySelectionService } from '@/modules/public-availability-selection';
 import { closePool } from '@/platform/database/pool';
@@ -85,7 +85,7 @@ function postRequest(
   payload: unknown,
   headers: Record<string, string> = {},
 ): Request {
-  return new Request('http://localhost/api/public/guest-bookings', {
+  return new Request('http://localhost/api/public/bookings', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -120,14 +120,15 @@ describe('public guest booking HTTP route', () => {
   it('books through the public route, derives correlation from request context, and serializes only the public result', async () => {
     const seeded = await seed();
     const response = await guestBookingRoute(
-      postRequest(
-        body(seeded.reference, { correlationId: 'guest@example.com' }),
-        { 'x-request-id': 'route-correlation-1' },
-      ),
+      postRequest(body(seeded.reference), {
+        'x-request-id': 'route-correlation-1',
+      }),
     );
 
     expect(response.status).toBe(201);
     expect(response.headers.get('x-request-id')).toBe('route-correlation-1');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
     const responseBody = await response.json();
     expect(Object.keys(responseBody).sort()).toEqual(
       [
@@ -171,7 +172,7 @@ describe('public guest booking HTTP route', () => {
       correlationId: 'route-correlation-1',
     });
     expect(JSON.stringify(audit.rows[0]?.metadata)).not.toContain(
-      'guest@example.com',
+      'route-guest@example.com',
     );
   });
 
@@ -202,33 +203,55 @@ describe('public guest booking HTTP route', () => {
     });
   });
 
-  it('returns a generic 400 for a malformed public body without mutating anything', async () => {
+  it('rejects non-allowlisted public body fields before mutation', async () => {
     const seeded = await seed();
     const response = await guestBookingRoute(
-      postRequest(
-        body(seeded.reference, { preferredLocale: 'en' }),
-        { 'idempotency-key': 'route-bad-locale' },
-      ),
+      postRequest(body(seeded.reference, { correlationId: 'guest@example.com' }), {
+        'idempotency-key': 'route-extra-field',
+        'x-request-id': 'route-extra-field-request',
+      }),
     );
 
     expect(response.status).toBe(400);
-    const responseBody = await response.json();
-    expect(responseBody.error).toBe('invalid_request');
+    await expect(response.json()).resolves.toEqual({
+      status: 'rejected',
+      requestId: 'route-extra-field-request',
+    });
     expect(await counts()).toEqual(zeroCounts);
   });
 
-  it('returns the same generic 409 without mutation or disclosure for unrelated rejection causes', async () => {
+  it('returns a generic 400 for a malformed public body without mutating anything', async () => {
     const seeded = await seed();
+    const response = await guestBookingRoute(
+      postRequest(body(seeded.reference, { preferredLocale: 'en' }), {
+        'idempotency-key': 'route-bad-locale',
+        'x-request-id': 'route-bad-locale-request',
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      status: 'rejected',
+      requestId: 'route-bad-locale-request',
+    });
+    expect(await counts()).toEqual(zeroCounts);
+  });
+
+  it('returns the same generic response without mutation for unrelated authoritative rejection causes', async () => {
+    const seeded = await seed();
+    const expected = {
+      status: 'rejected',
+      requestId: 'route-authoritative-rejection',
+    };
 
     const malformed = await guestBookingRoute(
-      postRequest(
-        { ...body('not-a-selection-reference') },
-        { 'idempotency-key': 'route-malformed' },
-      ),
+      postRequest(body('not-a-selection-reference'), {
+        'idempotency-key': 'route-malformed',
+        'x-request-id': 'route-authoritative-rejection',
+      }),
     );
-    expect(malformed.status).toBe(409);
-    const malformedBody = await malformed.json();
-    expect(malformedBody).toMatchObject({ error: 'conflict' });
+    expect(malformed.status).toBe(400);
+    await expect(malformed.json()).resolves.toEqual(expected);
 
     await pool.query(`UPDATE clinics SET status = 'inactive' WHERE id = $1`, [
       seeded.clinicId,
@@ -236,12 +259,11 @@ describe('public guest booking HTTP route', () => {
     const inactiveClinic = await guestBookingRoute(
       postRequest(body(seeded.reference), {
         'idempotency-key': 'route-inactive-clinic',
+        'x-request-id': 'route-authoritative-rejection',
       }),
     );
-    expect(inactiveClinic.status).toBe(409);
-    const inactiveClinicBody = await inactiveClinic.json();
-    expect(inactiveClinicBody).toMatchObject({ error: 'conflict' });
-    expect(inactiveClinicBody.message).toBe(malformedBody.message);
+    expect(inactiveClinic.status).toBe(400);
+    await expect(inactiveClinic.json()).resolves.toEqual(expected);
 
     expect(await counts()).toEqual(zeroCounts);
   });
