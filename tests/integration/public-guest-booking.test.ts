@@ -222,10 +222,15 @@ describe('public guest booking transaction', () => {
       () => now,
     );
 
-    const tampered = `${seeded.reference.slice(0, -1)}${seeded.reference.endsWith('A') ? 'B' : 'A'}`;
-    await expect(service.book(input(tampered, 'tampered'))).rejects.toBeInstanceOf(
-      PublicGuestBookingRejectedError,
-    );
+    const [version, iv, ciphertext, tag] = seeded.reference.split('.');
+    if (!version || !iv || !ciphertext || !tag) {
+      throw new Error('selection reference has an unexpected format');
+    }
+    const tamperedCiphertext = `${ciphertext[0] === 'A' ? 'B' : 'A'}${ciphertext.slice(1)}`;
+    const tampered = [version, iv, tamperedCiphertext, tag].join('.');
+    await expect(
+      service.book(input(tampered, 'tampered')),
+    ).rejects.toBeInstanceOf(PublicGuestBookingRejectedError);
     expect(await counts()).toEqual(zeroCounts);
 
     await pool.query(
