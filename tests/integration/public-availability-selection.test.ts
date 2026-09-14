@@ -92,6 +92,14 @@ describe('opaque public availability selection reference', () => {
       startsAt,
       endsAt,
     });
+    expect(await service.resolveForMutation(reference!)).toEqual({
+      clinicId,
+      doctorId,
+      sessionId,
+      serviceDate: '2099-03-01',
+      startsAt,
+      endsAt,
+    });
     expect(await service.resolve(reference!)).toEqual({
       serviceDate: '2099-03-01',
       startsAt,
@@ -119,6 +127,7 @@ describe('opaque public availability selection reference', () => {
     }
 
     expect(await service.resolve(`${reference}tampered`)).toBeNull();
+    expect(await service.resolveForMutation(`${reference}tampered`)).toBeNull();
     expect(await service.resolve('not-a-reference')).toBeNull();
     expect(
       await service.resolve(`v2.${reference!.split('.').slice(1).join('.')}`),
@@ -128,6 +137,7 @@ describe('opaque public availability selection reference', () => {
       clinicId,
     ]);
     expect(await service.resolve(reference!)).toBeNull();
+    expect(await service.resolveForMutation(reference!)).toBeNull();
     await pool.query(`UPDATE clinics SET status = 'active' WHERE id = $1`, [
       clinicId,
     ]);
@@ -149,6 +159,7 @@ describe('opaque public availability selection reference', () => {
       [sessionId, alternateDoctorId],
     );
     expect(await service.resolve(reference!)).toBeNull();
+    expect(await service.resolveForMutation(reference!)).toBeNull();
     await pool.query(
       `UPDATE consultation_sessions SET doctor_id = $2 WHERE id = $1`,
       [sessionId, doctorId],
@@ -159,6 +170,7 @@ describe('opaque public availability selection reference', () => {
       [sessionId],
     );
     expect(await service.resolve(reference!)).toBeNull();
+    expect(await service.resolveForMutation(reference!)).toBeNull();
     await pool.query(
       `UPDATE consultation_sessions SET status = 'planned' WHERE id = $1`,
       [sessionId],
@@ -169,6 +181,7 @@ describe('opaque public availability selection reference', () => {
       [sessionId],
     );
     expect(await service.resolve(reference!)).toBeNull();
+    expect(await service.resolveForMutation(reference!)).toBeNull();
     await pool.query(
       `UPDATE consultation_sessions SET starts_at = $2 WHERE id = $1`,
       [sessionId, startsAt],
@@ -176,6 +189,7 @@ describe('opaque public availability selection reference', () => {
 
     now = new Date('2099-02-01T00:01:00.000Z');
     expect(await service.resolve(reference!)).toBeNull();
+    expect(await service.resolveForMutation(reference!)).toBeNull();
   });
 
   it('keeps same-name clinics and doctors isolated by encrypted internal identity', async () => {
@@ -262,6 +276,16 @@ describe('opaque public availability selection reference', () => {
       serviceDate: '2099-04-01',
       startsAt: startsB,
       endsAt: endsB,
+    });
+    expect(await service.resolveForMutation(referenceA!)).toMatchObject({
+      clinicId: clinicA,
+      doctorId: doctorA,
+      sessionId: sessionA,
+    });
+    expect(await service.resolveForMutation(referenceB!)).toMatchObject({
+      clinicId: clinicB,
+      doctorId: doctorB,
+      sessionId: sessionB,
     });
 
     expect(
