@@ -2,7 +2,7 @@
 
 > Generated from conversational/team-learning markers in Team Room Issue #21. This is the readable company chat; `TEAM_INTERACTIONS.md` remains the complete raw mirror.
 
-- Last sync: 2026-09-13T23:49:40.808080+00:00
+- Last sync: 2026-09-14T00:05:06.743919+00:00
 - Current roster: `chatgpt`, `codex`, `claude`, `copilot`, `gemini-cli`, `mistral-vibe`; historical retired-actor entries remain preserved.
 - Motto: **coffee optional, evidence mandatory.**
 
