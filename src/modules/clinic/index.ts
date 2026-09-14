@@ -51,6 +51,7 @@ interface ClinicRow {
 }
 
 interface PublicDiscoveryRow {
+  clinic_id: string;
   clinic_name: string;
   default_locale: 'ar' | 'fr';
   enabled_locales: Array<'ar' | 'fr'>;
@@ -74,7 +75,8 @@ export class PublicDiscoveryService {
 
   async listClinics(): Promise<PublicDiscoveryClinic[]> {
     const result = await this.pool.query<PublicDiscoveryRow>(
-      `SELECT clinic.name AS clinic_name,
+      `SELECT clinic.id AS clinic_id,
+              clinic.name AS clinic_name,
               clinic.default_locale,
               clinic.enabled_locales,
               doctor.display_name AS doctor_display_name
@@ -90,11 +92,7 @@ export class PublicDiscoveryService {
     let currentKey: string | undefined;
 
     for (const row of result.rows) {
-      const key = JSON.stringify([
-        row.clinic_name,
-        row.default_locale,
-        row.enabled_locales,
-      ]);
+      const key = row.clinic_id;
       if (key !== currentKey) {
         current = {
           name: row.clinic_name,

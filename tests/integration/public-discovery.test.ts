@@ -141,4 +141,51 @@ describe('public clinic and doctor discovery', () => {
       result.find((clinic) => clinic.name === 'Beta Clinic')?.doctors,
     ).toEqual([{ displayName: 'Doctor Beta' }]);
   });
+
+  it('keeps same-name clinics separate by internal clinic identity', async () => {
+    const clinicA = randomUUID();
+    const clinicB = randomUUID();
+    const doctorAUser = randomUUID();
+    const doctorBUser = randomUUID();
+    const doctorA = randomUUID();
+    const doctorB = randomUUID();
+
+    await pool.query(
+      `INSERT INTO users (id, auth_subject, display_name) VALUES
+        ($1, 'wu56-collision-a-user', 'Collision A'),
+        ($2, 'wu56-collision-b-user', 'Collision B')`,
+      [doctorAUser, doctorBUser],
+    );
+    await pool.query(
+      `INSERT INTO clinics (id, tenant_key, name) VALUES
+        ($1, 'wu56-collision-a', 'Shared Clinic'),
+        ($2, 'wu56-collision-b', 'Shared Clinic')`,
+      [clinicA, clinicB],
+    );
+    await pool.query(
+      `INSERT INTO doctor_profiles (id, user_id, display_name) VALUES
+        ($1, $2, 'Doctor One'), ($3, $4, 'Doctor Two')`,
+      [doctorA, doctorAUser, doctorB, doctorBUser],
+    );
+    await pool.query(
+      `INSERT INTO doctor_clinics (clinic_id, doctor_id) VALUES ($1, $2), ($3, $4)`,
+      [clinicA, doctorA, clinicB, doctorB],
+    );
+
+    const result = await new PublicDiscoveryService(pool).listClinics();
+
+    expect(result).toHaveLength(2);
+    expect(result.every((clinic) => clinic.name === 'Shared Clinic')).toBe(true);
+    expect(result.map((clinic) => clinic.doctors)).toEqual(
+      expect.arrayContaining([
+        [{ displayName: 'Doctor One' }],
+        [{ displayName: 'Doctor Two' }],
+      ]),
+    );
+
+    const serialized = JSON.stringify(result);
+    for (const forbidden of [clinicA, clinicB, doctorA, doctorB]) {
+      expect(serialized).not.toContain(forbidden);
+    }
+  });
 });
