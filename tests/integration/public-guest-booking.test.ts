@@ -213,7 +213,7 @@ describe('public guest booking transaction', () => {
     });
   });
 
-  it('fails closed before mutation for tampered and stale selections', async () => {
+  it('fails closed before mutation for malformed, tampered, expired, and stale selections', async () => {
     const now = new Date('2099-02-01T00:00:00.000Z');
     const seeded = await seed(now);
     const service = new PublicGuestBookingService(
@@ -221,6 +221,11 @@ describe('public guest booking transaction', () => {
       seeded.selections,
       () => now,
     );
+
+    await expect(
+      service.book(input('not-a-selection-reference', 'malformed')),
+    ).rejects.toBeInstanceOf(PublicGuestBookingRejectedError);
+    expect(await counts()).toEqual(zeroCounts);
 
     const [version, iv, ciphertext, tag] = seeded.reference.split('.');
     if (!version || !iv || !ciphertext || !tag) {
@@ -233,6 +238,23 @@ describe('public guest booking transaction', () => {
     ).rejects.toBeInstanceOf(PublicGuestBookingRejectedError);
     expect(await counts()).toEqual(zeroCounts);
 
+    const expiredNow = new Date(now.getTime() + 120_000);
+    const expiredSelections = new PublicAvailabilitySelectionService(
+      pool,
+      selectionSecret,
+      () => expiredNow,
+      60_000,
+    );
+    const expiredService = new PublicGuestBookingService(
+      pool,
+      expiredSelections,
+      () => expiredNow,
+    );
+    await expect(
+      expiredService.book(input(seeded.reference, 'expired')),
+    ).rejects.toBeInstanceOf(PublicGuestBookingRejectedError);
+    expect(await counts()).toEqual(zeroCounts);
+
     await pool.query(
       `UPDATE consultation_sessions
           SET starts_at = starts_at + interval '5 minutes',
@@ -242,6 +264,45 @@ describe('public guest booking transaction', () => {
     );
     await expect(
       service.book(input(seeded.reference, 'window-drift')),
+    ).rejects.toBeInstanceOf(PublicGuestBookingRejectedError);
+    expect(await counts()).toEqual(zeroCounts);
+  });
+
+  it('fails closed for inactive clinic, terminal session, and doctor-clinic association drift', async () => {
+    const now = new Date('2099-02-01T00:00:00.000Z');
+
+    const inactive = await seed(now);
+    await pool.query(`UPDATE clinics SET status = 'inactive' WHERE id = $1`, [
+      inactive.clinicId,
+    ]);
+    await expect(
+      new PublicGuestBookingService(pool, inactive.selections, () => now).book(
+        input(inactive.reference, 'inactive-clinic'),
+      ),
+    ).rejects.toBeInstanceOf(PublicGuestBookingRejectedError);
+    expect(await counts()).toEqual(zeroCounts);
+
+    const terminal = await seed(now);
+    await pool.query(
+      `UPDATE consultation_sessions SET status = 'closed' WHERE id = $1 AND clinic_id = $2`,
+      [terminal.sessionId, terminal.clinicId],
+    );
+    await expect(
+      new PublicGuestBookingService(pool, terminal.selections, () => now).book(
+        input(terminal.reference, 'terminal-session'),
+      ),
+    ).rejects.toBeInstanceOf(PublicGuestBookingRejectedError);
+    expect(await counts()).toEqual(zeroCounts);
+
+    const drifted = await seed(now);
+    await pool.query(
+      `DELETE FROM doctor_clinics WHERE clinic_id = $1 AND doctor_id = $2`,
+      [drifted.clinicId, drifted.doctorId],
+    );
+    await expect(
+      new PublicGuestBookingService(pool, drifted.selections, () => now).book(
+        input(drifted.reference, 'association-drift'),
+      ),
     ).rejects.toBeInstanceOf(PublicGuestBookingRejectedError);
     expect(await counts()).toEqual(zeroCounts);
   });
