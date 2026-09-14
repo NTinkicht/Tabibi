@@ -7,7 +7,6 @@ const workflowDirectory = path.join(process.cwd(), '.github', 'workflows');
 const globallyForbiddenWorkflowPatterns = [
   { label: 'OpenRouter provider reference', pattern: /openrouter/i },
   { label: 'OpenRouter repository secret', pattern: /OPENROUTER_API_KEY/ },
-  { label: 'OpenRouter PR-Agent key', pattern: /OPENROUTER__KEY/ },
   { label: 'Google/Vertex API key route', pattern: /GOOGLE_API_KEY/ },
   {
     label: 'Vertex AI paid route',
@@ -79,7 +78,7 @@ describe('AI capacity policy', () => {
         readonlyMarker: '--enabled-tools grep',
         hardeningMarkers: [
           '--enabled-tools read_file',
-          '--auto-approve',
+          '--agent plan',
           'enabled_tools = ["grep", "read_file"]',
           '--workdir "$GITHUB_WORKSPACE"',
           'https://console.mistral.ai/api/vibe/whoami',
@@ -122,7 +121,7 @@ describe('AI capacity policy', () => {
     );
   });
 
-  it('limits unattended Mistral execution to read-only repository tools', () => {
+  it('limits unattended Mistral execution to the read-only plan agent and repository tools', () => {
     const workflowPath = path.join(workflowDirectory, 'mistral-vibe-wake.yml');
     const content = fs.readFileSync(workflowPath, 'utf8');
     const enabledTools = [
@@ -131,9 +130,13 @@ describe('AI capacity policy', () => {
 
     expect(enabledTools).toEqual(['grep', 'read_file']);
     expect(content).toContain('enabled_tools = ["grep", "read_file"]');
-    expect(content).toContain('--auto-approve');
+    expect(content).toContain('--agent plan');
+    expect(content).not.toContain('--auto-approve');
+    expect(content).not.toContain('--yolo');
     expect(content).toContain('--workdir "$GITHUB_WORKSPACE"');
-    expect(content).not.toContain('--agent plan');
+    expect(content).toContain(
+      'reads outside --workdir still require approval',
+    );
     expect(content).toContain("text.replace(secret, '[REDACTED]')");
     expect(content).toContain(
       'PAYG remains disabled and no paid fallback was attempted',
