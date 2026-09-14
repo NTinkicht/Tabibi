@@ -7,6 +7,7 @@ import { PublicAvailabilitySelectionService } from '@/modules/public-availabilit
 import {
   PublicGuestBookingRejectedError,
   PublicGuestBookingService,
+  PublicGuestBookingValidationError,
 } from '@/modules/public-guest-booking';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
@@ -101,6 +102,15 @@ async function counts() {
   return result.rows[0];
 }
 
+const zeroCounts = {
+  receipts: '0',
+  patients: '0',
+  appointments: '0',
+  entries: '0',
+  credentials: '0',
+  audits: '0',
+};
+
 describe('public guest booking transaction', () => {
   it('creates one privacy-safe booking and replays the same usable capability', async () => {
     const now = new Date('2099-02-01T00:00:00.000Z');
@@ -150,6 +160,33 @@ describe('public guest booking transaction', () => {
       sessionId: seeded.sessionId,
     });
 
+    const audit = await pool.query<{
+      action: string;
+      actor_user_id: string | null;
+      metadata: Record<string, unknown>;
+    }>(
+      `SELECT action, actor_user_id, metadata
+         FROM audit_events
+        WHERE clinic_id = $1`,
+      [seeded.clinicId],
+    );
+    expect(audit.rows).toHaveLength(1);
+    expect(audit.rows[0]).toMatchObject({
+      action: 'public_guest_appointment_booked',
+      actor_user_id: null,
+    });
+    expect(audit.rows[0]?.metadata).toMatchObject({ source: 'guest_public' });
+    const auditSerialized = JSON.stringify(audit.rows[0]?.metadata);
+    for (const forbidden of [
+      'Private Guest Name',
+      '+213555010101',
+      'guest@example.com',
+      seeded.doctorId,
+      seeded.sessionId,
+    ]) {
+      expect(auditSerialized).not.toContain(forbidden);
+    }
+
     expect(await service.book(input(seeded.reference))).toEqual(result);
     expect(await counts()).toEqual({
       receipts: '1',
@@ -174,6 +211,64 @@ describe('public guest booking transaction', () => {
       credentials: '1',
       audits: '1',
     });
+  });
+
+  it('fails closed before mutation for tampered and stale cross-tenant selections', async () => {
+    const now = new Date('2099-02-01T00:00:00.000Z');
+    const seeded = await seed(now);
+    const service = new PublicGuestBookingService(
+      pool,
+      seeded.selections,
+      () => now,
+    );
+
+    const tampered = `${seeded.reference.slice(0, -1)}${seeded.reference.endsWith('A') ? 'B' : 'A'}`;
+    await expect(service.book(input(tampered, 'tampered'))).rejects.toBeInstanceOf(
+      PublicGuestBookingRejectedError,
+    );
+    expect(await counts()).toEqual(zeroCounts);
+
+    await pool.query(
+      `DELETE FROM doctor_clinics WHERE clinic_id = $1 AND doctor_id = $2`,
+      [seeded.clinicId, seeded.doctorId],
+    );
+    await expect(
+      service.book(input(seeded.reference, 'association-drift')),
+    ).rejects.toBeInstanceOf(PublicGuestBookingRejectedError);
+    expect(await counts()).toEqual(zeroCounts);
+  });
+
+  it('enforces locale and contact-preference validation before database mutation', async () => {
+    const now = new Date('2099-02-01T00:00:00.000Z');
+    const seeded = await seed(now);
+    const service = new PublicGuestBookingService(
+      pool,
+      seeded.selections,
+      () => now,
+    );
+
+    await expect(
+      service.book({
+        ...input(seeded.reference, 'bad-locale'),
+        preferredLocale: 'en' as never,
+      }),
+    ).rejects.toBeInstanceOf(PublicGuestBookingValidationError);
+    await expect(
+      service.book({
+        ...input(seeded.reference, 'missing-phone'),
+        contactPhone: null,
+        contactPreference: 'phone',
+      }),
+    ).rejects.toBeInstanceOf(PublicGuestBookingValidationError);
+    await expect(
+      service.book({
+        ...input(seeded.reference, 'missing-contact'),
+        contactPhone: null,
+        contactEmail: null,
+        contactPreference: 'none',
+      }),
+    ).rejects.toBeInstanceOf(PublicGuestBookingValidationError);
+    expect(await counts()).toEqual(zeroCounts);
   });
 
   it('converges concurrent equivalents and rolls back every row after a late failure', async () => {
@@ -212,13 +307,6 @@ describe('public guest booking transaction', () => {
     await expect(
       failing.book(input(seeded.reference, 'rollback-booking')),
     ).rejects.toThrow('injected late failure');
-    expect(await counts()).toEqual({
-      receipts: '0',
-      patients: '0',
-      appointments: '0',
-      entries: '0',
-      credentials: '0',
-      audits: '0',
-    });
+    expect(await counts()).toEqual(zeroCounts);
   });
 });
