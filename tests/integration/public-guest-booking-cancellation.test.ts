@@ -160,10 +160,7 @@ async function cancellationAudits(booking: SeededBooking) {
 describe('WU61 public guest booking cancellation', () => {
   it('atomically cancels appointment and queue once and emits one privacy-safe audit', async () => {
     const booking = await createBooking('1001');
-    const service = new PublicGuestBookingCancellationService(
-      pool,
-      () => now,
-    );
+    const service = new PublicGuestBookingCancellationService(pool, () => now);
     const before = await state(booking);
 
     await expect(service.cancel(booking.bearer)).resolves.toEqual({
@@ -209,10 +206,7 @@ describe('WU61 public guest booking cancellation', () => {
 
   it('converges concurrent equivalent cancellations to one committed mutation and audit', async () => {
     const booking = await createBooking('2001');
-    const service = new PublicGuestBookingCancellationService(
-      pool,
-      () => now,
-    );
+    const service = new PublicGuestBookingCancellationService(pool, () => now);
     const before = await state(booking);
 
     const results = await Promise.all([
@@ -284,10 +278,7 @@ describe('WU61 public guest booking cancellation', () => {
     const parts = tamperedBooking.bearer.split('.');
     expect(parts).toHaveLength(3);
     const tampered = `${parts[0]}.${parts[1]}.${'A'.repeat(43)}`;
-    const service = new PublicGuestBookingCancellationService(
-      pool,
-      () => now,
-    );
+    const service = new PublicGuestBookingCancellationService(pool, () => now);
 
     await expect(service.cancel(tampered)).rejects.toBeInstanceOf(
       PublicGuestBookingCancellationRejectedError,
