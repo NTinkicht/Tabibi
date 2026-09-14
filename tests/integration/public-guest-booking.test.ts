@@ -295,6 +295,31 @@ describe('public guest booking transaction', () => {
     expect(await counts()).toEqual(zeroCounts);
 
     const drifted = await seed(now);
+    const replacementDoctorUserId = randomUUID();
+    const replacementDoctorId = randomUUID();
+    await pool.query(
+      `INSERT INTO users (id, auth_subject, display_name)
+       VALUES ($1, $2, 'Replacement Doctor')`,
+      [
+        replacementDoctorUserId,
+        `wu59-replacement-doctor-${replacementDoctorUserId}`,
+      ],
+    );
+    await pool.query(
+      `INSERT INTO doctor_profiles (id, user_id, display_name)
+       VALUES ($1, $2, 'Replacement Doctor')`,
+      [replacementDoctorId, replacementDoctorUserId],
+    );
+    await pool.query(
+      `INSERT INTO doctor_clinics (clinic_id, doctor_id) VALUES ($1, $2)`,
+      [drifted.clinicId, replacementDoctorId],
+    );
+    await pool.query(
+      `UPDATE consultation_sessions
+          SET doctor_id = $1
+        WHERE id = $2 AND clinic_id = $3`,
+      [replacementDoctorId, drifted.sessionId, drifted.clinicId],
+    );
     await pool.query(
       `DELETE FROM doctor_clinics WHERE clinic_id = $1 AND doctor_id = $2`,
       [drifted.clinicId, drifted.doctorId],
