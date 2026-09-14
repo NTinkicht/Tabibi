@@ -175,7 +175,9 @@ describe('public clinic and doctor discovery', () => {
     const result = await new PublicDiscoveryService(pool).listClinics();
 
     expect(result).toHaveLength(2);
-    expect(result.every((clinic) => clinic.name === 'Shared Clinic')).toBe(true);
+    expect(result.every((clinic) => clinic.name === 'Shared Clinic')).toBe(
+      true,
+    );
     expect(result.map((clinic) => clinic.doctors)).toEqual(
       expect.arrayContaining([
         [{ displayName: 'Doctor One' }],
