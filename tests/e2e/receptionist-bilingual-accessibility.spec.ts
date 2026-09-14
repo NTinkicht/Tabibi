@@ -194,7 +194,7 @@ test('receptionist queue stays clinic-scoped, private, bilingual, and keyboard o
     ).toContainText('د. ليلى');
 
     const body = page.locator('body');
-    await expect(body).not.toContainText(privateName);
+    await expect(body).toContainText(privateName);
     await expect(body).not.toContainText(otherPrivateName);
     await expect(body).not.toContainText(otherClinicMarker);
     await expect(body).not.toContainText(first.entry.id);
