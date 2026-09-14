@@ -3,9 +3,7 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import { PublicAvailabilitySelectionService } from '@/modules/public-availability-selection';
-import {
-  PublicGuestBookingService,
-} from '@/modules/public-guest-booking';
+import { PublicGuestBookingService } from '@/modules/public-guest-booking';
 import {
   PublicGuestBookingStatusRejectedError,
   PublicGuestBookingStatusService,
@@ -148,7 +146,7 @@ describe('WU60 public guest booking status', () => {
 
     expect(first).toEqual(second);
     expect(first).toMatchObject({
-      bookingState: 'booked',
+      bookingState: 'confirmed',
       serviceDate: '2099-03-01',
       queueState: 'waiting',
       called: false,
@@ -251,7 +249,7 @@ describe('WU60 public guest booking status', () => {
     const secondStatus = await service.get(second.bearer);
 
     expect(firstStatus).toMatchObject({
-      bookingState: 'booked',
+      bookingState: 'confirmed',
       queueState: 'waiting',
       preferredLocale: 'fr',
     });
