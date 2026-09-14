@@ -71,7 +71,9 @@ test('proves the WU49 bilingual public projection renders a real row without pri
       'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
     await expect(publicMain).toHaveAttribute('dir', 'rtl');
-    await expect(page.getByRole('list', { name: 'قاعة الانتظار' })).toBeVisible();
+    await expect(
+      page.getByRole('list', { name: 'قاعة الانتظار' }),
+    ).toBeVisible();
     await expect(interactiveWithinProjection).toHaveCount(0);
     await expect(
       page.getByText(registration.entry.publicDisplayLabel),
