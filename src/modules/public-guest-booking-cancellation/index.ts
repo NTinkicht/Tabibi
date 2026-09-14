@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import {
   authenticatedGuestCredentialId,
-  verifier,
+  verifierMatches,
 } from '@/modules/guest-access';
 import { inTransaction } from '@/platform/database/transaction';
 
@@ -21,6 +21,7 @@ export class PublicGuestBookingCancellationRejectedError extends Error {
 
 type CancellationRow = {
   credential_id: string;
+  bearer_verifier: string;
   clinic_id: string;
   session_id: string;
   queue_entry_id: string;
@@ -65,6 +66,7 @@ export class PublicGuestBookingCancellationService {
 
       const result = await client.query<CancellationRow>(
         `SELECT credential.id AS credential_id,
+                credential.bearer_verifier,
                 credential.clinic_id,
                 credential.session_id,
                 credential.queue_entry_id,
@@ -85,13 +87,17 @@ export class PublicGuestBookingCancellationService {
             AND appointment.session_id = entry.session_id
             AND appointment.patient_id = entry.patient_id
           WHERE credential.id = $1
-            AND credential.bearer_verifier = $2
           FOR UPDATE OF credential, appointment, entry`,
-        [credentialId, verifier(secret)],
+        [credentialId],
       );
 
       const row = result.rows[0];
-      if (!row || row.revoked_at || row.expires_at <= this.clock())
+      if (
+        !row ||
+        !verifierMatches(row.bearer_verifier, secret) ||
+        row.revoked_at ||
+        row.expires_at <= this.clock()
+      )
         throw new PublicGuestBookingCancellationRejectedError();
 
       if (
