@@ -19,6 +19,11 @@ export class PublicGuestBookingCancellationRejectedError extends Error {
   }
 }
 
+type CancellationIdentityRow = {
+  clinic_id: string;
+  session_id: string;
+};
+
 type CancellationRow = {
   credential_id: string;
   bearer_verifier: string;
@@ -64,6 +69,25 @@ export class PublicGuestBookingCancellationService {
         [`public-guest-cancellation:${credentialId}`],
       );
 
+      const identity = await client.query<CancellationIdentityRow>(
+        `SELECT clinic_id, session_id
+           FROM guest_credentials
+          WHERE id = $1`,
+        [credentialId],
+      );
+      const target = identity.rows[0];
+      if (!target) throw new PublicGuestBookingCancellationRejectedError();
+
+      const session = await client.query(
+        `SELECT id
+           FROM consultation_sessions
+          WHERE id = $1 AND clinic_id = $2
+          FOR UPDATE`,
+        [target.session_id, target.clinic_id],
+      );
+      if (!session.rows[0])
+        throw new PublicGuestBookingCancellationRejectedError();
+
       const result = await client.query<CancellationRow>(
         `SELECT credential.id AS credential_id,
                 credential.bearer_verifier,
@@ -87,8 +111,10 @@ export class PublicGuestBookingCancellationService {
             AND appointment.session_id = entry.session_id
             AND appointment.patient_id = entry.patient_id
           WHERE credential.id = $1
+            AND credential.clinic_id = $2
+            AND credential.session_id = $3
           FOR UPDATE OF credential, appointment, entry`,
-        [credentialId],
+        [credentialId, target.clinic_id, target.session_id],
       );
 
       const row = result.rows[0];
@@ -167,10 +193,6 @@ export class PublicGuestBookingCancellationService {
         [row.session_id, row.clinic_id],
       );
 
-      if (this.afterOperationalMutationForTest) {
-        await this.afterOperationalMutationForTest(client);
-      }
-
       await client.query(
         `INSERT INTO audit_events
            (clinic_id, actor_user_id, entity_type, entity_id, action, metadata)
@@ -188,6 +210,10 @@ export class PublicGuestBookingCancellationService {
           }),
         ],
       );
+
+      if (this.afterOperationalMutationForTest) {
+        await this.afterOperationalMutationForTest(client);
+      }
 
       return { status: 'cancelled' };
     });
