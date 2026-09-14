@@ -29,7 +29,9 @@ Deployment is **NO-GO** if any item below is false:
 6. A recoverable database backup exists according to the production platform's approved backup mechanism.
 7. The repository recovery rehearsal remains green in a guarded non-production target via `npm run db:rehearse-recovery`.
 8. The operator has identified the previous known-good application SHA and the schema/migration boundary between it and the candidate.
-9. Before any production migration runs, the operator has explicitly chosen and recorded one safe traffic-consistency strategy: either (a) every pending migration is independently verified backward-compatible with both the currently serving and candidate application versions, or (b) application writes are placed into an approved maintenance/write-drain state until migration and cutover verification complete.
+9. Before any production migration runs, the operator has explicitly chosen and recorded one safe traffic-consistency strategy: either (a) every pending migration is independently verified backward-compatible with both the currently serving and candidate application versions **and** its lock/duration impact has been assessed as safe for online execution under bounded database lock/statement timeouts, or (b) application writes are placed into an approved maintenance/write-drain state until migration and cutover verification complete. If online lock/duration safety cannot be proven, a full traffic/write drain is mandatory.
+10. An explicit retention/anonymization policy required by `SECURITY.md` has been approved and is in force for the production environment.
+11. The owner/legal production gate required by `SECURITY.md` is satisfied, including confirmation of applicable Algeria-specific legal/regulatory requirements. Absence of that decision is a production NO-GO regardless of technical readiness.
 
 The repository rehearsal command is evidence that backup/restore mechanics are testable; it is **not** permission to point rehearsal tooling at production.
 
@@ -41,7 +43,7 @@ Use the immutable candidate SHA throughout the attempt.
 2. Install dependencies from the committed lockfile with `npm ci`.
 3. Build the application with `npm run build`.
 4. Confirm a current database backup exists using the deployment platform's approved production backup facility.
-5. Enforce the traffic-consistency strategy recorded at GO / NO-GO. Do not apply pending DDL while an older application is accepting writes unless every pending migration has been verified backward-compatible with both versions. Otherwise, enter the approved maintenance/write-drain state before migration and keep it in force through schema-sensitive cutover checks.
+5. Enforce the traffic-consistency strategy recorded at GO / NO-GO. Do not apply pending DDL while an older application is accepting writes unless every pending migration has been verified backward-compatible with both versions **and** assessed for lock strength, expected duration, table rewrite/scan risk, and operational impact under production-like volume. Configure bounded lock and statement timeouts appropriate to the approved platform so unsafe lock acquisition fails closed instead of stalling clinic traffic indefinitely. If any migration cannot be proven safe for online execution, enter the approved full maintenance/write-drain state before migration and keep it in force through schema-sensitive cutover checks.
 6. Apply repository migrations once with `npm run db:migrate` against the intended production database connection supplied through the platform's secret/configuration mechanism.
 7. If migration fails, stop the cutover. Do not repeatedly retry a partially understood migration failure.
 8. Start the built application using the platform-equivalent of `npm start`.
@@ -83,7 +85,7 @@ Security/privacy isolation failure is an immediate stop condition, not an observ
 
 ### A. Application-only defect with backward-compatible schema
 
-If the schema remains compatible with the previous known-good application SHA:
+If the schema remains compatible with the previous known-good application SHA and no migration/schema defect is implicated:
 
 1. remove/stop traffic to the faulty candidate according to the hosting platform's normal mechanism;
 2. redeploy the previous known-good application SHA;
@@ -94,15 +96,15 @@ If the schema remains compatible with the previous known-good application SHA:
 
 Treat database rollback separately from code rollback. Repository migrations are forward operations; this runbook does not claim every migration is mechanically reversible.
 
-1. stop further rollout/migration attempts;
-2. preserve logs and the exact failing SHA/migration evidence without sensitive payloads;
-3. determine whether the previous application can safely run against the current schema;
-4. if yes, roll application code back while leaving the schema intact and verify behavior;
-5. if no, place production application writes **and notification dispatch** into an approved quiesced state before any destructive restore action;
-6. identify and preserve a privacy-minimal reconciliation record for every durable write or dispatch attempt that occurred after the pre-deploy backup snapshot. Do not restore over unaccounted post-snapshot activity: decide how those writes will be replayed, re-entered, or otherwise reconciled without duplicating notification attempts or silently losing clinic state;
-7. obtain explicit owner authorization from Nassim for the specific production restore, including the backup/snapshot being restored, known post-snapshot write window, reconciliation plan, and expected resulting application SHA. Approved platform tooling is necessary but is not itself authorization to perform the destructive restore;
-8. only after steps 5-7 are satisfied, execute the approved production database restore procedure from the selected pre-deploy backup rather than inventing ad-hoc reverse SQL;
-9. deploy the application SHA known to match the restored database state while writes/dispatch remain quiesced;
+1. immediately stop further rollout/migration attempts **and quiesce candidate application writes plus notification dispatch** for every confirmed or strongly suspected migration/schema defect. Do this before deciding whether code-only rollback or database restore is required; do not let a faulty schema path continue mutating clinic state during diagnosis.
+2. preserve logs and the exact failing SHA/migration evidence without sensitive payloads.
+3. determine whether the previous application can safely run against the current schema while writes/dispatch remain quiesced.
+4. if yes, roll application code back while leaving the schema intact, verify schema-sensitive behavior, and only then release the quiescence boundary.
+5. if no, keep production application writes **and notification dispatch** in the approved quiesced state before any destructive restore action.
+6. identify and preserve a privacy-minimal reconciliation record for every durable write or dispatch attempt that occurred after the pre-deploy backup snapshot. Do not restore over unaccounted post-snapshot activity: decide how those writes will be replayed, re-entered, or otherwise reconciled without duplicating notification attempts or silently losing clinic state.
+7. obtain explicit owner authorization from Nassim for the specific production restore, including the backup/snapshot being restored, known post-snapshot write window, reconciliation plan, and expected resulting application SHA. Approved platform tooling is necessary but is not itself authorization to perform the destructive restore.
+8. only after steps 5-7 are satisfied, execute the approved production database restore procedure from the selected pre-deploy backup rather than inventing ad-hoc reverse SQL.
+9. deploy the application SHA known to match the restored database state while writes/dispatch remain quiesced.
 10. complete the post-rollback checks, reconcile the recorded post-snapshot writes/dispatch attempts exactly once, and only then release the quiescence boundary.
 
 Never perform destructive reverse-SQL improvisation on production when the repository does not contain an independently reviewed reversible migration procedure. Never restore a production snapshot while newer writes or notification dispatches are still occurring or while post-snapshot activity remains unaccounted for.
@@ -139,7 +141,8 @@ For every deployment or rollback, retain a concise record containing:
 - CI run identifier;
 - independent reviewer/verdict reference;
 - migration outcome;
-- selected traffic-consistency strategy and any maintenance/write-drain interval;
+- selected traffic-consistency strategy, per-migration lock/duration assessment, timeout policy, and any maintenance/write-drain interval;
+- retention/anonymization approval reference and owner/legal production-gate reference;
 - backup/recovery evidence reference;
 - cutover start/end times;
 - GO/NO-GO decision and reason;
@@ -151,4 +154,4 @@ Never copy secrets, database URLs, access tokens, patient names, phone numbers, 
 
 ## WU52 gate
 
-This runbook is merge-eligible only when exact-head CI is green and an eligible non-author reviewer verifies that the sequence is grounded in repository capabilities, does not imply unsafe production rehearsal behavior, distinguishes code rollback from schema recovery, requires a safe traffic boundary for production migrations, requires write/dispatch quiescence plus post-snapshot reconciliation before a destructive restore, requires explicit owner authorization for that restore, and contains no unresolved Medium+/Major+/High+/Critical/Blocker finding.
+This runbook is merge-eligible only when exact-head CI is green and an eligible non-author reviewer verifies that the sequence is grounded in repository capabilities, does not imply unsafe production rehearsal behavior, distinguishes code rollback from schema recovery, requires a safe traffic boundary plus per-migration lock/duration safety for production migrations, requires the production retention/anonymization and owner/legal gates, requires immediate write/dispatch quiescence for migration/schema defects, requires post-snapshot reconciliation before a destructive restore, requires explicit owner authorization for that restore, and contains no unresolved Medium+/Major+/High+/Critical/Blocker finding.
