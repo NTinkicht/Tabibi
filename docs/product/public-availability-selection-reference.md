@@ -34,6 +34,8 @@ Successful resolution requires all of the following to remain true at resolution
 5. the referenced window still matches durable session start/end values and remains future-facing;
 6. the reference is valid and unexpired.
 
+The persistence model prevents removing a doctor-clinic association while a consultation session still references that exact association. This database-level `ON DELETE RESTRICT` invariant is part of the durable truth boundary. If a session is legitimately retargeted to another doctor-clinic association, an old reference bound to the previous doctor must fail closed rather than follow the session to its new identity.
+
 Any failure returns a bounded public not-available/invalid result without revealing which private predicate failed.
 
 Possession or successful resolution of a reference is not booking authorization. A later booking mutation must independently re-check its full appointment-domain invariants, patient/guest requirements, consent/policy, idempotency, and concurrency behavior.
@@ -64,7 +66,7 @@ Tests must prove, without external network dependencies:
 1. a valid reference resolves to the exact eligible current availability window;
 2. tampered, malformed, unsupported-version and expired references fail closed;
 3. clinic deactivation invalidates a previously issued reference;
-4. doctor-clinic association removal invalidates it;
+4. the database refuses removal of an association still referenced by a session, and legitimate session doctor-association drift invalidates the old reference;
 5. terminal or stale session state invalidates it;
 6. session start/end drift invalidates the old reference rather than silently retargeting it;
 7. same-name clinics and doctors remain isolated by internal identity;
