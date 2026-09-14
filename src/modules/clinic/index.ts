@@ -29,6 +29,17 @@ export interface ClinicDoctor {
   displayName: string;
 }
 
+export interface PublicDiscoveryDoctor {
+  displayName: string;
+}
+
+export interface PublicDiscoveryClinic {
+  name: string;
+  defaultLocale: 'ar' | 'fr';
+  enabledLocales: Array<'ar' | 'fr'>;
+  doctors: PublicDiscoveryDoctor[];
+}
+
 interface ClinicRow {
   id: string;
   tenant_key: string;
@@ -37,6 +48,13 @@ interface ClinicRow {
   default_locale: 'ar' | 'fr';
   enabled_locales: Array<'ar' | 'fr'>;
   status: 'active' | 'inactive';
+}
+
+interface PublicDiscoveryRow {
+  clinic_name: string;
+  default_locale: 'ar' | 'fr';
+  enabled_locales: Array<'ar' | 'fr'>;
+  doctor_display_name: string | null;
 }
 
 function clinicFromRow(row: ClinicRow): Clinic {
@@ -49,6 +67,51 @@ function clinicFromRow(row: ClinicRow): Clinic {
     enabledLocales: row.enabled_locales,
     status: row.status,
   };
+}
+
+export class PublicDiscoveryService {
+  constructor(private readonly pool: Pool) {}
+
+  async listClinics(): Promise<PublicDiscoveryClinic[]> {
+    const result = await this.pool.query<PublicDiscoveryRow>(
+      `SELECT clinic.name AS clinic_name,
+              clinic.default_locale,
+              clinic.enabled_locales,
+              doctor.display_name AS doctor_display_name
+         FROM clinics clinic
+         LEFT JOIN doctor_clinics association ON association.clinic_id = clinic.id
+         LEFT JOIN doctor_profiles doctor ON doctor.id = association.doctor_id
+        WHERE clinic.status = 'active'
+        ORDER BY clinic.name, clinic.id, doctor.display_name, doctor.id`,
+    );
+
+    const clinics: PublicDiscoveryClinic[] = [];
+    let current: PublicDiscoveryClinic | undefined;
+    let currentKey: string | undefined;
+
+    for (const row of result.rows) {
+      const key = JSON.stringify([
+        row.clinic_name,
+        row.default_locale,
+        row.enabled_locales,
+      ]);
+      if (key !== currentKey) {
+        current = {
+          name: row.clinic_name,
+          defaultLocale: row.default_locale,
+          enabledLocales: row.enabled_locales,
+          doctors: [],
+        };
+        clinics.push(current);
+        currentKey = key;
+      }
+      if (row.doctor_display_name !== null) {
+        current!.doctors.push({ displayName: row.doctor_display_name });
+      }
+    }
+
+    return clinics;
+  }
 }
 
 export class ClinicService {
