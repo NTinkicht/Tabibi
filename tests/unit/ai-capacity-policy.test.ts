@@ -134,9 +134,7 @@ describe('AI capacity policy', () => {
     expect(content).not.toContain('--auto-approve');
     expect(content).not.toContain('--yolo');
     expect(content).toContain('--workdir "$GITHUB_WORKSPACE"');
-    expect(content).toContain(
-      'reads outside --workdir still require approval',
-    );
+    expect(content).toContain('reads outside --workdir still require approval');
     expect(content).toContain("text.replace(secret, '[REDACTED]')");
     expect(content).toContain(
       'PAYG remains disabled and no paid fallback was attempted',
