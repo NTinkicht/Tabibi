@@ -126,6 +126,73 @@ async function createBooking(suffix: string): Promise<SeededBooking> {
   };
 }
 
+async function createBookingInSession(
+  sessionBooking: SeededBooking,
+  suffix: string,
+): Promise<SeededBooking> {
+  const startsAt = '2099-04-15T08:00:00.000Z';
+  const endsAt = '2099-04-15T09:00:00.000Z';
+  const privateDisplayName = `Private Guest ${suffix}`;
+  const contactPhone = `+21355502${suffix.padStart(4, '0')}`;
+  const selections = new PublicAvailabilitySelectionService(
+    pool,
+    selectionSecret,
+    () => now,
+    60_000,
+  );
+  const selectionReference = await selections.issue({
+    clinicId: sessionBooking.clinicId,
+    doctorId: sessionBooking.doctorId,
+    sessionId: sessionBooking.sessionId,
+    startsAt,
+    endsAt,
+  });
+  if (!selectionReference) throw new Error('selection reference not issued');
+
+  const booking = await new PublicGuestBookingService(
+    pool,
+    selections,
+    () => now,
+  ).book({
+    selectionReference,
+    privateDisplayName,
+    contactPhone,
+    contactEmail: `${suffix}@example.com`,
+    preferredLocale: 'fr',
+    contactPreference: 'phone',
+    idempotencyKey: `wu61-${suffix}`,
+    correlationId: `wu61-correlation-${suffix}`,
+  });
+
+  const internal = await pool.query<{
+    id: string;
+    queue_entry_id: string;
+    patient_id: string;
+  }>(
+    `SELECT appointment.id, appointment.queue_entry_id, appointment.patient_id
+       FROM appointments appointment
+       JOIN patient_operational_records patient ON patient.id=appointment.patient_id
+      WHERE appointment.clinic_id=$1
+        AND appointment.session_id=$2
+        AND patient.contact_phone=$3`,
+    [sessionBooking.clinicId, sessionBooking.sessionId, contactPhone],
+  );
+  const row = internal.rows[0];
+  if (!row) throw new Error('booking internals not created');
+
+  return {
+    clinicId: sessionBooking.clinicId,
+    doctorId: sessionBooking.doctorId,
+    sessionId: sessionBooking.sessionId,
+    queueEntryId: row.queue_entry_id,
+    appointmentId: row.id,
+    patientId: row.patient_id,
+    bearer: booking.guestBearer,
+    privateDisplayName,
+    contactPhone,
+  };
+}
+
 async function state(booking: SeededBooking) {
   const result = await pool.query<{
     appointment_status: string;
@@ -229,6 +296,33 @@ describe('WU61 public guest booking cancellation', () => {
       Number(before?.queue_order_version) + 1,
     );
     expect((await cancellationAudits(booking)).rows).toHaveLength(1);
+  });
+
+  it('serializes concurrent cancellation of two distinct prioritized bookings in one session', async () => {
+    const first = await createBooking('2101');
+    const second = await createBookingInSession(first, '2102');
+    const service = new PublicGuestBookingCancellationService(pool, () => now);
+    const before = await state(first);
+
+    await expect(
+      Promise.all([service.cancel(first.bearer), service.cancel(second.bearer)]),
+    ).resolves.toEqual([{ status: 'cancelled' }, { status: 'cancelled' }]);
+
+    expect(await state(first)).toMatchObject({
+      appointment_status: 'cancelled',
+      queue_state: 'cancelled',
+      priority_order: null,
+    });
+    expect(await state(second)).toMatchObject({
+      appointment_status: 'cancelled',
+      queue_state: 'cancelled',
+      priority_order: null,
+    });
+    expect(Number((await state(first))?.queue_order_version)).toBe(
+      Number(before?.queue_order_version) + 2,
+    );
+    expect((await cancellationAudits(first)).rows).toHaveLength(1);
+    expect((await cancellationAudits(second)).rows).toHaveLength(1);
   });
 
   it('keeps another booking isolated from a valid cancellation', async () => {
