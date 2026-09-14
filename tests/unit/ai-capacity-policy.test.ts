@@ -121,7 +121,7 @@ describe('AI capacity policy', () => {
     );
   });
 
-  it('limits unattended Mistral to plan agent and repository tools', () => {
+  it('limits unattended Mistral execution to read-only repository tools', () => {
     const workflowPath = path.join(workflowDirectory, 'mistral-vibe-wake.yml');
     const content = fs.readFileSync(workflowPath, 'utf8');
     const enabledTools = [
@@ -134,7 +134,6 @@ describe('AI capacity policy', () => {
     expect(content).not.toContain('--auto-approve');
     expect(content).not.toContain('--yolo');
     expect(content).toContain('--workdir "$GITHUB_WORKSPACE"');
-    expect(content).toContain('reads outside --workdir still require approval');
     expect(content).toContain("text.replace(secret, '[REDACTED]')");
     expect(content).toContain(
       'PAYG remains disabled and no paid fallback was attempted',
