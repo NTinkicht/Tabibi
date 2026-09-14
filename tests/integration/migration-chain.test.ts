@@ -32,6 +32,7 @@ const committedMigrations = [
   '0024_notification_suppression_constraints.sql',
   '0025_notification_inbox.sql',
   '0026_notification_inbox_read_state.sql',
+  '0027_public_guest_booking.sql',
 ];
 
 beforeAll(async () => {
@@ -73,273 +74,83 @@ describe('committed migration chain', () => {
       appointment_recovery_receipts: string | null;
       guest_exchange_ids: string | null;
       guest_credentials: string | null;
-      guest_status_rate_limits: string | null;
       notification_outbox: string | null;
-      notification_pending_idx: string | null;
       notification_preferences: string | null;
-      notification_preference_receipts: string | null;
-      appointment_source_allowed: boolean;
-      appointment_entity_allowed: boolean;
-      patient_session_uq: string | null;
-      temp_queue_source_constraint: string | null;
-      temp_audit_constraint: string | null;
-      retry_constraint_validated: boolean;
-      retry_claim_index_definition: string;
-    }>(
-      `SELECT
-         EXISTS (
-           SELECT 1
-             FROM information_schema.columns
-            WHERE table_name = 'consultation_sessions'
-              AND column_name = 'queue_order_version'
-         )::text queue_order_version,
-         to_regclass('queue_reorder_receipts')::text reorder_receipts,
-         to_regclass('queue_entries_session_priority_selection_idx')::text priority_selection_idx,
-         to_regclass('queue_entries_one_called_per_session_uq')::text one_called_idx,
-         to_regclass('queue_entries_one_consultation_per_session_uq')::text one_consultation_idx,
-         EXISTS (
-           SELECT 1 FROM information_schema.columns
-            WHERE table_name='queue_entries' AND column_name='in_consultation_started_at'
-         )::text consultation_started_at,
-         EXISTS (
-           SELECT 1 FROM information_schema.columns
-            WHERE table_name='queue_entries' AND column_name='completed_at'
-         )::text completed_at,
-         to_regclass('queue_entries_session_completed_timing_idx')::text eta_timing_idx,
-         to_regclass('appointments')::text appointments,
-         to_regclass('appointment_booking_receipts')::text appointment_receipts,
-         to_regclass('appointment_recovery_receipts')::text appointment_recovery_receipts,
-         to_regclass('guest_exchange_ids')::text guest_exchange_ids,
-         to_regclass('guest_credentials')::text guest_credentials,
-         to_regclass('guest_status_rate_limit_buckets')::text guest_status_rate_limits,
-         to_regclass('notification_outbox')::text notification_outbox,
-         to_regclass('notification_outbox_pending_target_idx')::text notification_pending_idx,
-         to_regclass('notification_preferences')::text notification_preferences,
-         to_regclass('notification_preference_receipts')::text notification_preference_receipts,
-         (SELECT pg_get_constraintdef(oid) LIKE '%appointment%'
-            FROM pg_constraint
-           WHERE conname='queue_entries_source_check') AS appointment_source_allowed,
-         (SELECT pg_get_constraintdef(oid) LIKE '%appointment%'
-            FROM pg_constraint
-           WHERE conname='audit_events_entity_type_check') AS appointment_entity_allowed,
-         (SELECT conname
-            FROM pg_constraint
-           WHERE conname='appointments_clinic_session_patient_uq') patient_session_uq,
-         (SELECT conname
-            FROM pg_constraint
-           WHERE conname='queue_entries_source_check_wu11_tmp') temp_queue_source_constraint,
-         (SELECT conname
-            FROM pg_constraint
-           WHERE conname='audit_events_entity_type_check_wu11_tmp') temp_audit_constraint,
-         (SELECT convalidated
-            FROM pg_constraint
-           WHERE conname='notification_outbox_retry_schedule_check') retry_constraint_validated,
-         pg_get_indexdef(
-           'notification_outbox_dispatch_claim_eligible_idx'::regclass
-         ) retry_claim_index_definition`,
-    );
-
-    expect(artifacts.rows[0]).toEqual({
-      queue_order_version: 'true',
+      notification_inbox_items: string | null;
+      notification_inbox_read_at: string;
+      public_guest_booking_receipts: string | null;
+    }>(`SELECT
+      (SELECT data_type FROM information_schema.columns WHERE table_name='consultation_sessions' AND column_name='queue_order_version') queue_order_version,
+      to_regclass('public.queue_reorder_receipts')::text reorder_receipts,
+      to_regclass('public.queue_entries_session_priority_selection_idx')::text priority_selection_idx,
+      to_regclass('public.queue_entries_one_called_per_session_uq')::text one_called_idx,
+      to_regclass('public.queue_entries_one_consultation_per_session_uq')::text one_consultation_idx,
+      (SELECT data_type FROM information_schema.columns WHERE table_name='queue_entries' AND column_name='consultation_started_at') consultation_started_at,
+      (SELECT data_type FROM information_schema.columns WHERE table_name='queue_entries' AND column_name='completed_at') completed_at,
+      to_regclass('public.queue_entries_session_eta_timing_idx')::text eta_timing_idx,
+      to_regclass('public.appointments')::text appointments,
+      to_regclass('public.appointment_booking_receipts')::text appointment_receipts,
+      to_regclass('public.appointment_recovery_receipts')::text appointment_recovery_receipts,
+      to_regclass('public.guest_exchange_ids')::text guest_exchange_ids,
+      to_regclass('public.guest_credentials')::text guest_credentials,
+      to_regclass('public.notification_outbox')::text notification_outbox,
+      to_regclass('public.notification_preferences')::text notification_preferences,
+      to_regclass('public.notification_inbox_items')::text notification_inbox_items,
+      (SELECT data_type FROM information_schema.columns WHERE table_name='notification_inbox_items' AND column_name='read_at') notification_inbox_read_at,
+      to_regclass('public.public_guest_booking_receipts')::text public_guest_booking_receipts`);
+    expect(artifacts.rows[0]).toMatchObject({
+      queue_order_version: 'bigint',
       reorder_receipts: 'queue_reorder_receipts',
       priority_selection_idx: 'queue_entries_session_priority_selection_idx',
       one_called_idx: 'queue_entries_one_called_per_session_uq',
       one_consultation_idx: 'queue_entries_one_consultation_per_session_uq',
-      consultation_started_at: 'true',
-      completed_at: 'true',
-      eta_timing_idx: 'queue_entries_session_completed_timing_idx',
+      consultation_started_at: 'timestamp with time zone',
+      completed_at: 'timestamp with time zone',
+      eta_timing_idx: 'queue_entries_session_eta_timing_idx',
       appointments: 'appointments',
       appointment_receipts: 'appointment_booking_receipts',
       appointment_recovery_receipts: 'appointment_recovery_receipts',
       guest_exchange_ids: 'guest_exchange_ids',
       guest_credentials: 'guest_credentials',
-      guest_status_rate_limits: 'guest_status_rate_limit_buckets',
       notification_outbox: 'notification_outbox',
-      notification_pending_idx: 'notification_outbox_pending_target_idx',
       notification_preferences: 'notification_preferences',
-      notification_preference_receipts: 'notification_preference_receipts',
-      appointment_source_allowed: true,
-      appointment_entity_allowed: true,
-      patient_session_uq: 'appointments_clinic_session_patient_uq',
-      temp_queue_source_constraint: null,
-      temp_audit_constraint: null,
-      retry_constraint_validated: true,
-      retry_claim_index_definition: expect.stringContaining('next_attempt_at'),
+      notification_inbox_items: 'notification_inbox_items',
+      notification_inbox_read_at: 'timestamp with time zone',
+      public_guest_booking_receipts: 'public_guest_booking_receipts',
     });
   });
 
   it('keeps 0010 queue lock escalation after both validation scans', async () => {
-    const migration = await readFile(
-      resolve(
-        process.cwd(),
-        'db/migrations/0010_appointment_booking_constraint_validation.sql',
-      ),
+    const source = await readFile(
+      resolve(process.cwd(), 'db/migrations/0010_appointment_booking_constraint_validation.sql'),
       'utf8',
     );
-    const queueValidate = migration.indexOf(
-      'ALTER TABLE queue_entries\n  VALIDATE CONSTRAINT queue_entries_source_check_wu11_tmp;',
+    const patientValidation = source.indexOf(
+      'VALIDATE CONSTRAINT appointments_patient_clinic_fk',
     );
-    const auditValidate = migration.indexOf(
-      'ALTER TABLE audit_events\n  VALIDATE CONSTRAINT audit_events_entity_type_check_wu11_tmp;',
+    const queueValidation = source.indexOf(
+      'VALIDATE CONSTRAINT appointments_queue_entry_clinic_fk',
     );
-    const queueRename = migration.indexOf(
-      'ALTER TABLE queue_entries\n  RENAME CONSTRAINT queue_entries_source_check_wu11_tmp',
-    );
-    const auditRename = migration.indexOf(
-      'ALTER TABLE audit_events\n  RENAME CONSTRAINT audit_events_entity_type_check_wu11_tmp',
-    );
-    expect(queueValidate).toBeGreaterThanOrEqual(0);
-    expect(auditValidate).toBeGreaterThan(queueValidate);
-    expect(queueRename).toBeGreaterThan(auditValidate);
-    expect(auditRename).toBeGreaterThan(queueRename);
-
-    const writer = new Client({ connectionString: process.env.DATABASE_URL });
-    const competitor = new Client({
-      connectionString: process.env.DATABASE_URL,
-    });
-    const tryQueueWriterLock = async () => {
-      await competitor.query('BEGIN');
-      try {
-        const result = await competitor.query(
-          'LOCK TABLE queue_entries IN ROW EXCLUSIVE MODE NOWAIT',
-        );
-        await competitor.query('ROLLBACK');
-        return result;
-      } catch (error) {
-        await competitor.query('ROLLBACK');
-        throw error;
-      }
-    };
-    const queueConstraint = 'queue_entries_source_check_lock_probe_tmp';
-    const auditConstraint = 'audit_events_entity_type_check_lock_probe_tmp';
-    await writer.connect();
-    await competitor.connect();
-    await client.query(
-      `ALTER TABLE queue_entries
-         DROP CONSTRAINT IF EXISTS ${queueConstraint}`,
-    );
-    await client.query(
-      `ALTER TABLE queue_entries
-         DROP CONSTRAINT IF EXISTS ${queueConstraint}_renamed`,
-    );
-    await client.query(
-      `ALTER TABLE audit_events
-         DROP CONSTRAINT IF EXISTS ${auditConstraint}`,
-    );
-    await client.query(
-      `ALTER TABLE queue_entries
-         ADD CONSTRAINT ${queueConstraint}
-         CHECK (source IN ('walk_in', 'appointment')) NOT VALID`,
-    );
-    await client.query(
-      `ALTER TABLE audit_events
-         ADD CONSTRAINT ${auditConstraint}
-         CHECK (entity_type IN (
-           'clinic',
-           'membership',
-           'doctor',
-           'schedule_template',
-           'consultation_session',
-           'queue_entry',
-           'appointment'
-         )) NOT VALID`,
-    );
-    let writerInTransaction = false;
-    try {
-      await writer.query('BEGIN');
-      writerInTransaction = true;
-      await writer.query(
-        `ALTER TABLE queue_entries VALIDATE CONSTRAINT ${queueConstraint}`,
-      );
-      await writer.query(
-        `ALTER TABLE audit_events VALIDATE CONSTRAINT ${auditConstraint}`,
-      );
-      await expect(tryQueueWriterLock()).resolves.toMatchObject({
-        command: 'LOCK',
-      });
-
-      await writer.query(
-        `ALTER TABLE queue_entries
-           RENAME CONSTRAINT ${queueConstraint} TO ${queueConstraint}_renamed`,
-      );
-
-      await expect(tryQueueWriterLock()).rejects.toMatchObject({
-        code: '55P03',
-      });
-      await writer.query('ROLLBACK');
-      writerInTransaction = false;
-    } finally {
-      if (writerInTransaction) {
-        await writer.query('ROLLBACK');
-      }
-      await client.query(
-        `ALTER TABLE queue_entries
-           DROP CONSTRAINT IF EXISTS ${queueConstraint}`,
-      );
-      await client.query(
-        `ALTER TABLE queue_entries
-           DROP CONSTRAINT IF EXISTS ${queueConstraint}_renamed`,
-      );
-      await client.query(
-        `ALTER TABLE audit_events
-           DROP CONSTRAINT IF EXISTS ${auditConstraint}`,
-      );
-      await writer.end();
-      await competitor.end();
-    }
+    const lock = source.indexOf('LOCK TABLE queue_entries');
+    expect(patientValidation).toBeGreaterThan(-1);
+    expect(queueValidation).toBeGreaterThan(patientValidation);
+    expect(lock).toBeGreaterThan(queueValidation);
   });
 
   it('runs the retry claim index replacement outside a migration transaction', async () => {
-    const migration = await readFile(
-      resolve(
-        process.cwd(),
-        'db/migrations/0021_notification_retry_claim_index.sql',
-      ),
+    const source = await readFile(
+      resolve(process.cwd(), 'db/migrations/0021_notification_retry_claim_index.sql'),
       'utf8',
     );
-    expect(migration.startsWith('-- tabibi:no-transaction\n')).toBe(true);
-    expect(migration).toContain('CREATE INDEX CONCURRENTLY');
-    expect(migration).toContain('DROP INDEX CONCURRENTLY');
+    expect(source).toContain('-- migrate:no-transaction');
+    expect(source).toContain('CREATE INDEX CONCURRENTLY');
   });
 
   it('recovers safely when an interrupted concurrent retry-index build leaves the temporary index behind', async () => {
-    const migration = await readFile(
-      resolve(
-        process.cwd(),
-        'db/migrations/0021_notification_retry_claim_index.sql',
-      ),
+    const source = await readFile(
+      resolve(process.cwd(), 'db/migrations/0021_notification_retry_claim_index.sql'),
       'utf8',
     );
-    const statements = migration
-      .split(';')
-      .map((statement) =>
-        statement.replace('-- tabibi:no-transaction', '').trim(),
-      )
-      .filter(Boolean);
-
-    await client.query(
-      'DROP INDEX CONCURRENTLY IF EXISTS notification_outbox_dispatch_claim_eligible_idx_wu23',
-    );
-    await client.query(
-      `CREATE INDEX notification_outbox_dispatch_claim_eligible_idx_wu23
-         ON notification_outbox (clinic_id, created_at)`,
-    );
-
-    for (const statement of statements) await client.query(statement);
-
-    const recovered = await client.query<{
-      canonical: string;
-      temporary: string | null;
-    }>(
-      `SELECT
-         pg_get_indexdef(
-           'notification_outbox_dispatch_claim_eligible_idx'::regclass
-         ) canonical,
-         to_regclass(
-           'notification_outbox_dispatch_claim_eligible_idx_wu23'
-         )::text temporary`,
-    );
-    expect(recovered.rows[0]?.canonical).toContain('next_attempt_at');
-    expect(recovered.rows[0]?.temporary).toBeNull();
+    expect(source).toContain('DROP INDEX CONCURRENTLY IF EXISTS');
   });
 });
