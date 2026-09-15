@@ -207,6 +207,95 @@ test('a stale in-flight poll response that predates a successful check-in cannot
   await expect(page.getByText(/en attente/)).toHaveCount(0);
 });
 
+test('a check-in that succeeds while polling is independently failing still shows its confirmation over the stale view', async ({
+  page,
+}) => {
+  await mockBooking(page);
+
+  let statusAttempt = 0;
+  await page.route(STATUS_URL, async (route) => {
+    statusAttempt += 1;
+    if (statusAttempt === 1) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          bookingState: 'confirmed',
+          queueState: 'waiting',
+        }),
+      });
+      return;
+    }
+    // Every poll from here on fails, independently of the check-in below.
+    await route.fulfill({ status: 503, body: '' });
+  });
+
+  const releaseCheckInHolder: { current: (() => void) | null } = {
+    current: null,
+  };
+  const checkInReleased = new Promise<void>((resolve) => {
+    releaseCheckInHolder.current = resolve;
+  });
+  await page.route(CHECK_IN_URL, async (route) => {
+    await checkInReleased;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ state: 'checked_in', reconciled: false }),
+    });
+  });
+
+  // Test-only visibility hook so an independent poll can be triggered
+  // immediately (hidden -> visible) instead of waiting out the real
+  // POLL_INTERVAL_MS cadence, which would also trip the check-in's own
+  // shorter internal request timeout before it could be released below.
+  await page.addInitScript(() => {
+    let hidden = false;
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => (hidden ? 'hidden' : 'visible'),
+    });
+    Object.defineProperty(window, '__setLiveQueueHiddenForTest', {
+      configurable: true,
+      value: (value: boolean) => {
+        hidden = value;
+        document.dispatchEvent(new Event('visibilitychange'));
+      },
+    });
+  });
+
+  await submitBookingForm(page);
+  await expect(page.getByText(/en attente/)).toBeVisible();
+
+  // Start a check-in and leave its response gated open.
+  await checkInButton(page).click();
+
+  // Independently, an immediate poll (triggered via a visibility toggle
+  // rather than waiting out the real cadence) fails and flips the view to
+  // stale before the check-in above has resolved.
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setLiveQueueHiddenForTest: (value: boolean) => void;
+      }
+    ).__setLiveQueueHiddenForTest(true);
+  });
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setLiveQueueHiddenForTest: (value: boolean) => void;
+      }
+    ).__setLiveQueueHiddenForTest(false);
+  });
+  await expect(page.getByText('Statut potentiellement obsolète')).toBeVisible();
+
+  // Now let the still-pending check-in succeed.
+  releaseCheckInHolder.current?.();
+
+  await expect(page.getByText('Votre présence a été confirmée.')).toBeVisible();
+  await expect(page.getByText(/enregistré/)).toBeVisible();
+});
+
 test('Arabic renders the stale-response suppression and reload-recovery behavior with RTL parity', async ({
   page,
 }) => {

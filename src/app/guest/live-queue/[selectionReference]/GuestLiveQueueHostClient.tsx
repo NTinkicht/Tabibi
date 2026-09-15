@@ -447,6 +447,12 @@ function LiveQueueView({
   // between the polling effect and submitCheckIn so a stale/out-of-order
   // response from either stream can never regress the display below it.
   const queueStateFloorRef = useRef<string | null>(null);
+  // The most recent poll data, whether currently displayed as 'active' or
+  // 'stale' (a transient poll failure). Shared with submitCheckIn so a
+  // check-in success reconciles the display even while polling itself is
+  // failing, and so a subsequent poll failure's own 'stale' render doesn't
+  // fall back to pre-check-in data.
+  const lastDataRef = useRef<LiveQueueData | null>(null);
 
   const submitCheckIn = async () => {
     if (checkInState.kind === 'pending') return;
@@ -484,21 +490,47 @@ function LiveQueueView({
             'checked_in',
             queueStateFloorRef.current,
           );
+          if (
+            lastDataRef.current &&
+            queueStateRank(lastDataRef.current.queueState) <
+              queueStateRank('checked_in')
+          ) {
+            lastDataRef.current = {
+              ...lastDataRef.current,
+              queueState: 'checked_in',
+            };
+          }
           setCheckInState({ kind: 'done', reconciled: result.reconciled });
           // Reflect the now-authoritatively-known transition immediately,
           // rather than waiting up to POLL_INTERVAL_MS for the next poll to
           // confirm it -- a stale in-flight poll response from before this
-          // check-in cannot regress it back below the floor set above.
-          setState((current) =>
-            current.kind === 'active' &&
-            queueStateRank(current.data.queueState) <
-              queueStateRank('checked_in')
-              ? {
-                  kind: 'active',
-                  data: { ...current.data, queueState: 'checked_in' },
-                }
-              : current,
-          );
+          // check-in cannot regress it back below the floor set above. This
+          // applies whether the view is currently 'active' or 'stale' (a
+          // transient poll failure does not un-know a completed check-in).
+          setState((current) => {
+            if (
+              current.kind === 'active' &&
+              queueStateRank(current.data.queueState) <
+                queueStateRank('checked_in')
+            ) {
+              return {
+                kind: 'active',
+                data: { ...current.data, queueState: 'checked_in' },
+              };
+            }
+            if (
+              current.kind === 'stale' &&
+              current.data &&
+              queueStateRank(current.data.queueState) <
+                queueStateRank('checked_in')
+            ) {
+              return {
+                ...current,
+                data: { ...current.data, queueState: 'checked_in' },
+              };
+            }
+            return current;
+          });
           return;
         }
         // A 200 that doesn't conform to the wire schema is not a trustworthy
@@ -537,7 +569,6 @@ function LiveQueueView({
     let currentBearer: string | null = initialBearerRef.current ?? null;
     let inFlight = false;
     let consecutiveFailures = 0;
-    let lastData: LiveQueueData | null = null;
     let hideAbort = false;
     let resumeIfVisibleAfterHideAbort = false;
     let activeController: AbortController | null = null;
@@ -607,7 +638,7 @@ function LiveQueueView({
         consecutiveFailures = 0;
         hideAbort = false;
         if (isTerminal(fetched)) {
-          lastData = fetched;
+          lastDataRef.current = fetched;
           stopForTerminal(fetched);
           return;
         }
@@ -626,7 +657,7 @@ function LiveQueueView({
           queueStateFloorRef.current = queueState;
         }
         const data: LiveQueueData = { ...fetched, queueState };
-        lastData = data;
+        lastDataRef.current = data;
         setState({ kind: 'active', data });
         scheduleNext(POLL_INTERVAL_MS);
       } catch {
@@ -639,7 +670,11 @@ function LiveQueueView({
         consecutiveFailures += 1;
         if (consecutiveFailures > MAX_TRANSIENT_FAILURES) {
           clearScheduled();
-          setState({ kind: 'stale', data: lastData, exhausted: true });
+          setState({
+            kind: 'stale',
+            data: lastDataRef.current,
+            exhausted: true,
+          });
           return;
         }
         const baseDelay = RETRY_DELAYS_MS[consecutiveFailures - 1];
@@ -647,7 +682,11 @@ function LiveQueueView({
           retryAfterOverride !== null
             ? Math.max(retryAfterOverride, baseDelay)
             : baseDelay;
-        setState({ kind: 'stale', data: lastData, exhausted: false });
+        setState({
+          kind: 'stale',
+          data: lastDataRef.current,
+          exhausted: false,
+        });
         scheduleNext(Math.min(delay, MAX_RETRY_AFTER_MS));
       } finally {
         clearTimeout(timeoutHandle);
@@ -689,10 +728,10 @@ function LiveQueueView({
         // Retry exhaustion already stops automatic polling until the user
         // triggers a manual retry; hiding must not silently clear that
         // state and revert the display to a pending-auto-retry message.
-        if (lastData && !exhausted) {
+        if (lastDataRef.current && !exhausted) {
           setState({
             kind: 'stale',
-            data: lastData,
+            data: lastDataRef.current,
             exhausted: false,
             hidden: true,
           });
@@ -780,6 +819,13 @@ function LiveQueueView({
           <p>
             <strong>{copy.status}</strong>{' '}
             {copy.queueStates[state.data.queueState] ?? state.data.queueState}
+          </p>
+        ) : null}
+        {checkInState.kind === 'done' ? (
+          <p role="status">
+            {checkInState.reconciled
+              ? copy.checkInAlreadyDone
+              : copy.checkInSuccess}
           </p>
         ) : null}
         <div role="status">
