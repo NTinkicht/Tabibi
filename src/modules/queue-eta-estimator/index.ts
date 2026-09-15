@@ -32,7 +32,9 @@ export interface QueueEtaRange {
 
 function normalizeSamples(samples: readonly DurationSample[]): number[] {
   return samples
-    .map((value) => (value === null || value === undefined ? Number.NaN : Number(value)))
+    .map((value) =>
+      value === null || value === undefined ? Number.NaN : Number(value),
+    )
     .filter((value) => Number.isFinite(value))
     .map((value) =>
       Math.min(MAX_SAMPLE_MINUTES, Math.max(MIN_SAMPLE_MINUTES, value)),
