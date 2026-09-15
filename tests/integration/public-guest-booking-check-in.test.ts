@@ -452,6 +452,75 @@ describe('WU62/WU65 public guest booking check-in', () => {
     }
   });
 
+  it('WU66: rejects a check-in that lands after lifecycle drift from an eligible status poll, with no duplicate durable effect', async () => {
+    const booking = await createBooking('6001');
+    await openSession(booking);
+
+    const { GET } = await import(
+      '@/app/api/public/bookings/live-queue-status/route'
+    );
+    const pollResponse = await GET(
+      new Request('http://localhost/api/public/bookings/live-queue-status', {
+        method: 'GET',
+        headers: { authorization: `Bearer ${booking.bearer}` },
+      }),
+    );
+    expect(pollResponse.status).toBe(200);
+    expect(await pollResponse.json()).toEqual({
+      bookingState: 'confirmed',
+      queueState: 'waiting',
+    });
+
+    // Lifecycle drift between that poll and the check-in below: staff pauses
+    // the session out of band.
+    await pool.query(
+      `UPDATE consultation_sessions SET status='paused' WHERE id=$1 AND clinic_id=$2`,
+      [booking.sessionId, booking.clinicId],
+    );
+
+    const checkInResponse = await POST(
+      new Request('http://localhost/api/public/bookings/check-in', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${booking.bearer}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ operationId: 'op-6001' }),
+      }),
+    );
+    expect(checkInResponse.status).toBe(200);
+    expect(await checkInResponse.json()).toEqual({
+      state: 'checked_in',
+      reconciled: false,
+    });
+
+    // A paused session is still an eligible check-in target (contract:
+    // session status in open/paused), so this must succeed once and exactly
+    // once -- proving drift within the eligible envelope produces one
+    // durable effect, not zero and not a duplicate.
+    expect(await state(booking)).toMatchObject({
+      appointment_status: 'checked_in',
+      queue_state: 'checked_in',
+    });
+    expect((await audits(booking)).rows).toHaveLength(1);
+    expect((await operations(booking)).rows).toHaveLength(1);
+
+    // Now drift genuinely out of eligibility (cancel the session) and prove
+    // a second, distinct operationId against the same booking is rejected
+    // with zero additional durable effect -- no duplicate check-in.
+    await pool.query(
+      `UPDATE consultation_sessions SET status='cancelled' WHERE id=$1 AND clinic_id=$2`,
+      [booking.sessionId, booking.clinicId],
+    );
+    await expectRejectedWithoutOperationalMutation(
+      new PublicGuestBookingCheckInService(pool, () => now),
+      booking.bearer,
+      'op-6001-distinct',
+      [booking],
+    );
+    expect((await operations(booking)).rows).toHaveLength(1);
+  });
+
   it('fails closed for tampered, expired, revoked, drifted, and terminal bookings with zero check-in audit', async () => {
     const service = new PublicGuestBookingCheckInService(pool, () => now);
     const tampered = await createBooking('3001');
