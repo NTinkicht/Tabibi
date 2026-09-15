@@ -159,6 +159,27 @@ async function audits(booking: Booking) {
   );
 }
 
+async function expectRejectedWithoutOperationalMutation(
+  service: PublicGuestBookingCheckInService,
+  bearer: string,
+  bookings: Booking[],
+) {
+  const before = await Promise.all(bookings.map((booking) => state(booking)));
+  const auditCounts = await Promise.all(
+    bookings.map(async (booking) => (await audits(booking)).rows.length),
+  );
+
+  await expect(service.checkIn(bearer)).rejects.toBeInstanceOf(
+    PublicGuestBookingCheckInRejectedError,
+  );
+
+  const after = await Promise.all(bookings.map((booking) => state(booking)));
+  expect(after).toEqual(before);
+  for (const [index, booking] of bookings.entries()) {
+    expect((await audits(booking)).rows).toHaveLength(auditCounts[index]!);
+  }
+}
+
 describe('WU62 public guest booking check-in', () => {
   it('atomically checks in once, increments the session version, and emits one privacy-safe audit', async () => {
     const booking = await createBooking('1001');
@@ -233,6 +254,102 @@ describe('WU62 public guest booking check-in', () => {
     );
     expect((await audits(first)).rows).toHaveLength(1);
     expect((await audits(second)).rows).toHaveLength(1);
+  });
+
+  it('keeps a capability scoped to its own booking within the same session', async () => {
+    const first = await createBooking('2101');
+    const second = await createBooking('2102', first);
+    await openSession(first);
+    const service = new PublicGuestBookingCheckInService(pool, () => now);
+    const secondBefore = await state(second);
+
+    await expect(service.checkIn(first.bearer)).resolves.toEqual({
+      status: 'checked_in',
+    });
+
+    expect(await state(first)).toMatchObject({
+      appointment_status: 'checked_in',
+      queue_state: 'checked_in',
+    });
+    expect(await state(second)).toMatchObject({
+      appointment_status: secondBefore?.appointment_status,
+      queue_state: secondBefore?.queue_state,
+      eligibility_order: secondBefore?.eligibility_order,
+    });
+    expect((await audits(first)).rows).toHaveLength(1);
+    expect((await audits(second)).rows).toHaveLength(0);
+  });
+
+  it('rejects cross-clinic credential substitution without operational mutation', async () => {
+    const source = await createBooking('2201');
+    const target = await createBooking('2202');
+    await openSession(source);
+    await openSession(target);
+    const service = new PublicGuestBookingCheckInService(pool, () => now);
+
+    await pool.query(
+      `UPDATE guest_credentials SET revoked_at=$2 WHERE queue_entry_id=$1`,
+      [target.queueEntryId, now],
+    );
+    await pool.query(
+      `UPDATE guest_credentials
+          SET clinic_id=$2, session_id=$3, queue_entry_id=$4
+        WHERE queue_entry_id=$1`,
+      [source.queueEntryId, target.clinicId, target.sessionId, target.queueEntryId],
+    );
+
+    await expectRejectedWithoutOperationalMutation(service, source.bearer, [
+      source,
+      target,
+    ]);
+  });
+
+  it('rejects immutable patient-association drift without operational mutation', async () => {
+    const booking = await createBooking('2301');
+    await openSession(booking);
+    const replacementPatientId = randomUUID();
+    await pool.query(
+      `INSERT INTO patient_operational_records
+         (id, clinic_id, private_display_name, contact_phone)
+       VALUES ($1, $2, 'Replacement Patient', '0555002301')`,
+      [replacementPatientId, booking.clinicId],
+    );
+    await pool.query(`UPDATE appointments SET patient_id=$2 WHERE id=$1`, [
+      booking.appointmentId,
+      replacementPatientId,
+    ]);
+    await pool.query(`UPDATE queue_entries SET patient_id=$2 WHERE id=$1`, [
+      booking.queueEntryId,
+      replacementPatientId,
+    ]);
+
+    const service = new PublicGuestBookingCheckInService(pool, () => now);
+    await expectRejectedWithoutOperationalMutation(service, booking.bearer, [
+      booking,
+    ]);
+  });
+
+  it('rejects completed and no-show bookings without operational mutation', async () => {
+    const service = new PublicGuestBookingCheckInService(pool, () => now);
+    for (const [index, terminalState] of ['completed', 'no_show'].entries()) {
+      const booking = await createBooking(`24${index + 1}1`);
+      await openSession(booking);
+      await pool.query(
+        `UPDATE appointments SET status=$2::appointment_status WHERE id=$1`,
+        [booking.appointmentId, terminalState],
+      );
+      await pool.query(
+        `UPDATE queue_entries
+            SET state=$2::queue_entry_status,
+                completed_at=CASE WHEN $2='completed' THEN now() ELSE completed_at END
+          WHERE id=$1`,
+        [booking.queueEntryId, terminalState],
+      );
+
+      await expectRejectedWithoutOperationalMutation(service, booking.bearer, [
+        booking,
+      ]);
+    }
   });
 
   it('fails closed for tampered, expired, revoked, drifted, and terminal bookings with zero check-in audit', async () => {
