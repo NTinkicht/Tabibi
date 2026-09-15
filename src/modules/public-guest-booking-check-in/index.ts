@@ -7,6 +7,7 @@ import { inTransaction } from '@/platform/database/transaction';
 
 export interface PublicGuestBookingCheckInResult {
   status: 'checked_in';
+  reconciled: boolean;
 }
 
 export class PublicGuestBookingCheckInRejectedError extends Error {
@@ -14,6 +15,22 @@ export class PublicGuestBookingCheckInRejectedError extends Error {
     super('Guest booking check-in request rejected');
     this.name = 'PublicGuestBookingCheckInRejectedError';
   }
+}
+
+export class PublicGuestBookingCheckInValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PublicGuestBookingCheckInValidationError';
+  }
+}
+
+function normalizedOperationId(operationId: string): string {
+  if (operationId.length < 1 || operationId.length > 128) {
+    throw new PublicGuestBookingCheckInValidationError(
+      'operationId must be between 1 and 128 characters',
+    );
+  }
+  return operationId;
 }
 
 type CheckInIdentityRow = {
@@ -52,7 +69,11 @@ export class PublicGuestBookingCheckInService {
     ) => Promise<void>,
   ) {}
 
-  async checkIn(bearer: string): Promise<PublicGuestBookingCheckInResult> {
+  async checkIn(
+    bearer: string,
+    operationId: string,
+  ): Promise<PublicGuestBookingCheckInResult> {
+    const validOperationId = normalizedOperationId(operationId);
     const credentialId = authenticatedGuestCredentialId(bearer);
     const secret = bearerSecret(bearer);
     if (!credentialId || !secret)
@@ -127,11 +148,20 @@ export class PublicGuestBookingCheckInService {
       )
         throw new PublicGuestBookingCheckInRejectedError();
 
-      if (
-        row.appointment_status === 'checked_in' &&
-        row.queue_state === 'checked_in'
-      ) {
-        return { status: 'checked_in' };
+      // Durable replay detection: a prior committed operation with this
+      // exact (credential, operationId) pair reconciles to the same
+      // outcome without repeating the mutation or audit effect. Any other
+      // request -- including one against an already-checked-in booking --
+      // falls through to the ordinary eligibility checks below, which
+      // reject it as an ineligible lifecycle state.
+      const priorOperation = await client.query(
+        `SELECT 1
+           FROM public_guest_check_in_operations
+          WHERE credential_id = $1 AND operation_id = $2`,
+        [credentialId, validOperationId],
+      );
+      if (priorOperation.rows[0]) {
+        return { status: 'checked_in', reconciled: true };
       }
 
       if (!['open', 'paused'].includes(session.rows[0].status)) {
@@ -194,11 +224,17 @@ export class PublicGuestBookingCheckInService {
         ],
       );
 
+      await client.query(
+        `INSERT INTO public_guest_check_in_operations (credential_id, operation_id)
+         VALUES ($1, $2)`,
+        [credentialId, validOperationId],
+      );
+
       if (this.afterOperationalMutationForTest) {
         await this.afterOperationalMutationForTest(client);
       }
 
-      return { status: 'checked_in' };
+      return { status: 'checked_in', reconciled: false };
     });
   }
 }

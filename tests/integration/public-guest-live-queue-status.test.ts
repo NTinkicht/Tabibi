@@ -170,6 +170,7 @@ describe('WU63 public guest live queue status', () => {
 
     await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
       booking.bearer,
+      'wu63-status-1001',
     );
 
     await expect(service.get(booking.bearer)).resolves.toEqual({
@@ -186,6 +187,7 @@ describe('WU63 public guest live queue status', () => {
 
     await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
       first.bearer,
+      'wu63-status-2101',
     );
 
     await expect(service.get(first.bearer)).resolves.toEqual({
