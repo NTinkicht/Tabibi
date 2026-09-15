@@ -81,7 +81,8 @@ async function createBooking(
     startsAt: targetStartsAt,
     endsAt: targetEndsAt,
   });
-  if (!selectionReference) throw new Error('WU68 selection reference not issued');
+  if (!selectionReference)
+    throw new Error('WU68 selection reference not issued');
 
   const contactPhone = `+21355568${suffix.padStart(4, '0')}`;
   const booked = await new PublicGuestBookingService(
@@ -126,7 +127,10 @@ async function openAndCheckIn(...bookings: Booking[]) {
   );
   const checkIn = new PublicGuestBookingCheckInService(pool, () => now);
   for (const [index, booking] of bookings.entries()) {
-    await checkIn.checkIn(booking.bearer, `wu68-check-in-${index}-${booking.appointmentId}`);
+    await checkIn.checkIn(
+      booking.bearer,
+      `wu68-check-in-${index}-${booking.appointmentId}`,
+    );
   }
 }
 
@@ -146,11 +150,10 @@ async function createReceptionist(clinicId: string) {
 async function insertSession(input: {
   clinicId: string;
   doctorId: string;
-  sessionId?: string;
   startsAt?: string;
   endsAt?: string;
 }) {
-  const sessionId = input.sessionId ?? randomUUID();
+  const sessionId = randomUUID();
   await pool.query(
     `INSERT INTO consultation_sessions
       (id,clinic_id,doctor_id,service_date,starts_at,ends_at,status)
@@ -179,7 +182,11 @@ async function insertDurationEntry(input: {
     `INSERT INTO patient_operational_records
       (id, clinic_id, private_display_name, contact_phone)
      VALUES ($1,$2,'WU68 Historical Patient',$3)`,
-    [patientId, input.clinicId, `+213555${patientId.replaceAll('-', '').slice(0, 8)}`],
+    [
+      patientId,
+      input.clinicId,
+      `+213555${patientId.replaceAll('-', '').slice(0, 8)}`,
+    ],
   );
   await pool.query(
     `INSERT INTO queue_entries
@@ -201,15 +208,21 @@ async function insertDurationEntry(input: {
   return entryId;
 }
 
-async function etaPair(booking: Booking, receptionistScope: Awaited<ReturnType<typeof createReceptionist>>) {
-  const guest = await new PublicGuestLiveQueueStatusService(pool, () => now).get(
-    booking.bearer,
-  );
+async function etaPair(
+  booking: Booking,
+  receptionistScope: Awaited<ReturnType<typeof createReceptionist>>,
+) {
+  const guest = await new PublicGuestLiveQueueStatusService(
+    pool,
+    () => now,
+  ).get(booking.bearer);
   const staff = await new ReceptionistDashboardService(pool).getSnapshot(
     receptionistScope,
     booking.sessionId,
   );
-  const staffEntry = staff.entries.find((entry) => entry.id === booking.queueEntryId);
+  const staffEntry = staff.entries.find(
+    (entry) => entry.id === booking.queueEntryId,
+  );
   if (!staffEntry) throw new Error('WU68 staff entry missing');
   return { guest: guest.eta, staff: staffEntry.eta };
 }
@@ -247,7 +260,12 @@ describe('WU68 deterministic historical ETA prior', () => {
       observedSampleCount: 0,
     });
     expect(Object.keys(guest!).sort()).toEqual(
-      ['patientsAhead', 'minWaitMinutes', 'maxWaitMinutes', 'estimateSource'].sort(),
+      [
+        'patientsAhead',
+        'minWaitMinutes',
+        'maxWaitMinutes',
+        'estimateSource',
+      ].sort(),
     );
     expect(JSON.stringify(guest)).not.toContain(booking.doctorId);
     expect(JSON.stringify(guest)).not.toContain(historySession);
