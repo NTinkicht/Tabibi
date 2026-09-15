@@ -224,6 +224,30 @@ describe('WU63 public guest live queue status', () => {
     });
   });
 
+  it('rejects permitted queue-entry association drift instead of reading the reassigned queue state', async () => {
+    const booking = await createBooking('2401');
+    await openSession(booking);
+    const driftPatientId = randomUUID();
+    const driftQueueEntryId = randomUUID();
+    await pool.query(
+      `INSERT INTO patient_operational_records (id, clinic_id, private_display_name, contact_phone) VALUES ($1, $2, 'Drift Target', '0555004401')`,
+      [driftPatientId, booking.clinicId],
+    );
+    await pool.query(
+      `INSERT INTO queue_entries (id, clinic_id, session_id, patient_id, state, source, registration_order, eligibility_order, priority_order) SELECT $1, $2, $3, $4, 'waiting', 'walk_in', COALESCE(MAX(registration_order), 0) + 1, NULL, NULL FROM queue_entries WHERE clinic_id = $2 AND session_id = $3`,
+      [driftQueueEntryId, booking.clinicId, booking.sessionId, driftPatientId],
+    );
+    await pool.query(
+      `UPDATE guest_credentials SET queue_entry_id=$2 WHERE queue_entry_id=$1`,
+      [booking.queueEntryId, driftQueueEntryId],
+    );
+
+    const service = new PublicGuestLiveQueueStatusService(pool, () => now);
+    await expect(service.get(booking.bearer)).rejects.toBeInstanceOf(
+      PublicGuestLiveQueueStatusRejectedError,
+    );
+  });
+
   it('rejects immutable patient-association drift instead of reading the reassigned patient state', async () => {
     const booking = await createBooking('2301');
     await openSession(booking);
