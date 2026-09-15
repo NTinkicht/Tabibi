@@ -22,6 +22,16 @@ type HostPhase =
   | { kind: 'live'; bearer: string | undefined; queueLabel: string };
 
 const TERMINAL_VALUES = new Set(['completed', 'cancelled', 'no_show']);
+// Non-terminal queue-state progression, oldest to newest. Used only to stop a
+// stale/out-of-order response (poll or check-in) from visually regressing the
+// display below a more-advanced state this view has already authoritatively
+// observed; terminal states are handled separately and always win outright.
+const QUEUE_STATE_PROGRESSION = [
+  'waiting',
+  'checked_in',
+  'called',
+  'in_consultation',
+];
 const POLL_INTERVAL_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 10_000;
 const RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000];
@@ -191,6 +201,23 @@ function isTerminal(data: LiveQueueData): boolean {
     TERMINAL_VALUES.has(data.bookingState) ||
     TERMINAL_VALUES.has(data.queueState)
   );
+}
+
+function queueStateRank(value: string): number {
+  return QUEUE_STATE_PROGRESSION.indexOf(value);
+}
+
+// Never let a queue-state value regress below a floor this view has already
+// authoritatively observed (from either a poll or a successful/reconciled
+// check-in). Values outside the known non-terminal progression -- including
+// every terminal value, which callers handle separately -- are passed
+// through unclamped rather than compared.
+function clampQueueState(value: string, floor: string | null): string {
+  if (!floor) return value;
+  const valueRank = queueStateRank(value);
+  const floorRank = queueStateRank(floor);
+  if (valueRank === -1 || floorRank === -1) return value;
+  return valueRank < floorRank ? floor : value;
 }
 
 function retryAfterMs(response: Response, fallback: number): number {
@@ -415,6 +442,11 @@ function LiveQueueView({
   // attempt reaches a definitive outcome (success, reconciled, or a generic
   // rejection).
   const checkInOperationIdRef = useRef<string | null>(null);
+  // The most-advanced non-terminal queue state this view has authoritatively
+  // observed, from either a poll or a successful/reconciled check-in. Shared
+  // between the polling effect and submitCheckIn so a stale/out-of-order
+  // response from either stream can never regress the display below it.
+  const queueStateFloorRef = useRef<string | null>(null);
 
   const submitCheckIn = async () => {
     if (checkInState.kind === 'pending') return;
@@ -448,7 +480,25 @@ function LiveQueueView({
           typeof result.reconciled === 'boolean'
         ) {
           checkInOperationIdRef.current = null;
+          queueStateFloorRef.current = clampQueueState(
+            'checked_in',
+            queueStateFloorRef.current,
+          );
           setCheckInState({ kind: 'done', reconciled: result.reconciled });
+          // Reflect the now-authoritatively-known transition immediately,
+          // rather than waiting up to POLL_INTERVAL_MS for the next poll to
+          // confirm it -- a stale in-flight poll response from before this
+          // check-in cannot regress it back below the floor set above.
+          setState((current) =>
+            current.kind === 'active' &&
+            queueStateRank(current.data.queueState) <
+              queueStateRank('checked_in')
+              ? {
+                  kind: 'active',
+                  data: { ...current.data, queueState: 'checked_in' },
+                }
+              : current,
+          );
           return;
         }
         // A 200 that doesn't conform to the wire schema is not a trustworthy
@@ -552,15 +602,31 @@ function LiveQueueView({
           retryAfterOverride = retryAfterMs(response, 0) || null;
           throw new Error('transient');
         }
-        const data = (await response.json()) as LiveQueueData;
+        const fetched = (await response.json()) as LiveQueueData;
         if (cancelled || terminalReached) return;
         consecutiveFailures = 0;
         hideAbort = false;
-        lastData = data;
-        if (isTerminal(data)) {
-          stopForTerminal(data);
+        if (isTerminal(fetched)) {
+          lastData = fetched;
+          stopForTerminal(fetched);
           return;
         }
+        // Never let this response regress the queue state below what a
+        // prior poll or a successful/reconciled check-in already
+        // established, in case it was in flight before that happened and
+        // only settles now.
+        const queueState = clampQueueState(
+          fetched.queueState,
+          queueStateFloorRef.current,
+        );
+        if (
+          queueStateRank(queueState) >
+          queueStateRank(queueStateFloorRef.current ?? '')
+        ) {
+          queueStateFloorRef.current = queueState;
+        }
+        const data: LiveQueueData = { ...fetched, queueState };
+        lastData = data;
         setState({ kind: 'active', data });
         scheduleNext(POLL_INTERVAL_MS);
       } catch {
@@ -741,7 +807,7 @@ function LiveQueueView({
         <strong>{copy.status}</strong>{' '}
         {copy.queueStates[state.data.queueState] ?? state.data.queueState}
       </p>
-      {state.data.queueState === 'waiting' ? (
+      {state.data.queueState === 'waiting' || checkInState.kind !== 'idle' ? (
         <div role="status">
           {checkInState.kind === 'done' ? (
             <p>
