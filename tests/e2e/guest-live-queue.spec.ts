@@ -1,0 +1,345 @@
+import { expect, test, type Page } from '@playwright/test';
+
+const BOOKING_URL = '**/api/public/bookings';
+const STATUS_URL = '**/api/public/bookings/live-queue-status';
+const BEARER = 'test-selection.test-guest-bearer-secret.signature';
+
+async function mockBooking(page: Page, bearer = BEARER) {
+  await page.route(BOOKING_URL, async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        serviceDate: '2099-05-15',
+        startsAt: '2099-05-15T08:00:00.000Z',
+        endsAt: '2099-05-15T09:00:00.000Z',
+        queueLabel: 'G-042',
+        guestBearer: bearer,
+        guestAccessExpiresAt: '2099-05-16T08:00:00.000Z',
+      }),
+    });
+  });
+}
+
+async function submitBookingForm(page: Page) {
+  await page.goto('/guest/live-queue/test-selection-ref');
+  await page.getByLabel(/Votre nom|اسمك/).fill('Test Guest');
+  await page.getByRole('button', { name: /Confirmer|تأكيد/ }).click();
+}
+
+test('guest live queue completes the booking-to-live handoff using only the Authorization header', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let capturedAuth = '';
+  let capturedCookie = '';
+  await page.route(STATUS_URL, async (route) => {
+    capturedAuth = route.request().headers()['authorization'] ?? '';
+    capturedCookie = route.request().headers()['cookie'] ?? '';
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await submitBookingForm(page);
+
+  await expect(page.getByText('G-042')).toBeVisible();
+  await expect(page.getByText(/en attente/)).toBeVisible();
+  expect(capturedAuth).toBe(`Bearer ${BEARER}`);
+  expect(capturedCookie).not.toContain('tabibi_guest');
+
+  expect(await page.locator('body').innerText()).not.toContain(BEARER);
+  expect(page.url()).not.toContain(BEARER);
+  expect(
+    await page.evaluate(() => [
+      ...Object.values(localStorage),
+      ...Object.values(sessionStorage),
+    ]),
+  ).not.toContain(BEARER);
+});
+
+test('booking failure shows a generic message and never reaches the live view', async ({
+  page,
+}) => {
+  await page.route(BOOKING_URL, async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'rejected', requestId: 'r1' }),
+    });
+  });
+
+  await submitBookingForm(page);
+  await expect(page.getByText(/indisponible|غير متاح/)).toBeVisible();
+  await expect(page.getByText('G-042')).toHaveCount(0);
+});
+
+test('a rejected live-queue-status response enters the generic unavailable state', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'rejected', requestId: 'r1' }),
+    });
+  });
+
+  await submitBookingForm(page);
+  await expect(
+    page.getByText(/Accès indisponible|الوصول غير متاح/),
+  ).toBeVisible();
+});
+
+test('reload after reaching the live view returns to the booking form, proving no persisted bearer recovery', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await submitBookingForm(page);
+  await expect(page.getByText('G-042')).toBeVisible();
+
+  await page.reload();
+  await expect(
+    page.getByRole('button', { name: /Confirmer|تأكيد/ }),
+  ).toBeVisible();
+  await expect(page.getByText('G-042')).toHaveCount(0);
+});
+
+test('a terminal booking/queue state stops polling permanently', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'completed',
+        queueState: 'completed',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect(
+    page.getByRole('heading', { name: /Statut de la visite|حالة الزيارة/ }),
+  ).toBeVisible();
+  expect(requests).toBe(1);
+
+  await page.clock.fastForward(120_000);
+  expect(requests).toBe(1);
+});
+
+test('active states keep polling on the 30-second cadence', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect(page.getByText(/en attente/)).toBeVisible();
+  expect(requests).toBe(1);
+
+  await page.clock.fastForward(29_000);
+  expect(requests).toBe(1);
+  await page.clock.fastForward(2_000);
+  await expect.poll(() => requests).toBe(2);
+});
+
+test('transient failures retry on the 5/15/30/60-second sequence and reset on success', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    if (requests <= 2) {
+      await route.fulfill({ status: 503, body: '' });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect.poll(() => requests).toBe(1);
+
+  await page.clock.fastForward(4_000);
+  expect(requests).toBe(1);
+  await page.clock.fastForward(2_000);
+  await expect.poll(() => requests).toBe(2);
+
+  await page.clock.fastForward(14_000);
+  expect(requests).toBe(2);
+  await page.clock.fastForward(2_000);
+  await expect.poll(() => requests).toBe(3);
+  await expect(page.getByText(/en attente/)).toBeVisible();
+});
+
+test('exhausts after five consecutive transient failures and a manual retry issues a fresh request', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  let allowSuccess = false;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    if (!allowSuccess) {
+      await route.fulfill({ status: 503, body: '' });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect.poll(() => requests).toBe(1);
+  await page.clock.fastForward(6_000);
+  await expect.poll(() => requests).toBe(2);
+  await page.clock.fastForward(16_000);
+  await expect.poll(() => requests).toBe(3);
+  await page.clock.fastForward(31_000);
+  await expect.poll(() => requests).toBe(4);
+  await page.clock.fastForward(61_000);
+  await expect.poll(() => requests).toBe(5);
+
+  await expect(
+    page.getByText(/Connexion interrompue|انقطع الاتصال/),
+  ).toBeVisible();
+
+  allowSuccess = true;
+  await page.getByRole('button', { name: /maintenant|الآن/ }).click();
+  await expect.poll(() => requests).toBe(6);
+  await expect(page.getByText(/en attente/)).toBeVisible();
+});
+
+test('hidden view does not start new polls and resumes with exactly one immediate refresh', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.addInitScript(() => {
+    let hidden = false;
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => (hidden ? 'hidden' : 'visible'),
+    });
+    Object.defineProperty(window, '__setLiveQueueHiddenForTest', {
+      configurable: true,
+      value: (value: boolean) => {
+        hidden = value;
+        document.dispatchEvent(new Event('visibilitychange'));
+      },
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect.poll(() => requests).toBe(1);
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setLiveQueueHiddenForTest: (value: boolean) => void;
+      }
+    ).__setLiveQueueHiddenForTest(true);
+  });
+  await page.clock.fastForward(90_000);
+  expect(requests).toBe(1);
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setLiveQueueHiddenForTest: (value: boolean) => void;
+      }
+    ).__setLiveQueueHiddenForTest(false);
+  });
+  await expect.poll(() => requests).toBe(2);
+  await page.clock.fastForward(1_000);
+  expect(requests).toBe(2);
+});
+
+test('Arabic renders RTL and French renders LTR with equivalent state semantics', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'language', { get: () => 'ar-DZ' });
+  });
+  await page.goto('/guest/live-queue/test-selection-ref');
+  await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.getByText('احجز زيارتك')).toBeVisible();
+
+  await mockBooking(page);
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+  await page.getByLabel('اسمك').fill('Test Guest');
+  await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
+  await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.getByText('في الانتظار')).toBeVisible();
+});
