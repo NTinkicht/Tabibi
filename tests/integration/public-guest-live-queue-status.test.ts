@@ -746,4 +746,117 @@ describe('WU67 public guest deterministic ETA projection', () => {
       ].sort(),
     );
   });
+
+  it('keeps queue order, declared delay, and the observed-sample threshold on one committed PostgreSQL snapshot', async () => {
+    const ahead = await createBooking('7091');
+    const booking = await createBooking('7092', ahead);
+    await openSession(booking);
+    await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
+      ahead.bearer,
+      'wu67-status-7091',
+    );
+    await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
+      booking.bearer,
+      'wu67-status-7092',
+    );
+    await insertQueueEntry(booking, 'completed', '7093', {
+      inConsultationStartedAt: new Date(now.getTime() - 10 * 60_000),
+      completedAt: now,
+    });
+    await insertQueueEntry(booking, 'completed', '7094', {
+      inConsultationStartedAt: new Date(now.getTime() - 12 * 60_000),
+      completedAt: now,
+    });
+
+    const service = new PublicGuestLiveQueueStatusService(pool, () => now);
+    const baseline = {
+      bookingState: 'checked_in',
+      queueState: 'checked_in',
+      eta: {
+        patientsAhead: 1,
+        minWaitMinutes: Math.round(1 * 15 * 0.75),
+        maxWaitMinutes: Math.round(1 * 15 * 1.5),
+        estimateSource: 'fallback' as const,
+      },
+    };
+    await expect(service.get(booking.bearer)).resolves.toEqual(baseline);
+
+    // A single writer transaction atomically changes all three ETA input
+    // categories at once: queue order/lifecycle (a new in-consultation
+    // entry cuts ahead), declared delay, and the observed-duration sample
+    // count (crossing the >=3 fallback -> median threshold). It is never
+    // committed until after the guest projection has been re-read.
+    const writer = await pool.connect();
+    try {
+      await writer.query('BEGIN');
+
+      const cuttingPatientId = randomUUID();
+      const cuttingEntryId = randomUUID();
+      await writer.query(
+        `INSERT INTO patient_operational_records (id, clinic_id, private_display_name, contact_phone) VALUES ($1, $2, 'Cutting Patient', '0555009991')`,
+        [cuttingPatientId, booking.clinicId],
+      );
+      await writer.query(
+        `INSERT INTO queue_entries
+          (id, clinic_id, session_id, patient_id, state, source, registration_order,
+           eligibility_order, priority_order, in_consultation_started_at, completed_at)
+         SELECT $1, $2, $3, $4, 'in_consultation'::queue_entry_status, 'walk_in',
+                COALESCE(MAX(registration_order), 0) + 1, NULL, NULL, now(), NULL
+           FROM queue_entries WHERE clinic_id = $2 AND session_id = $3`,
+        [cuttingEntryId, booking.clinicId, booking.sessionId, cuttingPatientId],
+      );
+
+      await writer.query(
+        `UPDATE consultation_sessions SET declared_delay_minutes=20, delay_updated_at=$2 WHERE id=$1`,
+        [booking.sessionId, now],
+      );
+
+      const thirdSamplePatientId = randomUUID();
+      const thirdSampleEntryId = randomUUID();
+      await writer.query(
+        `INSERT INTO patient_operational_records (id, clinic_id, private_display_name, contact_phone) VALUES ($1, $2, 'Third Sample', '0555009992')`,
+        [thirdSamplePatientId, booking.clinicId],
+      );
+      await writer.query(
+        `INSERT INTO queue_entries
+          (id, clinic_id, session_id, patient_id, state, source, registration_order,
+           eligibility_order, priority_order, in_consultation_started_at, completed_at)
+         SELECT $1, $2, $3, $4, 'completed'::queue_entry_status, 'walk_in',
+                COALESCE(MAX(registration_order), 0) + 1, NULL, NULL, $5, $6
+           FROM queue_entries WHERE clinic_id = $2 AND session_id = $3`,
+        [
+          thirdSampleEntryId,
+          booking.clinicId,
+          booking.sessionId,
+          thirdSamplePatientId,
+          new Date(now.getTime() - 20 * 60_000),
+          now,
+        ],
+      );
+
+      // While the writer's transaction above remains uncommitted, the guest
+      // projection must be entirely the old committed snapshot -- never a
+      // hybrid mixing in the new order, delay, or sample count.
+      await expect(service.get(booking.bearer)).resolves.toEqual(baseline);
+
+      await writer.query('COMMIT');
+    } finally {
+      writer.release();
+    }
+
+    // Once committed, the projection must be entirely the new snapshot:
+    // patientsAhead includes the cutting-in-consultation entry, the
+    // declared delay applies, and the third sample has flipped the
+    // estimate to the observed median of [10, 12, 20] = 12.
+    await expect(service.get(booking.bearer)).resolves.toEqual({
+      bookingState: 'checked_in',
+      queueState: 'checked_in',
+      eta: {
+        patientsAhead: 2,
+        minWaitMinutes: Math.round(20 + 2 * 12 * 0.75),
+        maxWaitMinutes: Math.round(20 + 2 * 12 * 1.5),
+        estimateSource: 'observed_median',
+      },
+    });
+  });
 });
