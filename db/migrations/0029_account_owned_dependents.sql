@@ -1,0 +1,29 @@
+CREATE TYPE dependent_status AS ENUM ('active', 'archived');
+
+CREATE TABLE patient_dependents (
+  id uuid PRIMARY KEY,
+  owner_user_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  display_name text NOT NULL,
+  status dependent_status NOT NULL DEFAULT 'active',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  archived_at timestamptz,
+  CHECK (display_name = btrim(display_name)),
+  CHECK (char_length(display_name) BETWEEN 1 AND 160),
+  CHECK (display_name !~ '[[:cntrl:]]'),
+  CHECK (
+    (status = 'active' AND archived_at IS NULL)
+    OR (status = 'archived' AND archived_at IS NOT NULL)
+  )
+);
+
+CREATE INDEX patient_dependents_owner_status_name_idx
+  ON patient_dependents (owner_user_id, status, display_name, id);
+
+CREATE INDEX patient_dependents_owner_updated_idx
+  ON patient_dependents (owner_user_id, updated_at DESC, id);
+
+COMMENT ON TABLE patient_dependents IS
+  'Operational dependent identities owned by authenticated patient accounts; no clinical data.';
+COMMENT ON COLUMN patient_dependents.owner_user_id IS
+  'Server-authoritative owner scope; never expose this identifier through dependent API responses.';
