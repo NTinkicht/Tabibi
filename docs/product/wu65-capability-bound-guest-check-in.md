@@ -25,10 +25,14 @@ Extend the merged WU64 guest live-queue flow with one explicit guest check-in mu
 
 ## Idempotency and ambiguous transport failure
 
-- The client creates one opaque operation identity when the user begins a check-in attempt and reuses that same identity for retries of that logical operation, including after timeout, disconnect, or other ambiguous transport failure.
-- A new operation identity is created only for a genuinely new logical check-in operation after the previous operation has reached a deterministic terminal reconciliation.
-- The server persists or otherwise transactionally enforces the operation identity at the authorization-bound mutation boundary so replay cannot duplicate effects.
-- Idempotency identity is not authorization and cannot widen the capability scope.
+- The mutation wire contract carries the bearer only in `Authorization: Bearer <capability>` and carries a separate opaque `operationId` request-body field. `operationId` is never accepted from a URL, cookie, storage-derived authority, or as a substitute for the bearer.
+- The client generates `operationId` once when the user begins one logical check-in attempt. It is an opaque, high-entropy value with no booking, clinic, patient, queue, or other identifying information encoded in it.
+- The client reuses that exact `operationId` for every retry of the same logical operation, including timeout, disconnect, response-loss, or other ambiguous transport failure. A new `operationId` is created only for a genuinely new logical operation after deterministic reconciliation of the previous one.
+- After capability validation, the server binds the idempotency record to the authorized durable guest-booking identity resolved from that capability. The effective uniqueness scope is `(authorized guest booking, operationId)`; client-supplied booking/appointment/queue/clinic identifiers never participate in authority or widen this scope.
+- Creation/claim of the idempotency record, lifecycle validation, check-in transition, allowed queue/audit effects, and durable success outcome occur in one PostgreSQL transaction (or an equivalent atomic serialization boundary). A unique database constraint/serialization mechanism must ensure concurrent requests for the same `(authorized guest booking, operationId)` cannot produce duplicate effects.
+- A committed replay of the same bound `operationId` returns the same allow-listed public reconciliation outcome without repeating booking, queue, or audit effects. Reuse of an `operationId` under a different capability/authorized booking is a separate authorization-bound scope and must never reveal whether the other operation exists.
+- A failed transaction must not leave a success idempotency record or partial booking/queue/audit effects. Retry after an ambiguous client-side failure therefore safely re-enters with the same identity and either observes the committed result or performs the operation once.
+- Idempotency identity is not authorization and cannot widen capability scope.
 
 ## Client behavior and localization
 
@@ -40,15 +44,15 @@ Extend the merged WU64 guest live-queue flow with one explicit guest check-in mu
 
 ## Required executable evidence
 
-1. A valid capability performs exactly one allowed check-in transition and returns only the public allow-list.
-2. Retry after an ambiguous transport failure reuses the same operation identity and remains idempotent.
-3. Concurrent duplicate requests produce one durable transition/effect and no duplicate audit/queue effect.
-4. Cross-booking, cross-clinic, forged, expired, revoked, malformed, and durable-binding-drift capabilities fail generically without an existence oracle.
-5. Terminal/ineligible lifecycle states cannot be mutated and do not leak internal state.
-6. Transaction rollback evidence proves no partial booking/queue/audit mutation survives a forced failure.
-7. Arabic/French browser evidence covers pending, success, already-reconciled, generic rejection, transient failure, and retry with RTL/LTR/accessibility parity.
-8. Capability and internal identifiers are absent from DOM, URL, browser storage, logs/telemetry fixtures, and public error payloads.
-9. PostgreSQL integration evidence covers transaction, concurrency, and idempotency behavior; browser evidence is external-network-free; full repository CI remains green.
+1. A valid capability plus a fresh `operationId` performs exactly one allowed check-in transition and returns only the public allow-list.
+2. An ambiguous transport-failure test commits or may commit the first request while withholding/losing its client-visible response, then retries with the exact same bearer and `operationId`; the retry deterministically reconciles to the same public outcome with exactly one durable transition and no duplicate queue/audit effect.
+3. Concurrent duplicate requests carrying the same authorized capability and `operationId` produce one durable transition/effect and no duplicate audit/queue effect; database evidence demonstrates the uniqueness/serialization boundary.
+4. Replaying the same `operationId` with forged, expired, revoked, malformed, cross-booking, cross-clinic, or durable-binding-drift capabilities fails generically and cannot act as an existence oracle for an idempotency record or booking.
+5. Terminal/ineligible lifecycle states cannot be mutated and do not leak internal state; deterministic replay of an already committed successful operation remains idempotent.
+6. Transaction rollback evidence proves no success idempotency record or partial booking/queue/audit mutation survives a forced failure, and retry with the same `operationId` can subsequently execute exactly once when eligible.
+7. Arabic/French browser evidence covers pending, success, already-reconciled, generic rejection, transient failure, and retry with RTL/LTR/accessibility parity; ambiguous retry visibly reuses the same logical operation rather than creating a second submission.
+8. Capability, `operationId`, and internal identifiers are absent from DOM, URL, browser storage, logs/telemetry fixtures, and public error payloads; `operationId` is transmitted only in the mutation request body and is not treated as authority.
+9. PostgreSQL integration evidence covers transaction, concurrency, operation-identity uniqueness/binding, rollback, and ambiguous-failure replay; browser evidence is external-network-free; full repository CI remains green.
 
 ## Governance
 
