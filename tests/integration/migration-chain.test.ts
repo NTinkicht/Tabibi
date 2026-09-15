@@ -33,6 +33,7 @@ const committedMigrations = [
   '0025_notification_inbox.sql',
   '0026_notification_inbox_read_state.sql',
   '0027_public_guest_booking.sql',
+  '0028_public_guest_check_in_operations.sql',
 ];
 
 beforeAll(async () => {

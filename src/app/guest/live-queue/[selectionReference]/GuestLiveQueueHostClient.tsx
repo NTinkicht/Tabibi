@@ -58,6 +58,12 @@ type Copy = {
   visitStatus: string;
   bookingStates: Record<string, string>;
   queueStates: Record<string, string>;
+  checkIn: string;
+  checkInPending: string;
+  checkInSuccess: string;
+  checkInAlreadyDone: string;
+  checkInRejected: string;
+  checkInTransient: string;
 };
 
 const COPY: Record<SupportedLocale, Copy> = {
@@ -93,6 +99,12 @@ const COPY: Record<SupportedLocale, Copy> = {
       'Nous n’avons pas pu actualiser votre statut. Réessayez manuellement.',
     manualRetry: 'Réessayer maintenant',
     visitStatus: 'Statut de la visite',
+    checkIn: 'Confirmer ma présence',
+    checkInPending: 'Confirmation en cours…',
+    checkInSuccess: 'Votre présence a été confirmée.',
+    checkInAlreadyDone: 'Votre présence était déjà confirmée.',
+    checkInRejected: 'Impossible de confirmer votre présence pour le moment.',
+    checkInTransient: 'La confirmation a échoué. Veuillez réessayer.',
     bookingStates: {
       confirmed: 'confirmée',
       checked_in: 'enregistré',
@@ -140,6 +152,12 @@ const COPY: Record<SupportedLocale, Copy> = {
     offlineBody: 'تعذر تحديث حالتك. أعد المحاولة يدويًا.',
     manualRetry: 'إعادة المحاولة الآن',
     visitStatus: 'حالة الزيارة',
+    checkIn: 'تأكيد الحضور',
+    checkInPending: 'جارٍ التأكيد…',
+    checkInSuccess: 'تم تأكيد حضورك.',
+    checkInAlreadyDone: 'كان حضورك مؤكدًا بالفعل.',
+    checkInRejected: 'يتعذر تأكيد حضورك في الوقت الحالي.',
+    checkInTransient: 'فشل التأكيد. يرجى إعادة المحاولة.',
     bookingStates: {
       confirmed: 'مؤكدة',
       checked_in: 'تم تسجيل الوصول',
@@ -358,6 +376,13 @@ type ViewState =
   | { kind: 'unavailable' }
   | { kind: 'terminal'; data: LiveQueueData };
 
+type CheckInState =
+  | { kind: 'idle' }
+  | { kind: 'pending' }
+  | { kind: 'done'; reconciled: boolean }
+  | { kind: 'rejected' }
+  | { kind: 'transient' };
+
 function LiveQueueView({
   bearer,
   onBearerAccepted,
@@ -381,6 +406,71 @@ function LiveQueueView({
   // instance): a replay's re-setup bumps this before the deferred cleanup
   // microtask below runs, so only a true unmount clears initialBearerRef.
   const effectGenerationRef = useRef(0);
+  const [checkInState, setCheckInState] = useState<CheckInState>({
+    kind: 'idle',
+  });
+  // Reused across retries of the same logical check-in attempt (including
+  // ambiguous transport failures) so the backend can reconcile a replay
+  // instead of treating it as a distinct operation; cleared only once that
+  // attempt reaches a definitive outcome (success, reconciled, or a generic
+  // rejection).
+  const checkInOperationIdRef = useRef<string | null>(null);
+
+  const submitCheckIn = async () => {
+    if (checkInState.kind === 'pending') return;
+    const bearer = initialBearerRef.current;
+    if (!bearer) return;
+    checkInOperationIdRef.current ??= crypto.randomUUID();
+    setCheckInState({ kind: 'pending' });
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(
+      () => controller.abort(),
+      REQUEST_TIMEOUT_MS,
+    );
+    try {
+      const response = await fetch('/api/public/bookings/check-in', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: {
+          authorization: `Bearer ${bearer}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ operationId: checkInOperationIdRef.current }),
+        signal: controller.signal,
+      });
+      if (response.status === 200) {
+        const result = (await response.json()) as {
+          state?: unknown;
+          reconciled?: unknown;
+        };
+        if (
+          result.state === 'checked_in' &&
+          typeof result.reconciled === 'boolean'
+        ) {
+          checkInOperationIdRef.current = null;
+          setCheckInState({ kind: 'done', reconciled: result.reconciled });
+          return;
+        }
+        // A 200 that doesn't conform to the wire schema is not a trustworthy
+        // success signal; keep the operationId so a retry reuses the same
+        // logical attempt rather than starting a new one.
+        setCheckInState({ kind: 'transient' });
+        return;
+      }
+      if (response.status === 404) {
+        checkInOperationIdRef.current = null;
+        setCheckInState({ kind: 'rejected' });
+        return;
+      }
+      // 400/503/other: keep the same operationId so a retry reuses the same
+      // logical attempt rather than starting a new one.
+      setCheckInState({ kind: 'transient' });
+    } catch {
+      setCheckInState({ kind: 'transient' });
+    } finally {
+      clearTimeout(timeoutHandle);
+    }
+  };
 
   useEffect(() => {
     // Report acceptance once so the host can drop its own reference; this
@@ -646,9 +736,42 @@ function LiveQueueView({
   }
 
   return shell(
-    <p>
-      <strong>{copy.status}</strong>{' '}
-      {copy.queueStates[state.data.queueState] ?? state.data.queueState}
-    </p>,
+    <>
+      <p>
+        <strong>{copy.status}</strong>{' '}
+        {copy.queueStates[state.data.queueState] ?? state.data.queueState}
+      </p>
+      {state.data.queueState === 'waiting' ? (
+        <div role="status">
+          {checkInState.kind === 'done' ? (
+            <p>
+              {checkInState.reconciled
+                ? copy.checkInAlreadyDone
+                : copy.checkInSuccess}
+            </p>
+          ) : (
+            <>
+              {checkInState.kind === 'rejected' ? (
+                <p role="alert">{copy.checkInRejected}</p>
+              ) : null}
+              {checkInState.kind === 'transient' ? (
+                <p role="alert">{copy.checkInTransient}</p>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void submitCheckIn()}
+                disabled={checkInState.kind === 'pending'}
+              >
+                {checkInState.kind === 'pending'
+                  ? copy.checkInPending
+                  : checkInState.kind === 'transient'
+                    ? copy.retry
+                    : copy.checkIn}
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
+    </>,
   );
 }
