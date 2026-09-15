@@ -608,6 +608,96 @@ test('a booking-only terminal state (no_show) stops polling and renders both fie
   expect(requests).toBe(1);
 });
 
+test('a booking-only terminal state (completed) stops polling', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'completed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect(
+    page.getByRole('heading', { name: /Statut de la visite|حالة الزيارة/ }),
+  ).toBeVisible();
+  await expect(page.getByText('terminée')).toBeVisible();
+  await expect(page.getByText('en attente')).toBeVisible();
+  expect(requests).toBe(1);
+
+  await page.clock.fastForward(120_000);
+  expect(requests).toBe(1);
+});
+
+test('a booking-only terminal state (cancelled) stops polling', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'cancelled',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect(
+    page.getByRole('heading', { name: /Statut de la visite|حالة الزيارة/ }),
+  ).toBeVisible();
+  await expect(page.getByText('annulée')).toBeVisible();
+  await expect(page.getByText('en attente')).toBeVisible();
+  expect(requests).toBe(1);
+
+  await page.clock.fastForward(120_000);
+  expect(requests).toBe(1);
+});
+
+test('a queue-only terminal state (no_show) stops polling', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'no_show',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect(
+    page.getByRole('heading', { name: /Statut de la visite|حالة الزيارة/ }),
+  ).toBeVisible();
+  await expect(page.getByText('confirmée')).toBeVisible();
+  await expect(page.getByText('absent')).toBeVisible();
+  expect(requests).toBe(1);
+
+  await page.clock.fastForward(120_000);
+  expect(requests).toBe(1);
+});
+
 test('aborts the in-flight request on hide so a stale response cannot resurrect polling after exhaustion', async ({
   page,
 }) => {
