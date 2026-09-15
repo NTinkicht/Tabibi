@@ -500,3 +500,59 @@ test('aborts the in-flight request on hide so a stale response cannot resurrect 
   await expect(page.getByText(/enregistré/)).toBeVisible();
   expect(requests).toBe(2);
 });
+
+test('recovers automatic polling when visibility returns before a hide-triggered abort settles', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    if (requests === 1) {
+      // Never resolves on its own; only the client's own abort ends it.
+      await new Promise<void>(() => undefined);
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'checked_in',
+      }),
+    });
+  });
+
+  await page.addInitScript(() => {
+    let hidden = false;
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => (hidden ? 'hidden' : 'visible'),
+    });
+    Object.defineProperty(window, '__setLiveQueueHiddenForTest', {
+      configurable: true,
+      value: (value: boolean) => {
+        hidden = value;
+        document.dispatchEvent(new Event('visibilitychange'));
+      },
+    });
+  });
+
+  await submitBookingForm(page);
+  await expect.poll(() => requests).toBe(1);
+
+  // Flip hidden -> visible back-to-back synchronously, so the visible
+  // handler runs while the first request is still `inFlight` (its
+  // abort-triggered rejection has not been processed yet), reproducing the
+  // race where the immediate-refresh check saw inFlight=true and skipped.
+  await page.evaluate(() => {
+    const w = window as typeof window & {
+      __setLiveQueueHiddenForTest: (value: boolean) => void;
+    };
+    w.__setLiveQueueHiddenForTest(true);
+    w.__setLiveQueueHiddenForTest(false);
+  });
+
+  await expect.poll(() => requests).toBe(2);
+  await expect(page.getByText(/enregistré/)).toBeVisible();
+});

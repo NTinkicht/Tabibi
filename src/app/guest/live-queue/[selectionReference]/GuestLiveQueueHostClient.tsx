@@ -384,6 +384,7 @@ function LiveQueueView({
     let consecutiveFailures = 0;
     let lastData: LiveQueueData | null = null;
     let hideAbort = false;
+    let resumeIfVisibleAfterHideAbort = false;
     let activeController: AbortController | null = null;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -400,6 +401,7 @@ function LiveQueueView({
     const stopForRejection = () => {
       terminalReached = true;
       currentBearer = null;
+      initialBearerRef.current = undefined;
       clearScheduled();
       if (!cancelled) setState({ kind: 'unavailable' });
     };
@@ -407,6 +409,7 @@ function LiveQueueView({
     const stopForTerminal = (data: LiveQueueData) => {
       terminalReached = true;
       currentBearer = null;
+      initialBearerRef.current = undefined;
       clearScheduled();
       if (!cancelled) setState({ kind: 'terminal', data });
     };
@@ -459,6 +462,7 @@ function LiveQueueView({
         if (cancelled || terminalReached) return;
         if (hideAbort) {
           hideAbort = false;
+          resumeIfVisibleAfterHideAbort = true;
           return;
         }
         consecutiveFailures += 1;
@@ -478,6 +482,20 @@ function LiveQueueView({
         clearTimeout(timeoutHandle);
         activeController = null;
         inFlight = false;
+        // A hide-triggered abort can settle after visibility has already
+        // returned, in which case handleVisibilityChange's own immediate
+        // refresh already saw inFlight=true and skipped. Self-heal here so
+        // polling never stalls waiting for another visibility event.
+        if (resumeIfVisibleAfterHideAbort) {
+          resumeIfVisibleAfterHideAbort = false;
+          if (
+            !cancelled &&
+            !terminalReached &&
+            document.visibilityState === 'visible'
+          ) {
+            void poll();
+          }
+        }
       }
     };
 
@@ -510,6 +528,8 @@ function LiveQueueView({
     return () => {
       cancelled = true;
       currentBearer = null;
+      initialBearerRef.current = undefined;
+      activeController?.abort();
       clearScheduled();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
