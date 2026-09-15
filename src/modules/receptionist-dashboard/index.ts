@@ -1,15 +1,15 @@
 import type { Pool } from 'pg';
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
 import type { QueueEntryState } from '@/modules/queue';
+import {
+  computeQueueEtaRange,
+  MAX_HISTORICAL_SAMPLES,
+  type QueueEtaEstimateSource,
+  selectConsultationEstimate,
+} from '@/modules/queue-eta-estimator';
 import type { SessionStatus } from '@/modules/session';
 import { inTransaction } from '@/platform/database/transaction';
 
-const FALLBACK_CONSULTATION_MINUTES = 15;
-const MIN_OBSERVED_SAMPLES = 3;
-const MIN_SAMPLE_MINUTES = 2;
-const MAX_SAMPLE_MINUTES = 120;
-const ETA_MIN_MULTIPLIER = 0.75;
-const ETA_MAX_MULTIPLIER = 1.5;
 const TERMINAL_STATE_RANK = 3;
 
 // One dashboard-local state contract drives both ordering and ETA eligibility.
@@ -44,7 +44,7 @@ export interface ReceptionistDashboardEntry {
     minWaitMinutes: number;
     maxWaitMinutes: number;
     estimatedConsultationMinutes: number;
-    estimateSource: 'fallback' | 'observed_median';
+    estimateSource: QueueEtaEstimateSource;
     observedSampleCount: number;
   } | null;
 }
@@ -68,6 +68,7 @@ export interface ReceptionistDashboardSnapshot {
 
 type Row = {
   session_id: string;
+  doctor_id: string;
   doctor_display_name: string;
   starts_at: Date;
   ends_at: Date;
@@ -86,17 +87,6 @@ type Row = {
   preferred_locale: 'ar' | 'fr' | null;
   has_contact: boolean | null;
 };
-
-function clampDuration(value: number): number {
-  return Math.min(MAX_SAMPLE_MINUTES, Math.max(MIN_SAMPLE_MINUTES, value));
-}
-
-function median(values: number[]): number {
-  const ordered = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(ordered.length / 2);
-  if (ordered.length % 2 === 1) return ordered[middle]!;
-  return (ordered[middle - 1]! + ordered[middle]!) / 2;
-}
 
 /** Private receptionist projection. Never reuse this query for public displays. */
 export class ReceptionistDashboardService {
@@ -117,6 +107,7 @@ export class ReceptionistDashboardService {
       await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
       const result = await client.query<Row>(
         `SELECT session.id AS session_id,
+                session.doctor_id,
                 doctor.display_name AS doctor_display_name,
                 session.starts_at, session.ends_at,
                 session.status AS session_status,
@@ -153,14 +144,33 @@ export class ReceptionistDashboardService {
             AND in_consultation_started_at IS NOT NULL`,
         [scope.clinicId, sessionId],
       );
-      const samples = durationResult.rows
-        .map((row) => Number(row.duration_minutes))
-        .filter((value) => Number.isFinite(value))
-        .map(clampDuration);
-      const useObserved = samples.length >= MIN_OBSERVED_SAMPLES;
-      const estimatedConsultationMinutes = useObserved
-        ? median(samples)
-        : FALLBACK_CONSULTATION_MINUTES;
+      const historicalDurationResult = await client.query<{
+        duration_minutes: string;
+      }>(
+        `SELECT historical.duration_minutes
+           FROM (
+             SELECT EXTRACT(EPOCH FROM (entry.completed_at - entry.in_consultation_started_at)) / 60 AS duration_minutes,
+                    entry.completed_at,
+                    entry.id
+               FROM queue_entries entry
+               JOIN consultation_sessions historical_session
+                 ON historical_session.id = entry.session_id
+                AND historical_session.clinic_id = entry.clinic_id
+              WHERE entry.clinic_id = $1
+                AND historical_session.doctor_id = $3
+                AND historical_session.id <> $2
+                AND entry.completed_at IS NOT NULL
+                AND entry.in_consultation_started_at IS NOT NULL
+                AND entry.completed_at < $4
+              ORDER BY entry.completed_at DESC, entry.id DESC
+              LIMIT ${MAX_HISTORICAL_SAMPLES}
+           ) historical`,
+        [scope.clinicId, sessionId, first.doctor_id, first.starts_at],
+      );
+      const estimate = selectConsultationEstimate(
+        durationResult.rows.map((row) => row.duration_minutes),
+        historicalDurationResult.rows.map((row) => row.duration_minutes),
+      );
       const declaredDelayMinutes = first.declared_delay_minutes ?? 0;
       let patientsAhead = 0;
 
@@ -168,28 +178,26 @@ export class ReceptionistDashboardService {
         if (!row.entry_id) return [];
         const state = row.entry_state!;
         const eligible = OPERATIONAL_STATE_RANK[state] < TERMINAL_STATE_RANK;
-        const eta = eligible
-          ? {
+        const range = eligible
+          ? computeQueueEtaRange({
               patientsAhead,
-              minWaitMinutes: Math.round(
-                declaredDelayMinutes +
-                  patientsAhead *
-                    estimatedConsultationMinutes *
-                    ETA_MIN_MULTIPLIER,
-              ),
-              maxWaitMinutes: Math.round(
-                declaredDelayMinutes +
-                  patientsAhead *
-                    estimatedConsultationMinutes *
-                    ETA_MAX_MULTIPLIER,
-              ),
-              estimatedConsultationMinutes,
-              estimateSource: useObserved
-                ? ('observed_median' as const)
-                : ('fallback' as const),
-              observedSampleCount: samples.length,
-            }
+              declaredDelayMinutes,
+              estimatedConsultationMinutes:
+                estimate.estimatedConsultationMinutes,
+            })
           : null;
+        const eta =
+          eligible && range
+            ? {
+                patientsAhead,
+                minWaitMinutes: range.minWaitMinutes,
+                maxWaitMinutes: range.maxWaitMinutes,
+                estimatedConsultationMinutes:
+                  estimate.estimatedConsultationMinutes,
+                estimateSource: estimate.estimateSource,
+                observedSampleCount: estimate.observedSampleCount,
+              }
+            : null;
         if (eligible) patientsAhead += 1;
         return [
           {
