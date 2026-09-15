@@ -218,6 +218,165 @@ test('transient failures retry on the 5/15/30/60-second sequence and reset on su
   await expect(page.getByText(/en attente/)).toBeVisible();
 });
 
+test('a stalled response triggers the internal 10-second request timeout and retries', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    if (requests === 1) {
+      // Never resolves on its own; only the client's own internal
+      // REQUEST_TIMEOUT_MS abort ends it.
+      await new Promise<void>(() => undefined);
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect.poll(() => requests).toBe(1);
+
+  await page.clock.fastForward(9_000);
+  expect(requests).toBe(1);
+  await page.clock.fastForward(1_000);
+  // The internal timeout fires at exactly 10s and schedules the first
+  // transient-failure retry at its 5s base delay.
+  await page.clock.fastForward(4_000);
+  expect(requests).toBe(1);
+  await page.clock.fastForward(1_000);
+  await expect.poll(() => requests).toBe(2);
+  await expect(page.getByText(/en attente/)).toBeVisible();
+});
+
+test('a Retry-After header lengthens the retry delay beyond the base backoff', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    if (requests === 1) {
+      await route.fulfill({
+        status: 503,
+        headers: { 'retry-after': '20' },
+        body: '',
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect.poll(() => requests).toBe(1);
+
+  // Retry-After: 20s exceeds the 5s base delay for the first failure, so it
+  // must win: no retry before 20s, one shortly after.
+  await page.clock.fastForward(19_000);
+  expect(requests).toBe(1);
+  await page.clock.fastForward(1_000);
+  await expect.poll(() => requests).toBe(2);
+  await expect(page.getByText(/en attente/)).toBeVisible();
+});
+
+test('a Retry-After header is capped at 300 seconds', async ({ page }) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    if (requests === 1) {
+      await route.fulfill({
+        status: 503,
+        headers: { 'retry-after': '9999' },
+        body: '',
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect.poll(() => requests).toBe(1);
+
+  // Retry-After: 9999s must be clamped to the 300s cap, not honored as-is.
+  await page.clock.fastForward(299_000);
+  expect(requests).toBe(1);
+  await page.clock.fastForward(1_000);
+  await expect.poll(() => requests).toBe(2);
+  await expect(page.getByText(/en attente/)).toBeVisible();
+});
+
+test('each transient retry delay honors its exact 5/15/30/60-second lower bound', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    if (requests <= 4) {
+      await route.fulfill({ status: 503, body: '' });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect.poll(() => requests).toBe(1);
+
+  await page.clock.fastForward(4_000);
+  expect(requests).toBe(1);
+  await page.clock.fastForward(1_000);
+  await expect.poll(() => requests).toBe(2);
+
+  await page.clock.fastForward(14_000);
+  expect(requests).toBe(2);
+  await page.clock.fastForward(1_000);
+  await expect.poll(() => requests).toBe(3);
+
+  await page.clock.fastForward(29_000);
+  expect(requests).toBe(3);
+  await page.clock.fastForward(1_000);
+  await expect.poll(() => requests).toBe(4);
+
+  await page.clock.fastForward(59_000);
+  expect(requests).toBe(4);
+  await page.clock.fastForward(1_000);
+  await expect.poll(() => requests).toBe(5);
+  await expect(page.getByText(/en attente/)).toBeVisible();
+});
+
 test('exhausts after five consecutive transient failures and a manual retry issues a fresh request', async ({
   page,
 }) => {
@@ -417,6 +576,36 @@ test('a terminal queue state displays even when the booking state alone is not t
   ).toBeVisible();
   await expect(page.getByText('confirmée')).toBeVisible();
   await expect(page.getByText('annulé')).toBeVisible();
+});
+
+test('a booking-only terminal state (no_show) stops polling and renders both fields', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'no_show',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect(
+    page.getByRole('heading', { name: /Statut de la visite|حالة الزيارة/ }),
+  ).toBeVisible();
+  await expect(page.getByText('absent')).toBeVisible();
+  await expect(page.getByText('en attente')).toBeVisible();
+  expect(requests).toBe(1);
+
+  await page.clock.fastForward(120_000);
+  expect(requests).toBe(1);
 });
 
 test('aborts the in-flight request on hide so a stale response cannot resurrect polling after exhaustion', async ({
