@@ -30,9 +30,10 @@ export async function GET(request: Request): Promise<Response> {
     if (!bearer) return rejected(requestId);
 
     try {
-      const result = await new PublicGuestLiveQueueStatusService(
-        getPool(),
-      ).get(bearer, request.signal);
+      const result = await new PublicGuestLiveQueueStatusService(getPool()).get(
+        bearer,
+        request.signal,
+      );
       return {
         body: {
           bookingState: result.bookingState,
