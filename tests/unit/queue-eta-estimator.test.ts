@@ -6,9 +6,7 @@ import {
 
 describe('shared deterministic queue ETA estimator', () => {
   it('prefers three current-session samples over historical evidence', () => {
-    expect(
-      selectConsultationEstimate([8, 10, 12], [40, 50, 60]),
-    ).toEqual({
+    expect(selectConsultationEstimate([8, 10, 12], [40, 50, 60])).toEqual({
       estimatedConsultationMinutes: 10,
       estimateSource: 'observed_median',
       observedSampleCount: 3,
