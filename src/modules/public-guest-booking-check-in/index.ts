@@ -94,12 +94,19 @@ export class PublicGuestBookingCheckInService {
                 appointment.status::text AS appointment_status,
                 entry.state::text AS queue_state
            FROM guest_credentials credential
+           JOIN public_guest_booking_receipts receipt
+             ON receipt.credential_id = credential.id
+            AND receipt.clinic_id = credential.clinic_id
+            AND receipt.queue_entry_id = credential.queue_entry_id
+            AND receipt.completed_at IS NOT NULL
            JOIN queue_entries entry
              ON entry.id = credential.queue_entry_id
             AND entry.clinic_id = credential.clinic_id
             AND entry.session_id = credential.session_id
            JOIN appointments appointment
-             ON appointment.queue_entry_id = entry.id
+             ON appointment.id = receipt.appointment_id
+            AND appointment.queue_entry_id = receipt.queue_entry_id
+            AND appointment.queue_entry_id = entry.id
             AND appointment.clinic_id = entry.clinic_id
             AND appointment.session_id = entry.session_id
             AND appointment.patient_id = entry.patient_id
