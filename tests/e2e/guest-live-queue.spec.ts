@@ -421,6 +421,84 @@ test('exhausts after five consecutive transient failures and a manual retry issu
   await expect(page.getByText(/en attente/)).toBeVisible();
 });
 
+test('hiding and restoring the document after retry exhaustion does not resume automatic polling', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  let allowSuccess = false;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    if (!allowSuccess) {
+      await route.fulfill({ status: 503, body: '' });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.addInitScript(() => {
+    let hidden = false;
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => (hidden ? 'hidden' : 'visible'),
+    });
+    Object.defineProperty(window, '__setLiveQueueHiddenForTest', {
+      configurable: true,
+      value: (value: boolean) => {
+        hidden = value;
+        document.dispatchEvent(new Event('visibilitychange'));
+      },
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect.poll(() => requests).toBe(1);
+  await page.clock.fastForward(6_000);
+  await expect.poll(() => requests).toBe(2);
+  await page.clock.fastForward(16_000);
+  await expect.poll(() => requests).toBe(3);
+  await page.clock.fastForward(31_000);
+  await expect.poll(() => requests).toBe(4);
+  await page.clock.fastForward(61_000);
+  await expect.poll(() => requests).toBe(5);
+  await expect(
+    page.getByText(/Connexion interrompue|انقطع الاتصال/),
+  ).toBeVisible();
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setLiveQueueHiddenForTest: (value: boolean) => void;
+      }
+    ).__setLiveQueueHiddenForTest(true);
+  });
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setLiveQueueHiddenForTest: (value: boolean) => void;
+      }
+    ).__setLiveQueueHiddenForTest(false);
+  });
+  await page.clock.fastForward(1_000);
+  expect(requests).toBe(5);
+  await expect(
+    page.getByText(/Connexion interrompue|انقطع الاتصال/),
+  ).toBeVisible();
+
+  allowSuccess = true;
+  await page.getByRole('button', { name: /maintenant|الآن/ }).click();
+  await expect.poll(() => requests).toBe(6);
+  await expect(page.getByText(/en attente/)).toBeVisible();
+});
+
 test('hidden view does not start new polls and resumes with exactly one immediate refresh', async ({
   page,
 }) => {

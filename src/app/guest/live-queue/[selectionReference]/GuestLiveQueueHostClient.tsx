@@ -514,18 +514,22 @@ function LiveQueueView({
 
     const handleVisibilityChange = () => {
       if (cancelled || terminalReached) return;
+      const exhausted = consecutiveFailures > MAX_TRANSIENT_FAILURES;
       if (document.visibilityState === 'hidden') {
         clearScheduled();
         if (inFlight) {
           hideAbort = true;
           activeController?.abort();
         }
-        if (lastData) {
+        // Retry exhaustion already stops automatic polling until the user
+        // triggers a manual retry; hiding must not silently clear that
+        // state and revert the display to a pending-auto-retry message.
+        if (lastData && !exhausted) {
           setState({ kind: 'stale', data: lastData, exhausted: false });
         }
         return;
       }
-      if (!inFlight) {
+      if (!inFlight && !exhausted) {
         clearScheduled();
         void poll();
       }
