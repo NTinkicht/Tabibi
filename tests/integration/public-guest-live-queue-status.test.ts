@@ -840,6 +840,9 @@ describe('WU67 public guest deterministic ETA projection', () => {
       await expect(service.get(booking.bearer)).resolves.toEqual(baseline);
 
       await writer.query('COMMIT');
+    } catch (error) {
+      await writer.query('ROLLBACK');
+      throw error;
     } finally {
       writer.release();
     }
