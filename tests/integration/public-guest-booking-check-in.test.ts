@@ -280,33 +280,25 @@ describe('WU62 public guest booking check-in', () => {
     expect((await audits(second)).rows).toHaveLength(0);
   });
 
-  it('rejects cross-clinic credential substitution without operational mutation', async () => {
+  it('rejects cross-clinic credential substitution at the database boundary', async () => {
     const source = await createBooking('2201');
     const target = await createBooking('2202');
     await openSession(source);
     await openSession(target);
-    const service = new PublicGuestBookingCheckInService(pool, () => now);
+    const before = await Promise.all([state(source), state(target)]);
 
-    await pool.query(
-      `UPDATE guest_credentials SET revoked_at=$2 WHERE queue_entry_id=$1`,
-      [target.queueEntryId, now],
-    );
-    await pool.query(
-      `UPDATE guest_credentials
-          SET clinic_id=$2, session_id=$3, queue_entry_id=$4
-        WHERE queue_entry_id=$1`,
-      [
-        source.queueEntryId,
-        target.clinicId,
-        target.sessionId,
-        target.queueEntryId,
-      ],
-    );
+    await expect(
+      pool.query(
+        `UPDATE guest_credentials
+            SET clinic_id=$2, session_id=$3, queue_entry_id=$4
+          WHERE queue_entry_id=$1`,
+        [source.queueEntryId, target.clinicId, target.sessionId, target.queueEntryId],
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
 
-    await expectRejectedWithoutOperationalMutation(service, source.bearer, [
-      source,
-      target,
-    ]);
+    expect(await Promise.all([state(source), state(target)])).toEqual(before);
+    expect((await audits(source)).rows).toHaveLength(0);
+    expect((await audits(target)).rows).toHaveLength(0);
   });
 
   it('rejects immutable patient-association drift without operational mutation', async () => {
@@ -343,11 +335,14 @@ describe('WU62 public guest booking check-in', () => {
         `UPDATE appointments SET status=$2::appointment_status WHERE id=$1`,
         [booking.appointmentId, terminalState],
       );
+      if (terminalState === 'completed') {
+        await pool.query(
+          `UPDATE queue_entries SET state='in_consultation' WHERE id=$1`,
+          [booking.queueEntryId],
+        );
+      }
       await pool.query(
-        `UPDATE queue_entries
-            SET state=$2::queue_entry_status,
-                completed_at=CASE WHEN $2='completed' THEN now() ELSE completed_at END
-          WHERE id=$1`,
+        `UPDATE queue_entries SET state=$2::queue_entry_status WHERE id=$1`,
         [booking.queueEntryId, terminalState],
       );
 
