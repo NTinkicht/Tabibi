@@ -10,9 +10,17 @@ type BookingResult = {
   queueLabel: string;
 };
 
+type LiveQueueEta = {
+  patientsAhead: number;
+  minWaitMinutes: number;
+  maxWaitMinutes: number;
+  estimateSource: 'fallback' | 'observed_median';
+};
+
 type LiveQueueData = {
   bookingState: string;
   queueState: string;
+  eta: LiveQueueEta | null;
 };
 
 type HostPhase =
@@ -74,6 +82,9 @@ type Copy = {
   checkInAlreadyDone: string;
   checkInRejected: string;
   checkInTransient: string;
+  etaHeading: string;
+  etaPatientsAhead: (count: number) => string;
+  etaWaitRange: (minMinutes: number, maxMinutes: number) => string;
 };
 
 const COPY: Record<SupportedLocale, Copy> = {
@@ -115,6 +126,17 @@ const COPY: Record<SupportedLocale, Copy> = {
     checkInAlreadyDone: 'Votre présence était déjà confirmée.',
     checkInRejected: 'Impossible de confirmer votre présence pour le moment.',
     checkInTransient: 'La confirmation a échoué. Veuillez réessayer.',
+    etaHeading: 'Temps d’attente estimé',
+    etaPatientsAhead: (count) =>
+      count === 0
+        ? 'Vous êtes le prochain'
+        : count === 1
+          ? '1 personne devant vous'
+          : `${count} personnes devant vous`,
+    etaWaitRange: (minMinutes, maxMinutes) =>
+      minMinutes === maxMinutes
+        ? `Environ ${minMinutes} min`
+        : `Environ ${minMinutes}–${maxMinutes} min`,
     bookingStates: {
       confirmed: 'confirmée',
       checked_in: 'enregistré',
@@ -168,6 +190,13 @@ const COPY: Record<SupportedLocale, Copy> = {
     checkInAlreadyDone: 'كان حضورك مؤكدًا بالفعل.',
     checkInRejected: 'يتعذر تأكيد حضورك في الوقت الحالي.',
     checkInTransient: 'فشل التأكيد. يرجى إعادة المحاولة.',
+    etaHeading: 'وقت الانتظار المقدر',
+    etaPatientsAhead: (count) =>
+      count === 0 ? 'أنت التالي' : `${count} أشخاص أمامك`,
+    etaWaitRange: (minMinutes, maxMinutes) =>
+      minMinutes === maxMinutes
+        ? `حوالي ${minMinutes} دقيقة`
+        : `حوالي ${minMinutes}–${maxMinutes} دقيقة`,
     bookingStates: {
       confirmed: 'مؤكدة',
       checked_in: 'تم تسجيل الوصول',
@@ -218,6 +247,16 @@ function clampQueueState(value: string, floor: string | null): string {
   const floorRank = queueStateRank(floor);
   if (valueRank === -1 || floorRank === -1) return value;
   return valueRank < floorRank ? floor : value;
+}
+
+function EtaStatus({ eta, copy }: { eta: LiveQueueEta; copy: Copy }) {
+  return (
+    <div role="status">
+      <h2>{copy.etaHeading}</h2>
+      <p>{copy.etaPatientsAhead(eta.patientsAhead)}</p>
+      <p>{copy.etaWaitRange(eta.minWaitMinutes, eta.maxWaitMinutes)}</p>
+    </div>
+  );
 }
 
 function retryAfterMs(response: Response, fallback: number): number {
@@ -656,7 +695,14 @@ function LiveQueueView({
         ) {
           queueStateFloorRef.current = queueState;
         }
-        const data: LiveQueueData = { ...fetched, queueState };
+        // A clamped response is stale/out-of-order for queueState, so its own
+        // eta was computed against that same stale row; keep the last
+        // authoritatively-displayed eta instead of regressing to it.
+        const eta =
+          queueState === fetched.queueState
+            ? fetched.eta
+            : (lastDataRef.current?.eta ?? fetched.eta);
+        const data: LiveQueueData = { ...fetched, queueState, eta };
         lastDataRef.current = data;
         setState({ kind: 'active', data });
         scheduleNext(POLL_INTERVAL_MS);
@@ -821,6 +867,9 @@ function LiveQueueView({
             {copy.queueStates[state.data.queueState] ?? state.data.queueState}
           </p>
         ) : null}
+        {state.data?.eta ? (
+          <EtaStatus eta={state.data.eta} copy={copy} />
+        ) : null}
         {checkInState.kind === 'done' ? (
           <p role="status">
             {checkInState.reconciled
@@ -853,6 +902,7 @@ function LiveQueueView({
         <strong>{copy.status}</strong>{' '}
         {copy.queueStates[state.data.queueState] ?? state.data.queueState}
       </p>
+      {state.data.eta ? <EtaStatus eta={state.data.eta} copy={copy} /> : null}
       {state.data.queueState === 'waiting' || checkInState.kind !== 'idle' ? (
         <div role="status">
           {checkInState.kind === 'done' ? (

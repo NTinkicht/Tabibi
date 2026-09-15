@@ -38,6 +38,14 @@ export async function GET(request: Request): Promise<Response> {
         body: {
           bookingState: result.bookingState,
           queueState: result.queueState,
+          eta: result.eta
+            ? {
+                patientsAhead: result.eta.patientsAhead,
+                minWaitMinutes: result.eta.minWaitMinutes,
+                maxWaitMinutes: result.eta.maxWaitMinutes,
+                estimateSource: result.eta.estimateSource,
+              }
+            : null,
         },
         status: 200,
       };
