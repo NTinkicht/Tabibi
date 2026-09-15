@@ -542,6 +542,9 @@ describe('WU62/WU65 public guest booking check-in', () => {
     await expect(
       service.checkIn(booking.bearer, 'x'.repeat(129)),
     ).rejects.toBeInstanceOf(PublicGuestBookingCheckInValidationError);
+    await expect(
+      service.checkIn(booking.bearer, 'op-with-\0-nul'),
+    ).rejects.toBeInstanceOf(PublicGuestBookingCheckInValidationError);
     expect(await state(booking)).toMatchObject({
       appointment_status: 'confirmed',
       queue_state: 'waiting',

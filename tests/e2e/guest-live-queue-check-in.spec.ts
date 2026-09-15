@@ -158,16 +158,25 @@ test('a transient failure keeps the same operationId across a manual retry and d
 
   const seenOperationIds: string[] = [];
   let attempt = 0;
-  let releaseFirst: (() => void) | null = null;
+  const markFirstStartedHolder: { current: (() => void) | null } = {
+    current: null,
+  };
+  const releaseFirstResponseHolder: { current: (() => void) | null } = {
+    current: null,
+  };
   const firstStarted = new Promise<void>((resolve) => {
-    releaseFirst = resolve;
+    markFirstStartedHolder.current = resolve;
+  });
+  const firstResponseReleased = new Promise<void>((resolve) => {
+    releaseFirstResponseHolder.current = resolve;
   });
   await page.route(CHECK_IN_URL, async (route) => {
     attempt += 1;
     const body = route.request().postDataJSON() as { operationId: string };
     seenOperationIds.push(body.operationId);
     if (attempt === 1) {
-      releaseFirst?.();
+      markFirstStartedHolder.current?.();
+      await firstResponseReleased;
       await route.fulfill({
         status: 503,
         contentType: 'application/json',
@@ -183,9 +192,14 @@ test('a transient failure keeps the same operationId across a manual retry and d
   });
 
   await submitBookingForm(page);
-  const button = checkInButton(page);
-  await button.click();
+  const statusRegion = page.getByRole('status');
+  await checkInButton(page).click();
   await firstStarted;
+  // The button's accessible name switches to the pending label while
+  // disabled, so re-query by role within the status region rather than
+  // reusing a name-scoped locator that no longer matches.
+  await expect(statusRegion.getByRole('button')).toBeDisabled();
+  releaseFirstResponseHolder.current?.();
 
   await expect(
     page.getByText('La confirmation a échoué. Veuillez réessayer.'),

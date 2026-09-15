@@ -25,9 +25,13 @@ export class PublicGuestBookingCheckInValidationError extends Error {
 }
 
 function normalizedOperationId(operationId: string): string {
-  if (operationId.length < 1 || operationId.length > 128) {
+  if (
+    operationId.length < 1 ||
+    operationId.length > 128 ||
+    operationId.includes('\0')
+  ) {
     throw new PublicGuestBookingCheckInValidationError(
-      'operationId must be between 1 and 128 characters',
+      'operationId must be valid text between 1 and 128 characters',
     );
   }
   return operationId;
