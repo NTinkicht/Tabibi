@@ -51,6 +51,7 @@ type Copy = {
   unavailableBody: string;
   stale: string;
   staleBody: string;
+  hiddenBody: string;
   offline: string;
   offlineBody: string;
   manualRetry: string;
@@ -85,6 +86,8 @@ const COPY: Record<SupportedLocale, Copy> = {
       'Votre session sécurisée a expiré ou n’est plus valide. Revenez depuis votre lien de réservation.',
     stale: 'Statut potentiellement obsolète',
     staleBody: 'Nouvelle tentative automatique en cours.',
+    hiddenBody:
+      'Les mises à jour sont en pause pendant que cet onglet est en arrière-plan.',
     offline: 'Connexion interrompue',
     offlineBody:
       'Nous n’avons pas pu actualiser votre statut. Réessayez manuellement.',
@@ -132,6 +135,7 @@ const COPY: Record<SupportedLocale, Copy> = {
       'انتهت جلستك الآمنة أو لم تعد صالحة. عد من رابط الحجز الخاص بك.',
     stale: 'قد تكون الحالة قديمة',
     staleBody: 'إعادة المحاولة التلقائية جارية.',
+    hiddenBody: 'التحديثات متوقفة مؤقتًا أثناء وجود هذا التبويب في الخلفية.',
     offline: 'انقطع الاتصال',
     offlineBody: 'تعذر تحديث حالتك. أعد المحاولة يدويًا.',
     manualRetry: 'إعادة المحاولة الآن',
@@ -345,7 +349,12 @@ export function GuestLiveQueueHostClient({
 type ViewState =
   | { kind: 'loading' }
   | { kind: 'active'; data: LiveQueueData }
-  | { kind: 'stale'; data: LiveQueueData | null; exhausted: boolean }
+  | {
+      kind: 'stale';
+      data: LiveQueueData | null;
+      exhausted: boolean;
+      hidden?: boolean;
+    }
   | { kind: 'unavailable' }
   | { kind: 'terminal'; data: LiveQueueData };
 
@@ -525,7 +534,12 @@ function LiveQueueView({
         // triggers a manual retry; hiding must not silently clear that
         // state and revert the display to a pending-auto-retry message.
         if (lastData && !exhausted) {
-          setState({ kind: 'stale', data: lastData, exhausted: false });
+          setState({
+            kind: 'stale',
+            data: lastData,
+            exhausted: false,
+            hidden: true,
+          });
         }
         return;
       }
@@ -614,7 +628,13 @@ function LiveQueueView({
         ) : null}
         <div role="status">
           <h2>{state.exhausted ? copy.offline : copy.stale}</h2>
-          <p>{state.exhausted ? copy.offlineBody : copy.staleBody}</p>
+          <p>
+            {state.exhausted
+              ? copy.offlineBody
+              : state.hidden
+                ? copy.hiddenBody
+                : copy.staleBody}
+          </p>
           {state.exhausted ? (
             <button type="button" onClick={() => manualRetryRef.current()}>
               {copy.manualRetry}

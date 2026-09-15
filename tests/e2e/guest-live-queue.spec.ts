@@ -605,6 +605,14 @@ test('hiding the view marks the last response as stale until it becomes visible 
     page.getByText(/Statut potentiellement obsolète|قد تكون الحالة قديمة/),
   ).toBeVisible();
   await expect(page.getByText(/en attente/)).toBeVisible();
+  await expect(
+    page.getByText(/Les mises à jour sont en pause|التحديثات متوقفة مؤقتًا/),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      /Nouvelle tentative automatique en cours|إعادة المحاولة التلقائية جارية/,
+    ),
+  ).toHaveCount(0);
 
   await page.evaluate(() => {
     (
