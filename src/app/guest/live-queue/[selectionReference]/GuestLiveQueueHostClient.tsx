@@ -19,7 +19,7 @@ type HostPhase =
   | { kind: 'form' }
   | { kind: 'booking' }
   | { kind: 'booking_failed' }
-  | { kind: 'live'; bearer: string; queueLabel: string };
+  | { kind: 'live'; bearer: string | undefined; queueLabel: string };
 
 const TERMINAL_VALUES = new Set(['completed', 'cancelled', 'no_show']);
 const POLL_INTERVAL_MS = 30_000;
@@ -202,17 +202,19 @@ export function GuestLiveQueueHostClient({
   const [contactEmail, setContactEmail] = useState('');
   const [contactPreference, setContactPreference] =
     useState<ContactPreference>('none');
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   const submitBooking = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPhase({ kind: 'booking' });
+    idempotencyKeyRef.current ??= crypto.randomUUID();
     try {
       const response = await fetch('/api/public/bookings', {
         method: 'POST',
         cache: 'no-store',
         headers: {
           'content-type': 'application/json',
-          'idempotency-key': crypto.randomUUID(),
+          'idempotency-key': idempotencyKeyRef.current,
         },
         body: JSON.stringify({
           selectionReference,
@@ -228,9 +230,12 @@ export function GuestLiveQueueHostClient({
         return;
       }
       const result = (await response.json()) as BookingResult;
-      const bearer = result.guestBearer;
-      const queueLabel = result.queueLabel;
-      setPhase({ kind: 'live', bearer, queueLabel });
+      idempotencyKeyRef.current = null;
+      setPhase({
+        kind: 'live',
+        bearer: result.guestBearer,
+        queueLabel: result.queueLabel,
+      });
     } catch {
       setPhase({ kind: 'booking_failed' });
     }
@@ -240,6 +245,13 @@ export function GuestLiveQueueHostClient({
     return (
       <LiveQueueView
         bearer={phase.bearer}
+        onBearerAccepted={() =>
+          setPhase((current) =>
+            current.kind === 'live'
+              ? { ...current, bearer: undefined }
+              : current,
+          )
+        }
         queueLabel={phase.queueLabel}
         copy={copy}
         locale={locale}
@@ -339,26 +351,40 @@ type ViewState =
 
 function LiveQueueView({
   bearer,
+  onBearerAccepted,
   queueLabel,
   copy,
   locale,
 }: {
-  bearer: string;
+  bearer: string | undefined;
+  onBearerAccepted: () => void;
   queueLabel: string;
   copy: Copy;
   locale: SupportedLocale;
 }) {
   const [state, setState] = useState<ViewState>({ kind: 'loading' });
   const manualRetryRef = useRef<() => void>(() => undefined);
+  // Captured once on mount; later re-renders may pass `undefined` once the
+  // host clears its own copy, but this ref keeps the value this view needs.
+  const initialBearerRef = useRef(bearer);
+
+  useEffect(() => {
+    // Report acceptance once so the host can drop its own reference; this
+    // view keeps its own copy via initialBearerRef regardless of what the
+    // host passes afterward.
+    onBearerAccepted();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     let terminalReached = false;
-    let currentBearer: string | null = bearer;
+    let currentBearer: string | null = initialBearerRef.current ?? null;
     let inFlight = false;
     let consecutiveFailures = 0;
     let lastData: LiveQueueData | null = null;
     let hideAbort = false;
+    let activeController: AbortController | null = null;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const clearScheduled = () => {
@@ -394,6 +420,7 @@ function LiveQueueView({
       }
       inFlight = true;
       const controller = new AbortController();
+      activeController = controller;
       const timeoutHandle = setTimeout(() => {
         controller.abort();
       }, REQUEST_TIMEOUT_MS);
@@ -408,7 +435,6 @@ function LiveQueueView({
           },
           signal: controller.signal,
         });
-        clearTimeout(timeoutHandle);
         if (cancelled || terminalReached) return;
         if (response.status === 400) {
           stopForRejection();
@@ -421,6 +447,7 @@ function LiveQueueView({
         const data = (await response.json()) as LiveQueueData;
         if (cancelled || terminalReached) return;
         consecutiveFailures = 0;
+        hideAbort = false;
         lastData = data;
         if (isTerminal(data)) {
           stopForTerminal(data);
@@ -429,7 +456,6 @@ function LiveQueueView({
         setState({ kind: 'active', data });
         scheduleNext(POLL_INTERVAL_MS);
       } catch {
-        clearTimeout(timeoutHandle);
         if (cancelled || terminalReached) return;
         if (hideAbort) {
           hideAbort = false;
@@ -449,6 +475,8 @@ function LiveQueueView({
         setState({ kind: 'stale', data: lastData, exhausted: false });
         scheduleNext(Math.min(delay, MAX_RETRY_AFTER_MS));
       } finally {
+        clearTimeout(timeoutHandle);
+        activeController = null;
         inFlight = false;
       }
     };
@@ -466,6 +494,7 @@ function LiveQueueView({
         clearScheduled();
         if (inFlight) {
           hideAbort = true;
+          activeController?.abort();
         }
         return;
       }
@@ -484,7 +513,9 @@ function LiveQueueView({
       clearScheduled();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [bearer]);
+    // The initial bearer is captured once via initialBearerRef; this effect
+    // intentionally runs only on mount/unmount for this view instance.
+  }, []);
 
   const shell = (content: React.ReactNode) => (
     <section lang={locale} dir={copy.dir} aria-live="polite">
@@ -512,9 +543,15 @@ function LiveQueueView({
       <>
         <h2>{copy.visitStatus}</h2>
         <p>
+          <strong>{copy.status}</strong>{' '}
           {copy.bookingStates[state.data.bookingState] ??
             state.data.bookingState}
         </p>
+        {state.data.queueState !== state.data.bookingState ? (
+          <p>
+            {copy.queueStates[state.data.queueState] ?? state.data.queueState}
+          </p>
+        ) : null}
       </>,
     );
   }

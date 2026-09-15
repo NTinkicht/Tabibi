@@ -343,3 +343,160 @@ test('Arabic renders RTL and French renders LTR with equivalent state semantics'
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
   await expect(page.getByText('في الانتظار')).toBeVisible();
 });
+
+test('reuses the same idempotency key across a retry after a failed submission', async ({
+  page,
+}) => {
+  const seenKeys: string[] = [];
+  let attempt = 0;
+  await page.route(BOOKING_URL, async (route) => {
+    attempt += 1;
+    seenKeys.push(route.request().headers()['idempotency-key'] ?? '');
+    if (attempt === 1) {
+      await route.fulfill({ status: 503, body: '' });
+      return;
+    }
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        serviceDate: '2099-05-15',
+        startsAt: '2099-05-15T08:00:00.000Z',
+        endsAt: '2099-05-15T09:00:00.000Z',
+        queueLabel: 'G-042',
+        guestBearer: BEARER,
+        guestAccessExpiresAt: '2099-05-16T08:00:00.000Z',
+      }),
+    });
+  });
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.goto('/guest/live-queue/test-selection-ref');
+  await page.getByLabel(/Votre nom|اسمك/).fill('Test Guest');
+  const submit = page.getByRole('button', { name: /Confirmer|تأكيد/ });
+  await submit.click();
+  await expect(page.getByText(/indisponible|غير متاح/)).toBeVisible();
+  await submit.click();
+  await expect(page.getByText('G-042')).toBeVisible();
+
+  expect(attempt).toBe(2);
+  expect(seenKeys[0]).not.toBe('');
+  expect(seenKeys[1]).toBe(seenKeys[0]);
+});
+
+test('a terminal queue state displays even when the booking state alone is not terminal', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'cancelled',
+      }),
+    });
+  });
+
+  await submitBookingForm(page);
+  await expect(
+    page.getByRole('heading', { name: /Statut de la visite|حالة الزيارة/ }),
+  ).toBeVisible();
+  await expect(page.getByText('confirmée')).toBeVisible();
+  await expect(page.getByText('annulé')).toBeVisible();
+});
+
+test('aborts the in-flight request on hide so a stale response cannot resurrect polling after exhaustion', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  const releaseFirstHolder: { current: (() => void) | null } = {
+    current: null,
+  };
+  const startedHolder: { current: (() => void) | null } = { current: null };
+  const firstRequestStarted = new Promise<void>((resolve) => {
+    startedHolder.current = resolve;
+  });
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    if (requests === 1) {
+      startedHolder.current?.();
+      await new Promise<void>((resolve) => {
+        releaseFirstHolder.current = resolve;
+      });
+      try {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            bookingState: 'confirmed',
+            queueState: 'waiting',
+          }),
+        });
+      } catch {
+        // The client aborted this request on hide; fulfilling it afterward
+        // is expected to fail and is not part of what this test asserts.
+      }
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'checked_in',
+      }),
+    });
+  });
+
+  await page.addInitScript(() => {
+    let hidden = false;
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => (hidden ? 'hidden' : 'visible'),
+    });
+    Object.defineProperty(window, '__setLiveQueueHiddenForTest', {
+      configurable: true,
+      value: (value: boolean) => {
+        hidden = value;
+        document.dispatchEvent(new Event('visibilitychange'));
+      },
+    });
+  });
+
+  await submitBookingForm(page);
+  await firstRequestStarted;
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setLiveQueueHiddenForTest: (value: boolean) => void;
+      }
+    ).__setLiveQueueHiddenForTest(true);
+  });
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setLiveQueueHiddenForTest: (value: boolean) => void;
+      }
+    ).__setLiveQueueHiddenForTest(false);
+  });
+  await expect.poll(() => requests).toBe(2);
+  await expect(page.getByText(/enregistré/)).toBeVisible();
+
+  releaseFirstHolder.current?.();
+  await page.waitForTimeout(200);
+  await expect(page.getByText(/enregistré/)).toBeVisible();
+  expect(requests).toBe(2);
+});
