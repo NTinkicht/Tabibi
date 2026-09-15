@@ -528,7 +528,12 @@ function LiveQueueView({
     return () => {
       cancelled = true;
       currentBearer = null;
-      initialBearerRef.current = undefined;
+      // Do not clear initialBearerRef here: React Strict Mode double-invokes
+      // this effect (mount -> cleanup -> mount again) on the same instance in
+      // dev, and this component is still mounted when that replay setup runs.
+      // Clearing the ref here would strand the second setup with no bearer.
+      // Terminal states clear it explicitly via stopForRejection/stopForTerminal,
+      // which are not subject to this replay since the view is truly done.
       activeController?.abort();
       clearScheduled();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
