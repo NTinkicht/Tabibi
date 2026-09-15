@@ -80,11 +80,7 @@ export class PublicGuestBookingCheckInService {
           FOR UPDATE`,
         [target.session_id, target.clinic_id],
       );
-      if (
-        !session.rows[0] ||
-        !['open', 'paused'].includes(session.rows[0].status)
-      )
-        throw new PublicGuestBookingCheckInRejectedError();
+      if (!session.rows[0]) throw new PublicGuestBookingCheckInRejectedError();
 
       const result = await client.query<CheckInRow>(
         `SELECT credential.id AS credential_id,
@@ -128,6 +124,10 @@ export class PublicGuestBookingCheckInService {
         row.queue_state === 'checked_in'
       ) {
         return { status: 'checked_in' };
+      }
+
+      if (!['open', 'paused'].includes(session.rows[0].status)) {
+        throw new PublicGuestBookingCheckInRejectedError();
       }
 
       if (
