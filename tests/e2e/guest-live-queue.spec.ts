@@ -555,11 +555,13 @@ test('reuses the same idempotency key across a retry after a failed submission',
   expect(seenKeys[1]).toBe(seenKeys[0]);
 });
 
-test('a terminal queue state displays even when the booking state alone is not terminal', async ({
+test('a terminal queue state displays even when the booking state alone is not terminal, and stops polling', async ({
   page,
 }) => {
   await mockBooking(page);
+  let requests = 0;
   await page.route(STATUS_URL, async (route) => {
+    requests += 1;
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -570,12 +572,47 @@ test('a terminal queue state displays even when the booking state alone is not t
     });
   });
 
+  await page.clock.install();
   await submitBookingForm(page);
   await expect(
     page.getByRole('heading', { name: /Statut de la visite|حالة الزيارة/ }),
   ).toBeVisible();
   await expect(page.getByText('confirmée')).toBeVisible();
   await expect(page.getByText('annulé')).toBeVisible();
+  expect(requests).toBe(1);
+
+  await page.clock.fastForward(120_000);
+  expect(requests).toBe(1);
+});
+
+test('a queue-only terminal state (completed) stops polling', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'completed',
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect(
+    page.getByRole('heading', { name: /Statut de la visite|حالة الزيارة/ }),
+  ).toBeVisible();
+  await expect(page.getByText('confirmée')).toBeVisible();
+  await expect(page.getByText('terminé')).toBeVisible();
+  expect(requests).toBe(1);
+
+  await page.clock.fastForward(120_000);
+  expect(requests).toBe(1);
 });
 
 test('a booking-only terminal state (no_show) stops polling and renders both fields', async ({
