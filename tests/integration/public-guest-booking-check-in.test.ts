@@ -156,7 +156,28 @@ describe('WU62 public guest booking check-in', () => {
     await expect(service.checkIn(revoked.bearer)).rejects.toBeInstanceOf(PublicGuestBookingCheckInRejectedError);
 
     const drifted = await createBooking('3004'); await openSession(drifted);
-    await pool.query(`UPDATE guest_credentials SET queue_entry_id=$2 WHERE queue_entry_id=$1`, [drifted.queueEntryId, tampered.queueEntryId]);
+    const driftPatientId = randomUUID();
+    const driftQueueEntryId = randomUUID();
+    await pool.query(
+      `INSERT INTO patient_operational_records
+         (id, clinic_id, private_display_name, contact_phone)
+       VALUES ($1, $2, 'Drift Target', '0555003999')`,
+      [driftPatientId, drifted.clinicId],
+    );
+    await pool.query(
+      `INSERT INTO queue_entries
+         (id, clinic_id, session_id, patient_id, state, source, registration_order,
+          eligibility_order, priority_order)
+       SELECT $1, $2, $3, $4, 'waiting', 'walk_in',
+              COALESCE(MAX(registration_order), 0) + 1, NULL, NULL
+         FROM queue_entries
+        WHERE clinic_id = $2 AND session_id = $3`,
+      [driftQueueEntryId, drifted.clinicId, drifted.sessionId, driftPatientId],
+    );
+    await pool.query(
+      `UPDATE guest_credentials SET queue_entry_id=$2 WHERE queue_entry_id=$1`,
+      [drifted.queueEntryId, driftQueueEntryId],
+    );
     await expect(service.checkIn(drifted.bearer)).rejects.toBeInstanceOf(PublicGuestBookingCheckInRejectedError);
 
     const terminal = await createBooking('3005'); await openSession(terminal);
