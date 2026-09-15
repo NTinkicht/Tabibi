@@ -36,6 +36,16 @@ describe('shared deterministic queue ETA estimator', () => {
     });
   });
 
+  it('ignores absent and non-numeric samples instead of counting them at the clamp floor', () => {
+    expect(
+      selectConsultationEstimate([null, undefined, 'not-a-number'], [20, 30]),
+    ).toEqual({
+      estimatedConsultationMinutes: 15,
+      estimateSource: 'fallback',
+      observedSampleCount: 0,
+    });
+  });
+
   it('keeps the 15-minute fallback when neither source reaches three samples', () => {
     expect(selectConsultationEstimate([8, 10], [20, 30])).toEqual({
       estimatedConsultationMinutes: 15,
