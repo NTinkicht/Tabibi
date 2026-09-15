@@ -520,6 +520,9 @@ function LiveQueueView({
           hideAbort = true;
           activeController?.abort();
         }
+        if (lastData) {
+          setState({ kind: 'stale', data: lastData, exhausted: false });
+        }
         return;
       }
       if (!inFlight) {

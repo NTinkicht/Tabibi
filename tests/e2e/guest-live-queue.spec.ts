@@ -479,6 +479,69 @@ test('hidden view does not start new polls and resumes with exactly one immediat
   expect(requests).toBe(2);
 });
 
+test('hiding the view marks the last response as stale until it becomes visible again', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let requests = 0;
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+
+  await page.addInitScript(() => {
+    let hidden = false;
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => (hidden ? 'hidden' : 'visible'),
+    });
+    Object.defineProperty(window, '__setLiveQueueHiddenForTest', {
+      configurable: true,
+      value: (value: boolean) => {
+        hidden = value;
+        document.dispatchEvent(new Event('visibilitychange'));
+      },
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect(page.getByText(/en attente/)).toBeVisible();
+  await expect.poll(() => requests).toBe(1);
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setLiveQueueHiddenForTest: (value: boolean) => void;
+      }
+    ).__setLiveQueueHiddenForTest(true);
+  });
+  await expect(
+    page.getByText(/Statut potentiellement obsolète|قد تكون الحالة قديمة/),
+  ).toBeVisible();
+  await expect(page.getByText(/en attente/)).toBeVisible();
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __setLiveQueueHiddenForTest: (value: boolean) => void;
+      }
+    ).__setLiveQueueHiddenForTest(false);
+  });
+  await expect.poll(() => requests).toBe(2);
+  await expect(
+    page.getByText(/Statut potentiellement obsolète|قد تكون الحالة قديمة/),
+  ).toHaveCount(0);
+  await expect(page.getByText(/en attente/)).toBeVisible();
+});
+
 test('Arabic renders RTL and French renders LTR with equivalent state semantics', async ({
   page,
 }) => {
