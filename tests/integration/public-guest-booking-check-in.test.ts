@@ -287,6 +287,11 @@ describe('WU62 public guest booking check-in', () => {
     await openSession(target);
     const before = await Promise.all([state(source), state(target)]);
 
+    await pool.query(
+      `UPDATE guest_credentials SET revoked_at=$2 WHERE queue_entry_id=$1`,
+      [target.queueEntryId, now],
+    );
+
     await expect(
       pool.query(
         `UPDATE guest_credentials
