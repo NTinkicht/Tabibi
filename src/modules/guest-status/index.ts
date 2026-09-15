@@ -46,6 +46,63 @@ export type GuestQueueStatusSnapshot =
       finalStatus: string;
     };
 
+export type PublicGuestQueueStatusSnapshot =
+  | {
+      generatedAt: string;
+      terminal: false;
+      publicDisplayLabel: string;
+      queueState: string;
+      clinicTimezone: string;
+      patientsAhead: number | null;
+      positionKind: 'live' | 'provisional';
+      arrivalWindow: {
+        earliestAt: string;
+        latestAt: string;
+        uncertaintyMinutes: number;
+        basis:
+          | 'appointment_schedule_plus_declared_delay'
+          | 'session_start_plus_declared_delay';
+      } | null;
+      session: {
+        status: string;
+        declaredDelayMinutes: number | null;
+        delayVersion: number;
+        queueOrderVersion: number;
+      };
+    }
+  | {
+      generatedAt: string;
+      terminal: true;
+      finalStatus: string;
+    };
+
+/**
+ * Explicit wire-boundary allow-list: strips the internal clinic/session/queue-entry
+ * target binding (and any other non-listed field) before a snapshot leaves the server.
+ */
+export function toPublicGuestQueueStatusSnapshot(
+  snapshot: GuestQueueStatusSnapshot,
+): PublicGuestQueueStatusSnapshot {
+  if (snapshot.terminal) {
+    return {
+      generatedAt: snapshot.generatedAt,
+      terminal: true,
+      finalStatus: snapshot.finalStatus,
+    };
+  }
+  return {
+    generatedAt: snapshot.generatedAt,
+    terminal: false,
+    publicDisplayLabel: snapshot.publicDisplayLabel,
+    queueState: snapshot.queueState,
+    clinicTimezone: snapshot.clinicTimezone,
+    patientsAhead: snapshot.patientsAhead,
+    positionKind: snapshot.positionKind,
+    arrivalWindow: snapshot.arrivalWindow,
+    session: snapshot.session,
+  };
+}
+
 function parseBearer(
   bearer: string,
 ): { credentialId: string; secret: string } | null {

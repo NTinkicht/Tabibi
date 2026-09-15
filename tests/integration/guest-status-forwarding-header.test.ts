@@ -142,14 +142,8 @@ describe('WU17 guest status trusted ingress boundary', () => {
 
     expect(valid.status).toBe(200);
     const payload = await valid.json();
-    expect(payload).toMatchObject({
-      terminal: false,
-      target: {
-        clinicId: ids.clinic,
-        sessionId: ids.session,
-        queueEntryId: ids.entry,
-      },
-    });
+    expect(payload).toMatchObject({ terminal: false });
+    expect(payload.target).toBeUndefined();
   });
 
   it('rejects rotating forged credential ids before lookup without throttling a valid bearer', async () => {
