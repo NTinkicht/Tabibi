@@ -40,3 +40,4 @@ jobs:
             actions: read
           claude_args: >-
             --max-turns 60
+            --allowedTools "Bash(npm ci),Bash(npm run format:*),Bash(npx --no-install prettier:*)"
