@@ -292,7 +292,12 @@ describe('WU62 public guest booking check-in', () => {
         `UPDATE guest_credentials
             SET clinic_id=$2, session_id=$3, queue_entry_id=$4
           WHERE queue_entry_id=$1`,
-        [source.queueEntryId, target.clinicId, target.sessionId, target.queueEntryId],
+        [
+          source.queueEntryId,
+          target.clinicId,
+          target.sessionId,
+          target.queueEntryId,
+        ],
       ),
     ).rejects.toMatchObject({ code: '23503' });
 
