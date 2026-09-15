@@ -4,7 +4,10 @@ import {
   authenticatedGuestCredentialId,
   GuestAccessRejectedError,
 } from '@/modules/guest-access';
-import { GuestStatusService } from '@/modules/guest-status';
+import {
+  GuestStatusService,
+  toPublicGuestQueueStatusSnapshot,
+} from '@/modules/guest-status';
 import { getPool } from '@/platform/database/pool';
 import { getLogger } from '@/platform/observability/logger';
 
@@ -103,7 +106,7 @@ export async function GET(request: Request): Promise<Response> {
     }
     if (!bearer) throw new GuestAccessRejectedError();
     const snapshot = await new GuestStatusService(pool).getSnapshot(bearer);
-    return Response.json(snapshot, {
+    return Response.json(toPublicGuestQueueStatusSnapshot(snapshot), {
       status: 200,
       headers: SECURITY_HEADERS,
     });

@@ -155,6 +155,45 @@ describe('WU17 guest queue-status read', () => {
     ).toBe(beforeAudit.rows[0].count);
   });
 
+  it('binds each capability strictly to its own queue entry, never substituting a different same-clinic/same-session booking', async () => {
+    const targetCredential = await liveBearer();
+    const aheadAccess = new GuestAccessService(pool);
+    const aheadTarget = {
+      clinicId: ids.clinic,
+      sessionId: ids.session,
+      queueEntryId: ids.aheadEntry,
+    };
+    const aheadIssued = await aheadAccess.issue(
+      aheadTarget,
+      ids.actor,
+      new Date('2026-09-10T09:00:00Z'),
+    );
+    const aheadCredential = await aheadAccess.consume(
+      aheadIssued.exchangeId,
+      aheadTarget,
+      new Date('2026-09-10T09:00:30Z'),
+    );
+    const service = new GuestStatusService(pool);
+
+    const targetSnapshot = await service.getSnapshot(
+      targetCredential.bearer,
+      new Date('2026-09-10T09:02:00Z'),
+    );
+    const aheadSnapshot = await service.getSnapshot(
+      aheadCredential.bearer,
+      new Date('2026-09-10T09:02:00Z'),
+    );
+
+    expect(targetSnapshot).toMatchObject({ target });
+    expect(aheadSnapshot).toMatchObject({ target: aheadTarget });
+    expect(targetSnapshot).not.toMatchObject({ target: aheadTarget });
+    if (!targetSnapshot.terminal && !aheadSnapshot.terminal) {
+      expect(targetSnapshot.publicDisplayLabel).not.toBe(
+        aheadSnapshot.publicDisplayLabel,
+      );
+    }
+  });
+
   it('rejects revoked, expired, and tampered signed credentials but preserves only a bounded terminal summary', async () => {
     const credential = await liveBearer();
     const service = new GuestStatusService(pool);
@@ -218,7 +257,7 @@ describe('WU17 guest queue-status read', () => {
     expect(ok.status).toBe(200);
     expect(ok.headers.get('cache-control')).toBe('no-store');
     const body = await ok.json();
-    expect(body.target).toEqual(target);
+    expect(body.target).toBeUndefined();
     expect(body.publicDisplayLabel).toBe(expectedPublicDisplayLabel);
     expect(body.positionKind).toBe('provisional');
     expect(body.patientsAhead).toBeNull();
@@ -226,7 +265,11 @@ describe('WU17 guest queue-status read', () => {
       uncertaintyMinutes: 15,
       basis: 'session_start_plus_declared_delay',
     });
-    expect(JSON.stringify(body)).not.toContain('0555000000');
+    const rawBody = JSON.stringify(body);
+    expect(rawBody).not.toContain('0555000000');
+    expect(rawBody).not.toContain(ids.clinic);
+    expect(rawBody).not.toContain(ids.session);
+    expect(rawBody).not.toContain(ids.targetEntry);
 
     const rejected = await GET(
       new Request('http://localhost/api/guest/status', {
@@ -296,5 +339,39 @@ describe('WU17 guest queue-status read', () => {
       "SELECT count(*)::text count FROM guest_status_rate_limit_buckets WHERE bucket_key='expired-probe'",
     );
     expect(expired.rows[0]?.count).toBe('0');
+  });
+
+  it('leaves credential, queue, and audit state untouched across concurrent polling reads', async () => {
+    const credential = await liveBearer();
+    const service = new GuestStatusService(pool);
+    const beforeCredential = await pool.query(
+      'SELECT issued_at,expires_at,revoked_at FROM guest_credentials',
+    );
+    const beforeAudit = await pool.query<{ count: string }>(
+      'SELECT count(*)::text count FROM audit_events',
+    );
+
+    const now = new Date('2026-09-10T09:02:00Z');
+    const snapshots = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        service.getSnapshot(credential.bearer, now),
+      ),
+    );
+
+    for (const snapshot of snapshots) {
+      expect(snapshot).toMatchObject({ terminal: false, target });
+    }
+    expect(
+      await pool.query(
+        'SELECT issued_at,expires_at,revoked_at FROM guest_credentials',
+      ),
+    ).toMatchObject({ rows: beforeCredential.rows });
+    expect(
+      (
+        await pool.query<{ count: string }>(
+          'SELECT count(*)::text count FROM audit_events',
+        )
+      ).rows[0].count,
+    ).toBe(beforeAudit.rows[0].count);
   });
 });
