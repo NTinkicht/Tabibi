@@ -4,16 +4,18 @@ This is the human-readable work marketplace. Live GitHub evidence is authoritati
 
 Status values: `ACTIVE`, `READY`, `BLOCKED`, `DONE`, `CANCELLED`.
 
-## Current company round - product delivery after Epic
+## Current company round - product delivery after WU66
 
-Epic restructuring is **DONE**.
+Epic restructuring is **DONE**, and product delivery has advanced through **WU66**.
 
 - PR #151 / `EPIC-CONTEXT-001` merged as `d935e5f72c74126f8b01e6a7688a3a96be7c0723`.
 - PR #158 / `EPIC-ORG-002` + `EPIC-ACTORS-003` merged as `a7660d5581507f7f243d5ec7a8b18c18f59c98c4` after green exact-head CI and an eligible independent non-author PASS/MERGE_READY gate.
 - Issues #154 and #155 are completed.
 - WU25 deferred ordering/test hardening was completed in PR #152, merged as `27ab7b4e9499db2087f454f7a1f562129dddeaa8`.
+- WU66 / Issue #268 was completed in PR #269, merged as `70dcdf0c0122a04cc2d233336ca33b801e784e68` after exact-head CI and exact-head independent review evidence.
+- Issue #6 is closed/completed and is **not** a valid continuation target.
 
-The company is now back in normal product-delivery mode under Company OS v3. The next product action is to decompose the remaining Issue #6 scope into the smallest dependency-ready bounded work unit, then establish exactly one canonical implementation lease/branch/PR.
+The company remains in normal product-delivery mode under Company OS v3. The next product action is to reconcile the remaining live open product epics (#2, #3, #4 and #5) against the codebase and merged work through WU66, select the smallest dependency-ready bounded slice, then establish exactly one canonical implementation lease/branch/PR.
 
 | Task ID | Status | Preferred actor | Scope | Expected artifact | Code allowed? |
 | --- | --- | --- | --- | --- | --- |
@@ -22,7 +24,9 @@ The company is now back in normal product-delivery mode under Company OS v3. The
 | EPIC-ACTORS-003 | DONE | ChatGPT | Activate `gemini-cli` and `mistral-vibe` as zero-extra-spend actors | Activation evidence + PR #158 merged | Complete |
 | WU25-FOLLOWUP-ORDER-001 | DONE | Codex | Expired-claim eligibility ordering hardening | PR #152 merged (`27ab7b4…`) | Complete |
 | WU25-FOLLOWUP-TEST-001 | DONE | Copilot | Deterministic ordering regression coverage | PR #152 merged (`27ab7b4…`) | Complete |
-| PRODUCT-CONTINUATION-001 | READY | Actor router | Reconcile remaining Issue #6 scope after WU25; define the next smallest dependency-ready bounded slice with deterministic acceptance/tests | One canonical issue/lease/branch/PR for the next product work unit | Yes, after explicit lease |
+| WU66 | DONE | Claude | Guest check-in recovery and lifecycle hardening | PR #269 merged (`70dcdf0…`), Issue #268 closed | Complete |
+| PRODUCT-CONTINUATION-001 | CANCELLED | Actor router | Obsolete continuation of closed Issue #6 | Superseded by live post-WU66 reconciliation | No |
+| PRODUCT-CONTINUATION-002 | READY | Actor router | Reconcile live open epics #2/#3/#4/#5 after WU66; select the smallest dependency-ready bounded slice with deterministic acceptance/tests. Explicitly exclude closed Issue #6. | One canonical issue/lease/branch/PR for the next product work unit | Yes, after explicit lease |
 | HEADROOM-SHADOW-001 | READY | Copilot or other non-author test lane | Historical/non-sensitive fidelity samples under shadow rules | Metrics + fidelity findings | Read-only evaluation |
 
 ## Current actor status

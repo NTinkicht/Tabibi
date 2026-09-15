@@ -1,12 +1,12 @@
 {
   "project": "Tabibi",
   "phase": "product_delivery_post_epic",
-  "state": "epic_complete_product_handoff_ready",
+  "state": "wu66_complete_product_handoff_ready",
   "current_pr": null,
   "current_issue": null,
   "last_actor": "chatgpt",
   "next_actor": "actor_router",
-  "next_action": "Select the smallest dependency-ready bounded product work unit from the remaining Issue #6 scope, establish one canonical implementation lease/branch/PR, and continue normal Tabibi delivery under Company OS v3. Preserve zero-extra-spend and exact-head independent review rules.",
+  "next_action": "Reconcile the live remaining open product epics after merged WU66 and define the smallest dependency-ready bounded work unit. Issue #6 is closed/completed and must not be routed. Establish exactly one canonical issue/lease/branch/PR for the selected slice, preserving zero-extra-spend and exact-head independent review rules.",
   "operating_model": "six-active-actor-mesh-v10-epic-company-os-v3",
   "binding_protocols": [
     "AGENTS.md",
@@ -49,7 +49,7 @@
   "agents": {
     "chatgpt": {
       "status": "available",
-      "current_activity": "Epic close-out/state reconciliation; available for orchestration or bounded product implementation subject to lease."
+      "current_activity": "Post-WU66 state reconciliation and bounded product handoff; available for orchestration or implementation subject to lease."
     },
     "codex": {
       "status": "available_subject_to_included_capacity",
@@ -75,12 +75,12 @@
   "role_leases": {},
   "current_work": null,
   "next_work": {
-    "id": "PRODUCT-CONTINUATION-001",
+    "id": "PRODUCT-CONTINUATION-002",
     "status": "ready_for_bounded_decomposition",
-    "parent_issue": 6,
-    "scope": "Continue the real-time status and notification-delivery epic after WU25 and its ordering hardening. Select the smallest dependency-ready remaining slice from live repository evidence; do not introduce paid provider/API dependencies.",
+    "parent_issue": null,
+    "scope": "Reconcile live open product epics #2, #3, #4 and #5 against merged work through WU66, then select the smallest dependency-ready remaining slice. Closed Issue #6 is explicitly excluded. Do not introduce paid provider/API dependencies.",
     "preferred_actor": "actor_router",
-    "next_action": "Reconcile Issue #6 and current code, define one bounded work unit with deterministic acceptance/tests, then establish exactly one canonical implementation stream."
+    "next_action": "Use live GitHub and current code to define one bounded work unit with deterministic acceptance/tests, record the lease, then establish exactly one canonical implementation stream."
   },
   "activation_evidence": {
     "gemini-cli": "probe passed: actor/repo/no-self-gating correct; no intentional repository edits; environment churn inspected/restored",
@@ -110,6 +110,15 @@
       "implementation_pr": 152,
       "final_head": "b4aa502175b7109032056d6842ab43f611c2e112",
       "merge_commit": "27ab7b4e9499db2087f454f7a1f562129dddeaa8",
+      "status": "merged"
+    },
+    {
+      "id": "WU66",
+      "issue": 268,
+      "implementation_pr": 269,
+      "final_head": "a1b1f3442032089601ed28b54e42abb58828e275",
+      "merge_commit": "70dcdf0c0122a04cc2d233336ca33b801e784e68",
+      "review_evidence": "Exact-head CI green; independent CodeRabbit exact-head review reported no actionable comments and no actionable merge risk.",
       "status": "merged"
     }
   ],
