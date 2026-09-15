@@ -22,9 +22,10 @@ async function mockBooking(page: Page, bearer = BEARER) {
 }
 
 async function submitBookingForm(page: Page) {
-  await page.goto('/guest/live-queue/test-selection-ref');
+  const response = await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel(/Votre nom|اسمك/).fill('Test Guest');
   await page.getByRole('button', { name: /Confirmer|تأكيد/ }).click();
+  return response;
 }
 
 test('guest live queue completes the booking-to-live handoff using only the Authorization header', async ({
@@ -46,7 +47,7 @@ test('guest live queue completes the booking-to-live handoff using only the Auth
     });
   });
 
-  await submitBookingForm(page);
+  const response = await submitBookingForm(page);
 
   await expect(page.getByText('G-042')).toBeVisible();
   await expect(page.getByText(/en attente/)).toBeVisible();
@@ -61,6 +62,8 @@ test('guest live queue completes the booking-to-live handoff using only the Auth
       ...Object.values(sessionStorage),
     ]),
   ).not.toContain(BEARER);
+  expect(response?.headers()['cache-control']).toContain('no-store');
+  expect(response?.headers()['referrer-policy']).toBe('no-referrer');
 });
 
 test('booking failure shows a generic message and never reaches the live view', async ({
