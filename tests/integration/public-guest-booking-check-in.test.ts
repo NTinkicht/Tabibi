@@ -186,17 +186,40 @@ describe('WU62 public guest booking check-in', () => {
     await openSession(booking);
     const service = new PublicGuestBookingCheckInService(pool, () => now);
     const before = await state(booking);
-    await expect(service.checkIn(booking.bearer)).resolves.toEqual({ status: 'checked_in' });
+    await expect(service.checkIn(booking.bearer)).resolves.toEqual({
+      status: 'checked_in',
+    });
     const after = await state(booking);
-    expect(after).toMatchObject({ appointment_status: 'checked_in', queue_state: 'checked_in' });
+    expect(after).toMatchObject({
+      appointment_status: 'checked_in',
+      queue_state: 'checked_in',
+    });
     expect(Number(after?.eligibility_order)).toBeGreaterThan(0);
-    expect(Number(after?.queue_order_version)).toBe(Number(before?.queue_order_version) + 1);
+    expect(Number(after?.queue_order_version)).toBe(
+      Number(before?.queue_order_version) + 1,
+    );
     const rows = (await audits(booking)).rows;
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.metadata).toEqual({ appointmentFrom: 'confirmed', appointmentTo: 'checked_in', queueFrom: 'waiting', queueTo: 'checked_in', authority: 'guest_capability' });
+    expect(rows[0]?.metadata).toEqual({
+      appointmentFrom: 'confirmed',
+      appointmentTo: 'checked_in',
+      queueFrom: 'waiting',
+      queueTo: 'checked_in',
+      authority: 'guest_capability',
+    });
     const serialized = JSON.stringify(rows[0]);
-    for (const forbidden of [booking.bearer, booking.privateDisplayName, booking.contactPhone, booking.doctorId, booking.sessionId, booking.queueEntryId]) expect(serialized).not.toContain(forbidden);
-    await expect(service.checkIn(booking.bearer)).resolves.toEqual({ status: 'checked_in' });
+    for (const forbidden of [
+      booking.bearer,
+      booking.privateDisplayName,
+      booking.contactPhone,
+      booking.doctorId,
+      booking.sessionId,
+      booking.queueEntryId,
+    ])
+      expect(serialized).not.toContain(forbidden);
+    await expect(service.checkIn(booking.bearer)).resolves.toEqual({
+      status: 'checked_in',
+    });
     expect(await state(booking)).toEqual(after);
     expect((await audits(booking)).rows).toHaveLength(1);
   });
@@ -207,10 +230,28 @@ describe('WU62 public guest booking check-in', () => {
     await openSession(first);
     const service = new PublicGuestBookingCheckInService(pool, () => now);
     const before = await state(first);
-    await expect(Promise.all([service.checkIn(first.bearer), service.checkIn(first.bearer), service.checkIn(second.bearer)])).resolves.toEqual([{ status: 'checked_in' }, { status: 'checked_in' }, { status: 'checked_in' }]);
-    expect(await state(first)).toMatchObject({ appointment_status: 'checked_in', queue_state: 'checked_in' });
-    expect(await state(second)).toMatchObject({ appointment_status: 'checked_in', queue_state: 'checked_in' });
-    expect(Number((await state(first))?.queue_order_version)).toBe(Number(before?.queue_order_version) + 2);
+    await expect(
+      Promise.all([
+        service.checkIn(first.bearer),
+        service.checkIn(first.bearer),
+        service.checkIn(second.bearer),
+      ]),
+    ).resolves.toEqual([
+      { status: 'checked_in' },
+      { status: 'checked_in' },
+      { status: 'checked_in' },
+    ]);
+    expect(await state(first)).toMatchObject({
+      appointment_status: 'checked_in',
+      queue_state: 'checked_in',
+    });
+    expect(await state(second)).toMatchObject({
+      appointment_status: 'checked_in',
+      queue_state: 'checked_in',
+    });
+    expect(Number((await state(first))?.queue_order_version)).toBe(
+      Number(before?.queue_order_version) + 2,
+    );
     expect((await audits(first)).rows).toHaveLength(1);
     expect((await audits(second)).rows).toHaveLength(1);
   });
@@ -221,9 +262,18 @@ describe('WU62 public guest booking check-in', () => {
     await openSession(first);
     const service = new PublicGuestBookingCheckInService(pool, () => now);
     const secondBefore = await state(second);
-    await expect(service.checkIn(first.bearer)).resolves.toEqual({ status: 'checked_in' });
-    expect(await state(first)).toMatchObject({ appointment_status: 'checked_in', queue_state: 'checked_in' });
-    expect(await state(second)).toMatchObject({ appointment_status: secondBefore?.appointment_status, queue_state: secondBefore?.queue_state, eligibility_order: secondBefore?.eligibility_order });
+    await expect(service.checkIn(first.bearer)).resolves.toEqual({
+      status: 'checked_in',
+    });
+    expect(await state(first)).toMatchObject({
+      appointment_status: 'checked_in',
+      queue_state: 'checked_in',
+    });
+    expect(await state(second)).toMatchObject({
+      appointment_status: secondBefore?.appointment_status,
+      queue_state: secondBefore?.queue_state,
+      eligibility_order: secondBefore?.eligibility_order,
+    });
     expect((await audits(first)).rows).toHaveLength(1);
     expect((await audits(second)).rows).toHaveLength(0);
   });
@@ -234,12 +284,14 @@ describe('WU62 public guest booking check-in', () => {
     await openSession(source);
     await openSession(target);
     const before = await Promise.all([state(source), state(target)]);
-    await expect(pool.query(
-      `UPDATE guest_credentials
+    await expect(
+      pool.query(
+        `UPDATE guest_credentials
           SET clinic_id=$2, session_id=$3
         WHERE queue_entry_id=$1`,
-      [source.queueEntryId, target.clinicId, target.sessionId],
-    )).rejects.toMatchObject({ code: '23503' });
+        [source.queueEntryId, target.clinicId, target.sessionId],
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
     expect(await Promise.all([state(source), state(target)])).toEqual(before);
     expect((await audits(source)).rows).toHaveLength(0);
     expect((await audits(target)).rows).toHaveLength(0);
@@ -249,11 +301,22 @@ describe('WU62 public guest booking check-in', () => {
     const booking = await createBooking('2301');
     await openSession(booking);
     const replacementPatientId = randomUUID();
-    await pool.query(`INSERT INTO patient_operational_records (id, clinic_id, private_display_name, contact_phone) VALUES ($1, $2, 'Replacement Patient', '0555002301')`, [replacementPatientId, booking.clinicId]);
-    await pool.query(`UPDATE appointments SET patient_id=$2 WHERE id=$1`, [booking.appointmentId, replacementPatientId]);
-    await pool.query(`UPDATE queue_entries SET patient_id=$2 WHERE id=$1`, [booking.queueEntryId, replacementPatientId]);
+    await pool.query(
+      `INSERT INTO patient_operational_records (id, clinic_id, private_display_name, contact_phone) VALUES ($1, $2, 'Replacement Patient', '0555002301')`,
+      [replacementPatientId, booking.clinicId],
+    );
+    await pool.query(`UPDATE appointments SET patient_id=$2 WHERE id=$1`, [
+      booking.appointmentId,
+      replacementPatientId,
+    ]);
+    await pool.query(`UPDATE queue_entries SET patient_id=$2 WHERE id=$1`, [
+      booking.queueEntryId,
+      replacementPatientId,
+    ]);
     const service = new PublicGuestBookingCheckInService(pool, () => now);
-    await expectRejectedWithoutOperationalMutation(service, booking.bearer, [booking]);
+    await expectRejectedWithoutOperationalMutation(service, booking.bearer, [
+      booking,
+    ]);
   });
 
   it('rejects completed and no-show bookings without operational mutation', async () => {
@@ -261,10 +324,22 @@ describe('WU62 public guest booking check-in', () => {
     for (const [index, terminalState] of ['completed', 'no_show'].entries()) {
       const booking = await createBooking(`24${index + 1}1`);
       await openSession(booking);
-      await pool.query(`UPDATE appointments SET status=$2::appointment_status WHERE id=$1`, [booking.appointmentId, terminalState]);
-      if (terminalState === 'completed') await pool.query(`UPDATE queue_entries SET state='in_consultation' WHERE id=$1`, [booking.queueEntryId]);
-      await pool.query(`UPDATE queue_entries SET state=$2::queue_entry_status WHERE id=$1`, [booking.queueEntryId, terminalState]);
-      await expectRejectedWithoutOperationalMutation(service, booking.bearer, [booking]);
+      await pool.query(
+        `UPDATE appointments SET status=$2::appointment_status WHERE id=$1`,
+        [booking.appointmentId, terminalState],
+      );
+      if (terminalState === 'completed')
+        await pool.query(
+          `UPDATE queue_entries SET state='in_consultation' WHERE id=$1`,
+          [booking.queueEntryId],
+        );
+      await pool.query(
+        `UPDATE queue_entries SET state=$2::queue_entry_status WHERE id=$1`,
+        [booking.queueEntryId, terminalState],
+      );
+      await expectRejectedWithoutOperationalMutation(service, booking.bearer, [
+        booking,
+      ]);
     }
   });
 
@@ -273,37 +348,79 @@ describe('WU62 public guest booking check-in', () => {
     const tampered = await createBooking('3001');
     await openSession(tampered);
     const parts = tampered.bearer.split('.');
-    await expect(service.checkIn(`${parts[0]}.${parts[1]}.${'A'.repeat(43)}`)).rejects.toBeInstanceOf(PublicGuestBookingCheckInRejectedError);
+    await expect(
+      service.checkIn(`${parts[0]}.${parts[1]}.${'A'.repeat(43)}`),
+    ).rejects.toBeInstanceOf(PublicGuestBookingCheckInRejectedError);
     const expired = await createBooking('3002');
     await openSession(expired);
-    await pool.query(`UPDATE guest_credentials SET issued_at=$2, expires_at=$3 WHERE queue_entry_id=$1`, [expired.queueEntryId, new Date(now.getTime() - 2000), new Date(now.getTime() - 1000)]);
-    await expect(service.checkIn(expired.bearer)).rejects.toBeInstanceOf(PublicGuestBookingCheckInRejectedError);
+    await pool.query(
+      `UPDATE guest_credentials SET issued_at=$2, expires_at=$3 WHERE queue_entry_id=$1`,
+      [
+        expired.queueEntryId,
+        new Date(now.getTime() - 2000),
+        new Date(now.getTime() - 1000),
+      ],
+    );
+    await expect(service.checkIn(expired.bearer)).rejects.toBeInstanceOf(
+      PublicGuestBookingCheckInRejectedError,
+    );
     const revoked = await createBooking('3003');
     await openSession(revoked);
-    await pool.query(`UPDATE guest_credentials SET revoked_at=$2 WHERE queue_entry_id=$1`, [revoked.queueEntryId, now]);
-    await expect(service.checkIn(revoked.bearer)).rejects.toBeInstanceOf(PublicGuestBookingCheckInRejectedError);
+    await pool.query(
+      `UPDATE guest_credentials SET revoked_at=$2 WHERE queue_entry_id=$1`,
+      [revoked.queueEntryId, now],
+    );
+    await expect(service.checkIn(revoked.bearer)).rejects.toBeInstanceOf(
+      PublicGuestBookingCheckInRejectedError,
+    );
     const drifted = await createBooking('3004');
     await openSession(drifted);
     const driftPatientId = randomUUID();
     const driftQueueEntryId = randomUUID();
-    await pool.query(`INSERT INTO patient_operational_records (id, clinic_id, private_display_name, contact_phone) VALUES ($1, $2, 'Drift Target', '0555003999')`, [driftPatientId, drifted.clinicId]);
-    await pool.query(`INSERT INTO queue_entries (id, clinic_id, session_id, patient_id, state, source, registration_order, eligibility_order, priority_order) SELECT $1, $2, $3, $4, 'waiting', 'walk_in', COALESCE(MAX(registration_order), 0) + 1, NULL, NULL FROM queue_entries WHERE clinic_id = $2 AND session_id = $3`, [driftQueueEntryId, drifted.clinicId, drifted.sessionId, driftPatientId]);
-    await pool.query(`UPDATE guest_credentials SET queue_entry_id=$2 WHERE queue_entry_id=$1`, [drifted.queueEntryId, driftQueueEntryId]);
-    await expect(service.checkIn(drifted.bearer)).rejects.toBeInstanceOf(PublicGuestBookingCheckInRejectedError);
+    await pool.query(
+      `INSERT INTO patient_operational_records (id, clinic_id, private_display_name, contact_phone) VALUES ($1, $2, 'Drift Target', '0555003999')`,
+      [driftPatientId, drifted.clinicId],
+    );
+    await pool.query(
+      `INSERT INTO queue_entries (id, clinic_id, session_id, patient_id, state, source, registration_order, eligibility_order, priority_order) SELECT $1, $2, $3, $4, 'waiting', 'walk_in', COALESCE(MAX(registration_order), 0) + 1, NULL, NULL FROM queue_entries WHERE clinic_id = $2 AND session_id = $3`,
+      [driftQueueEntryId, drifted.clinicId, drifted.sessionId, driftPatientId],
+    );
+    await pool.query(
+      `UPDATE guest_credentials SET queue_entry_id=$2 WHERE queue_entry_id=$1`,
+      [drifted.queueEntryId, driftQueueEntryId],
+    );
+    await expect(service.checkIn(drifted.bearer)).rejects.toBeInstanceOf(
+      PublicGuestBookingCheckInRejectedError,
+    );
     const terminal = await createBooking('3005');
     await openSession(terminal);
-    await pool.query(`UPDATE appointments SET status='cancelled' WHERE id=$1`, [terminal.appointmentId]);
-    await pool.query(`UPDATE queue_entries SET state='cancelled' WHERE id=$1`, [terminal.queueEntryId]);
-    await expect(service.checkIn(terminal.bearer)).rejects.toBeInstanceOf(PublicGuestBookingCheckInRejectedError);
-    for (const booking of [tampered, expired, revoked, drifted, terminal]) expect((await audits(booking)).rows).toHaveLength(0);
+    await pool.query(`UPDATE appointments SET status='cancelled' WHERE id=$1`, [
+      terminal.appointmentId,
+    ]);
+    await pool.query(`UPDATE queue_entries SET state='cancelled' WHERE id=$1`, [
+      terminal.queueEntryId,
+    ]);
+    await expect(service.checkIn(terminal.bearer)).rejects.toBeInstanceOf(
+      PublicGuestBookingCheckInRejectedError,
+    );
+    for (const booking of [tampered, expired, revoked, drifted, terminal])
+      expect((await audits(booking)).rows).toHaveLength(0);
   });
 
   it('rolls back appointment, queue/session, and audit on a late injected failure', async () => {
     const booking = await createBooking('4001');
     await openSession(booking);
     const before = await state(booking);
-    const service = new PublicGuestBookingCheckInService(pool, () => now, async () => { throw new Error('late failure'); });
-    await expect(service.checkIn(booking.bearer)).rejects.toThrow('late failure');
+    const service = new PublicGuestBookingCheckInService(
+      pool,
+      () => now,
+      async () => {
+        throw new Error('late failure');
+      },
+    );
+    await expect(service.checkIn(booking.bearer)).rejects.toThrow(
+      'late failure',
+    );
     expect(await state(booking)).toEqual(before);
     expect((await audits(booking)).rows).toHaveLength(0);
   });
@@ -311,12 +428,27 @@ describe('WU62 public guest booking check-in', () => {
   it('keeps the public route bearer-only and serialization allow-listed', async () => {
     const booking = await createBooking('5001');
     await openSession(booking);
-    const response = await POST(new Request('http://localhost/api/public/bookings/check-in', { method: 'POST', headers: { authorization: `Bearer ${booking.bearer}` } }));
+    const response = await POST(
+      new Request('http://localhost/api/public/bookings/check-in', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${booking.bearer}` },
+      }),
+    );
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body).toEqual({ status: 'checked_in' });
     const serialized = JSON.stringify(body);
-    for (const forbidden of [booking.bearer, booking.privateDisplayName, booking.contactPhone, booking.clinicId, booking.doctorId, booking.sessionId, booking.queueEntryId, booking.appointmentId]) expect(serialized).not.toContain(forbidden);
+    for (const forbidden of [
+      booking.bearer,
+      booking.privateDisplayName,
+      booking.contactPhone,
+      booking.clinicId,
+      booking.doctorId,
+      booking.sessionId,
+      booking.queueEntryId,
+      booking.appointmentId,
+    ])
+      expect(serialized).not.toContain(forbidden);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
   });
