@@ -192,7 +192,11 @@ const COPY: Record<SupportedLocale, Copy> = {
     checkInTransient: 'فشل التأكيد. يرجى إعادة المحاولة.',
     etaHeading: 'وقت الانتظار المقدر',
     etaPatientsAhead: (count) =>
-      count === 0 ? 'أنت التالي' : `${count} أشخاص أمامك`,
+      count === 0
+        ? 'أنت التالي'
+        : count === 1
+          ? 'شخص واحد أمامك'
+          : `${count} أشخاص أمامك`,
     etaWaitRange: (minMinutes, maxMinutes) =>
       minMinutes === maxMinutes
         ? `حوالي ${minMinutes} دقيقة`

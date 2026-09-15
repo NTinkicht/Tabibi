@@ -137,6 +137,38 @@ test('Arabic renders the ETA section with RTL parity', async ({ page }) => {
   await expect(page.getByText('حوالي 15–30 دقيقة')).toBeVisible();
 });
 
+test('Arabic uses singular wording for exactly one patient ahead', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'language', { get: () => 'ar-DZ' });
+  });
+  await mockBooking(page);
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'checked_in',
+        queueState: 'checked_in',
+        eta: {
+          patientsAhead: 1,
+          minWaitMinutes: 5,
+          maxWaitMinutes: 10,
+          estimateSource: 'fallback',
+        },
+      }),
+    });
+  });
+
+  await page.goto('/guest/live-queue/test-selection-ref');
+  await page.getByLabel('اسمك').fill('Test Guest');
+  await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
+
+  await expect(page.getByText('شخص واحد أمامك')).toBeVisible();
+  await expect(page.getByText('1 أشخاص أمامك')).toHaveCount(0);
+});
+
 test('a stale in-flight poll response cannot regress a previously shown ETA', async ({
   page,
 }) => {
