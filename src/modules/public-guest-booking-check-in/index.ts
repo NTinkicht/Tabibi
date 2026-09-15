@@ -110,6 +110,7 @@ export class PublicGuestBookingCheckInService {
             AND appointment.clinic_id = entry.clinic_id
             AND appointment.session_id = entry.session_id
             AND appointment.patient_id = entry.patient_id
+            AND appointment.patient_id = receipt.patient_id
           WHERE credential.id = $1
             AND credential.clinic_id = $2
             AND credential.session_id = $3
