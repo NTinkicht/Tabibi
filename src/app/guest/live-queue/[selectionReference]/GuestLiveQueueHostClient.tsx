@@ -367,6 +367,11 @@ function LiveQueueView({
   // Captured once on mount; later re-renders may pass `undefined` once the
   // host clears its own copy, but this ref keeps the value this view needs.
   const initialBearerRef = useRef(bearer);
+  // Distinguishes a real unmount from React Strict Mode's dev-only effect
+  // replay (mount -> cleanup -> mount again, synchronously, on the same
+  // instance): a replay's re-setup bumps this before the deferred cleanup
+  // microtask below runs, so only a true unmount clears initialBearerRef.
+  const effectGenerationRef = useRef(0);
 
   useEffect(() => {
     // Report acceptance once so the host can drop its own reference; this
@@ -377,6 +382,7 @@ function LiveQueueView({
   }, []);
 
   useEffect(() => {
+    const generation = ++effectGenerationRef.current;
     let cancelled = false;
     let terminalReached = false;
     let currentBearer: string | null = initialBearerRef.current ?? null;
@@ -528,15 +534,24 @@ function LiveQueueView({
     return () => {
       cancelled = true;
       currentBearer = null;
-      // Do not clear initialBearerRef here: React Strict Mode double-invokes
-      // this effect (mount -> cleanup -> mount again) on the same instance in
-      // dev, and this component is still mounted when that replay setup runs.
-      // Clearing the ref here would strand the second setup with no bearer.
-      // Terminal states clear it explicitly via stopForRejection/stopForTerminal,
-      // which are not subject to this replay since the view is truly done.
       activeController?.abort();
       clearScheduled();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      // Defer the ref clear: React Strict Mode double-invokes this effect
+      // (mount -> cleanup -> mount again) synchronously on the same instance
+      // in dev. A replay's re-setup bumps effectGenerationRef before this
+      // microtask runs, so the check below skips the clear and preserves the
+      // bearer for it. A real unmount has no following setup, so the
+      // generation still matches and the clear proceeds.
+      queueMicrotask(() => {
+        // Intentionally reading the live ref value here, not a snapshot: the
+        // whole point is to detect whether a replay's re-setup incremented it
+        // after this cleanup captured `generation`, above.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        if (effectGenerationRef.current === generation) {
+          initialBearerRef.current = undefined;
+        }
+      });
     };
     // The initial bearer is captured once via initialBearerRef; this effect
     // intentionally runs only on mount/unmount for this view instance.
