@@ -3,24 +3,21 @@ import {
   authenticatedGuestCredentialId,
   verifierMatches,
 } from '@/modules/guest-access';
+import {
+  computeQueueEtaRange,
+  MAX_HISTORICAL_SAMPLES,
+  type QueueEtaEstimateSource,
+  selectConsultationEstimate,
+} from '@/modules/queue-eta-estimator';
 import { abortableQuery } from '@/platform/database/abortable-query';
 
-// Mirrors the WU9/WU10 deterministic ETA policy in ReceptionistDashboardService
-// exactly, so the guest-facing projection and the staff dashboard can never
-// diverge on the underlying estimate for the same committed state.
-const FALLBACK_CONSULTATION_MINUTES = 15;
-const MIN_OBSERVED_SAMPLES = 3;
-const MIN_SAMPLE_MINUTES = 2;
-const MAX_SAMPLE_MINUTES = 120;
-const ETA_MIN_MULTIPLIER = 0.75;
-const ETA_MAX_MULTIPLIER = 1.5;
 const LIVE_QUEUE_STATES = new Set(['checked_in', 'called', 'in_consultation']);
 
 export interface PublicGuestLiveQueueEta {
   patientsAhead: number;
   minWaitMinutes: number;
   maxWaitMinutes: number;
-  estimateSource: 'fallback' | 'observed_median';
+  estimateSource: QueueEtaEstimateSource;
 }
 
 export interface PublicGuestLiveQueueStatusResult {
@@ -44,23 +41,13 @@ type StatusRow = {
   queue_state: string;
   service_position: string | null;
   declared_delay_minutes: number | null;
-  duration_samples: number[] | null;
+  duration_samples: Array<number | string> | null;
+  historical_duration_samples: Array<number | string> | null;
 };
 
 function bearerSecret(bearer: string): string | null {
   const parts = bearer.split('.');
   return parts.length === 3 && parts[1] ? parts[1] : null;
-}
-
-function clampDuration(value: number): number {
-  return Math.min(MAX_SAMPLE_MINUTES, Math.max(MIN_SAMPLE_MINUTES, value));
-}
-
-function median(values: number[]): number {
-  const ordered = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(ordered.length / 2);
-  if (ordered.length % 2 === 1) return ordered[middle]!;
-  return (ordered[middle - 1]! + ordered[middle]!) / 2;
 }
 
 /**
@@ -70,8 +57,9 @@ function median(values: number[]): number {
  * scope. This performs a single plain SELECT (no lock, no transaction, no
  * mutation, no audit event), so repeated and concurrent reads are inherently
  * side-effect free. The single-statement CTE query below computes lifecycle,
- * authoritative service order, declared delay, and observed-duration samples
- * from one PostgreSQL query snapshot, so ETA inputs cannot mix versions.
+ * authoritative service order, declared delay, current-session durations, and
+ * bounded same-clinic/same-doctor historical durations from one PostgreSQL
+ * query snapshot, so ETA inputs cannot mix versions.
  */
 export class PublicGuestLiveQueueStatusService {
   constructor(
@@ -94,8 +82,13 @@ export class PublicGuestLiveQueueStatusService {
          SELECT credential.id AS credential_id,
                 credential.clinic_id,
                 credential.session_id,
-                credential.queue_entry_id
+                credential.queue_entry_id,
+                target_session.doctor_id,
+                target_session.starts_at
            FROM guest_credentials credential
+           JOIN consultation_sessions target_session
+             ON target_session.id = credential.session_id
+            AND target_session.clinic_id = credential.clinic_id
           WHERE credential.id = $1
        ),
        ordered AS (
@@ -127,6 +120,27 @@ export class PublicGuestLiveQueueStatusService {
             AND duration_entry.session_id = target.session_id
             AND duration_entry.completed_at IS NOT NULL
             AND duration_entry.in_consultation_started_at IS NOT NULL
+       ),
+       historical_durations AS (
+         SELECT historical.duration_minutes
+           FROM (
+             SELECT EXTRACT(EPOCH FROM (history_entry.completed_at - history_entry.in_consultation_started_at)) / 60 AS duration_minutes,
+                    history_entry.completed_at,
+                    history_entry.id
+               FROM queue_entries history_entry
+               JOIN consultation_sessions history_session
+                 ON history_session.id = history_entry.session_id
+                AND history_session.clinic_id = history_entry.clinic_id
+               CROSS JOIN target
+              WHERE history_entry.clinic_id = target.clinic_id
+                AND history_session.doctor_id = target.doctor_id
+                AND history_session.id <> target.session_id
+                AND history_entry.completed_at IS NOT NULL
+                AND history_entry.in_consultation_started_at IS NOT NULL
+                AND history_entry.completed_at < target.starts_at
+              ORDER BY history_entry.completed_at DESC, history_entry.id DESC
+              LIMIT ${MAX_HISTORICAL_SAMPLES}
+           ) historical
        )
        SELECT credential.bearer_verifier,
               credential.expires_at,
@@ -135,7 +149,8 @@ export class PublicGuestLiveQueueStatusService {
               entry.state::text AS queue_state,
               ordered.service_position::text AS service_position,
               session.declared_delay_minutes,
-              (SELECT array_agg(duration_minutes) FROM durations) AS duration_samples
+              (SELECT array_agg(duration_minutes) FROM durations) AS duration_samples,
+              (SELECT array_agg(duration_minutes) FROM historical_durations) AS historical_duration_samples
          FROM guest_credentials credential
          JOIN public_guest_booking_receipts receipt
            ON receipt.credential_id = credential.id
@@ -184,28 +199,23 @@ export class PublicGuestLiveQueueStatusService {
     if (!LIVE_QUEUE_STATES.has(row.queue_state) || !row.service_position)
       return null;
 
-    const samples = (row.duration_samples ?? [])
-      .map(Number)
-      .filter((value) => Number.isFinite(value))
-      .map(clampDuration);
-    const useObserved = samples.length >= MIN_OBSERVED_SAMPLES;
-    const estimatedConsultationMinutes = useObserved
-      ? median(samples)
-      : FALLBACK_CONSULTATION_MINUTES;
+    const estimate = selectConsultationEstimate(
+      row.duration_samples ?? [],
+      row.historical_duration_samples ?? [],
+    );
     const declaredDelayMinutes = row.declared_delay_minutes ?? 0;
     const patientsAhead = Math.max(0, Number(row.service_position) - 1);
+    const range = computeQueueEtaRange({
+      patientsAhead,
+      declaredDelayMinutes,
+      estimatedConsultationMinutes: estimate.estimatedConsultationMinutes,
+    });
 
     return {
       patientsAhead,
-      minWaitMinutes: Math.round(
-        declaredDelayMinutes +
-          patientsAhead * estimatedConsultationMinutes * ETA_MIN_MULTIPLIER,
-      ),
-      maxWaitMinutes: Math.round(
-        declaredDelayMinutes +
-          patientsAhead * estimatedConsultationMinutes * ETA_MAX_MULTIPLIER,
-      ),
-      estimateSource: useObserved ? 'observed_median' : 'fallback',
+      minWaitMinutes: range.minWaitMinutes,
+      maxWaitMinutes: range.maxWaitMinutes,
+      estimateSource: estimate.estimateSource,
     };
   }
 }
