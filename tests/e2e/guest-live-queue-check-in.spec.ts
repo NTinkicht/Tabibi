@@ -259,3 +259,91 @@ test('the check-in button does not appear once the guest is already checked in',
   await expect(page.getByText(/enregistré/)).toBeVisible();
   await expect(checkInButton(page)).toHaveCount(0);
 });
+
+test('a stalled check-in request times out into the transient state and a retry reuses the same operationId', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  await mockWaitingStatus(page);
+
+  const seenOperationIds: string[] = [];
+  let attempt = 0;
+  await page.route(CHECK_IN_URL, async (route) => {
+    attempt += 1;
+    const body = route.request().postDataJSON() as { operationId: string };
+    seenOperationIds.push(body.operationId);
+    if (attempt === 1) {
+      // Never resolves on its own; only the client's own internal request
+      // timeout (via AbortController) should end it.
+      await new Promise<void>(() => undefined);
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ state: 'checked_in', reconciled: false }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await checkInButton(page).click();
+  await expect.poll(() => attempt).toBe(1);
+
+  await page.clock.fastForward(10_000);
+  await expect(
+    page.getByText('La confirmation a échoué. Veuillez réessayer.'),
+  ).toBeVisible();
+
+  const retryButton = page.getByRole('button', { name: 'Réessayer' });
+  await retryButton.click();
+  await expect(page.getByText('Votre présence a été confirmée.')).toBeVisible();
+
+  expect(attempt).toBe(2);
+  expect(seenOperationIds[1]).toBe(seenOperationIds[0]);
+});
+
+test('a malformed 200 check-in response is not treated as success and a retry reuses the same operationId', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  await mockWaitingStatus(page);
+
+  const seenOperationIds: string[] = [];
+  let attempt = 0;
+  await page.route(CHECK_IN_URL, async (route) => {
+    attempt += 1;
+    const body = route.request().postDataJSON() as { operationId: string };
+    seenOperationIds.push(body.operationId);
+    if (attempt === 1) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ state: 'other', reconciled: 'yes' }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ state: 'checked_in', reconciled: false }),
+    });
+  });
+
+  await submitBookingForm(page);
+  await checkInButton(page).click();
+
+  await expect(
+    page.getByText('La confirmation a échoué. Veuillez réessayer.'),
+  ).toBeVisible();
+  await expect(page.getByText('Votre présence a été confirmée.')).toHaveCount(
+    0,
+  );
+
+  const retryButton = page.getByRole('button', { name: 'Réessayer' });
+  await retryButton.click();
+  await expect(page.getByText('Votre présence a été confirmée.')).toBeVisible();
+
+  expect(attempt).toBe(2);
+  expect(seenOperationIds[1]).toBe(seenOperationIds[0]);
+});

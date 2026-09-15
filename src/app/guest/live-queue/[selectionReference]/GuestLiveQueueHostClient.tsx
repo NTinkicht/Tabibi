@@ -422,6 +422,11 @@ function LiveQueueView({
     if (!bearer) return;
     checkInOperationIdRef.current ??= crypto.randomUUID();
     setCheckInState({ kind: 'pending' });
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(
+      () => controller.abort(),
+      REQUEST_TIMEOUT_MS,
+    );
     try {
       const response = await fetch('/api/public/bookings/check-in', {
         method: 'POST',
@@ -431,14 +436,25 @@ function LiveQueueView({
           'content-type': 'application/json',
         },
         body: JSON.stringify({ operationId: checkInOperationIdRef.current }),
+        signal: controller.signal,
       });
       if (response.status === 200) {
         const result = (await response.json()) as {
-          state: string;
-          reconciled: boolean;
+          state?: unknown;
+          reconciled?: unknown;
         };
-        checkInOperationIdRef.current = null;
-        setCheckInState({ kind: 'done', reconciled: result.reconciled });
+        if (
+          result.state === 'checked_in' &&
+          typeof result.reconciled === 'boolean'
+        ) {
+          checkInOperationIdRef.current = null;
+          setCheckInState({ kind: 'done', reconciled: result.reconciled });
+          return;
+        }
+        // A 200 that doesn't conform to the wire schema is not a trustworthy
+        // success signal; keep the operationId so a retry reuses the same
+        // logical attempt rather than starting a new one.
+        setCheckInState({ kind: 'transient' });
         return;
       }
       if (response.status === 404) {
@@ -451,6 +467,8 @@ function LiveQueueView({
       setCheckInState({ kind: 'transient' });
     } catch {
       setCheckInState({ kind: 'transient' });
+    } finally {
+      clearTimeout(timeoutHandle);
     }
   };
 
