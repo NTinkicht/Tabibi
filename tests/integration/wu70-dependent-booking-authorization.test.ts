@@ -193,6 +193,20 @@ describe('WU70 dependent booking authorization boundary', () => {
     expect(serializedAudit).not.toContain('Élodie');
   });
 
+  it('keeps the successful HTTP response free of dependent and owner identity', async () => {
+    const response = await routeBooking(
+      ids.activeDependent,
+      'wu71-http-success-privacy',
+    );
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain(ids.activeDependent);
+    expect(serialized).not.toContain(ids.owner);
+    expect(serialized).not.toContain('ليان');
+    expect(serialized).not.toContain('Élodie');
+  });
+
   it('fails malformed, unknown, cross-account and archived dependent references identically with zero writes', async () => {
     const dependentIds = [
       'not-a-uuid',
