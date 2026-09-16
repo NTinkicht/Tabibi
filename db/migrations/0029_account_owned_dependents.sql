@@ -10,6 +10,7 @@ CREATE TABLE patient_dependents (
   archived_at timestamptz,
   CHECK (display_name = btrim(display_name)),
   CHECK (char_length(display_name) BETWEEN 1 AND 160),
+  CHECK (display_name IS NFC NORMALIZED),
   CHECK (display_name !~ '[[:cntrl:]]'),
   CHECK (
     (status = 'active' AND archived_at IS NULL)
