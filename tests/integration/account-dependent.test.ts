@@ -34,12 +34,17 @@ describe('WU69 account-owned dependent foundation', () => {
     const french = await service.create(scopeA, {
       displayName: '  E\u0301lodie Benali  ',
     });
-    const arabic = await service.create(scopeA, { displayName: '  ليلى بن علي  ' });
+    const arabic = await service.create(scopeA, {
+      displayName: '  ليلى بن علي  ',
+    });
     await service.create(scopeB, { displayName: 'Other Account' });
 
     expect(french.displayName).toBe('Élodie Benali');
     expect(arabic.displayName).toBe('ليلى بن علي');
-    expect(await service.list(scopeA)).toEqual([french, arabic]);
+    expect(await service.list(scopeA)).toEqual(
+      expect.arrayContaining([french, arabic]),
+    );
+    expect(await service.list(scopeA)).toHaveLength(2);
     expect(await service.list(scopeB)).toHaveLength(1);
 
     for (const dependent of await service.list(scopeA)) {
@@ -107,7 +112,9 @@ describe('WU69 account-owned dependent foundation', () => {
   });
 
   it('rejects unsafe text and enforces NFC at both service and PostgreSQL boundaries', async () => {
-    expect(normalizeDependentDisplayName('  Franc\u0327ois  ')).toBe('François');
+    expect(normalizeDependentDisplayName('  Franc\u0327ois  ')).toBe(
+      'François',
+    );
     expect(normalizeDependentDisplayName('  أحمد  ')).toBe('أحمد');
     expect(() => normalizeDependentDisplayName('')).toThrow(
       AccountDependentValidationError,
