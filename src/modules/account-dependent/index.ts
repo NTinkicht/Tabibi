@@ -68,8 +68,7 @@ function normalizeOwnerScope(scope: AccountOwnerScope): string {
 }
 
 export function normalizeDependentDisplayName(raw: string): string {
-  if (typeof raw !== 'string')
-    throw new AccountDependentValidationError();
+  if (typeof raw !== 'string') throw new AccountDependentValidationError();
   const normalized = raw.normalize('NFC').trim();
   const codePointLength = Array.from(normalized).length;
   if (
