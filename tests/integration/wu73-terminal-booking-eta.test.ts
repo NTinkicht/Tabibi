@@ -8,17 +8,24 @@ import {
   expect,
   it,
 } from 'vitest';
-import { PublicAvailabilitySelectionService } from '@/modules/public-availability-selection';
+import {
+  PublicAvailabilitySelectionService,
+} from '@/modules/public-availability-selection';
 import { PublicGuestBookingService } from '@/modules/public-guest-booking';
-import { PublicGuestBookingCheckInService } from '@/modules/public-guest-booking-check-in';
-import { PublicGuestLiveQueueStatusService } from '@/modules/public-guest-live-queue-status';
+import {
+  PublicGuestBookingCheckInService,
+} from '@/modules/public-guest-booking-check-in';
+import {
+  PublicGuestLiveQueueStatusService,
+} from '@/modules/public-guest-live-queue-status';
 import { migrate } from '../../scripts/db/lib';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 4,
 });
-const selectionSecret = 'wu73-selection-secret-that-is-deliberately-long-enough';
+const selectionSecret =
+  'wu73-selection-secret-that-is-deliberately-long-enough';
 const now = new Date('2099-05-01T00:00:00.000Z');
 
 beforeAll(async () => migrate());
@@ -124,19 +131,22 @@ describe('WU73 terminal booking ETA suppression', () => {
     ['7302', 'cancelled'],
     ['7303', 'no_show'],
   ] as const) {
-    it(`suppresses ETA for isolated ${terminalState} booking while queue remains checked_in`, async () => {
-      const booking = await createCheckedInBooking(suffix);
-      await pool.query(`UPDATE appointments SET status=$2 WHERE id=$1`, [
-        booking.appointmentId,
-        terminalState,
-      ]);
+    it(
+      `suppresses ETA for isolated ${terminalState} booking while queue remains checked_in`,
+      async () => {
+        const booking = await createCheckedInBooking(suffix);
+        await pool.query(`UPDATE appointments SET status=$2 WHERE id=$1`, [
+          booking.appointmentId,
+          terminalState,
+        ]);
 
-      const service = new PublicGuestLiveQueueStatusService(pool, () => now);
-      await expect(service.get(booking.bearer)).resolves.toEqual({
-        bookingState: terminalState,
-        queueState: 'checked_in',
-        eta: null,
-      });
-    });
+        const service = new PublicGuestLiveQueueStatusService(pool, () => now);
+        await expect(service.get(booking.bearer)).resolves.toEqual({
+          bookingState: terminalState,
+          queueState: 'checked_in',
+          eta: null,
+        });
+      },
+    );
   }
 });
