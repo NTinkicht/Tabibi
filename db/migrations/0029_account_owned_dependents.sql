@@ -9,6 +9,14 @@ CREATE TABLE patient_dependents (
   updated_at timestamptz NOT NULL DEFAULT now(),
   archived_at timestamptz,
   CHECK (display_name = btrim(display_name)),
+  CHECK (
+    display_name = regexp_replace(
+      display_name,
+      U&'^[[:space:]\00A0\1680\2000-\200A\2028\2029\202F\205F\3000]+|[[:space:]\00A0\1680\2000-\200A\2028\2029\202F\205F\3000]+$',
+      '',
+      'g'
+    )
+  ),
   CHECK (char_length(display_name) BETWEEN 1 AND 160),
   CHECK (display_name IS NFC NORMALIZED),
   CHECK (display_name !~ '[[:cntrl:]]'),
