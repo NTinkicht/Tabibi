@@ -58,6 +58,7 @@ const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const unsafeControlPattern = /[\p{Cc}\p{Cf}]/u;
 
+/** Validates and canonicalizes the trusted authenticated account scope. */
 function normalizeOwnerScope(scope: AccountOwnerScope): string {
   const ownerUserId = scope.ownerUserId.trim();
   if (!uuidPattern.test(ownerUserId))
@@ -67,6 +68,11 @@ function normalizeOwnerScope(scope: AccountOwnerScope): string {
   return ownerUserId;
 }
 
+/**
+ * Canonicalizes a human-readable dependent name before persistence while
+ * preserving legitimate Arabic/French Unicode and rejecting invisible control
+ * or format characters that could make identity text ambiguous.
+ */
 export function normalizeDependentDisplayName(raw: string): string {
   if (typeof raw !== 'string') throw new AccountDependentValidationError();
   const normalized = raw.normalize('NFC').trim();
@@ -80,12 +86,14 @@ export function normalizeDependentDisplayName(raw: string): string {
   return normalized;
 }
 
+/** Validates opaque dependent identifiers without leaking ownership state. */
 function normalizeDependentId(id: string): string {
   const normalized = id.trim();
   if (!uuidPattern.test(normalized)) throw new AccountDependentNotFoundError();
   return normalized;
 }
 
+/** Maps an internal owner-bound row to the privacy-safe service representation. */
 function toDependent(row: DependentRow): AccountDependent {
   return {
     id: row.id,
