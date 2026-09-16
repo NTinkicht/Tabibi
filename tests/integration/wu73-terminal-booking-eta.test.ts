@@ -7,7 +7,10 @@ import { PublicGuestBookingCheckInService } from "@/modules/public-guest-booking
 import { PublicGuestLiveQueueStatusService } from "@/modules/public-guest-live-queue-status";
 import { migrate } from "../../scripts/db/lib";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 4 });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 4,
+});
 const selectionSecret = "wu73-selection-secret-that-is-deliberately-long-enough";
 const now = new Date("2099-05-01T00:00:00.000Z");
 
