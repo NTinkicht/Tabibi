@@ -11,7 +11,8 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 4,
 });
-const selectionSecret = "wu73-selection-secret-that-is-deliberately-long-enough";
+const selectionSecret =
+  "wu73-selection-secret-that-is-deliberately-long-enough";
 const now = new Date("2099-05-01T00:00:00.000Z");
 
 beforeAll(async () => migrate());
@@ -78,7 +79,11 @@ async function createCheckedInBooking(suffix: string): Promise<Booking> {
   });
   if (!selectionReference) throw new Error("selection reference not issued");
 
-  const booked = await new PublicGuestBookingService(pool, selections, () => now).book({
+  const booked = await new PublicGuestBookingService(
+    pool,
+    selections,
+    () => now,
+  ).book({
     selectionReference,
     privateDisplayName: `WU73 Guest ${suffix}`,
     contactPhone,
