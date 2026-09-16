@@ -1,15 +1,15 @@
-import { randomUUID } from 'node:crypto';
-import { Pool } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PublicAvailabilitySelectionService } from '@/modules/public-availability-selection';
-import { PublicGuestBookingService } from '@/modules/public-guest-booking';
-import { PublicGuestBookingCheckInService } from '@/modules/public-guest-booking-check-in';
-import { PublicGuestLiveQueueStatusService } from '@/modules/public-guest-live-queue-status';
-import { migrate } from '../../scripts/db/lib';
+import { randomUUID } from "node:crypto";
+import { Pool } from "pg";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { PublicAvailabilitySelectionService } from "@/modules/public-availability-selection";
+import { PublicGuestBookingService } from "@/modules/public-guest-booking";
+import { PublicGuestBookingCheckInService } from "@/modules/public-guest-booking-check-in";
+import { PublicGuestLiveQueueStatusService } from "@/modules/public-guest-live-queue-status";
+import { migrate } from "../../scripts/db/lib";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 4 });
-const selectionSecret = 'wu73-selection-secret-that-is-deliberately-long-enough';
-const now = new Date('2099-05-01T00:00:00.000Z');
+const selectionSecret = "wu73-selection-secret-that-is-deliberately-long-enough";
+const now = new Date("2099-05-01T00:00:00.000Z");
 
 beforeAll(async () => migrate());
 beforeEach(async () => {
@@ -33,9 +33,9 @@ async function createCheckedInBooking(suffix: string): Promise<Booking> {
   const doctorId = randomUUID();
   const sessionId = randomUUID();
   const doctorUserId = randomUUID();
-  const startsAt = '2099-05-15T08:00:00.000Z';
-  const endsAt = '2099-05-15T09:00:00.000Z';
-  const contactPhone = `+21355573${suffix.padStart(4, '0')}`;
+  const startsAt = "2099-05-15T08:00:00.000Z";
+  const endsAt = "2099-05-15T09:00:00.000Z";
+  const contactPhone = `+21355573${suffix.padStart(4, "0")}`;
 
   await pool.query(
     `INSERT INTO users (id, auth_subject, display_name) VALUES ($1,$2,'WU73 Doctor')`,
@@ -73,15 +73,15 @@ async function createCheckedInBooking(suffix: string): Promise<Booking> {
     startsAt,
     endsAt,
   });
-  if (!selectionReference) throw new Error('selection reference not issued');
+  if (!selectionReference) throw new Error("selection reference not issued");
 
   const booked = await new PublicGuestBookingService(pool, selections, () => now).book({
     selectionReference,
     privateDisplayName: `WU73 Guest ${suffix}`,
     contactPhone,
     contactEmail: `wu73-${suffix}@example.com`,
-    preferredLocale: 'fr',
-    contactPreference: 'phone',
+    preferredLocale: "fr",
+    contactPreference: "phone",
     idempotencyKey: `wu73-book-${suffix}`,
     correlationId: `wu73-book-correlation-${suffix}`,
   });
@@ -94,7 +94,7 @@ async function createCheckedInBooking(suffix: string): Promise<Booking> {
     [clinicId, sessionId, contactPhone],
   );
   const appointmentId = internal.rows[0]?.id;
-  if (!appointmentId) throw new Error('booking internals not created');
+  if (!appointmentId) throw new Error("booking internals not created");
 
   await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
     booked.guestBearer,
@@ -104,11 +104,11 @@ async function createCheckedInBooking(suffix: string): Promise<Booking> {
   return { clinicId, sessionId, appointmentId, bearer: booked.guestBearer };
 }
 
-describe('WU73 terminal booking ETA suppression', () => {
+describe("WU73 terminal booking ETA suppression", () => {
   for (const [suffix, terminalState] of [
-    ['7301', 'completed'],
-    ['7302', 'cancelled'],
-    ['7303', 'no_show'],
+    ["7301", "completed"],
+    ["7302", "cancelled"],
+    ["7303", "no_show"],
   ] as const) {
     it(
       `suppresses ETA for isolated ${terminalState} booking while queue remains checked_in`,
@@ -122,7 +122,7 @@ describe('WU73 terminal booking ETA suppression', () => {
         const service = new PublicGuestLiveQueueStatusService(pool, () => now);
         await expect(service.get(booking.bearer)).resolves.toEqual({
           bookingState: terminalState,
-          queueState: 'checked_in',
+          queueState: "checked_in",
           eta: null,
         });
       },
