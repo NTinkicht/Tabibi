@@ -12,6 +12,7 @@ import {
 import { abortableQuery } from '@/platform/database/abortable-query';
 
 const LIVE_QUEUE_STATES = new Set(['checked_in', 'called', 'in_consultation']);
+const TERMINAL_BOOKING_STATES = new Set(['completed', 'cancelled', 'no_show']);
 
 export interface PublicGuestLiveQueueEta {
   patientsAhead: number;
@@ -196,7 +197,11 @@ export class PublicGuestLiveQueueStatusService {
   }
 
   private computeEta(row: StatusRow): PublicGuestLiveQueueEta | null {
-    if (!LIVE_QUEUE_STATES.has(row.queue_state) || !row.service_position)
+    if (
+      TERMINAL_BOOKING_STATES.has(row.appointment_status) ||
+      !LIVE_QUEUE_STATES.has(row.queue_state) ||
+      !row.service_position
+    )
       return null;
 
     const estimate = selectConsultationEstimate(
