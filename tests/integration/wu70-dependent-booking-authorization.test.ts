@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { POST as appointmentRoute } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/appointments/route';
-import { AppointmentConflictError, AppointmentService } from '@/modules/appointment';
+import {
+  AppointmentConflictError,
+  AppointmentService,
+} from '@/modules/appointment';
 import { closePool } from '@/platform/database/pool';
 import { createStaffSessionToken } from '@/platform/http/staff-auth';
 import { migrate } from '../../scripts/db/lib';
@@ -197,7 +200,11 @@ describe('WU70 dependent booking authorization boundary', () => {
       ids.crossAccountDependent,
       ids.archivedDependent,
     ];
-    const failures: Array<{ status: number; error: unknown; message: unknown }> = [];
+    const failures: Array<{
+      status: number;
+      error: unknown;
+      message: unknown;
+    }> = [];
 
     for (const [index, dependentId] of dependentIds.entries()) {
       const response = await routeBooking(dependentId, `wu70-deny-${index}`);
@@ -238,7 +245,9 @@ describe('WU70 dependent booking authorization boundary', () => {
         [ids.activeDependent, ids.owner],
       );
 
-      const bookingPromise = new AppointmentService(pool).bookForExistingPatient(
+      const bookingPromise = new AppointmentService(
+        pool,
+      ).bookForExistingPatient(
         scope,
         ids.session,
         bookingInput('wu70-archive-race'),
