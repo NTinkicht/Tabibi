@@ -116,10 +116,14 @@ describe('WU69 account-owned dependent foundation', () => {
       'François',
     );
     expect(normalizeDependentDisplayName('  أحمد  ')).toBe('أحمد');
+    expect(normalizeDependentDisplayName('\u00A0Amine\u00A0')).toBe('Amine');
     expect(() => normalizeDependentDisplayName('')).toThrow(
       AccountDependentValidationError,
     );
     expect(() => normalizeDependentDisplayName('   ')).toThrow(
+      AccountDependentValidationError,
+    );
+    expect(() => normalizeDependentDisplayName('\u00A0')).toThrow(
       AccountDependentValidationError,
     );
     expect(() => normalizeDependentDisplayName('Ali\u0000')).toThrow(
@@ -132,13 +136,15 @@ describe('WU69 account-owned dependent foundation', () => {
       AccountDependentValidationError,
     );
 
-    await expect(
-      pool.query(
-        `INSERT INTO patient_dependents (id, owner_user_id, display_name)
-         VALUES ($1,$2,$3)`,
-        [randomUUID(), ownerA, 'E\u0301lodie'],
-      ),
-    ).rejects.toMatchObject({ code: '23514' });
+    for (const displayName of ['E\u0301lodie', 'Ali\u200B']) {
+      await expect(
+        pool.query(
+          `INSERT INTO patient_dependents (id, owner_user_id, display_name)
+           VALUES ($1,$2,$3)`,
+          [randomUUID(), ownerA, displayName],
+        ),
+      ).rejects.toMatchObject({ code: '23514' });
+    }
   });
 
   it('keeps the storage schema free of clinical/contact/account-display leakage fields', async () => {
