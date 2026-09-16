@@ -120,12 +120,19 @@ describe('WU73 terminal booking ETA suppression', () => {
   ] as const) {
     it(`suppresses ETA for isolated ${terminalState} booking while queue remains checked_in`, async () => {
       const booking = await createCheckedInBooking(suffix);
+      const service = new PublicGuestLiveQueueStatusService(pool, () => now);
+      const beforeTerminalTransition = await service.get(booking.bearer);
+      expect(beforeTerminalTransition).toMatchObject({
+        bookingState: 'checked_in',
+        queueState: 'checked_in',
+      });
+      expect(beforeTerminalTransition.eta).not.toBeNull();
+
       await pool.query(`UPDATE appointments SET status=$2 WHERE id=$1`, [
         booking.appointmentId,
         terminalState,
       ]);
 
-      const service = new PublicGuestLiveQueueStatusService(pool, () => now);
       await expect(service.get(booking.bearer)).resolves.toEqual({
         bookingState: terminalState,
         queueState: 'checked_in',
