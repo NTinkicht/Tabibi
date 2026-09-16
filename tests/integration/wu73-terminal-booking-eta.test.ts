@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from 'vitest';
 import { PublicAvailabilitySelectionService } from '@/modules/public-availability-selection';
 import { PublicGuestBookingService } from '@/modules/public-guest-booking';
 import { PublicGuestBookingCheckInService } from '@/modules/public-guest-booking-check-in';
