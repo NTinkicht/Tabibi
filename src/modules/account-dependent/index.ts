@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 
 export type AccountDependentStatus = 'active' | 'archived';
 
@@ -103,6 +103,32 @@ function toDependent(row: DependentRow): AccountDependent {
     updatedAt: row.updated_at.toISOString(),
     archivedAt: row.archived_at?.toISOString() ?? null,
   };
+}
+
+/**
+ * Resolves and locks one active owner-bound dependent on an existing database
+ * transaction. The row lock is retained by the caller's transaction through
+ * persistence, which serializes booking against a concurrent archive update.
+ * Only the opaque identifier is returned so booking code never handles the
+ * dependent's display name.
+ */
+export async function lockActiveAccountDependentForOperation(
+  client: PoolClient,
+  scope: AccountOwnerScope,
+  dependentId: string,
+): Promise<{ id: string }> {
+  const ownerUserId = normalizeOwnerScope(scope);
+  const id = normalizeDependentId(dependentId);
+  const result = await client.query<{ id: string }>(
+    `SELECT id
+       FROM patient_dependents
+      WHERE id=$1 AND owner_user_id=$2 AND status='active'
+      FOR UPDATE`,
+    [id, ownerUserId],
+  );
+  const row = result.rows[0];
+  if (!row) throw new AccountDependentNotFoundError();
+  return row;
 }
 
 /**

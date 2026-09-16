@@ -1,5 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
+import {
+  AccountDependentNotFoundError,
+  lockActiveAccountDependentForOperation,
+} from '@/modules/account-dependent';
 import { appendAuditEvent } from '@/modules/audit';
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
 import { inTransaction } from '@/platform/database/transaction';
@@ -24,6 +28,7 @@ export type AppointmentQueueState =
 
 export interface AppointmentBookingInput {
   patientId: string;
+  dependentId?: string | null;
   scheduledStartAt: Date;
   scheduledEndAt: Date;
   contactPreference: AppointmentContactPreference;
@@ -79,6 +84,10 @@ function isDuplicatePatientSessionConflict(error: unknown): boolean {
   );
 }
 
+function dependentUnavailable(): AppointmentConflictError {
+  return new AppointmentConflictError('Dependent is unavailable for booking');
+}
+
 function normalizeInput(input: AppointmentBookingInput) {
   if (!input.patientId)
     throw new AppointmentValidationError('Patient id is required');
@@ -96,6 +105,8 @@ function normalizeInput(input: AppointmentBookingInput) {
     );
   return {
     patientId: input.patientId,
+    dependentId:
+      input.dependentId == null ? null : input.dependentId.trim().toLowerCase(),
     scheduledStartAt: input.scheduledStartAt,
     scheduledEndAt: input.scheduledEndAt,
     contactPreference: input.contactPreference,
@@ -113,6 +124,7 @@ function fingerprint(
       JSON.stringify([
         sessionId,
         input.patientId,
+        input.dependentId,
         input.scheduledStartAt.toISOString(),
         input.scheduledEndAt.toISOString(),
         input.contactPreference,
@@ -261,8 +273,9 @@ export class AppointmentService {
         preferred_locale: 'ar' | 'fr';
         contact_phone: string | null;
         contact_email: string | null;
+        account_user_id: string | null;
       }>(
-        `SELECT preferred_locale, contact_phone, contact_email
+        `SELECT preferred_locale, contact_phone, contact_email, account_user_id
            FROM patient_operational_records
           WHERE id = $1 AND clinic_id = $2
           FOR SHARE`,
@@ -273,6 +286,25 @@ export class AppointmentService {
         throw new AppointmentConflictError(
           'Patient was not found in this clinic',
         );
+
+      let resolvedDependentId: string | null = null;
+      if (input.dependentId !== null) {
+        if (patient.account_user_id !== scope.actorUserId)
+          throw dependentUnavailable();
+        try {
+          const dependent = await lockActiveAccountDependentForOperation(
+            client,
+            { ownerUserId: scope.actorUserId },
+            input.dependentId,
+          );
+          resolvedDependentId = dependent.id;
+        } catch (error) {
+          if (error instanceof AccountDependentNotFoundError)
+            throw dependentUnavailable();
+          throw error;
+        }
+      }
+
       if (input.contactPreference === 'phone' && !patient.contact_phone)
         throw new AppointmentValidationError(
           'Phone contact preference requires a patient phone number',
@@ -308,16 +340,17 @@ export class AppointmentService {
       try {
         await client.query(
           `INSERT INTO appointments
-             (id, clinic_id, doctor_id, session_id, patient_id, queue_entry_id,
-              status, scheduled_start_at, scheduled_end_at, preferred_locale,
-              contact_preference, source)
-           VALUES ($1, $2, $3, $4, $5, $6, 'confirmed', $7, $8, $9, $10, 'staff')`,
+             (id, clinic_id, doctor_id, session_id, patient_id, dependent_id,
+              queue_entry_id, status, scheduled_start_at, scheduled_end_at,
+              preferred_locale, contact_preference, source)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed', $8, $9, $10, $11, 'staff')`,
           [
             appointmentId,
             scope.clinicId,
             session.doctor_id,
             sessionId,
             input.patientId,
+            resolvedDependentId,
             entryId,
             input.scheduledStartAt,
             input.scheduledEndAt,
@@ -341,6 +374,7 @@ export class AppointmentService {
         metadata: {
           source: 'staff',
           status: 'confirmed',
+          subjectKind: resolvedDependentId ? 'dependent' : 'self',
           sessionId,
           queueEntryId: entryId,
           registrationOrder,

@@ -14,6 +14,7 @@ const paramsSchema = z.object({
 
 const bookingSchema = z.object({
   patientId: z.string().uuid(),
+  dependentId: z.string().max(128).nullable().optional(),
   scheduledStartAt: z.coerce.date(),
   scheduledEndAt: z.coerce.date(),
   contactPreference: z.enum(['none', 'phone', 'email']).default('none'),
