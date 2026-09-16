@@ -34,6 +34,7 @@ const committedMigrations = [
   '0026_notification_inbox_read_state.sql',
   '0027_public_guest_booking.sql',
   '0028_public_guest_check_in_operations.sql',
+  '0029_account_owned_dependents.sql',
 ];
 
 beforeAll(async () => {
