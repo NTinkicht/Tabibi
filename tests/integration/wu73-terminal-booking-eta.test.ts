@@ -4,9 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PublicAvailabilitySelectionService } from '@/modules/public-availability-selection';
 import { PublicGuestBookingService } from '@/modules/public-guest-booking';
 import { PublicGuestBookingCheckInService } from '@/modules/public-guest-booking-check-in';
-import {
-  PublicGuestLiveQueueStatusService,
-} from '@/modules/public-guest-live-queue-status';
+import { PublicGuestLiveQueueStatusService } from '@/modules/public-guest-live-queue-status';
 import { migrate } from '../../scripts/db/lib';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 4 });
@@ -77,11 +75,7 @@ async function createCheckedInBooking(suffix: string): Promise<Booking> {
   });
   if (!selectionReference) throw new Error('selection reference not issued');
 
-  const booked = await new PublicGuestBookingService(
-    pool,
-    selections,
-    () => now,
-  ).book({
+  const booked = await new PublicGuestBookingService(pool, selections, () => now).book({
     selectionReference,
     privateDisplayName: `WU73 Guest ${suffix}`,
     contactPhone,
