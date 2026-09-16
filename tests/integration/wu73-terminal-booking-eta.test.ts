@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { PublicAvailabilitySelectionService } from "@/modules/public-availability-selection";
 import { PublicGuestBookingService } from "@/modules/public-guest-booking";
 import { PublicGuestBookingCheckInService } from "@/modules/public-guest-booking-check-in";
@@ -11,8 +18,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 4,
 });
-const selectionSecret =
-  "wu73-selection-secret-that-is-deliberately-long-enough";
+const selectionSecret = "wu73-selection-secret-that-is-deliberately-long-enough";
 const now = new Date("2099-05-01T00:00:00.000Z");
 
 beforeAll(async () => migrate());
