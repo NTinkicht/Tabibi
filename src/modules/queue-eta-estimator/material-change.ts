@@ -31,8 +31,10 @@ export function isMaterialEstimateChange(
 ): boolean {
   const previousMidpoint =
     (previous.minWaitMinutes + previous.maxWaitMinutes) / 2;
-  const currentMidpoint = (current.minWaitMinutes + current.maxWaitMinutes) / 2;
-  const previousUncertainty = previous.maxWaitMinutes - previous.minWaitMinutes;
+  const currentMidpoint =
+    (current.minWaitMinutes + current.maxWaitMinutes) / 2;
+  const previousUncertainty =
+    previous.maxWaitMinutes - previous.minWaitMinutes;
   const currentUncertainty = current.maxWaitMinutes - current.minWaitMinutes;
 
   const midpointDelta = Math.abs(currentMidpoint - previousMidpoint);
