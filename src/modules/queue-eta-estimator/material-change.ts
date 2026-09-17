@@ -12,11 +12,12 @@ export type MaterialEstimateChangeThresholds = {
   queuePlaces: number;
 };
 
-export const DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS: MaterialEstimateChangeThresholds = {
-  midpointMinutes: 10,
-  uncertaintyMinutes: 15,
-  queuePlaces: 2,
-};
+export const DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS: MaterialEstimateChangeThresholds =
+  {
+    midpointMinutes: 10,
+    uncertaintyMinutes: 15,
+    queuePlaces: 2,
+  };
 
 /**
  * Applies Tabibi's deterministic default material-change policy without any
@@ -27,24 +28,36 @@ export function isMaterialEstimateChange(
   current: QueueEstimateSnapshot,
   thresholds: MaterialEstimateChangeThresholds = DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS,
 ): boolean {
-  const previousMidpoint = (previous.minWaitMinutes + previous.maxWaitMinutes) / 2;
-  const currentMidpoint = (current.minWaitMinutes + current.maxWaitMinutes) / 2;
-  const previousUncertainty = previous.maxWaitMinutes - previous.minWaitMinutes;
+  const previousMidpoint =
+    (previous.minWaitMinutes + previous.maxWaitMinutes) / 2;
+  const currentMidpoint =
+    (current.minWaitMinutes + current.maxWaitMinutes) / 2;
+  const previousUncertainty =
+    previous.maxWaitMinutes - previous.minWaitMinutes;
   const currentUncertainty = current.maxWaitMinutes - current.minWaitMinutes;
 
-  if (Math.abs(currentMidpoint - previousMidpoint) >= thresholds.midpointMinutes) {
+  if (
+    Math.abs(currentMidpoint - previousMidpoint) >= thresholds.midpointMinutes
+  ) {
     return true;
   }
-  if (Math.abs(currentUncertainty - previousUncertainty) >= thresholds.uncertaintyMinutes) {
+  if (
+    Math.abs(currentUncertainty - previousUncertainty) >=
+    thresholds.uncertaintyMinutes
+  ) {
     return true;
   }
-  if (Math.abs(current.queuePosition - previous.queuePosition) >= thresholds.queuePlaces) {
+  if (
+    Math.abs(current.queuePosition - previous.queuePosition) >=
+    thresholds.queuePlaces
+  ) {
     return true;
   }
 
   const becameDisrupted =
     current.sessionStatus !== previous.sessionStatus &&
-    (current.sessionStatus === "delayed" || current.sessionStatus === "cancelled");
+    (current.sessionStatus === "delayed" ||
+      current.sessionStatus === "cancelled");
   if (becameDisrupted) return true;
 
   return current.approachingTurn === true && previous.approachingTurn !== true;
