@@ -13,11 +13,12 @@ export type MaterialEstimateChangeThresholds = {
   queuePlaces: number;
 };
 
-export const DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS: MaterialEstimateChangeThresholds = {
-  midpointMinutes: 10,
-  uncertaintyMinutes: 15,
-  queuePlaces: 2,
-};
+export const DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS: MaterialEstimateChangeThresholds =
+  {
+    midpointMinutes: 10,
+    uncertaintyMinutes: 15,
+    queuePlaces: 2,
+  };
 
 /**
  * Applies Tabibi's deterministic default material-change policy without any
@@ -26,16 +27,20 @@ export const DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS: MaterialEstimateChange
 export function isMaterialEstimateChange(
   previous: QueueEstimateSnapshot,
   current: QueueEstimateSnapshot,
-  thresholds: MaterialEstimateChangeThresholds = DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS,
+  thresholds: MaterialEstimateChangeThresholds =
+    DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS,
 ): boolean {
-  const previousMidpoint = (previous.minWaitMinutes + previous.maxWaitMinutes) / 2;
+  const previousMidpoint =
+    (previous.minWaitMinutes + previous.maxWaitMinutes) / 2;
   const currentMidpoint = (current.minWaitMinutes + current.maxWaitMinutes) / 2;
   const previousUncertainty = previous.maxWaitMinutes - previous.minWaitMinutes;
   const currentUncertainty = current.maxWaitMinutes - current.minWaitMinutes;
 
   const midpointDelta = Math.abs(currentMidpoint - previousMidpoint);
   const uncertaintyDelta = Math.abs(currentUncertainty - previousUncertainty);
-  const queuePositionDelta = Math.abs(current.queuePosition - previous.queuePosition);
+  const queuePositionDelta = Math.abs(
+    current.queuePosition - previous.queuePosition,
+  );
 
   if (midpointDelta >= thresholds.midpointMinutes) return true;
   if (uncertaintyDelta >= thresholds.uncertaintyMinutes) return true;
