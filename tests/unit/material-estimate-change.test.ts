@@ -48,7 +48,10 @@ describe("material estimate change policy", () => {
 
   it("marks a queue-position change at the default threshold as material", () => {
     expect(
-      isMaterialEstimateChange(baseline, { ...baseline, queuePosition: 3 }),
+      isMaterialEstimateChange(baseline, {
+        ...baseline,
+        queuePosition: 3,
+      }),
     ).toBe(true);
   });
 
