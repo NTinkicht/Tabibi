@@ -14,9 +14,12 @@ describe("classifyEtaConfidence", () => {
     { width: 10.1, expected: "medium" },
     { width: 25, expected: "medium" },
     { width: 25.1, expected: "low" },
-  ] as const)("classifies width $width as $expected", ({ width, expected }) => {
-    expect(classifyEtaConfidence(width, thresholds)).toBe(expected);
-  });
+  ] as const)(
+    "classifies width $width as $expected",
+    ({ width, expected }) => {
+      expect(classifyEtaConfidence(width, thresholds)).toBe(expected);
+    },
+  );
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(
     "rejects invalid uncertainty width %s",
