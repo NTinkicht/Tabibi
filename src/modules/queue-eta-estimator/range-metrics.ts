@@ -16,19 +16,26 @@ export function deriveWaitRangeMetrics(range: WaitRange): WaitRangeMetrics {
   const { minWaitMinutes, maxWaitMinutes } = range;
 
   if (!Number.isFinite(minWaitMinutes) || !Number.isFinite(maxWaitMinutes)) {
-    throw new RangeError('wait range bounds must be finite');
+    throw new RangeError("wait range bounds must be finite");
   }
 
   if (minWaitMinutes < 0 || maxWaitMinutes < 0) {
-    throw new RangeError('wait range bounds must be non-negative');
+    throw new RangeError("wait range bounds must be non-negative");
   }
 
   if (minWaitMinutes > maxWaitMinutes) {
-    throw new RangeError('minimum wait cannot exceed maximum wait');
+    throw new RangeError("minimum wait cannot exceed maximum wait");
+  }
+
+  const uncertaintyWidthMinutes = maxWaitMinutes - minWaitMinutes;
+  const midpointMinutes = minWaitMinutes + uncertaintyWidthMinutes / 2;
+
+  if (!Number.isFinite(midpointMinutes)) {
+    throw new RangeError("wait range midpoint must be finite");
   }
 
   return {
-    midpointMinutes: (minWaitMinutes + maxWaitMinutes) / 2,
-    uncertaintyWidthMinutes: maxWaitMinutes - minWaitMinutes,
+    midpointMinutes,
+    uncertaintyWidthMinutes,
   };
 }
