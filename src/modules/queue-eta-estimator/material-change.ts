@@ -2,7 +2,7 @@ export type QueueEstimateSnapshot = {
   minWaitMinutes: number;
   maxWaitMinutes: number;
   queuePosition: number;
-  sessionStatus?: 'active' | 'delayed' | 'cancelled';
+  sessionStatus?: "active" | "delayed" | "cancelled";
   approachingTurn?: boolean;
 };
 
@@ -56,8 +56,8 @@ export function isMaterialEstimateChange(
 
   const becameDisrupted =
     current.sessionStatus !== previous.sessionStatus &&
-    (current.sessionStatus === 'delayed' ||
-      current.sessionStatus === 'cancelled');
+    (current.sessionStatus === "delayed" ||
+      current.sessionStatus === "cancelled");
   if (becameDisrupted) return true;
 
   return current.approachingTurn === true && previous.approachingTurn !== true;
