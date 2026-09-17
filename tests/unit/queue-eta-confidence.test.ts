@@ -29,9 +29,9 @@ describe("classifyEtaConfidence", () => {
   });
 
   it("rejects a non-finite uncertainty width", () => {
-    expect(() =>
-      classifyEtaConfidence(Number.NaN, thresholds),
-    ).toThrow(RangeError);
+    expect(() => classifyEtaConfidence(Number.NaN, thresholds)).toThrow(
+      RangeError,
+    );
   });
 
   it("rejects a negative uncertainty width", () => {
@@ -49,7 +49,10 @@ describe("classifyEtaConfidence", () => {
     },
     {
       name: "non-finite medium threshold",
-      value: { highMaxWidthMinutes: 10, mediumMaxWidthMinutes: Number.POSITIVE_INFINITY },
+      value: {
+        highMaxWidthMinutes: 10,
+        mediumMaxWidthMinutes: Number.POSITIVE_INFINITY,
+      },
     },
     {
       name: "negative medium threshold",
