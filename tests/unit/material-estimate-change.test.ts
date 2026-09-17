@@ -46,17 +46,14 @@ describe('material estimate change policy', () => {
     ).toBe(true);
   });
 
-  it(
-    'marks a queue-position change at the default threshold as material',
-    () => {
-      expect(
-        isMaterialEstimateChange(baseline, {
-          ...baseline,
-          queuePosition: 3,
-        }),
-      ).toBe(true);
-    },
-  );
+  it('marks a queue-position change at the default threshold as material', () => {
+    expect(
+      isMaterialEstimateChange(baseline, {
+        ...baseline,
+        queuePosition: 3,
+      }),
+    ).toBe(true);
+  });
 
   it('marks a newly delayed session as material', () => {
     expect(
