@@ -43,10 +43,7 @@ describe("material estimate change policy", () => {
     ).toBe(false);
   });
 
-  it.each(materialChangeCases)(
-    "marks %s as material (%s)",
-    (current) => {
-      expect(isMaterialEstimateChange(baseline, current)).toBe(true);
-    },
-  );
+  it.each(materialChangeCases)("marks %s as material (%s)", (current) => {
+    expect(isMaterialEstimateChange(baseline, current)).toBe(true);
+  });
 });
