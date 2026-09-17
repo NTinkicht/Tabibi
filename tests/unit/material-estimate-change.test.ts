@@ -16,8 +16,14 @@ const baseline: QueueEstimateSnapshot = {
 type MaterialChangeCase = [QueueEstimateSnapshot, string];
 
 const materialChangeCases: MaterialChangeCase[] = [
-  [{ ...baseline, minWaitMinutes: 20, maxWaitMinutes: 30 }, 'midpoint'],
-  [{ ...baseline, minWaitMinutes: 5, maxWaitMinutes: 30 }, 'uncertainty'],
+  [
+    { ...baseline, minWaitMinutes: 20, maxWaitMinutes: 30 },
+    'midpoint',
+  ],
+  [
+    { ...baseline, minWaitMinutes: 5, maxWaitMinutes: 30 },
+    'uncertainty',
+  ],
   [{ ...baseline, queuePosition: 3 }, 'queue position'],
   [{ ...baseline, sessionStatus: 'delayed' }, 'delay'],
   [{ ...baseline, sessionStatus: 'cancelled' }, 'cancellation'],
