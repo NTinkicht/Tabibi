@@ -2,7 +2,8 @@ export type QueueEstimateSnapshot = {
   minWaitMinutes: number;
   maxWaitMinutes: number;
   queuePosition: number;
-  sessionStatus?: 'active' | 'delayed' | 'cancelled';
+  sessionStatus?: "active" | "delayed" | "cancelled";
+  declaredDelayMinutes?: number;
   approachingTurn?: boolean;
 };
 
@@ -46,9 +47,14 @@ export function isMaterialEstimateChange(
 
   const becameDisrupted =
     current.sessionStatus !== previous.sessionStatus &&
-    (current.sessionStatus === 'delayed' ||
-      current.sessionStatus === 'cancelled');
+    (current.sessionStatus === "delayed" ||
+      current.sessionStatus === "cancelled");
   if (becameDisrupted) return true;
+
+  const doctorDelayChanged =
+    current.declaredDelayMinutes !== previous.declaredDelayMinutes &&
+    (current.declaredDelayMinutes ?? 0) > 0;
+  if (doctorDelayChanged) return true;
 
   return current.approachingTurn === true && previous.approachingTurn !== true;
 }
