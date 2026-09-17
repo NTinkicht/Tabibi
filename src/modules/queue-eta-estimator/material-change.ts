@@ -12,7 +12,8 @@ export type MaterialEstimateChangeThresholds = {
   queuePlaces: number;
 };
 
-export const DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS: MaterialEstimateChangeThresholds = {
+export const DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS:
+  MaterialEstimateChangeThresholds = {
   midpointMinutes: 10,
   uncertaintyMinutes: 15,
   queuePlaces: 2,
