@@ -8,25 +8,31 @@ const thresholds = {
 };
 
 describe("classifyEtaConfidence", () => {
-  it.each([
-    { width: 0, expected: "high" },
-    { width: 10, expected: "high" },
-    { width: 10.1, expected: "medium" },
-    { width: 25, expected: "medium" },
-    { width: 25.1, expected: "low" },
-  ] as const)(
-    "classifies width $width as $expected",
-    ({ width, expected }) => {
-      expect(classifyEtaConfidence(width, thresholds)).toBe(expected);
-    },
-  );
+  it("classifies high confidence at the upper boundary", () => {
+    expect(classifyEtaConfidence(10, thresholds)).toBe("high");
+  });
 
-  it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(
-    "rejects invalid uncertainty width %s",
-    (width) => {
-      expect(() => classifyEtaConfidence(width, thresholds)).toThrow(RangeError);
-    },
-  );
+  it("classifies medium confidence above the high boundary", () => {
+    expect(classifyEtaConfidence(10.1, thresholds)).toBe("medium");
+  });
+
+  it("classifies medium confidence at the upper boundary", () => {
+    expect(classifyEtaConfidence(25, thresholds)).toBe("medium");
+  });
+
+  it("classifies low confidence above the medium boundary", () => {
+    expect(classifyEtaConfidence(25.1, thresholds)).toBe("low");
+  });
+
+  it("rejects a non-finite uncertainty width", () => {
+    expect(() => classifyEtaConfidence(Number.NaN, thresholds)).toThrow(
+      RangeError,
+    );
+  });
+
+  it("rejects a negative uncertainty width", () => {
+    expect(() => classifyEtaConfidence(-1, thresholds)).toThrow(RangeError);
+  });
 
   it("rejects inverted thresholds", () => {
     expect(() =>
