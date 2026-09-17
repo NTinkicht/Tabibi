@@ -32,9 +32,15 @@ export function isMaterialEstimateChange(
   const previousUncertainty = previous.maxWaitMinutes - previous.minWaitMinutes;
   const currentUncertainty = current.maxWaitMinutes - current.minWaitMinutes;
 
-  if (Math.abs(currentMidpoint - previousMidpoint) >= thresholds.midpointMinutes) return true;
-  if (Math.abs(currentUncertainty - previousUncertainty) >= thresholds.uncertaintyMinutes) return true;
-  if (Math.abs(current.queuePosition - previous.queuePosition) >= thresholds.queuePlaces) return true;
+  if (Math.abs(currentMidpoint - previousMidpoint) >= thresholds.midpointMinutes) {
+    return true;
+  }
+  if (Math.abs(currentUncertainty - previousUncertainty) >= thresholds.uncertaintyMinutes) {
+    return true;
+  }
+  if (Math.abs(current.queuePosition - previous.queuePosition) >= thresholds.queuePlaces) {
+    return true;
+  }
 
   const becameDisrupted =
     current.sessionStatus !== previous.sessionStatus &&
