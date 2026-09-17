@@ -41,10 +41,7 @@ describe("classifyEtaConfidence", () => {
   it.each([
     {
       name: "non-finite high threshold",
-      value: {
-        highMaxWidthMinutes: Number.NaN,
-        mediumMaxWidthMinutes: 25,
-      },
+      value: { highMaxWidthMinutes: Number.NaN, mediumMaxWidthMinutes: 25 },
     },
     {
       name: "negative high threshold",
