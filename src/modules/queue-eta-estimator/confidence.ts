@@ -1,4 +1,4 @@
-export type EtaConfidence = 'high' | 'medium' | 'low';
+export type EtaConfidence = "high" | "medium" | "low";
 
 export type EtaConfidenceThresholds = {
   highMaxWidthMinutes: number;
@@ -20,7 +20,7 @@ export function classifyEtaConfidence(
     !Number.isFinite(highMaxWidthMinutes) ||
     !Number.isFinite(mediumMaxWidthMinutes)
   ) {
-    throw new RangeError('ETA confidence inputs must be finite');
+    throw new RangeError("ETA confidence inputs must be finite");
   }
 
   if (
@@ -28,20 +28,20 @@ export function classifyEtaConfidence(
     highMaxWidthMinutes < 0 ||
     mediumMaxWidthMinutes < 0
   ) {
-    throw new RangeError('ETA confidence inputs must be non-negative');
+    throw new RangeError("ETA confidence inputs must be non-negative");
   }
 
   if (highMaxWidthMinutes > mediumMaxWidthMinutes) {
-    throw new RangeError('high confidence threshold cannot exceed medium threshold');
+    throw new RangeError("high confidence threshold cannot exceed medium threshold");
   }
 
   if (uncertaintyWidthMinutes <= highMaxWidthMinutes) {
-    return 'high';
+    return "high";
   }
 
   if (uncertaintyWidthMinutes <= mediumMaxWidthMinutes) {
-    return 'medium';
+    return "medium";
   }
 
-  return 'low';
+  return "low";
 }
