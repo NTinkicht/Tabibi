@@ -36,9 +36,7 @@ export function isMaterialEstimateChange(
     previous.maxWaitMinutes - previous.minWaitMinutes;
   const currentUncertainty = current.maxWaitMinutes - current.minWaitMinutes;
 
-  if (
-    Math.abs(currentMidpoint - previousMidpoint) >= thresholds.midpointMinutes
-  ) {
+  if (Math.abs(currentMidpoint - previousMidpoint) >= thresholds.midpointMinutes) {
     return true;
   }
   if (
