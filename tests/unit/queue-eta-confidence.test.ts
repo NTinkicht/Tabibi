@@ -29,9 +29,9 @@ describe("classifyEtaConfidence", () => {
   });
 
   it("rejects a non-finite uncertainty width", () => {
-    expect(() => classifyEtaConfidence(Number.NaN, thresholds)).toThrow(
-      RangeError,
-    );
+    expect(() =>
+      classifyEtaConfidence(Number.NaN, thresholds),
+    ).toThrow(RangeError);
   });
 
   it("rejects a negative uncertainty width", () => {
