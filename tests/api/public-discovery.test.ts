@@ -73,6 +73,45 @@ describe('GET /api/public/discovery', () => {
     });
   });
 
+  it('never serializes sensitive fields added by the discovery service', async () => {
+    listClinics.mockResolvedValue([
+      {
+        name: 'Public Clinic',
+        defaultLocale: 'en',
+        enabledLocales: ['en'],
+        id: 'clinic-secret',
+        tenantKey: 'tenant-secret',
+        internalNotes: 'private-clinic-notes',
+        doctors: [
+          {
+            displayName: 'Dr. Public',
+            id: 'doctor-secret',
+            userId: 'user-secret',
+            membershipRole: 'clinic_admin',
+            internalNotes: 'private-doctor-notes',
+          },
+        ],
+      },
+    ]);
+
+    const response = await GET(request());
+    const body = JSON.stringify(await response.json());
+
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    for (const secret of [
+      'clinic-secret',
+      'tenant-secret',
+      'private-clinic-notes',
+      'doctor-secret',
+      'user-secret',
+      'clinic_admin',
+      'private-doctor-notes',
+    ]) {
+      expect(body).not.toContain(secret);
+    }
+  });
+
   it('returns a successful empty discovery result', async () => {
     listClinics.mockResolvedValue([]);
 
