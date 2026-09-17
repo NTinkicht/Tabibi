@@ -72,7 +72,10 @@ describe("material estimate change policy", () => {
 
   it("marks a newly approaching turn as material", () => {
     expect(
-      isMaterialEstimateChange(baseline, { ...baseline, approachingTurn: true }),
+      isMaterialEstimateChange(baseline, {
+        ...baseline,
+        approachingTurn: true,
+      }),
     ).toBe(true);
   });
 });
