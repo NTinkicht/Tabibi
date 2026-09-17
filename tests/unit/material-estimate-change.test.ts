@@ -1,32 +1,34 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 
 import {
   isMaterialEstimateChange,
   type QueueEstimateSnapshot,
-} from '@/modules/queue-eta-estimator/material-change';
+} from "@/modules/queue-eta-estimator/material-change";
 
 const baseline: QueueEstimateSnapshot = {
   minWaitMinutes: 10,
   maxWaitMinutes: 20,
   queuePosition: 5,
-  sessionStatus: 'active',
+  sessionStatus: "active",
+  declaredDelayMinutes: 0,
   approachingTurn: false,
 };
 
-describe('material estimate change policy', () => {
-  it('stays quiet below every default threshold', () => {
+describe("material estimate change policy", () => {
+  it("stays quiet below every default threshold", () => {
     expect(
       isMaterialEstimateChange(baseline, {
         minWaitMinutes: 18,
         maxWaitMinutes: 30,
         queuePosition: 4,
-        sessionStatus: 'active',
+        sessionStatus: "active",
+        declaredDelayMinutes: 0,
         approachingTurn: false,
       }),
     ).toBe(false);
   });
 
-  it('marks a midpoint change at the default threshold as material', () => {
+  it("marks a midpoint change at the default threshold as material", () => {
     expect(
       isMaterialEstimateChange(baseline, {
         ...baseline,
@@ -36,7 +38,7 @@ describe('material estimate change policy', () => {
     ).toBe(true);
   });
 
-  it('marks an uncertainty change at the default threshold as material', () => {
+  it("marks an uncertainty change at the default threshold as material", () => {
     expect(
       isMaterialEstimateChange(baseline, {
         ...baseline,
@@ -46,7 +48,7 @@ describe('material estimate change policy', () => {
     ).toBe(true);
   });
 
-  it('marks a queue-position change at the default threshold as material', () => {
+  it("marks a queue-position change at the default threshold as material", () => {
     expect(
       isMaterialEstimateChange(baseline, {
         ...baseline,
@@ -55,25 +57,34 @@ describe('material estimate change policy', () => {
     ).toBe(true);
   });
 
-  it('marks a newly delayed session as material', () => {
+  it("marks a declared doctor delay as material without numeric ETA movement", () => {
     expect(
       isMaterialEstimateChange(baseline, {
         ...baseline,
-        sessionStatus: 'delayed',
+        declaredDelayMinutes: 15,
       }),
     ).toBe(true);
   });
 
-  it('marks a newly cancelled session as material', () => {
+  it("marks a newly delayed session as material", () => {
     expect(
       isMaterialEstimateChange(baseline, {
         ...baseline,
-        sessionStatus: 'cancelled',
+        sessionStatus: "delayed",
       }),
     ).toBe(true);
   });
 
-  it('marks a newly approaching turn as material', () => {
+  it("marks a newly cancelled session as material", () => {
+    expect(
+      isMaterialEstimateChange(baseline, {
+        ...baseline,
+        sessionStatus: "cancelled",
+      }),
+    ).toBe(true);
+  });
+
+  it("marks a newly approaching turn as material", () => {
     expect(
       isMaterialEstimateChange(baseline, {
         ...baseline,
