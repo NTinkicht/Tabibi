@@ -15,7 +15,10 @@ export type WaitRangeMetrics = {
 export function deriveWaitRangeMetrics(range: WaitRange): WaitRangeMetrics {
   const { minWaitMinutes, maxWaitMinutes } = range;
 
-  if (!Number.isFinite(minWaitMinutes) || !Number.isFinite(maxWaitMinutes)) {
+  if (
+    !Number.isFinite(minWaitMinutes) ||
+    !Number.isFinite(maxWaitMinutes)
+  ) {
     throw new RangeError("wait range bounds must be finite");
   }
 
