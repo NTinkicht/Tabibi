@@ -2,7 +2,7 @@ export type QueueEstimateSnapshot = {
   minWaitMinutes: number;
   maxWaitMinutes: number;
   queuePosition: number;
-  sessionStatus?: "active" | "delayed" | "cancelled";
+  sessionStatus?: 'active' | 'delayed' | 'cancelled';
   approachingTurn?: boolean;
 };
 
@@ -12,12 +12,12 @@ export type MaterialEstimateChangeThresholds = {
   queuePlaces: number;
 };
 
-export const DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS:
-  MaterialEstimateChangeThresholds = {
-  midpointMinutes: 10,
-  uncertaintyMinutes: 15,
-  queuePlaces: 2,
-};
+export const DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS: MaterialEstimateChangeThresholds =
+  {
+    midpointMinutes: 10,
+    uncertaintyMinutes: 15,
+    queuePlaces: 2,
+  };
 
 /**
  * Applies Tabibi's deterministic default material-change policy without any
@@ -26,7 +26,8 @@ export const DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS:
 export function isMaterialEstimateChange(
   previous: QueueEstimateSnapshot,
   current: QueueEstimateSnapshot,
-  thresholds: MaterialEstimateChangeThresholds = DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS,
+  thresholds: MaterialEstimateChangeThresholds =
+    DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS,
 ): boolean {
   const previousMidpoint =
     (previous.minWaitMinutes + previous.maxWaitMinutes) / 2;
@@ -48,8 +49,8 @@ export function isMaterialEstimateChange(
 
   const becameDisrupted =
     current.sessionStatus !== previous.sessionStatus &&
-    (current.sessionStatus === "delayed" ||
-      current.sessionStatus === "cancelled");
+    (current.sessionStatus === 'delayed' ||
+      current.sessionStatus === 'cancelled');
   if (becameDisrupted) return true;
 
   return current.approachingTurn === true && previous.approachingTurn !== true;
