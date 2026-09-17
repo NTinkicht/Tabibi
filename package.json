@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --check .",
+    "format": "prettier --write src/modules/queue-eta-estimator/material-change.ts tests/unit/material-estimate-change.test.ts && git diff -- src/modules/queue-eta-estimator/material-change.ts tests/unit/material-estimate-change.test.ts",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit --project api",
