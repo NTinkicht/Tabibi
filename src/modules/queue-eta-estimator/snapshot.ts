@@ -13,16 +13,16 @@ export interface EtaSnapshotInput {
 }
 
 export interface EtaSnapshot {
-  minWaitMinutes: number;
-  maxWaitMinutes: number;
-  revision: string;
+  readonly minWaitMinutes: number;
+  readonly maxWaitMinutes: number;
+  readonly revision: string;
 }
 
-/** Composes the deterministic wait range and revision from committed inputs. */
+/** Composes an immutable deterministic wait range and revision from committed inputs. */
 export function createEtaSnapshot(input: EtaSnapshotInput): EtaSnapshot {
   const range = computeQueueEtaRange(input);
-  return {
+  return Object.freeze({
     ...range,
     revision: createEtaRevision(input),
-  };
+  });
 }
