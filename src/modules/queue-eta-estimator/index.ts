@@ -101,3 +101,8 @@ export function computeQueueEtaRange({
 }
 
 export { summarizeWaitRange, type WaitRangeSummary } from './summary';
+export {
+  formatWaitRangeSummary,
+  type FormattedWaitRangeSummary,
+  type WaitRangeSummaryInput,
+} from './summary-format';
