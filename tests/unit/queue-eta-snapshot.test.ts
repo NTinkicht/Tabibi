@@ -17,7 +17,9 @@ describe('WU83 deterministic ETA snapshot', () => {
       maxWaitMinutes: 50,
       revision: createEtaSnapshot(baseline).revision,
     });
-    expect(createEtaSnapshot(baseline).revision).toMatch(/^eta-v1-[0-9a-f]{8}$/);
+    expect(createEtaSnapshot(baseline).revision).toMatch(
+      /^eta-v1-[0-9a-f]{8}$/,
+    );
   });
 
   it('is deterministic for identical committed inputs', () => {
