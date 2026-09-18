@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyEtaConfidence } from "@/modules/queue-eta-estimator/confidence";
+import {
+  classifyEtaConfidence,
+} from "@/modules/queue-eta-estimator/confidence";
 
 const thresholds = {
   highMaxWidthMinutes: 10,
