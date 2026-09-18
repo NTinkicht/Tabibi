@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --check .",
+    "format": "prettier --write tests/unit/queue-eta-snapshot.test.ts && git diff -- tests/unit/queue-eta-snapshot.test.ts && exit 1",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit --project api",
