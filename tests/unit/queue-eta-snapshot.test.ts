@@ -29,4 +29,14 @@ describe('WU83 deterministic ETA snapshot', () => {
       createEtaSnapshot(baseline).revision,
     );
   });
+
+  it('returns a runtime-immutable snapshot', () => {
+    const snapshot = createEtaSnapshot(baseline);
+
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(() => {
+      (snapshot as { minWaitMinutes: number }).minWaitMinutes = 999;
+    }).toThrow(TypeError);
+    expect(snapshot.minWaitMinutes).toBe(28);
+  });
 });
