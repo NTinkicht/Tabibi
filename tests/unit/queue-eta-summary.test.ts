@@ -10,10 +10,7 @@ const thresholds = {
 describe('summarizeWaitRange', () => {
   it('composes midpoint, exact uncertainty width, and high confidence', () => {
     expect(
-      summarizeWaitRange(
-        { minWaitMinutes: 5, maxWaitMinutes: 15 },
-        thresholds,
-      ),
+      summarizeWaitRange({ minWaitMinutes: 5, maxWaitMinutes: 15 }, thresholds),
     ).toEqual({
       midpointMinutes: 10,
       uncertaintyWidthMinutes: 10,
@@ -23,10 +20,7 @@ describe('summarizeWaitRange', () => {
 
   it('classifies the exact derived width as medium', () => {
     expect(
-      summarizeWaitRange(
-        { minWaitMinutes: 5, maxWaitMinutes: 20 },
-        thresholds,
-      ),
+      summarizeWaitRange({ minWaitMinutes: 5, maxWaitMinutes: 20 }, thresholds),
     ).toEqual({
       midpointMinutes: 12.5,
       uncertaintyWidthMinutes: 15,
@@ -36,10 +30,7 @@ describe('summarizeWaitRange', () => {
 
   it('classifies the exact derived width as low', () => {
     expect(
-      summarizeWaitRange(
-        { minWaitMinutes: 5, maxWaitMinutes: 35 },
-        thresholds,
-      ),
+      summarizeWaitRange({ minWaitMinutes: 5, maxWaitMinutes: 35 }, thresholds),
     ).toEqual({
       midpointMinutes: 20,
       uncertaintyWidthMinutes: 30,

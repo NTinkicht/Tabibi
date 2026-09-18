@@ -100,7 +100,4 @@ export function computeQueueEtaRange({
   };
 }
 
-export {
-  summarizeWaitRange,
-  type WaitRangeSummary,
-} from './summary';
+export { summarizeWaitRange, type WaitRangeSummary } from './summary';
