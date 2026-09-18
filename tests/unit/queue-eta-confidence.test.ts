@@ -28,6 +28,16 @@ describe("classifyEtaConfidence", () => {
     expect(classifyEtaConfidence(25.1, thresholds)).toBe("low");
   });
 
+  it("allows equal thresholds without inventing a medium band", () => {
+    const equalThresholds = {
+      highMaxWidthMinutes: 10,
+      mediumMaxWidthMinutes: 10,
+    };
+
+    expect(classifyEtaConfidence(10, equalThresholds)).toBe("high");
+    expect(classifyEtaConfidence(10.1, equalThresholds)).toBe("low");
+  });
+
   it("rejects NaN uncertainty width", () => {
     expect(() => classifyEtaConfidence(Number.NaN, thresholds)).toThrow(
       RangeError,
