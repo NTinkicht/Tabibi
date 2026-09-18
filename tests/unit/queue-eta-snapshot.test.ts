@@ -34,6 +34,19 @@ describe('WU83 deterministic ETA snapshot', () => {
     ).not.toBe(createEtaSnapshot(baseline).revision);
   });
 
+  it('changes revision when estimator provenance changes even if the wait range does not', () => {
+    const original = createEtaSnapshot(baseline);
+    const changedEvidence = createEtaSnapshot({
+      ...baseline,
+      estimateSource: 'configured_default',
+      observedSampleCount: 0,
+    });
+
+    expect(changedEvidence.minWaitMinutes).toBe(original.minWaitMinutes);
+    expect(changedEvidence.maxWaitMinutes).toBe(original.maxWaitMinutes);
+    expect(changedEvidence.revision).not.toBe(original.revision);
+  });
+
   it('changes revision and wait range when declared delay changes', () => {
     const delayed = createEtaSnapshot({
       ...baseline,
