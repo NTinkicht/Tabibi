@@ -14,7 +14,12 @@ type LiveQueueEta = {
   patientsAhead: number;
   minWaitMinutes: number;
   maxWaitMinutes: number;
-  estimateSource: 'fallback' | 'observed_median';
+  estimateSource: 'fallback' | 'historical_median' | 'observed_median';
+  summary?: {
+    midpointMinutes: number;
+    uncertaintyWidthMinutes: number;
+    confidence: 'high' | 'medium' | 'low';
+  };
 };
 
 type LiveQueueData = {
@@ -85,6 +90,8 @@ type Copy = {
   etaHeading: string;
   etaPatientsAhead: (count: number) => string;
   etaWaitRange: (minMinutes: number, maxMinutes: number) => string;
+  etaConfidenceLabel: string;
+  etaConfidence: Record<'high' | 'medium' | 'low', string>;
 };
 
 const COPY: Record<SupportedLocale, Copy> = {
@@ -137,6 +144,12 @@ const COPY: Record<SupportedLocale, Copy> = {
       minMinutes === maxMinutes
         ? `Environ ${minMinutes} min`
         : `Environ ${minMinutes}–${maxMinutes} min`,
+    etaConfidenceLabel: 'Confiance de l’estimation',
+    etaConfidence: {
+      high: 'élevée',
+      medium: 'moyenne',
+      low: 'faible',
+    },
     bookingStates: {
       confirmed: 'confirmée',
       checked_in: 'enregistré',
@@ -201,6 +214,12 @@ const COPY: Record<SupportedLocale, Copy> = {
       minMinutes === maxMinutes
         ? `حوالي ${minMinutes} دقيقة`
         : `حوالي ${minMinutes}–${maxMinutes} دقيقة`,
+    etaConfidenceLabel: 'ثقة التقدير',
+    etaConfidence: {
+      high: 'عالية',
+      medium: 'متوسطة',
+      low: 'منخفضة',
+    },
     bookingStates: {
       confirmed: 'مؤكدة',
       checked_in: 'تم تسجيل الوصول',
@@ -259,6 +278,11 @@ function EtaStatus({ eta, copy }: { eta: LiveQueueEta; copy: Copy }) {
       <h2>{copy.etaHeading}</h2>
       <p>{copy.etaPatientsAhead(eta.patientsAhead)}</p>
       <p>{copy.etaWaitRange(eta.minWaitMinutes, eta.maxWaitMinutes)}</p>
+      {eta.summary ? (
+        <p>
+          {copy.etaConfidenceLabel}: {copy.etaConfidence[eta.summary.confidence]}
+        </p>
+      ) : null}
     </div>
   );
 }
