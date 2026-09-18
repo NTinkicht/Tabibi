@@ -12,7 +12,9 @@ const baseline = {
 
 describe('WU82 deterministic ETA revision', () => {
   it('returns the same revision for identical committed inputs', () => {
-    expect(createEtaRevision(baseline)).toBe(createEtaRevision({ ...baseline }));
+    expect(createEtaRevision(baseline)).toBe(
+      createEtaRevision({ ...baseline }),
+    );
   });
 
   it.each([
