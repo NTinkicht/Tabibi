@@ -280,7 +280,7 @@ function EtaStatus({ eta, copy }: { eta: LiveQueueEta; copy: Copy }) {
       <p>{copy.etaWaitRange(eta.minWaitMinutes, eta.maxWaitMinutes)}</p>
       {eta.summary ? (
         <p>
-          {copy.etaConfidenceLabel}: {copy.etaConfidence[eta.summary.confidence]}
+          {copy.etaConfidenceLabel}:{' '}\n          {copy.etaConfidence[eta.summary.confidence]}
         </p>
       ) : null}
     </div>
