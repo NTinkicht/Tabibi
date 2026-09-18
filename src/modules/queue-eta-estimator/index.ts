@@ -99,3 +99,8 @@ export function computeQueueEtaRange({
     ),
   };
 }
+
+export {
+  summarizeWaitRange,
+  type WaitRangeSummary,
+} from './summary';
