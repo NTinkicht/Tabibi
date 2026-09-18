@@ -43,4 +43,12 @@ describe('WU83 deterministic ETA snapshot', () => {
     }).toThrow(TypeError);
     expect(snapshot.minWaitMinutes).toBe(28);
   });
+
+  it('keeps the revision token immutable with the wait range', () => {
+    const snapshot = createEtaSnapshot(baseline);
+    const revision = snapshot.revision;
+
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(snapshot.revision).toBe(revision);
+  });
 });
