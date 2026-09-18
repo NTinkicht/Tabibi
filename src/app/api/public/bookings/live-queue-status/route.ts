@@ -1,9 +1,16 @@
+import { summarizeWaitRange } from '@/modules/queue-eta-estimator';
+import { formatWaitRangeSummary } from '@/modules/queue-eta-estimator/summary-format';
 import {
   PublicGuestLiveQueueStatusRejectedError,
   PublicGuestLiveQueueStatusService,
 } from '@/modules/public-guest-live-queue-status';
 import { getPool } from '@/platform/database/pool';
 import { observedJson } from '@/platform/http/request-context';
+
+const GUEST_ETA_CONFIDENCE_THRESHOLDS = {
+  highMaxWidthMinutes: 0,
+  mediumMaxWidthMinutes: 15,
+} as const;
 
 const SECURITY_HEADERS = {
   'cache-control': 'no-store',
@@ -44,6 +51,15 @@ export async function GET(request: Request): Promise<Response> {
                 minWaitMinutes: result.eta.minWaitMinutes,
                 maxWaitMinutes: result.eta.maxWaitMinutes,
                 estimateSource: result.eta.estimateSource,
+                summary: formatWaitRangeSummary(
+                  summarizeWaitRange(
+                    {
+                      minWaitMinutes: result.eta.minWaitMinutes,
+                      maxWaitMinutes: result.eta.maxWaitMinutes,
+                    },
+                    GUEST_ETA_CONFIDENCE_THRESHOLDS,
+                  ),
+                ),
               }
             : null,
         },
