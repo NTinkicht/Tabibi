@@ -1,4 +1,7 @@
-import { computeQueueEtaRange, type QueueEtaEstimateSource } from './index';
+import {
+  computeQueueEtaRange,
+  type QueueEtaEstimateSource,
+} from './index';
 import { createEtaRevision } from './revision';
 
 export interface EtaSnapshotInput {
