@@ -32,9 +32,7 @@ export function classifyEtaConfidence(
   }
 
   if (highMaxWidthMinutes > mediumMaxWidthMinutes) {
-    throw new RangeError(
-      "high confidence threshold cannot exceed medium threshold",
-    );
+    throw new RangeError("high confidence threshold cannot exceed medium threshold");
   }
 
   if (uncertaintyWidthMinutes <= highMaxWidthMinutes) {
