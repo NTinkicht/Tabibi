@@ -23,7 +23,9 @@ describe('WU83 deterministic ETA snapshot', () => {
   });
 
   it('is deterministic for identical committed inputs', () => {
-    expect(createEtaSnapshot(baseline)).toEqual(createEtaSnapshot({ ...baseline }));
+    expect(createEtaSnapshot(baseline)).toEqual(
+      createEtaSnapshot({ ...baseline }),
+    );
   });
 
   it('changes revision when committed estimator evidence changes', () => {
