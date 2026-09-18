@@ -34,6 +34,18 @@ describe('WU83 deterministic ETA snapshot', () => {
     ).not.toBe(createEtaSnapshot(baseline).revision);
   });
 
+  it('changes revision and wait range when declared delay changes', () => {
+    const delayed = createEtaSnapshot({
+      ...baseline,
+      declaredDelayMinutes: baseline.declaredDelayMinutes + 10,
+    });
+    const original = createEtaSnapshot(baseline);
+
+    expect(delayed.revision).not.toBe(original.revision);
+    expect(delayed.minWaitMinutes).toBeGreaterThan(original.minWaitMinutes);
+    expect(delayed.maxWaitMinutes).toBeGreaterThan(original.maxWaitMinutes);
+  });
+
   it('returns a runtime-immutable snapshot', () => {
     const snapshot = createEtaSnapshot(baseline);
 
