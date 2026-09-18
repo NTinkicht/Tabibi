@@ -46,6 +46,11 @@ test('renders patientsAhead and the estimated wait range once checked in', async
           minWaitMinutes: 10,
           maxWaitMinutes: 20,
           estimateSource: 'observed_median',
+          summary: {
+            midpointMinutes: 15,
+            uncertaintyWidthMinutes: 10,
+            confidence: 'medium',
+          },
         },
       }),
     });
@@ -56,6 +61,9 @@ test('renders patientsAhead and the estimated wait range once checked in', async
   await expect(page.getByText('Temps d’attente estimé')).toBeVisible();
   await expect(page.getByText('2 personnes devant vous')).toBeVisible();
   await expect(page.getByText('Environ 10–20 min')).toBeVisible();
+  await expect(
+    page.getByText('Confiance de l’estimation: moyenne'),
+  ).toBeVisible();
 });
 
 test('shows a single-value wait range and next-in-line copy when patientsAhead is zero', async ({
@@ -74,6 +82,11 @@ test('shows a single-value wait range and next-in-line copy when patientsAhead i
           minWaitMinutes: 0,
           maxWaitMinutes: 0,
           estimateSource: 'fallback',
+          summary: {
+            midpointMinutes: 0,
+            uncertaintyWidthMinutes: 0,
+            confidence: 'high',
+          },
         },
       }),
     });
@@ -82,6 +95,42 @@ test('shows a single-value wait range and next-in-line copy when patientsAhead i
   await submitBookingForm(page);
   await expect(page.getByText('Vous êtes le prochain')).toBeVisible();
   await expect(page.getByText('Environ 0 min')).toBeVisible();
+  await expect(
+    page.getByText('Confiance de l’estimation: élevée'),
+  ).toBeVisible();
+});
+
+test('renders low confidence when ETA uncertainty exceeds 15 minutes', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'checked_in',
+        queueState: 'checked_in',
+        eta: {
+          patientsAhead: 3,
+          minWaitMinutes: 10,
+          maxWaitMinutes: 30,
+          estimateSource: 'fallback',
+          summary: {
+            midpointMinutes: 20,
+            uncertaintyWidthMinutes: 20,
+            confidence: 'low',
+          },
+        },
+      }),
+    });
+  });
+
+  await submitBookingForm(page);
+  await expect(page.getByText('Environ 10–30 min')).toBeVisible();
+  await expect(
+    page.getByText('Confiance de l’estimation: faible'),
+  ).toBeVisible();
 });
 
 test('shows no ETA section while the guest is still waiting', async ({
@@ -122,6 +171,11 @@ test('Arabic renders the ETA section with RTL parity', async ({ page }) => {
           minWaitMinutes: 15,
           maxWaitMinutes: 30,
           estimateSource: 'fallback',
+          summary: {
+            midpointMinutes: 22.5,
+            uncertaintyWidthMinutes: 15,
+            confidence: 'medium',
+          },
         },
       }),
     });
@@ -135,6 +189,7 @@ test('Arabic renders the ETA section with RTL parity', async ({ page }) => {
   await expect(page.getByText('وقت الانتظار المقدر')).toBeVisible();
   await expect(page.getByText('3 أشخاص أمامك')).toBeVisible();
   await expect(page.getByText('حوالي 15–30 دقيقة')).toBeVisible();
+  await expect(page.getByText('ثقة التقدير: متوسطة')).toBeVisible();
 });
 
 test('Arabic uses singular wording for exactly one patient ahead', async ({
