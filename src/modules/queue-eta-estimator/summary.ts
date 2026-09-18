@@ -3,10 +3,7 @@ import {
   type EtaConfidence,
   type EtaConfidenceThresholds,
 } from './confidence';
-import {
-  deriveWaitRangeMetrics,
-  type WaitRange,
-} from './range-metrics';
+import { deriveWaitRangeMetrics, type WaitRange } from './range-metrics';
 
 export type WaitRangeSummary = {
   midpointMinutes: number;
