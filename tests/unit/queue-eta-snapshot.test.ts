@@ -29,9 +29,9 @@ describe('WU83 deterministic ETA snapshot', () => {
   });
 
   it('changes revision when committed estimator evidence changes', () => {
-    expect(createEtaSnapshot({ ...baseline, patientsAhead: 3 }).revision).not.toBe(
-      createEtaSnapshot(baseline).revision,
-    );
+    expect(
+      createEtaSnapshot({ ...baseline, patientsAhead: 3 }).revision,
+    ).not.toBe(createEtaSnapshot(baseline).revision);
   });
 
   it('returns a runtime-immutable snapshot', () => {
