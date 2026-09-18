@@ -1,5 +1,10 @@
 import type { EtaConfidence } from './confidence';
-import type { WaitRangeSummary } from './summary';
+
+export type WaitRangeSummaryInput = {
+  midpointMinutes: number;
+  uncertaintyWidthMinutes: number;
+  confidence: EtaConfidence;
+};
 
 export type FormattedWaitRangeSummary = {
   midpointMinutes: number;
@@ -18,7 +23,7 @@ const VALID_CONFIDENCE: ReadonlySet<EtaConfidence> = new Set([
  * It intentionally performs no rounding, localization, or ETA recomputation.
  */
 export function formatWaitRangeSummary(
-  summary: WaitRangeSummary,
+  summary: WaitRangeSummaryInput,
 ): FormattedWaitRangeSummary {
   const { midpointMinutes, uncertaintyWidthMinutes, confidence } = summary;
 
