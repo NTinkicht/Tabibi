@@ -735,6 +735,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: 0,
         maxWaitMinutes: 0,
         estimateSource: 'fallback',
+        summary: {
+          midpointMinutes: 0,
+          uncertaintyWidthMinutes: 0,
+          confidence: 'high',
+        },
       },
     });
     expect(Object.keys(body.eta).sort()).toEqual(
@@ -743,7 +748,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         'minWaitMinutes',
         'maxWaitMinutes',
         'estimateSource',
+        'summary',
       ].sort(),
+    );
+    expect(Object.keys(body.eta.summary).sort()).toEqual(
+      ['midpointMinutes', 'uncertaintyWidthMinutes', 'confidence'].sort(),
     );
   });
 
