@@ -90,7 +90,6 @@ type Copy = {
   etaHeading: string;
   etaPatientsAhead: (count: number) => string;
   etaWaitRange: (minMinutes: number, maxMinutes: number) => string;
-  etaConfidenceLabel: string;
   etaConfidence: Record<'high' | 'medium' | 'low', string>;
 };
 
@@ -144,11 +143,10 @@ const COPY: Record<SupportedLocale, Copy> = {
       minMinutes === maxMinutes
         ? `Environ ${minMinutes} min`
         : `Environ ${minMinutes}–${maxMinutes} min`,
-    etaConfidenceLabel: 'Confiance de l’estimation',
     etaConfidence: {
-      high: 'élevée',
-      medium: 'moyenne',
-      low: 'faible',
+      high: 'Confiance de l’estimation: élevée',
+      medium: 'Confiance de l’estimation: moyenne',
+      low: 'Confiance de l’estimation: faible',
     },
     bookingStates: {
       confirmed: 'confirmée',
@@ -214,11 +212,10 @@ const COPY: Record<SupportedLocale, Copy> = {
       minMinutes === maxMinutes
         ? `حوالي ${minMinutes} دقيقة`
         : `حوالي ${minMinutes}–${maxMinutes} دقيقة`,
-    etaConfidenceLabel: 'ثقة التقدير',
     etaConfidence: {
-      high: 'عالية',
-      medium: 'متوسطة',
-      low: 'منخفضة',
+      high: 'ثقة التقدير: عالية',
+      medium: 'ثقة التقدير: متوسطة',
+      low: 'ثقة التقدير: منخفضة',
     },
     bookingStates: {
       confirmed: 'مؤكدة',
@@ -279,9 +276,7 @@ function EtaStatus({ eta, copy }: { eta: LiveQueueEta; copy: Copy }) {
       <p>{copy.etaPatientsAhead(eta.patientsAhead)}</p>
       <p>{copy.etaWaitRange(eta.minWaitMinutes, eta.maxWaitMinutes)}</p>
       {eta.summary ? (
-        <p>
-          {copy.etaConfidenceLabel}:{' '}\n          {copy.etaConfidence[eta.summary.confidence]}
-        </p>
+        <p>{copy.etaConfidence[eta.summary.confidence]}</p>
       ) : null}
     </div>
   );
