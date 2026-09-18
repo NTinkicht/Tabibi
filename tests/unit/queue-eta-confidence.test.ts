@@ -35,10 +35,9 @@ describe("classifyEtaConfidence", () => {
   });
 
   it("rejects infinite uncertainty width", () => {
-    const classify = () =>
-      classifyEtaConfidence(Number.POSITIVE_INFINITY, thresholds);
-
-    expect(classify).toThrow(RangeError);
+    expect(() =>
+      classifyEtaConfidence(Number.POSITIVE_INFINITY, thresholds),
+    ).toThrow(RangeError);
   });
 
   it("rejects a negative uncertainty width", () => {
