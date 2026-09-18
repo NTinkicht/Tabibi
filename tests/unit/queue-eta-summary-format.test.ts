@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatWaitRangeSummary } from '@/modules/queue-eta-estimator';
+import { formatWaitRangeSummary } from '@/modules/queue-eta-estimator/summary-format';
 
 describe('formatWaitRangeSummary', () => {
   it('preserves validated summary values without rounding or recomputation', () => {
