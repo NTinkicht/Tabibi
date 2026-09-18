@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write \"src/app/guest/live-queue/[selectionReference]/GuestLiveQueueHostClient.tsx\" && git diff -- \"src/app/guest/live-queue/[selectionReference]/GuestLiveQueueHostClient.tsx\" && exit 1",
+    "format": "prettier --check .",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit --project api",
