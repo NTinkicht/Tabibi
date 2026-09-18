@@ -275,11 +275,7 @@ function EtaStatus({ eta, copy }: { eta: LiveQueueEta; copy: Copy }) {
       <h2>{copy.etaHeading}</h2>
       <p>{copy.etaPatientsAhead(eta.patientsAhead)}</p>
       <p>{copy.etaWaitRange(eta.minWaitMinutes, eta.maxWaitMinutes)}</p>
-      {eta.summary ? (
-        <p>
-          {copy.etaConfidence[eta.summary.confidence]}
-        </p>
-      ) : null}
+      {eta.summary ? <p>{copy.etaConfidence[eta.summary.confidence]}</p> : null}
     </div>
   );
 }
