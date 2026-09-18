@@ -100,4 +100,5 @@ export function computeQueueEtaRange({
   };
 }
 
+export { createEtaRevision, type EtaRevisionInput } from './revision';
 export { summarizeWaitRange, type WaitRangeSummary } from './summary';
