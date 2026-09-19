@@ -88,6 +88,10 @@ test('renders the remaining consultation time as its own status, distinct from t
   // heading; both can render, but the remaining-time copy must never appear
   // inside it.
   await expect(page.getByText('Temps d’attente estimé')).toBeVisible();
+  // Both status regions independently surface the explainer link.
+  await expect(
+    page.getByRole('link', { name: 'Pourquoi ces estimations changent' }),
+  ).toHaveCount(2);
 });
 
 test('uses singular wording for exactly one minute remaining', async ({
@@ -191,6 +195,9 @@ test('Arabic renders the active-consultation status with RTL parity', async ({
   await expect(
     page.getByText('الوقت المتبقي المقدر: حوالي 6 دقائق'),
   ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'لماذا تتغير هذه التقديرات' }),
+  ).toHaveAttribute('href', '/guest/eta-explained?lang=ar');
 });
 
 test('Arabic uses the dedicated singular and dual noun forms for 1 and 2 minutes', async ({

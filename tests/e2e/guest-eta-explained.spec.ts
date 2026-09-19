@@ -18,6 +18,10 @@ test('explains ETA uncertainty and privacy in French by default', async ({
   await expect(
     page.getByRole('heading', { name: 'Consultation en cours' }),
   ).toBeVisible();
+  await expect(page.getByText(/état validé de la file/)).toBeVisible();
+  await expect(
+    page.getByText(/état validé de votre consultation/),
+  ).toBeVisible();
   await expect(page.getByText(/ni identité d’un autre patient/)).toBeVisible();
 });
 
@@ -35,5 +39,7 @@ test('provides equivalent accessible Arabic RTL guidance', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: 'الاستشارة جارية' }),
   ).toBeVisible();
+  await expect(page.getByText(/الحالة المعتمدة للطابور/)).toBeVisible();
+  await expect(page.getByText(/الحالة المعتمدة لاستشارتك/)).toBeVisible();
   await expect(page.getByText(/هوية أي مريض آخر/)).toBeVisible();
 });

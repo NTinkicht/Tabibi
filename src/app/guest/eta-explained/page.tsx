@@ -20,10 +20,10 @@ const COPY: Record<Locale, Copy> = {
       'Les temps affichés sont des estimations qui évoluent avec la file réelle. Ils ne constituent pas une heure de passage garantie.',
     queueHeading: 'Temps d’attente',
     queueBody:
-      'La fourchette d’attente est recalculée à partir de l’ordre de la file et des durées observées disponibles. Une urgence, une pause ou une consultation plus longue peut la faire évoluer.',
+      'La fourchette d’attente est recalculée à partir de l’état validé de la file (ordre et durées observées disponibles) au moment du calcul. Une urgence, une pause ou une consultation plus longue peut la faire évoluer.',
     consultationHeading: 'Consultation en cours',
     consultationBody:
-      'Le temps restant est une approximation fondée sur la durée attendue et le temps déjà écoulé. La durée réelle dépend de la consultation.',
+      'Le temps restant est une approximation fondée sur l’état validé de votre consultation (durée attendue et temps déjà écoulé) au moment du calcul. La durée réelle dépend de la consultation.',
     privacyHeading: 'Votre vie privée',
     privacyBody:
       'Ces explications n’affichent ni identité d’un autre patient, ni motif de consultation, ni donnée clinique.',
@@ -35,10 +35,10 @@ const COPY: Record<Locale, Copy> = {
       'الأوقات المعروضة تقديرات تتغير مع حالة الطابور الفعلية، وليست موعدًا مضمونًا للدخول.',
     queueHeading: 'وقت الانتظار',
     queueBody:
-      'يُعاد حساب نطاق الانتظار اعتمادًا على ترتيب الطابور والمدد المرصودة المتاحة. قد يتغير بسبب حالة طارئة أو توقف مؤقت أو استشارة أطول من المتوقع.',
+      'يُعاد حساب نطاق الانتظار اعتمادًا على الحالة المعتمدة للطابور (الترتيب والمدد المرصودة المتاحة) وقت الحساب. قد يتغير بسبب حالة طارئة أو توقف مؤقت أو استشارة أطول من المتوقع.',
     consultationHeading: 'الاستشارة جارية',
     consultationBody:
-      'الوقت المتبقي تقريب يعتمد على المدة المتوقعة والوقت المنقضي. المدة الفعلية تعتمد على الاستشارة نفسها.',
+      'الوقت المتبقي تقريب يعتمد على الحالة المعتمدة لاستشارتك (المدة المتوقعة والوقت المنقضي) وقت الحساب. المدة الفعلية تعتمد على الاستشارة نفسها.',
     privacyHeading: 'خصوصيتك',
     privacyBody:
       'لا تعرض هذه التوضيحات هوية أي مريض آخر أو سبب الاستشارة أو أي بيانات سريرية.',
