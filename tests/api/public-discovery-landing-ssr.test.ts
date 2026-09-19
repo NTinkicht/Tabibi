@@ -77,10 +77,12 @@ describe('WU85 public discovery initial server render', () => {
   it('bounds a stalled service even when it ignores cancellation', async () => {
     vi.useFakeTimers();
     let signal: AbortSignal | undefined;
-    listClinics.mockImplementation((_timeout: number, suppliedSignal: AbortSignal) => {
-      signal = suppliedSignal;
-      return new Promise(() => {});
-    });
+    listClinics.mockImplementation(
+      (_timeout: number, suppliedSignal: AbortSignal) => {
+        signal = suppliedSignal;
+        return new Promise(() => {});
+      },
+    );
     const pending = Home();
     await vi.advanceTimersByTimeAsync(2_500);
     const html = renderToStaticMarkup(await pending);
