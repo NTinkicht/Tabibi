@@ -176,11 +176,11 @@
         "failure_analysis",
         "test_design"
       ],
-      "included_capacity": "Existing SuperGrok included weekly Grok Build allowance only",
+      "included_capacity": "Existing SuperGrok included Grok Build pool OR included Grok Bot pool (separate weekly usage), no extra spend",
       "paid_fallback": false,
       "production_merge_authority": false,
-      "wake": "Official Grok Build CLI via owner OAuth on owner-private local machine or persistent Codespace; no unattended wake.",
-      "runtime_activation": "Verify owner OAuth and included capacity with bounded smoke probe before assigning a lease.",
+      "wake": "Official Grok Build via owner-private local OAuth OR owner-linked Grok Bot persistent cloud teammate signed into GitHub; no unattended GitHub Action/token relay.",
+      "runtime_activation": "Verify owner OAuth/included usage (Build) or linked SuperGrok and shared cloud computer access/privacy (Bot); bounded probe before lease.",
       "unattended_wake": {
         "mode": "disabled",
         "reason": "No authorized shared OAuth runner; xAI API/PAYG forbidden."
