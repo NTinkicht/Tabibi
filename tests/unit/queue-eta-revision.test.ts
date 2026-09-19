@@ -52,9 +52,11 @@ describe('WU82 deterministic ETA revision', () => {
         'GUEST_BEARER_SIGNING_SECRET',
       );
     } finally {
-      if (previous === undefined)
+      if (previous === undefined) {
         delete process.env.GUEST_BEARER_SIGNING_SECRET;
-      else process.env.GUEST_BEARER_SIGNING_SECRET = previous;
+      } else {
+        process.env.GUEST_BEARER_SIGNING_SECRET = previous;
+      }
     }
   });
 });
