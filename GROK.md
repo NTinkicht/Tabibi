@@ -29,6 +29,16 @@ Official alternative: `npm i -g @xai-official/grok`. xAI documents subscription 
 
 For owner-private scripting: `grok --no-auto-update -p "<bounded task>" --output-format json`. Confirm the installed CLI and included SuperGrok entitlement with a non-sensitive bounded smoke test before routing any lease. Registering an actor is not proof a session is running.
 
+## Optional always-on Grok Bot (also included with SuperGrok)
+
+For a persistent cloud teammate instead of an interactive CLI, xAI separately includes **Grok Bot** with SuperGrok. It has its **own weekly included usage pool**, separate from Grok Build, and a persistent cloud computer. This is an alternative runtime for the same actor identity `grok`, **not** another independent AI reviewer when the Grok CLI and Bot participated in the same SHA.
+
+One-time owner setup: install Grok Bot from https://x.ai/bot (Windows/macOS/Linux, or mobile); sign in with its Cursor account, link the existing SuperGrok subscription when prompted, create a focused Bot named **Tabibi Code & Security Challenger**, and connect/sign in to GitHub `NTinkicht/Tabibi` on its cloud computer using the normal owner-controlled sign-in flow. Give it this `GROK.md` and `AGENTS.md`, then the bounded first-task prompt below. It must check live GitHub evidence before each action. If the cloud computer stores GitHub sessions or repo files, treat them as available to **all Bots on the same owner's shared computer**; grant the minimum needed access, keep production credentials/patient data off it, and inspect Grok Bot's cloud storage/privacy and approvals before connecting sensitive tools. Never export CLI OAuth secrets to it.
+
+Grok Bot is a user-authorized subscription agent, **not** an unattended GitHub Action or an automatic `@grok` wake. Its persistent sessions, costs and access must be verified in the app before any lease. Its GitHub activity must disclose `actor: grok` and exact SHA and respect the same lease/non-author gate and zero-extra-spend rules.
+
+Official: https://x.ai/news/grok-bot-more-plans ; https://docs.x.ai/grok-bot/get-started ; https://docs.x.ai/grok-bot/overview
+
 ## Hard boundaries
 
 - Only existing **included SuperGrok weekly usage**; no xAI API key, independently billed API, Grok extra usage credits, PAYG, auto-topup, upgrade or OpenRouter. Never use `XAI_API_KEY`.
