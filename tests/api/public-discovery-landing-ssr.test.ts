@@ -83,7 +83,11 @@ describe('WU85 public discovery initial server render', () => {
     expect(html).toContain('Le répertoire est momentanément indisponible.');
     expect(html).toContain('Réessayer');
     expect(logError).toHaveBeenCalledWith(
-      { err: expect.objectContaining({ message: 'Public discovery SSR deadline exceeded' }) },
+      {
+        err: expect.objectContaining({
+          message: 'Public discovery SSR deadline exceeded',
+        }),
+      },
       'public discovery SSR fetch failed',
     );
     expect(listClinics).toHaveBeenCalledWith(2_000);
