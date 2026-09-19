@@ -5,6 +5,7 @@ import {
 } from '@/modules/guest-access';
 import {
   MAX_HISTORICAL_SAMPLES,
+  computeActiveConsultationRemainingMinutes,
   type QueueEtaEstimateSource,
   selectConsultationEstimate,
 } from '@/modules/queue-eta-estimator';
@@ -25,6 +26,7 @@ export interface PublicGuestLiveQueueEta {
 export interface PublicGuestLiveQueueStatusResult {
   bookingState: string;
   queueState: string;
+  activeConsultationRemainingMinutes: number | null;
   eta: PublicGuestLiveQueueEta | null;
 }
 
@@ -41,6 +43,7 @@ type StatusRow = {
   revoked_at: Date | null;
   appointment_status: string;
   queue_state: string;
+  in_consultation_started_at: Date | null;
   service_position: string | null;
   declared_delay_minutes: number | null;
   duration_samples: Array<number | string> | null;
@@ -52,17 +55,7 @@ function bearerSecret(bearer: string): string | null {
   return parts.length === 3 && parts[1] ? parts[1] : null;
 }
 
-/**
- * Read-only public live queue status authorized exclusively by the existing
- * guest capability and bound to the immutable completed booking receipt.
- * No caller-supplied internal identifier participates in authorization or
- * scope. This performs a single plain SELECT (no lock, no transaction, no
- * mutation, no audit event), so repeated and concurrent reads are inherently
- * side-effect free. The single-statement CTE query below computes lifecycle,
- * authoritative service order, declared delay, current-session durations, and
- * bounded same-clinic/same-doctor historical durations from one PostgreSQL
- * query snapshot, so ETA inputs cannot mix versions.
- */
+/** Read-only capability-bound guest queue snapshot. */
 export class PublicGuestLiveQueueStatusService {
   constructor(
     private readonly pool: Pool,
@@ -149,6 +142,7 @@ export class PublicGuestLiveQueueStatusService {
               credential.revoked_at,
               appointment.status::text AS appointment_status,
               entry.state::text AS queue_state,
+              entry.in_consultation_started_at,
               ordered.service_position::text AS service_position,
               session.declared_delay_minutes,
               (SELECT array_agg(duration_minutes) FROM durations) AS duration_samples,
@@ -174,30 +168,49 @@ export class PublicGuestLiveQueueStatusService {
          JOIN consultation_sessions session
            ON session.id = entry.session_id
           AND session.clinic_id = entry.clinic_id
-         LEFT JOIN ordered
-           ON ordered.id = entry.id
+         LEFT JOIN ordered ON ordered.id = entry.id
         WHERE credential.id = $1`,
       [credentialId],
       signal,
     );
 
     const row = result.rows[0];
+    const snapshotNow = this.clock();
     if (
       !row ||
       !verifierMatches(row.bearer_verifier, secret) ||
       row.revoked_at ||
-      row.expires_at <= this.clock()
+      row.expires_at <= snapshotNow
     )
       throw new PublicGuestLiveQueueStatusRejectedError();
+
+    const estimate = selectConsultationEstimate(
+      row.duration_samples ?? [],
+      row.historical_duration_samples ?? [],
+    );
+    const activeConsultationRemainingMinutes =
+      !TERMINAL_BOOKING_STATES.has(row.appointment_status) &&
+      row.queue_state === 'in_consultation' &&
+      row.in_consultation_started_at
+        ? computeActiveConsultationRemainingMinutes({
+            startedAt: row.in_consultation_started_at,
+            now: snapshotNow,
+            estimatedConsultationMinutes: estimate.estimatedConsultationMinutes,
+          })
+        : null;
 
     return {
       bookingState: row.appointment_status,
       queueState: row.queue_state,
-      eta: this.computeEta(row),
+      activeConsultationRemainingMinutes,
+      eta: this.computeEta(row, estimate),
     };
   }
 
-  private computeEta(row: StatusRow): PublicGuestLiveQueueEta | null {
+  private computeEta(
+    row: StatusRow,
+    estimate: ReturnType<typeof selectConsultationEstimate>,
+  ): PublicGuestLiveQueueEta | null {
     if (
       TERMINAL_BOOKING_STATES.has(row.appointment_status) ||
       !LIVE_QUEUE_STATES.has(row.queue_state) ||
@@ -205,10 +218,6 @@ export class PublicGuestLiveQueueStatusService {
     )
       return null;
 
-    const estimate = selectConsultationEstimate(
-      row.duration_samples ?? [],
-      row.historical_duration_samples ?? [],
-    );
     const declaredDelayMinutes = row.declared_delay_minutes ?? 0;
     const patientsAhead = Math.max(0, Number(row.service_position) - 1);
     const range = createEtaSnapshot({
