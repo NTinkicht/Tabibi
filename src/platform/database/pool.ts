@@ -7,6 +7,11 @@ export function getPool(): Pool {
   pool ??= new Pool({
     connectionString: getEnvironment().DATABASE_URL,
     max: 10,
+    // Bound both initial connection establishment and saturated-pool checkout.
+    // Public discovery has a 2.5 s SSR deadline and a 2 s query timeout, so a
+    // queued checkout must fail well before the request deadline rather than
+    // surviving the response and executing later.
+    connectionTimeoutMillis: 400,
   });
   return pool;
 }
