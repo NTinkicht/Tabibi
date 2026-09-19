@@ -186,6 +186,76 @@ describe('receptionist dashboard read model', () => {
     );
   });
 
+  it('projects bounded remaining time only for the current in-consultation entry', async () => {
+    const queue = new QueueService(pool);
+    const active = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Active consultation',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu87-active-register',
+      correlationId: 'wu87-active-register',
+    });
+    const snapshotNow = '2026-09-08T10:05:30.000Z';
+    const service = new ReceptionistDashboardService(
+      pool,
+      () => new Date(snapshotNow),
+    );
+    await queue.command(scope, ids.sessionA, active.entry.id, {
+      command: 'check_in',
+      idempotencyKey: 'wu87-check-in',
+      correlationId: 'wu87-check-in',
+    });
+    await queue.command(scope, ids.sessionA, active.entry.id, {
+      command: 'call',
+      idempotencyKey: 'wu87-call',
+      correlationId: 'wu87-call',
+    });
+    const called = await service.getSnapshot(scope, ids.sessionA);
+    expect(called.entries[0]!.activeConsultationRemainingMinutes).toBeNull();
+
+    await queue.command(scope, ids.sessionA, active.entry.id, {
+      command: 'start_consultation',
+      idempotencyKey: 'wu87-start',
+      correlationId: 'wu87-start',
+    });
+    await pool.query(
+      `UPDATE queue_entries SET in_consultation_started_at=$2 WHERE id=$1`,
+      [active.entry.id, '2026-09-08T10:00:00.000Z'],
+    );
+    const waiting = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Waiting behind consultation',
+      preferredLocale: 'ar',
+      idempotencyKey: 'wu87-wait-register',
+      correlationId: 'wu87-wait-register',
+    });
+
+    const snapshot = await service.getSnapshot(scope, ids.sessionA);
+    expect(snapshot.generatedAt).toBe(snapshotNow);
+    expect(
+      snapshot.entries.find((entry) => entry.id === active.entry.id)
+        ?.activeConsultationRemainingMinutes,
+    ).toBe(10);
+    expect(
+      snapshot.entries.find((entry) => entry.id === waiting.entry.id)
+        ?.activeConsultationRemainingMinutes,
+    ).toBeNull();
+    expect(
+      snapshot.entries.find((entry) => entry.id === waiting.entry.id)?.eta,
+    ).toMatchObject({ patientsAhead: 1 });
+
+    await pool.query(
+      `UPDATE queue_entries
+          SET state='completed', completed_at='2026-09-08T10:06:00.000Z'
+        WHERE id=$1`,
+      [active.entry.id],
+    );
+    const terminal = await service.getSnapshot(scope, ids.sessionA);
+    const terminalEntry = terminal.entries.find(
+      (entry) => entry.id === active.entry.id,
+    )!;
+    expect(terminalEntry.activeConsultationRemainingMinutes).toBeNull();
+    expect(terminalEntry.eta).toBeNull();
+  });
+
   it('excludes terminal entries from ETA output and future service-time consumption', async () => {
     const queue = new QueueService(pool);
     const completed = await queue.registerWalkIn(scope, ids.sessionA, {
