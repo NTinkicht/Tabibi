@@ -71,8 +71,12 @@ export default async function GuestEtaExplainedPage({
         <p>{copy.privacyBody}</p>
       </section>
       <nav aria-label={locale === 'ar' ? 'اللغة' : 'Langue'}>
-        <a href="?lang=fr" lang="fr">Français</a>{' '}
-        <a href="?lang=ar" lang="ar">العربية</a>
+        <a href="?lang=fr" lang="fr">
+          Français
+        </a>{' '}
+        <a href="?lang=ar" lang="ar">
+          العربية
+        </a>
       </nav>
     </main>
   );
