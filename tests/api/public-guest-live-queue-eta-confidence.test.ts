@@ -74,6 +74,7 @@ describe('WU81 guest ETA confidence HTTP contract', () => {
           minWaitMinutes,
           maxWaitMinutes,
           estimateSource: 'historical_median',
+          revision: 'eta-v2-a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4',
         },
       });
 
@@ -90,6 +91,7 @@ describe('WU81 guest ETA confidence HTTP contract', () => {
           minWaitMinutes,
           maxWaitMinutes,
           estimateSource: 'historical_median',
+          revision: 'eta-v2-a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4',
           summary: {
             midpointMinutes,
             uncertaintyWidthMinutes,

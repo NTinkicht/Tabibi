@@ -220,6 +220,7 @@ describe('WU63 public guest live queue status', () => {
         minWaitMinutes: 0,
         maxWaitMinutes: 0,
         estimateSource: 'fallback',
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
   });
@@ -243,6 +244,7 @@ describe('WU63 public guest live queue status', () => {
         minWaitMinutes: 0,
         maxWaitMinutes: 0,
         estimateSource: 'fallback',
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
     await expect(service.get(second.bearer)).resolves.toEqual({
@@ -510,6 +512,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: 20,
         maxWaitMinutes: 20,
         estimateSource: 'fallback',
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
   });
@@ -544,6 +547,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(1 * 15 * 0.75),
         maxWaitMinutes: Math.round(1 * 15 * 1.5),
         estimateSource: 'fallback',
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
   });
@@ -582,6 +586,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(1 * 20 * 0.75),
         maxWaitMinutes: Math.round(1 * 20 * 1.5),
         estimateSource: 'observed_median',
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
   });
@@ -623,6 +628,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(1 * 2 * 0.75),
         maxWaitMinutes: Math.round(1 * 2 * 1.5),
         estimateSource: 'observed_median',
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
   });
@@ -649,6 +655,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(2 * 15 * 0.75),
         maxWaitMinutes: Math.round(2 * 15 * 1.5),
         estimateSource: 'fallback',
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
   });
@@ -673,6 +680,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: 0,
         maxWaitMinutes: 0,
         estimateSource: 'fallback',
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
   });
@@ -699,6 +707,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: 0,
         maxWaitMinutes: 0,
         estimateSource: 'fallback',
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
     await expect(service.get(second.bearer)).resolves.toEqual({
@@ -709,6 +718,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(1 * 15 * 0.75),
         maxWaitMinutes: Math.round(1 * 15 * 1.5),
         estimateSource: 'fallback',
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
   });
@@ -735,6 +745,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: 0,
         maxWaitMinutes: 0,
         estimateSource: 'fallback',
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
         summary: {
           midpointMinutes: 0,
           uncertaintyWidthMinutes: 0,
@@ -748,6 +759,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         'minWaitMinutes',
         'maxWaitMinutes',
         'estimateSource',
+        'revision',
         'summary',
       ].sort(),
     );
@@ -786,6 +798,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(1 * 15 * 0.75),
         maxWaitMinutes: Math.round(1 * 15 * 1.5),
         estimateSource: 'fallback' as const,
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     };
     await expect(service.get(booking.bearer)).resolves.toEqual(baseline);
@@ -868,6 +881,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(20 + 2 * 12 * 0.75),
         maxWaitMinutes: Math.round(20 + 2 * 12 * 1.5),
         estimateSource: 'observed_median',
+        revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
   });

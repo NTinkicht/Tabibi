@@ -51,6 +51,7 @@ export async function GET(request: Request): Promise<Response> {
                 minWaitMinutes: result.eta.minWaitMinutes,
                 maxWaitMinutes: result.eta.maxWaitMinutes,
                 estimateSource: result.eta.estimateSource,
+                revision: result.eta.revision,
                 summary: formatWaitRangeSummary(
                   summarizeWaitRange(
                     {

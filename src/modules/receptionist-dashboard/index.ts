@@ -2,11 +2,11 @@ import type { Pool } from 'pg';
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
 import type { QueueEntryState } from '@/modules/queue';
 import {
-  computeQueueEtaRange,
   MAX_HISTORICAL_SAMPLES,
   type QueueEtaEstimateSource,
   selectConsultationEstimate,
 } from '@/modules/queue-eta-estimator';
+import { createEtaSnapshot } from '@/modules/queue-eta-estimator/snapshot';
 import type { SessionStatus } from '@/modules/session';
 import { inTransaction } from '@/platform/database/transaction';
 
@@ -43,6 +43,7 @@ export interface ReceptionistDashboardEntry {
     patientsAhead: number;
     minWaitMinutes: number;
     maxWaitMinutes: number;
+    revision: string;
     estimatedConsultationMinutes: number;
     estimateSource: QueueEtaEstimateSource;
     observedSampleCount: number;
@@ -179,11 +180,13 @@ export class ReceptionistDashboardService {
         const state = row.entry_state!;
         const eligible = OPERATIONAL_STATE_RANK[state] < TERMINAL_STATE_RANK;
         const range = eligible
-          ? computeQueueEtaRange({
+          ? createEtaSnapshot({
               patientsAhead,
               declaredDelayMinutes,
               estimatedConsultationMinutes:
                 estimate.estimatedConsultationMinutes,
+              estimateSource: estimate.estimateSource,
+              observedSampleCount: estimate.observedSampleCount,
             })
           : null;
         const eta =
@@ -192,6 +195,7 @@ export class ReceptionistDashboardService {
                 patientsAhead,
                 minWaitMinutes: range.minWaitMinutes,
                 maxWaitMinutes: range.maxWaitMinutes,
+                revision: range.revision,
                 estimatedConsultationMinutes:
                   estimate.estimatedConsultationMinutes,
                 estimateSource: estimate.estimateSource,

@@ -245,11 +245,13 @@ describe('WU68 deterministic historical ETA prior', () => {
     }
 
     const { guest, staff } = await etaPair(booking, receptionistScope);
+    expect(guest?.revision).toBe(staff?.revision);
     expect(guest).toEqual({
       patientsAhead: 1,
       minWaitMinutes: 23,
       maxWaitMinutes: 45,
       estimateSource: 'historical_median',
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
     expect(staff).toEqual({
       patientsAhead: 1,
@@ -257,6 +259,7 @@ describe('WU68 deterministic historical ETA prior', () => {
       maxWaitMinutes: 45,
       estimatedConsultationMinutes: 30,
       estimateSource: 'historical_median',
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       observedSampleCount: 0,
     });
     expect(Object.keys(guest!).sort()).toEqual(
@@ -265,6 +268,7 @@ describe('WU68 deterministic historical ETA prior', () => {
         'minWaitMinutes',
         'maxWaitMinutes',
         'estimateSource',
+        'revision',
       ].sort(),
     );
     expect(JSON.stringify(guest)).not.toContain(booking.doctorId);
@@ -296,15 +300,18 @@ describe('WU68 deterministic historical ETA prior', () => {
     }
 
     const { guest, staff } = await etaPair(booking, receptionistScope);
+    expect(guest?.revision).toBe(staff?.revision);
     expect(guest).toEqual({
       patientsAhead: 1,
       minWaitMinutes: 8,
       maxWaitMinutes: 15,
       estimateSource: 'observed_median',
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
     expect(staff).toMatchObject({
       estimatedConsultationMinutes: 10,
       estimateSource: 'observed_median',
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       observedSampleCount: 3,
       minWaitMinutes: 8,
       maxWaitMinutes: 15,
@@ -385,15 +392,18 @@ describe('WU68 deterministic historical ETA prior', () => {
     }
 
     const { guest, staff } = await etaPair(booking, receptionistScope);
+    expect(guest?.revision).toBe(staff?.revision);
     expect(guest).toEqual({
       patientsAhead: 1,
       minWaitMinutes: 11,
       maxWaitMinutes: 23,
       estimateSource: 'fallback',
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
     expect(staff).toMatchObject({
       estimatedConsultationMinutes: 15,
       estimateSource: 'fallback',
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       observedSampleCount: 0,
     });
   });
@@ -423,15 +433,18 @@ describe('WU68 deterministic historical ETA prior', () => {
     }
 
     const { guest, staff } = await etaPair(booking, receptionistScope);
+    expect(guest?.revision).toBe(staff?.revision);
     expect(guest).toEqual({
       patientsAhead: 1,
       minWaitMinutes: 11,
       maxWaitMinutes: 23,
       estimateSource: 'historical_median',
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
     expect(staff).toMatchObject({
       estimatedConsultationMinutes: 15,
       estimateSource: 'historical_median',
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       observedSampleCount: 0,
       minWaitMinutes: 11,
       maxWaitMinutes: 23,

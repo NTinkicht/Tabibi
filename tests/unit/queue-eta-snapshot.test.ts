@@ -18,7 +18,7 @@ describe('WU83 deterministic ETA snapshot', () => {
       revision: createEtaSnapshot(baseline).revision,
     });
     expect(createEtaSnapshot(baseline).revision).toMatch(
-      /^eta-v1-[0-9a-f]{8}$/,
+      /^eta-v2-[0-9a-f]{32}$/,
     );
   });
 
