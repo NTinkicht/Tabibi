@@ -10,6 +10,7 @@ Tabibi is operated as a small autonomous engineering company. Epic applies a **S
 - `copilot` - QA/Test Automation and eligible Code Review;
 - `gemini-cli` - Repository Intelligence & Regression Scout;
 - `mistral-vibe` - Failure & Test Design Analyst.
+- `grok` - Independent Code & Security Challenger; leased implementation reserve.
 
 `gemini_agent` and `gemini_chat` remain retired historical identities. `gemini-cli` is a new actor, not a reactivation.
 
@@ -77,16 +78,18 @@ Primary tendencies:
 - QA/system verification: Copilot.
 - Repository intelligence/regression scouting: Gemini CLI.
 - Failure analysis/adversarial test design: Mistral Vibe.
+- Independent code/security/architecture challenge and implementation reserve: Grok Build.
 - Deterministic referee: CI.
 
 These are preferences, not permanent ownership.
 
 ### Standing service lanes
 
-Two read-only standing lanes make the additional actors useful without creating duplicate implementation branches:
+Three read-only standing lanes make the additional actors useful without creating duplicate implementation branches:
 
 1. **Gemini CLI - Repository Intelligence & Regression Scout.** Produce bounded repository-wide impact maps, dependency/blast-radius analyses, contract/documentation drift reports, post-merge regression scouts and eligible exact-head reviews. Use the machine capabilities `repository_intelligence` and `regression_scouting`.
 2. **Mistral Vibe - Failure & Test Design Analyst.** Produce bounded failure matrices, retry/idempotency/concurrency analysis, CI diagnoses, degraded-mode checks, adversarial test plans and eligible exact-head reviews. Use the machine capabilities `failure_analysis` and `test_design`.
+3. **Grok Build - Independent Code & Security Challenger.** Produce bounded security/privacy/authorization, race-condition, UX, regression and alternate-design findings and eligible exact-head review. May implement only on the existing canonical stream under explicit lease. Owner-private local OAuth only; no automatic wake/token relay.
 
 These lanes generate artifacts, not activity theater. A finding that requires code is handed to the active implementer unless the specialist receives an explicit implementation lease.
 
@@ -105,7 +108,7 @@ Each materially active actor posts at most one useful standup per workday unless
 
 ```text
 STANDUP
-actor: <chatgpt|codex|claude|copilot|gemini-cli|mistral-vibe>
+actor: <chatgpt|codex|claude|copilot|gemini-cli|mistral-vibe|grok>
 date: <YYYY-MM-DD>
 yesterday: <evidence>
 today: <concrete contribution>
@@ -130,7 +133,7 @@ Every queued task states task ID/goal, owner/claim status, work stream, allowed 
 
 ## 10. Zero-extra-spend company rule
 
-The company uses only existing subscriptions/entitlements/free non-billable allowance. Gemini/Vertex paid billing, Mistral PAYG, OpenRouter, OpenAI/Anthropic API credits, Copilot overage and auto-topups are not authorized. Quota exhaustion triggers failover or wait-for-reset.
+The company uses only existing subscriptions/entitlements/free non-billable allowance. Gemini/Vertex paid billing, Mistral PAYG, OpenRouter, OpenAI/Anthropic API credits, Copilot overage, xAI API/PAYG and auto-topups are not authorized. Quota exhaustion triggers failover or wait-for-reset.
 
 Local Gemini/Mistral credentials are never committed or wired into GitHub Actions without a separate owner decision. The only authorized unattended Gemini/Mistral credential paths are the owner-approved guarded Issue #11 workflows described in `AGENTS.md`, `GEMINI.md`, `VIBE.md` and `coordination/ROLE_FAILOVER_PROTOCOL.md`.
 

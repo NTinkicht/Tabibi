@@ -154,13 +154,48 @@
         "credential_secret": "MISTRAL_API_KEY",
         "schedule_allowed": false
       }
+    },
+    {
+      "id": "grok",
+      "active": true,
+      "standing_role": "independent-code-and-security-challenger",
+      "role_mission": "Grok Build: independent exact-head review/code/security/architecture challenger; bounded code/test/CI implementation reserve only with lease.",
+      "capabilities": [
+        "orchestration",
+        "architecture",
+        "implementation",
+        "review",
+        "qa",
+        "documentation",
+        "ci_remediation",
+        "research",
+        "scouting",
+        "long_context_analysis",
+        "repository_intelligence",
+        "regression_scouting",
+        "failure_analysis",
+        "test_design"
+      ],
+      "included_capacity": "Existing SuperGrok included weekly Grok Build allowance only",
+      "paid_fallback": false,
+      "production_merge_authority": false,
+      "wake": "Official Grok Build CLI via owner OAuth on owner-private local machine or persistent Codespace; no unattended wake.",
+      "runtime_activation": "Verify owner OAuth and included capacity with bounded smoke probe before assigning a lease.",
+      "unattended_wake": {
+        "mode": "disabled",
+        "reason": "No authorized shared OAuth runner; xAI API/PAYG forbidden."
+      }
     }
   ],
-  "retired_actors": ["gemini_agent", "gemini_chat"],
+  "retired_actors": [
+    "gemini_agent",
+    "gemini_chat"
+  ],
   "routing": {
     "orchestration": [
       "chatgpt",
       "claude",
+      "grok",
       "codex",
       "mistral-vibe",
       "gemini-cli",
@@ -169,6 +204,7 @@
     "architecture": [
       "chatgpt",
       "claude",
+      "grok",
       "mistral-vibe",
       "codex",
       "gemini-cli",
@@ -178,6 +214,7 @@
       "codex",
       "claude",
       "chatgpt",
+      "grok",
       "mistral-vibe",
       "copilot",
       "gemini-cli"
@@ -188,6 +225,7 @@
       "codex",
       "gemini-cli",
       "mistral-vibe",
+      "grok",
       "copilot"
     ],
     "qa": [
@@ -195,14 +233,23 @@
       "gemini-cli",
       "claude",
       "mistral-vibe",
+      "grok",
       "chatgpt",
       "codex"
     ],
-    "ci_remediation": ["codex", "claude", "chatgpt", "mistral-vibe", "copilot"],
+    "ci_remediation": [
+      "codex",
+      "claude",
+      "chatgpt",
+      "grok",
+      "mistral-vibe",
+      "copilot"
+    ],
     "documentation": [
       "chatgpt",
       "gemini-cli",
       "mistral-vibe",
+      "grok",
       "claude",
       "codex",
       "copilot"
@@ -211,6 +258,7 @@
       "gemini-cli",
       "chatgpt",
       "claude",
+      "grok",
       "mistral-vibe",
       "codex",
       "copilot"
@@ -219,6 +267,7 @@
       "gemini-cli",
       "chatgpt",
       "mistral-vibe",
+      "grok",
       "claude",
       "codex",
       "copilot"
@@ -226,15 +275,43 @@
     "long_context_analysis": [
       "gemini-cli",
       "claude",
+      "grok",
       "chatgpt",
       "mistral-vibe",
       "codex",
       "copilot"
     ],
-    "repository_intelligence": ["gemini-cli", "chatgpt", "claude"],
-    "regression_scouting": ["gemini-cli", "copilot", "claude"],
-    "failure_analysis": ["mistral-vibe", "claude", "codex", "chatgpt"],
-    "test_design": ["mistral-vibe", "copilot", "claude", "codex"],
-    "merge_execution": ["codex", "chatgpt", "claude", "copilot"]
+    "repository_intelligence": [
+      "gemini-cli",
+      "chatgpt",
+      "grok",
+      "claude"
+    ],
+    "regression_scouting": [
+      "gemini-cli",
+      "copilot",
+      "claude",
+      "grok"
+    ],
+    "failure_analysis": [
+      "mistral-vibe",
+      "claude",
+      "codex",
+      "chatgpt",
+      "grok"
+    ],
+    "test_design": [
+      "mistral-vibe",
+      "copilot",
+      "claude",
+      "grok",
+      "codex"
+    ],
+    "merge_execution": [
+      "codex",
+      "chatgpt",
+      "claude",
+      "copilot"
+    ]
   }
 }

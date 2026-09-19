@@ -9,6 +9,7 @@ const globallyForbiddenWorkflowPatterns = [
   { label: 'OpenRouter repository secret', pattern: /OPENROUTER_API_KEY/ },
   { label: 'OpenRouter PR-Agent key', pattern: /OPENROUTER__KEY/ },
   { label: 'Google/Vertex API key route', pattern: /GOOGLE_API_KEY/ },
+  { label: 'xAI API key route', pattern: /XAI_API_KEY/ },
   {
     label: 'Vertex AI paid route',
     pattern: /(?:vertexai|aiplatform\.googleapis\.com)/i,
@@ -51,6 +52,11 @@ describe('AI capacity policy', () => {
     }
 
     expect(violations).toEqual([]);
+  });
+
+  it('does not introduce a Grok unattended Action', () => {
+    const files = fs.readdirSync(workflowDirectory).filter((file) => /\.ya?ml$/i.test(file));
+    expect(files.some((file) => /grok/i.test(file))).toBe(false);
   });
 
   it('keeps external actor wakes owner-only and read-only', () => {

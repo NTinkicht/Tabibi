@@ -54,6 +54,7 @@ jobs:
           relay_actor_labels = {
               'gemini-cli': 'Gemini CLI',
               'mistral-vibe': 'Mistral Vibe',
+              'grok': 'Grok Build',
           }
           prefix = ''
           env_name = token_env.get(actor)

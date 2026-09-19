@@ -1,4 +1,4 @@
-# Tabibi Capability-Resilient Six-Actor Failover Protocol v8
+# Tabibi Capability-Resilient Seven-Actor Failover Protocol v9
 
 Status: **binding project coordination protocol**.
 
@@ -8,7 +8,7 @@ Tabibi must keep moving when an actor/capability is unavailable because of quota
 
 Roles belong to the project, not permanently to an actor.
 
-Active actors: `chatgpt`, `codex`, `claude`, `copilot`, `gemini-cli`, `mistral-vibe`.
+Active actors: `chatgpt`, `codex`, `claude`, `copilot`, `gemini-cli`, `mistral-vibe`, `grok`.
 
 Retired historical actors: `gemini_agent`, `gemini_chat`. They are never failover candidates.
 
@@ -47,15 +47,15 @@ Skip a candidate that lacks the capability, is currently unavailable, materially
 
 | Capability/role | Preferred order |
 | --- | --- |
-| Orchestration/state | ChatGPT -> Claude -> Codex -> Mistral Vibe -> Gemini CLI -> Copilot |
-| Product/technical architecture | ChatGPT -> Claude -> Mistral Vibe -> Codex -> Gemini CLI -> Copilot |
-| Implementation | Codex -> Claude -> ChatGPT -> Mistral Vibe -> Copilot -> Gemini CLI |
-| Independent exact-head review | Claude -> ChatGPT -> Codex -> Gemini CLI -> Mistral Vibe -> Copilot Code Review |
-| QA/system verification | Copilot -> Gemini CLI -> Claude -> Mistral Vibe -> ChatGPT -> Codex |
-| CI remediation | Codex -> Claude -> ChatGPT -> Mistral Vibe -> Copilot |
-| Documentation/state synthesis | ChatGPT -> Gemini CLI -> Mistral Vibe -> Claude -> Codex -> Copilot |
-| Research/scouting | Gemini CLI -> ChatGPT -> Claude -> Mistral Vibe -> Codex -> Copilot |
-| Long-context analysis | Gemini CLI -> Claude -> ChatGPT -> Mistral Vibe -> Codex -> Copilot |
+| Orchestration/state | ChatGPT -> Claude -> Grok -> Codex -> Mistral Vibe -> Gemini CLI -> Copilot |
+| Product/technical architecture | ChatGPT -> Claude -> Grok -> Mistral Vibe -> Codex -> Gemini CLI -> Copilot |
+| Implementation | Codex -> Claude -> ChatGPT -> Grok -> Mistral Vibe -> Copilot -> Gemini CLI |
+| Independent exact-head review | Claude -> ChatGPT -> Codex -> Gemini CLI -> Mistral Vibe -> Grok -> Copilot Code Review |
+| QA/system verification | Copilot -> Gemini CLI -> Claude -> Mistral Vibe -> Grok -> ChatGPT -> Codex |
+| CI remediation | Codex -> Claude -> ChatGPT -> Grok -> Mistral Vibe -> Copilot |
+| Documentation/state synthesis | ChatGPT -> Gemini CLI -> Mistral Vibe -> Grok -> Claude -> Codex -> Copilot |
+| Research/scouting | Gemini CLI -> ChatGPT -> Claude -> Mistral Vibe -> Grok -> Codex -> Copilot |
+| Long-context analysis | Gemini CLI -> Claude -> ChatGPT -> Mistral Vibe -> Grok -> Codex -> Copilot |
 | Mechanical merge execution | Codex -> ChatGPT -> Claude -> Copilot |
 
 Use `node scripts/actor-router.mjs <capability> ...` for deterministic candidate selection, then reconcile live evidence before assigning the lease.
@@ -94,6 +94,7 @@ A slow response alone is not enough. Reconcile live evidence first.
 - Claude: persistent Claude Code review/session handoff; do not assume the stateless Action is available.
 - Copilot: `@copilot ...`, coding-agent assignment and/or GitHub Code Review request.
 - Gemini CLI: interactive `gemini` CLI in the owner's Codespace/local environment, plus the dedicated owner-only Issue #11 wake workflow `.github/workflows/gemini-cli-wake.yml` when `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true`. Any other repository-wide unattended Gemini API-key automation remains unauthorized.
+- Grok: official `grok` Build CLI with owner OAuth in private local machine/persistent Codespace. Verify `grok inspect` and bounded included-capacity probe before lease; continue existing branch/PR; no Action/OAuth relay/xAI API or PAYG. See `GROK.md`.
 - Mistral Vibe: interactive `vibe` CLI in the owner's Codespace/local environment, plus the dedicated owner-only Issue #11 wake workflow `.github/workflows/mistral-vibe-wake.yml` when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`. Any other PAYG/API-key automation remains unauthorized.
 
 A durable marker without a supported executable path is not a complete handoff.
@@ -112,7 +113,7 @@ Replacement developers inherit existing scope, tests, findings, branch history a
 
 ## Merge resilience
 
-`MERGE_READY` authorizes the merge role, not an identity. Any eligible merge-capable actor may mechanically merge the unchanged reviewed exact head after all gates pass. `gemini-cli` and `mistral-vibe` are not default merge executors.
+`MERGE_READY` authorizes the merge role, not an identity. Any eligible merge-capable actor may mechanically merge the unchanged reviewed exact head after all gates pass. `gemini-cli`, `mistral-vibe` and `grok` are not default merge executors.
 
 ## Capacity conservation
 
@@ -122,8 +123,9 @@ Replacement developers inherit existing scope, tests, findings, branch history a
 - Use Headroom only under its shadow-mode rules.
 - Gemini local free/non-billable allowance only; if billing state is uncertain, mark unavailable.
 - Mistral existing subscription only with PAYG disabled.
+- Grok included SuperGrok only via owner-private OAuth; no extra credits/API/PAYG.
 - Never introduce paid fallback because included capacity is exhausted.
 
-## Healthy six-actor mesh
+## Healthy seven-actor mesh
 
 The system is healthy when every active role has exactly one valid lease, no work stream has duplicate implementation PRs, every exact head has an eligible independent reviewer, capacity limits trigger bounded failover, CI remains objective, GitHub is authoritative, retired actors are never routed, and no actor waits for Nassim to relay routine state.
