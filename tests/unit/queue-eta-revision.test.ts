@@ -32,6 +32,7 @@ describe('WU82 deterministic ETA revision', () => {
   it('uses an explicit versioned opaque prefix', () => {
     expect(createEtaRevision(baseline)).toMatch(/^eta-v2-[0-9a-f]{32}$/);
   });
+
   it('binds the revision to the server-side secret without exposing that secret', () => {
     const previous = process.env.GUEST_BEARER_SIGNING_SECRET;
     try {
@@ -56,5 +57,4 @@ describe('WU82 deterministic ETA revision', () => {
       else process.env.GUEST_BEARER_SIGNING_SECRET = previous;
     }
   });
-
 });
