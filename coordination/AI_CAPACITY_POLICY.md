@@ -29,6 +29,7 @@ No workflow, script, scheduled task, hook or actor may create a billing commitme
 - **Gemini CLI (`gemini-cli`):** only the owner's already-configured free/non-billable allowance. A Gemini API key may be used by the dedicated owner-only wake workflow only when `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true`; no Vertex AI or paid Gemini tier is authorized.
 - **Mistral Vibe (`mistral-vibe`):** the owner's existing included Mistral plan allowance only. The dedicated owner-only wake workflow may use a Vibe/API credential only when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`; PAYG/overage must remain disabled.
 - **Grok Build (`grok`):** owner-authenticated official Grok Build CLI using only existing SuperGrok included weekly allowance. Verify local OAuth/entitlement before lease; no xAI API key/PAYG or unattended wake.
+- **Grok Bot (`grok`, alternative runtime):** owner's existing SuperGrok-linked Grok Bot included weekly usage, separate from Grok Build's pool. Requires owner sign-in/link in the Grok Bot/Cursor app and conscious access/privacy setup on its shared persistent cloud computer; no extra plan or credit purchase. Same actor for author/reviewer-independence accounting; not an API-key GitHub Action.
 - **Headroom:** local read-only shadow compression under `HEADROOM_SHADOW_TRIAL.md`.
 - **Shell/Git/CI:** first choice for search, indexing, diffs, tests and logs.
 
