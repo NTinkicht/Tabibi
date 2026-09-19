@@ -130,6 +130,10 @@ function runReview(lease, { dryRun = false } = {}) {
     if (command('git', ['rev-parse', 'FETCH_HEAD']) !== lease.sha) return 'STALE_HEAD';
     command('git', ['worktree', 'add', '--detach', work, lease.sha]);
     const env = { ...process.env };
+    // Dispatcher owns GitHub writes. Do not pass Codespaces GitHub tokens to Grok.
+    for (const key of ['GITHUB_TOKEN', 'GH_TOKEN', 'GH_ENTERPRISE_TOKEN']) {
+      delete env[key];
+    }
     const grokHome = env.GROK_HOME || path.join(os.homedir(), '.grok');
     if (!fs.existsSync(path.join(grokHome, 'auth.json'))) throw new Error('oauth_not_verified');
     if (env.XAI_API_KEY || env.XAI_BASE_URL || env.OPENROUTER_API_KEY || env.GROK_API_KEY) {
