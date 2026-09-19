@@ -19,7 +19,8 @@ const copy = {
       'Découvrez les cliniques et les médecins disponibles sur Tabibi.',
     directory: 'Cliniques',
     refresh: 'Actualiser',
-    refreshed: (count: number) => `Répertoire actualisé : ${count} clinique${count === 1 ? '' : 's'}.`,
+    refreshed: (count: number) =>
+      `Répertoire actualisé : ${count} clinique${count === 1 ? '' : 's'}.`,
     doctors: 'Médecins',
     noDoctors: 'Aucun médecin affiché pour le moment.',
     languages: 'Langues',
@@ -78,7 +79,6 @@ function parseClinics(value: unknown): PublicClinic[] | null {
       }
       doctors.push({ displayName: doctor.displayName });
     }
-    // Explicit client allow-list: never retain injected identifiers or roles.
     result.push({
       name: clinic.name,
       defaultLocale: clinic.defaultLocale,
@@ -106,8 +106,6 @@ export default function PublicDiscoveryLandingClient({
   useEffect(() => {
     if (retry === 0) return;
     const controller = new AbortController();
-    // A stalled fetch must not leave Refresh disabled forever. Aborting also
-    // prevents a late response from overwriting the retryable error state.
     const deadlineTimer = setTimeout(() => {
       controller.abort();
       setState('error');
@@ -161,10 +159,20 @@ export default function PublicDiscoveryLandingClient({
           <h1>Tabibi</h1>
         </div>
         <nav className="publicLocales" aria-label="Langue / اللغة">
-          <button type="button" lang="fr" aria-pressed={locale === 'fr'} onClick={() => setLocale('fr')}>
+          <button
+            type="button"
+            lang="fr"
+            aria-pressed={locale === 'fr'}
+            onClick={() => setLocale('fr')}
+          >
             Français
           </button>
-          <button type="button" lang="ar" aria-pressed={locale === 'ar'} onClick={() => setLocale('ar')}>
+          <button
+            type="button"
+            lang="ar"
+            aria-pressed={locale === 'ar'}
+            onClick={() => setLocale('ar')}
+          >
             العربية
           </button>
         </nav>
@@ -179,7 +187,12 @@ export default function PublicDiscoveryLandingClient({
       <section aria-labelledby="publicDirectoryTitle">
         <div className="publicDirectoryHeading">
           <h2 id="publicDirectoryTitle">{t.directory}</h2>
-          <button className="publicRefresh" type="button" disabled={state === 'loading'} onClick={beginRefresh}>
+          <button
+            className="publicRefresh"
+            type="button"
+            disabled={state === 'loading'}
+            onClick={beginRefresh}
+          >
             {t.refresh}
           </button>
         </div>
@@ -188,7 +201,9 @@ export default function PublicDiscoveryLandingClient({
           {state === 'error' && (
             <div className="publicNotice" role="alert">
               <p>{t.error}</p>
-              <button type="button" onClick={beginRefresh}>{t.retry}</button>
+              <button type="button" onClick={beginRefresh}>
+                {t.retry}
+              </button>
             </div>
           )}
           {state === 'ready' && refreshCount !== null && clinics.length > 0 && (
@@ -205,7 +220,9 @@ export default function PublicDiscoveryLandingClient({
                 <h3>{clinic.name}</h3>
                 <p className="publicLanguages">
                   {t.languages}:{' '}
-                  {clinic.enabledLocales.map((value) => (value === 'ar' ? 'العربية' : 'Français')).join(' · ')}
+                  {clinic.enabledLocales
+                    .map((value) => (value === 'ar' ? 'العربية' : 'Français'))
+                    .join(' · ')}
                 </p>
                 <h4>{t.doctors}</h4>
                 {clinic.doctors.length === 0 ? (
