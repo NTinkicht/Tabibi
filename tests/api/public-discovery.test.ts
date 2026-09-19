@@ -120,4 +120,33 @@ describe('GET /api/public/discovery', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ clinics: [] });
   });
+
+  it('bounds a stalled discovery query and returns a retryable privacy-safe error', async () => {
+    let querySignal: AbortSignal | undefined;
+    listClinics.mockImplementation(
+      (_timeout: unknown, signal: AbortSignal) => {
+        querySignal = signal;
+        return new Promise<never>(() => {});
+      },
+    );
+
+    vi.useFakeTimers();
+    try {
+      const pending = GET(request());
+      await vi.advanceTimersByTimeAsync(2_000);
+      const response = await pending;
+
+      expect(querySignal?.aborted).toBe(true);
+      expect(response.status).toBe(500);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+      expect(await response.json()).toEqual({
+        status: 'error',
+        requestId: 'wu74-public-discovery-1',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
 });
