@@ -125,7 +125,9 @@ function runReview(lease, { dryRun = false } = {}) {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'tabibi-grok-review-'));
   try {
     command('git', ['fetch', '--no-tags', 'origin', 'main'], { timeout: 90_000 });
-    command('git', ['fetch', '--no-tags', 'origin', lease.sha], { timeout: 90_000 });
+    const fetched = command('git', ['fetch', '--no-tags', 'origin', `refs/pull/${lease.pr}/head`], { timeout: 90_000 });
+    void fetched;
+    if (command('git', ['rev-parse', 'FETCH_HEAD']) !== lease.sha) return 'STALE_HEAD';
     command('git', ['worktree', 'add', '--detach', work, lease.sha]);
     const env = { ...process.env };
     const grokHome = env.GROK_HOME || path.join(os.homedir(), '.grok');
@@ -182,11 +184,14 @@ export function oneCycle({ dryRun = false } = {}) {
       process.stdout.write(`grok-dispatch: PR #${lease.pr} ${outcome}\n`);
     } catch {
       if (!dryRun) {
-        record(lease, 'CAPACITY_DEGRADED');
-        post(lease.pr, `<!-- tabibi-grok-dispatch:${lease.key} -->\n` +
-          `CAPACITY_DEGRADED actor: grok capability: review exact_sha: ${lease.sha}. ` +
-          'Owner-private dispatcher could not complete this lease. ' +
-          'Reconcile and fail over; no AI review verdict was produced.');
+        try {
+          post(lease.pr, `<!-- tabibi-grok-dispatch:${lease.key} -->\n` +
+            `CAPACITY_DEGRADED actor: grok capability: review exact_sha: ${lease.sha}. ` +
+            'Owner-private dispatcher could not publish a verified review. ' +
+            'Reconcile and fail over; no GitHub-verifiable review verdict exists.');
+        } finally {
+          record(lease, 'CAPACITY_DEGRADED');
+        }
       }
       process.stderr.write(`grok-dispatch: PR #${lease.pr} failed; fail over.\n`);
     }
