@@ -94,6 +94,7 @@ type Copy = {
   etaConfidence: Record<'high' | 'medium' | 'low', string>;
   activeConsultationHeading: string;
   activeConsultationRemaining: (minutes: number) => string;
+  estimateExplainerLink: string;
 };
 
 // Arabic noun-number agreement for دقيقة (minute): 1/2 take dedicated
@@ -166,6 +167,7 @@ const COPY: Record<SupportedLocale, Copy> = {
       minutes === 1
         ? 'Temps restant estimé : environ 1 min'
         : `Temps restant estimé : environ ${minutes} min`,
+    estimateExplainerLink: 'Pourquoi ces estimations changent',
     bookingStates: {
       confirmed: 'confirmée',
       checked_in: 'enregistré',
@@ -238,6 +240,7 @@ const COPY: Record<SupportedLocale, Copy> = {
     activeConsultationHeading: 'الاستشارة جارية الآن',
     activeConsultationRemaining: (minutes) =>
       `الوقت المتبقي المقدر: حوالي ${arabicMinuteCount(minutes)}`,
+    estimateExplainerLink: 'لماذا تتغير هذه التقديرات',
     bookingStates: {
       confirmed: 'مؤكدة',
       checked_in: 'تم تسجيل الوصول',
@@ -290,13 +293,30 @@ function clampQueueState(value: string, floor: string | null): string {
   return valueRank < floorRank ? floor : value;
 }
 
-function EtaStatus({ eta, copy }: { eta: LiveQueueEta; copy: Copy }) {
+function EtaStatus({
+  eta,
+  copy,
+  locale,
+}: {
+  eta: LiveQueueEta;
+  copy: Copy;
+  locale: SupportedLocale;
+}) {
   return (
     <div role="status">
       <h2>{copy.etaHeading}</h2>
       <p>{copy.etaPatientsAhead(eta.patientsAhead)}</p>
       <p>{copy.etaWaitRange(eta.minWaitMinutes, eta.maxWaitMinutes)}</p>
       {eta.summary ? <p>{copy.etaConfidence[eta.summary.confidence]}</p> : null}
+      <p>
+        <a
+          href={`/guest/eta-explained?lang=${locale}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {copy.estimateExplainerLink}
+        </a>
+      </p>
     </div>
   );
 }
@@ -309,14 +329,25 @@ function EtaStatus({ eta, copy }: { eta: LiveQueueEta; copy: Copy }) {
 function ActiveConsultationStatus({
   minutes,
   copy,
+  locale,
 }: {
   minutes: number;
   copy: Copy;
+  locale: SupportedLocale;
 }) {
   return (
     <div role="status">
       <h2>{copy.activeConsultationHeading}</h2>
       <p>{copy.activeConsultationRemaining(minutes)}</p>
+      <p>
+        <a
+          href={`/guest/eta-explained?lang=${locale}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {copy.estimateExplainerLink}
+        </a>
+      </p>
     </div>
   );
 }
@@ -943,13 +974,14 @@ function LiveQueueView({
           </p>
         ) : null}
         {state.data?.eta ? (
-          <EtaStatus eta={state.data.eta} copy={copy} />
+          <EtaStatus eta={state.data.eta} copy={copy} locale={locale} />
         ) : null}
         {state.data?.activeConsultationRemainingMinutes !== null &&
         state.data?.activeConsultationRemainingMinutes !== undefined ? (
           <ActiveConsultationStatus
             minutes={state.data.activeConsultationRemainingMinutes}
             copy={copy}
+            locale={locale}
           />
         ) : null}
         {checkInState.kind === 'done' ? (
@@ -984,12 +1016,15 @@ function LiveQueueView({
         <strong>{copy.status}</strong>{' '}
         {copy.queueStates[state.data.queueState] ?? state.data.queueState}
       </p>
-      {state.data.eta ? <EtaStatus eta={state.data.eta} copy={copy} /> : null}
+      {state.data.eta ? (
+        <EtaStatus eta={state.data.eta} copy={copy} locale={locale} />
+      ) : null}
       {state.data.activeConsultationRemainingMinutes !== null &&
       state.data.activeConsultationRemainingMinutes !== undefined ? (
         <ActiveConsultationStatus
           minutes={state.data.activeConsultationRemainingMinutes}
           copy={copy}
+          locale={locale}
         />
       ) : null}
       {state.data.queueState === 'waiting' || checkInState.kind !== 'idle' ? (

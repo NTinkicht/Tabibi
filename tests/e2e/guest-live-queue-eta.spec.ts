@@ -64,6 +64,9 @@ test('renders patientsAhead and the estimated wait range once checked in', async
   await expect(
     page.getByText('Confiance de l’estimation: moyenne'),
   ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Pourquoi ces estimations changent' }),
+  ).toHaveAttribute('href', '/guest/eta-explained?lang=fr');
 });
 
 test('shows a single-value wait range and next-in-line copy when patientsAhead is zero', async ({
@@ -190,6 +193,9 @@ test('Arabic renders the ETA section with RTL parity', async ({ page }) => {
   await expect(page.getByText('3 أشخاص أمامك')).toBeVisible();
   await expect(page.getByText('حوالي 15–30 دقيقة')).toBeVisible();
   await expect(page.getByText('ثقة التقدير: متوسطة')).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'لماذا تتغير هذه التقديرات' }),
+  ).toHaveAttribute('href', '/guest/eta-explained?lang=ar');
 });
 
 test('Arabic uses singular wording for exactly one patient ahead', async ({
