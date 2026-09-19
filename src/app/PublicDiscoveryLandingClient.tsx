@@ -10,6 +10,7 @@ export type PublicClinic = {
   doctors: { displayName: string }[];
 };
 type LoadState = 'loading' | 'ready' | 'error';
+const REFRESH_TIMEOUT_MS = 5_000;
 
 const copy = {
   fr: {
@@ -102,6 +103,12 @@ export default function PublicDiscoveryLandingClient({
   useEffect(() => {
     if (retry === 0) return;
     const controller = new AbortController();
+    // A stalled fetch must not leave Refresh disabled forever. Aborting also
+    // prevents a late response from overwriting the retryable error state.
+    const deadlineTimer = setTimeout(() => {
+      controller.abort();
+      setState('error');
+    }, REFRESH_TIMEOUT_MS);
     async function load() {
       try {
         const response = await fetch('/api/public/discovery', {
@@ -119,10 +126,15 @@ export default function PublicDiscoveryLandingClient({
         setState('ready');
       } catch {
         if (!controller.signal.aborted) setState('error');
+      } finally {
+        clearTimeout(deadlineTimer);
       }
     }
     void load();
-    return () => controller.abort();
+    return () => {
+      clearTimeout(deadlineTimer);
+      controller.abort();
+    };
   }, [retry]);
 
   return (
