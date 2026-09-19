@@ -191,7 +191,7 @@ describe('WU68 receptionist historical ETA snapshot', () => {
       maxWaitMinutes: 23,
       estimatedConsultationMinutes: 15,
       estimateSource: 'fallback',
-      revision: expect.stringMatching(/^eta-v1-[0-9a-f]{8}$/),
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       observedSampleCount: 0,
     });
 
@@ -206,7 +206,7 @@ describe('WU68 receptionist historical ETA snapshot', () => {
       maxWaitMinutes: 38,
       estimatedConsultationMinutes: 12,
       estimateSource: 'historical_median',
-      revision: expect.stringMatching(/^eta-v1-[0-9a-f]{8}$/),
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       observedSampleCount: 0,
     });
   });
