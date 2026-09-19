@@ -122,7 +122,6 @@ describe('owner-private Grok dispatch lease parser', () => {
   });
 });
 
-
 describe('Grok dispatcher security and durability regression guards', () => {
   const lease = parseLease(valid, comment(valid), pr());
 
@@ -195,10 +194,10 @@ describe('Grok dispatcher security and durability regression guards', () => {
       false,
     );
     expect(
-      dispatcher.isReviewAuthorEligible(
-        { commits: 2 },
-        [commits[0], { commit: { message: 'actor: grok updated tests' } }],
-      ),
+      dispatcher.isReviewAuthorEligible({ commits: 2 }, [
+        commits[0],
+        { commit: { message: 'actor: grok updated tests' } },
+      ]),
     ).toBe(false);
     expect(
       dispatcher.isReviewAuthorEligible(
@@ -255,7 +254,8 @@ describe('Grok dispatcher security and durability regression guards', () => {
 
   it('persists pending delivery before a failed write and retries without double-posting', () => {
     const outcomes: string[] = [];
-    const persist = (_lease: unknown, outcome: string) => outcomes.push(outcome);
+    const persist = (_lease: unknown, outcome: string) =>
+      outcomes.push(outcome);
     const errorWrite = () => {
       throw new Error('GitHub unavailable');
     };

@@ -90,7 +90,6 @@ function command(bin, args, { cwd = ROOT, input, timeout = 45_000, env } = {}) {
   return result.stdout.trim();
 }
 
-
 export function grokReviewEnvironment(base, grokHome, isolatedHome) {
   const env = { ...base };
   for (const key of Object.keys(env)) {
@@ -99,8 +98,14 @@ export function grokReviewEnvironment(base, grokHome, isolatedHome) {
       key.startsWith('GH_') ||
       key.startsWith('CODESPACE_') ||
       key.startsWith('GIT_CONFIG_') ||
-      ['GIT_ASKPASS', 'SSH_ASKPASS', 'SSH_AUTH_SOCK', 'GIT_CREDENTIAL_HELPER'].includes(key)
-    ) delete env[key];
+      [
+        'GIT_ASKPASS',
+        'SSH_ASKPASS',
+        'SSH_AUTH_SOCK',
+        'GIT_CREDENTIAL_HELPER',
+      ].includes(key)
+    )
+      delete env[key];
   }
   // OAuth stays in the private Grok directory, while GitHub CLI and git
   // credential/config paths are empty for the untrusted model subprocess.
@@ -124,8 +129,11 @@ export function assertSafeReviewOutput(text, authJson = '') {
     /\bsk-[A-Za-z0-9_-]{20,}\b/.test(text) ||
     /\bBearer\s+[A-Za-z0-9._~+/-]{16,}\b/i.test(text) ||
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(text) ||
-    /(?:access_token|refresh_token|client_secret)\s*[:=]\s*["']?[A-Za-z0-9._~+/-]{12,}/i.test(text)
-  ) throw new Error('unsafe_review_output');
+    /(?:access_token|refresh_token|client_secret)\s*[:=]\s*["']?[A-Za-z0-9._~+/-]{12,}/i.test(
+      text,
+    )
+  )
+    throw new Error('unsafe_review_output');
   // The existing owner OAuth is necessary for the CLI, but its actual
   // secret leaf values must never be sent to a public PR comment.
   let auth;
@@ -151,11 +159,19 @@ export function assertSafeReviewOutput(text, authJson = '') {
 }
 
 export function isReviewAuthorEligible(pr, commits) {
-  if (pr.commits > 100 || !Array.isArray(commits) || commits.length !== pr.commits)
+  if (
+    pr.commits > 100 ||
+    !Array.isArray(commits) ||
+    commits.length !== pr.commits
+  )
     return false;
   return !commits.some((c) =>
     /\b(?:grok build|actor:\s*grok|co-authored-by:\s*grok)\b/i.test(
-      [c.commit?.message, c.commit?.author?.name, c.commit?.committer?.name].join('\n'),
+      [
+        c.commit?.message,
+        c.commit?.author?.name,
+        c.commit?.committer?.name,
+      ].join('\n'),
     ),
   );
 }
@@ -215,7 +231,9 @@ function record(lease, outcome, pending = {}) {
 export function isTrustedDeliveryComment(lease, c) {
   return (
     c.user?.login === 'NTinkicht' &&
-    String(c.body || '').includes(`<!-- tabibi-grok-dispatch:${lease.key} -->`) &&
+    String(c.body || '').includes(
+      `<!-- tabibi-grok-dispatch:${lease.key} -->`,
+    ) &&
     String(c.body || '').includes(`exact_sha: ${lease.sha}`) &&
     String(c.body || '').includes(`source_lease_comment: ${lease.commentId}`)
   );
@@ -224,8 +242,14 @@ export function trustedPosted(lease, api = gh) {
   // Delivery deduplication must search ALL pages, not the recent lease window:
   // retrying after >100 new comments must never double-post a review.
   const issue = api(`repos/${REPO}/issues/${lease.pr}`);
-  for (let page = Math.max(1, Math.ceil((issue.comments || 0) / 100)); page >= 1; page -= 1) {
-    const comments = api(`repos/${REPO}/issues/${lease.pr}/comments?per_page=100&page=${page}`);
+  for (
+    let page = Math.max(1, Math.ceil((issue.comments || 0) / 100));
+    page >= 1;
+    page -= 1
+  ) {
+    const comments = api(
+      `repos/${REPO}/issues/${lease.pr}/comments?per_page=100&page=${page}`,
+    );
     if (comments.some((c) => isTrustedDeliveryComment(lease, c))) return true;
   }
   return false;
@@ -309,7 +333,9 @@ function runReview(lease, { dryRun = false } = {}) {
     return 'DRY_RUN';
   }
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'tabibi-grok-review-'));
-  const isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), 'tabibi-grok-home-'));
+  const isolatedHome = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'tabibi-grok-home-'),
+  );
   try {
     command('git', ['fetch', '--no-tags', 'origin', 'main'], {
       timeout: 90_000,
