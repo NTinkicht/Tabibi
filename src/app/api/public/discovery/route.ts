@@ -11,7 +11,13 @@ const PUBLIC_HEADERS = {
 export async function GET(request: Request): Promise<Response> {
   const controller = new AbortController();
   const onRequestAbort = () => controller.abort();
-  request.signal.addEventListener('abort', onRequestAbort, { once: true });
+  if (request.signal.aborted) {
+    controller.abort();
+  } else {
+    request.signal.addEventListener('abort', onRequestAbort, { once: true });
+    // AbortSignal does not replay an abort that races listener registration.
+    if (request.signal.aborted) controller.abort();
+  }
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
     deadlineTimer = setTimeout(() => {
@@ -25,7 +31,7 @@ export async function GET(request: Request): Promise<Response> {
       // Bound the HTTP response even if a query implementation ignores abort.
       // The signal also tears down real in-flight PostgreSQL work.
       const clinics = await Promise.race([
-        new PublicDiscoveryService(getPool()).listClinics(
+        new PublicDiscoveryService(getPool('public-discovery')).listClinics(
           undefined,
           controller.signal,
         ),
