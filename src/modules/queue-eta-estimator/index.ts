@@ -30,6 +30,12 @@ export interface QueueEtaRange {
   maxWaitMinutes: number;
 }
 
+export interface ActiveConsultationRemainingInput {
+  startedAt: Date | string;
+  now: Date | string;
+  estimatedConsultationMinutes: number;
+}
+
 function normalizeSamples(samples: readonly DurationSample[]): number[] {
   return samples
     .map((value) =>
@@ -80,6 +86,86 @@ export function selectConsultationEstimate(
     estimateSource: 'fallback',
     observedSampleCount: current.length,
   };
+}
+
+/**
+ * Resolves only absolute ISO date-times or valid Date instances. Rejects
+ * offset-free, calendar-normalized, or otherwise ambiguous timestamps.
+ */
+function absoluteTimestampMs(value: Date | string): number {
+  if (value instanceof Date) return value.getTime();
+
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|([+-])(\d{2}):(\d{2}))$/.exec(
+      value,
+    );
+  if (!match) return Number.NaN;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const millis = Number((match[7] ?? '').padEnd(3, '0').slice(0, 3));
+  const offsetHours = match[8] === 'Z' ? 0 : Number(match[10]);
+  const offsetMinutes = match[8] === 'Z' ? 0 : Number(match[11]);
+  if (
+    month < 1 ||
+    month > 12 ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59 ||
+    offsetHours > 23 ||
+    offsetMinutes > 59
+  ) {
+    return Number.NaN;
+  }
+
+  const calendar = new Date(0);
+  calendar.setUTCFullYear(year, month - 1, day);
+  calendar.setUTCHours(hour, minute, second, millis);
+  if (
+    calendar.getUTCFullYear() !== year ||
+    calendar.getUTCMonth() !== month - 1 ||
+    calendar.getUTCDate() !== day
+  ) {
+    return Number.NaN;
+  }
+
+  const direction = match[9] === '-' ? -1 : 1;
+  return (
+    calendar.getTime() - direction * (offsetHours * 60 + offsetMinutes) * 60_000
+  );
+}
+
+/**
+ * Computes the deterministic whole-minute contribution of an active
+ * consultation. Invalid or future timestamps fail closed with no added wait.
+ */
+export function computeActiveConsultationRemainingMinutes({
+  startedAt,
+  now,
+  estimatedConsultationMinutes,
+}: ActiveConsultationRemainingInput): number {
+  const startedAtMs = absoluteTimestampMs(startedAt);
+  const nowMs = absoluteTimestampMs(now);
+  if (
+    !Number.isFinite(startedAtMs) ||
+    !Number.isFinite(nowMs) ||
+    startedAtMs > nowMs ||
+    !Number.isFinite(estimatedConsultationMinutes) ||
+    estimatedConsultationMinutes <= 0
+  ) {
+    return 0;
+  }
+
+  const boundedEstimate = Math.min(
+    MAX_SAMPLE_MINUTES,
+    Math.max(MIN_SAMPLE_MINUTES, estimatedConsultationMinutes),
+  );
+  const elapsedMinutes = (nowMs - startedAtMs) / 60_000;
+  return Math.max(0, Math.ceil(boundedEstimate - elapsedMinutes));
 }
 
 /** Applies the established WU9/WU10 delay and bounded uncertainty policy. */

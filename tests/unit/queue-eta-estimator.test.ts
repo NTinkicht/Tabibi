@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  computeActiveConsultationRemainingMinutes,
   computeQueueEtaRange,
   selectConsultationEstimate,
 } from '@/modules/queue-eta-estimator';
@@ -50,6 +51,100 @@ describe('shared deterministic queue ETA estimator', () => {
       estimateSource: 'fallback',
       observedSampleCount: 2,
     });
+  });
+
+  it('computes bounded active-consultation remaining time from explicit committed time', () => {
+    const startedAt = '2026-09-19T12:00:00.000Z';
+    expect(
+      computeActiveConsultationRemainingMinutes({
+        startedAt,
+        now: startedAt,
+        estimatedConsultationMinutes: 15,
+      }),
+    ).toBe(15);
+    expect(
+      computeActiveConsultationRemainingMinutes({
+        startedAt,
+        now: '2026-09-19T12:05:30.000Z',
+        estimatedConsultationMinutes: 15,
+      }),
+    ).toBe(10);
+    expect(
+      computeActiveConsultationRemainingMinutes({
+        startedAt,
+        now: '2026-09-19T12:20:00.000Z',
+        estimatedConsultationMinutes: 15,
+      }),
+    ).toBe(0);
+  });
+
+  it('fails closed for invalid or future active-consultation timestamps', () => {
+    expect(
+      computeActiveConsultationRemainingMinutes({
+        startedAt: 'not-a-date',
+        now: '2026-09-19T12:00:00.000Z',
+        estimatedConsultationMinutes: 15,
+      }),
+    ).toBe(0);
+    expect(
+      computeActiveConsultationRemainingMinutes({
+        startedAt: '2026-09-19T12:00:00.000Z',
+        now: 'not-a-date',
+        estimatedConsultationMinutes: 15,
+      }),
+    ).toBe(0);
+    expect(
+      computeActiveConsultationRemainingMinutes({
+        startedAt: '2026-09-19T12:00:00',
+        now: '2026-09-19T12:05:00.000Z',
+        estimatedConsultationMinutes: 15,
+      }),
+    ).toBe(0);
+    expect(
+      computeActiveConsultationRemainingMinutes({
+        startedAt: '2026-02-30T12:00:00.000Z',
+        now: '2026-03-02T12:05:00.000Z',
+        estimatedConsultationMinutes: 15,
+      }),
+    ).toBe(0);
+    expect(
+      computeActiveConsultationRemainingMinutes({
+        startedAt: '2026-09-19T12:00:00.000Z',
+        now: '2026-09-19T12:05:00',
+        estimatedConsultationMinutes: 15,
+      }),
+    ).toBe(0);
+    expect(
+      computeActiveConsultationRemainingMinutes({
+        startedAt: '2026-09-19T12:01:00.000Z',
+        now: '2026-09-19T12:00:00.000Z',
+        estimatedConsultationMinutes: 15,
+      }),
+    ).toBe(0);
+  });
+
+  it('accepts only unambiguous absolute timestamps with equivalent offsets and Date values', () => {
+    expect(
+      computeActiveConsultationRemainingMinutes({
+        startedAt: '2026-09-19T16:00:00+04:00',
+        now: '2026-09-19T12:05:30.000Z',
+        estimatedConsultationMinutes: 15,
+      }),
+    ).toBe(10);
+    expect(
+      computeActiveConsultationRemainingMinutes({
+        startedAt: new Date('2026-09-19T12:00:00.000Z'),
+        now: new Date('2026-09-19T12:05:30.000Z'),
+        estimatedConsultationMinutes: 15,
+      }),
+    ).toBe(10);
+    expect(
+      computeActiveConsultationRemainingMinutes({
+        startedAt: new Date(Number.NaN),
+        now: '2026-09-19T12:05:30.000Z',
+        estimatedConsultationMinutes: 15,
+      }),
+    ).toBe(0);
   });
 
   it('keeps the established declared-delay and uncertainty arithmetic', () => {
