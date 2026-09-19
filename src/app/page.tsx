@@ -1,209 +1,27 @@
-'use client';
+import { PublicDiscoveryService } from '@/modules/clinic';
+import { getPool } from '@/platform/database/pool';
+import PublicDiscoveryLandingClient, {
+  type PublicClinic,
+} from './PublicDiscoveryLandingClient';
 
-import { useEffect, useState } from 'react';
+// Public directory data must be in the initial HTML, not only in a JS fetch.
+export const dynamic = 'force-dynamic';
 
-type Locale = 'ar' | 'fr';
-type PublicClinic = {
-  name: string;
-  defaultLocale: Locale;
-  enabledLocales: Locale[];
-  doctors: { displayName: string }[];
-};
-type LoadState = 'loading' | 'ready' | 'error';
-
-const copy = {
-  fr: {
-    intro: 'Trouvez votre clinique',
-    description:
-      'Découvrez les cliniques et les médecins disponibles sur Tabibi.',
-    directory: 'Cliniques',
-    doctors: 'Médecins',
-    noDoctors: 'Aucun médecin affiché pour le moment.',
-    languages: 'Langues',
-    empty: 'Aucune clinique à afficher pour le moment.',
-    error: 'Le répertoire est momentanément indisponible.',
-    retry: 'Réessayer',
-    loading: 'Chargement des cliniques…',
-    note: 'Les disponibilités et la réservation seront accessibles depuis un parcours sécurisé.',
-  },
-  ar: {
-    intro: 'ابحث عن عيادتك',
-    description: 'تعرّف على العيادات والأطباء المعروضين على طبيبي.',
-    directory: 'العيادات',
-    doctors: 'الأطباء',
-    noDoctors: 'لا يوجد أطباء معروضون حاليًا.',
-    languages: 'اللغات',
-    empty: 'لا توجد عيادات معروضة حاليًا.',
-    error: 'دليل العيادات غير متاح مؤقتًا.',
-    retry: 'إعادة المحاولة',
-    loading: 'جارٍ تحميل العيادات…',
-    note: 'ستتاح المواعيد والحجوزات عبر مسار آمن مخصص لها.',
-  },
-} as const;
-
-function parseClinics(value: unknown): PublicClinic[] | null {
-  if (typeof value !== 'object' || value === null || !('clinics' in value)) {
-    return null;
-  }
-  const clinics = value.clinics;
-  if (!Array.isArray(clinics)) return null;
-  const result: PublicClinic[] = [];
-  for (const clinic of clinics) {
-    if (
-      typeof clinic !== 'object' ||
-      clinic === null ||
-      typeof clinic.name !== 'string' ||
-      (clinic.defaultLocale !== 'ar' && clinic.defaultLocale !== 'fr') ||
-      !Array.isArray(clinic.enabledLocales) ||
-      !clinic.enabledLocales.every(
-        (entry: unknown) => entry === 'ar' || entry === 'fr',
-      ) ||
-      !Array.isArray(clinic.doctors)
-    ) {
-      return null;
-    }
-    const doctors: { displayName: string }[] = [];
-    for (const doctor of clinic.doctors) {
-      if (
-        typeof doctor !== 'object' ||
-        doctor === null ||
-        typeof doctor.displayName !== 'string'
-      ) {
-        return null;
-      }
-      doctors.push({ displayName: doctor.displayName });
-    }
-    // Explicit client allow-list: never retain injected identifiers or roles.
-    result.push({
+export default async function Home() {
+  let initialClinics: PublicClinic[] | null = null;
+  try {
+    const clinics = await new PublicDiscoveryService(getPool()).listClinics();
+    // Only the deliberate public allow-list crosses the server/client boundary.
+    initialClinics = clinics.map((clinic) => ({
       name: clinic.name,
       defaultLocale: clinic.defaultLocale,
       enabledLocales: [...clinic.enabledLocales],
-      doctors,
-    });
+      doctors: clinic.doctors.map((doctor) => ({
+        displayName: doctor.displayName,
+      })),
+    }));
+  } catch {
+    // Keep the landing page available and allow explicit client-side retry.
   }
-  return result;
-}
-
-export default function Home() {
-  const [locale, setLocale] = useState<Locale>('fr');
-  const [state, setState] = useState<LoadState>('loading');
-  const [clinics, setClinics] = useState<PublicClinic[]>([]);
-  const [retry, setRetry] = useState(0);
-  const t = copy[locale];
-
-  useEffect(() => {
-    const controller = new AbortController();
-    async function load() {
-      try {
-        const response = await fetch('/api/public/discovery', {
-          signal: controller.signal,
-          cache: 'no-store',
-          credentials: 'omit',
-          referrerPolicy: 'no-referrer',
-        });
-        if (!response.ok) throw new Error('Discovery unavailable');
-        const result: unknown = await response.json();
-        const publicClinics = parseClinics(result);
-        if (publicClinics === null) throw new Error('Invalid discovery shape');
-        if (controller.signal.aborted) return;
-        setClinics(publicClinics);
-        setState('ready');
-      } catch {
-        if (!controller.signal.aborted) setState('error');
-      }
-    }
-    void load();
-    return () => controller.abort();
-  }, [retry]);
-
-  return (
-    <main
-      className="publicLanding"
-      lang={locale}
-      dir={locale === 'ar' ? 'rtl' : 'ltr'}
-    >
-      <header className="publicHeader">
-        <div>
-          <span className="publicMark" aria-hidden="true">
-            ✚
-          </span>
-          <h1>Tabibi</h1>
-        </div>
-        <nav className="publicLocales" aria-label="Langue / اللغة">
-          <button
-            type="button"
-            lang="fr"
-            aria-pressed={locale === 'fr'}
-            onClick={() => setLocale('fr')}
-          >
-            Français
-          </button>
-          <button
-            type="button"
-            lang="ar"
-            aria-pressed={locale === 'ar'}
-            onClick={() => setLocale('ar')}
-          >
-            العربية
-          </button>
-        </nav>
-      </header>
-
-      <section className="publicHero">
-        <p className="publicEyebrow">TABIBI</p>
-        <h2>{t.intro}</h2>
-        <p>{t.description}</p>
-      </section>
-
-      <section aria-labelledby="publicDirectoryTitle">
-        <h2 id="publicDirectoryTitle">{t.directory}</h2>
-        <div aria-live="polite" aria-atomic="true">
-          {state === 'loading' && <p role="status">{t.loading}</p>}
-          {state === 'error' && (
-            <div className="publicNotice" role="alert">
-              <p>{t.error}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setState('loading');
-                  setRetry((value) => value + 1);
-                }}
-              >
-                {t.retry}
-              </button>
-            </div>
-          )}
-          {state === 'ready' && clinics.length === 0 && (
-            <p className="publicNotice">{t.empty}</p>
-          )}
-        </div>
-        {state === 'ready' && clinics.length > 0 && (
-          <div className="publicGrid">
-            {clinics.map((clinic, index) => (
-              <article className="publicClinic" key={index}>
-                <h3>{clinic.name}</h3>
-                <p className="publicLanguages">
-                  {t.languages}:{' '}
-                  {clinic.enabledLocales
-                    .map((value) => (value === 'ar' ? 'العربية' : 'Français'))
-                    .join(' · ')}
-                </p>
-                <h4>{t.doctors}</h4>
-                {clinic.doctors.length === 0 ? (
-                  <p>{t.noDoctors}</p>
-                ) : (
-                  <ul>
-                    {clinic.doctors.map((doctor, doctorIndex) => (
-                      <li key={doctorIndex}>{doctor.displayName}</li>
-                    ))}
-                  </ul>
-                )}
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-      <footer className="publicFootnote">{t.note}</footer>
-    </main>
-  );
+  return <PublicDiscoveryLandingClient initialClinics={initialClinics} />;
 }
