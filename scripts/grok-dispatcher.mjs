@@ -234,7 +234,8 @@ async function main() {
       (args.includes('--watch') && args.includes('--once'))) {
     throw new Error('Usage: node scripts/grok-dispatcher.mjs [--watch|--once] [--dry-run]');
   }
-  if (process.env.CODESPACES !== 'true' || process.env.GITHUB_REPOSITORY !== REPO) {
+  if (process.env.CODESPACES !== 'true' || process.env.GITHUB_REPOSITORY !== REPO ||
+      process.env.GITHUB_USER !== 'NTinkicht' || process.env.GITHUB_ACTIONS) {
     throw new Error('owner Codespace for NTinkicht/Tabibi required');
   }
   if (process.env.XAI_API_KEY || process.env.OPENROUTER_API_KEY || process.env.GROK_API_KEY) {
