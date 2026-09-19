@@ -107,6 +107,47 @@ test('a failed discovery read is retryable on the same page', async ({
   expect(attempts).toBe(2);
 });
 
+test('a stalled directory refresh times out and the retry can recover', async ({
+  page,
+}) => {
+  let attempts = 0;
+  await page.route(DISCOVERY_URL, async (route) => {
+    attempts += 1;
+    if (attempts === 1) {
+      // Simulate a server that never responds before the client deadline.
+      await new Promise<void>((resolve) => setTimeout(resolve, 6_000));
+      await route.abort().catch(() => {});
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        clinics: [
+          {
+            name: 'Clinique du Renouveau',
+            defaultLocale: 'fr',
+            enabledLocales: ['fr'],
+            doctors: [{ displayName: 'Dr. Sami' }],
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await expect(page.getByRole('button', { name: 'Actualiser' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Réessayer' })).toBeVisible({
+    timeout: 8_000,
+  });
+  await page.getByRole('button', { name: 'Réessayer' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Clinique du Renouveau' }),
+  ).toBeVisible();
+  expect(attempts).toBe(2);
+});
+
 test('Arabic directory uses RTL on a mobile viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockDirectory(page, [
