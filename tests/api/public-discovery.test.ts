@@ -4,8 +4,8 @@ const listClinics = vi.fn();
 
 vi.mock('@/modules/clinic', () => ({
   PublicDiscoveryService: class {
-    listClinics() {
-      return listClinics();
+    listClinics(...args: unknown[]) {
+      return listClinics(...args);
     }
   },
 }));
