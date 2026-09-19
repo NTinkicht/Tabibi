@@ -220,7 +220,7 @@ export function isTrustedDeliveryComment(lease, c) {
     String(c.body || '').includes(`source_lease_comment: ${lease.commentId}`)
   );
 }
-function trustedPosted(lease, api = gh) {
+export function trustedPosted(lease, api = gh) {
   // Delivery deduplication must search ALL pages, not the recent lease window:
   // retrying after >100 new comments must never double-post a review.
   const issue = api(`repos/${REPO}/issues/${lease.pr}`);
@@ -230,10 +230,15 @@ function trustedPosted(lease, api = gh) {
   }
   return false;
 }
-function deliver(lease, body, finalOutcome) {
-  record(lease, 'DELIVERY_PENDING', { body, finalOutcome });
-  if (!trustedPosted(lease)) post(lease.pr, body);
-  record(lease, finalOutcome);
+export function deliver(
+  lease,
+  body,
+  finalOutcome,
+  { persist = record, isPosted = trustedPosted, write = post } = {},
+) {
+  persist(lease, 'DELIVERY_PENDING', { body, finalOutcome });
+  if (!isPosted(lease)) write(lease.pr, body);
+  persist(lease, finalOutcome);
 }
 function drainPending() {
   for (const file of fs
