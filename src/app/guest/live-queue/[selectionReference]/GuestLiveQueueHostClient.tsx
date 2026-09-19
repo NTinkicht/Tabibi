@@ -96,6 +96,16 @@ type Copy = {
   activeConsultationRemaining: (minutes: number) => string;
 };
 
+// Arabic noun-number agreement for دقيقة (minute): 1/2 take dedicated
+// singular/dual forms, 3–10 take the plural noun, 11+ reverts to the
+// singular noun after the numeral.
+function arabicMinuteCount(minutes: number): string {
+  if (minutes === 1) return 'دقيقة واحدة';
+  if (minutes === 2) return 'دقيقتان';
+  if (minutes >= 3 && minutes <= 10) return `${minutes} دقائق`;
+  return `${minutes} دقيقة`;
+}
+
 const COPY: Record<SupportedLocale, Copy> = {
   fr: {
     dir: 'ltr',
@@ -227,7 +237,7 @@ const COPY: Record<SupportedLocale, Copy> = {
     },
     activeConsultationHeading: 'الاستشارة جارية الآن',
     activeConsultationRemaining: (minutes) =>
-      `الوقت المتبقي المقدر: حوالي ${minutes} دقيقة`,
+      `الوقت المتبقي المقدر: حوالي ${arabicMinuteCount(minutes)}`,
     bookingStates: {
       confirmed: 'مؤكدة',
       checked_in: 'تم تسجيل الوصول',

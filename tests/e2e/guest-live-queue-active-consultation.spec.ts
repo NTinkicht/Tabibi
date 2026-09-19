@@ -163,7 +163,36 @@ test('Arabic renders the active-consultation status with RTL parity', async ({
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
   await expect(page.getByText('الاستشارة جارية الآن')).toBeVisible();
   await expect(
-    page.getByText('الوقت المتبقي المقدر: حوالي 6 دقيقة'),
+    page.getByText('الوقت المتبقي المقدر: حوالي 6 دقائق'),
+  ).toBeVisible();
+});
+
+test('Arabic uses the dedicated singular and dual noun forms for 1 and 2 minutes', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'language', { get: () => 'ar-DZ' });
+  });
+  await mockBooking(page);
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'checked_in',
+        queueState: 'in_consultation',
+        activeConsultationRemainingMinutes: 1,
+        eta: null,
+      }),
+    });
+  });
+
+  await page.goto('/guest/live-queue/test-selection-ref');
+  await page.getByLabel('اسمك').fill('Test Guest');
+  await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
+
+  await expect(
+    page.getByText('الوقت المتبقي المقدر: حوالي دقيقة واحدة'),
   ).toBeVisible();
 });
 
