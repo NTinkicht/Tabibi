@@ -89,7 +89,7 @@ Three read-only standing lanes make the additional actors useful without creatin
 
 1. **Gemini CLI - Repository Intelligence & Regression Scout.** Produce bounded repository-wide impact maps, dependency/blast-radius analyses, contract/documentation drift reports, post-merge regression scouts and eligible exact-head reviews. Use the machine capabilities `repository_intelligence` and `regression_scouting`.
 2. **Mistral Vibe - Failure & Test Design Analyst.** Produce bounded failure matrices, retry/idempotency/concurrency analysis, CI diagnoses, degraded-mode checks, adversarial test plans and eligible exact-head reviews. Use the machine capabilities `failure_analysis` and `test_design`.
-3. **Grok Build - Independent Code & Security Challenger.** Produce bounded security/privacy/authorization, race-condition, UX, regression and alternate-design findings and eligible exact-head review. May implement only on the existing canonical stream under explicit lease. Owner-private local OAuth only; no automatic wake/token relay.
+3. **Grok Build - Independent Code & Security Challenger.** Produce bounded security/privacy/authorization, race-condition, UX, regression and alternate-design findings and eligible exact-head review. May implement only on the existing canonical stream under explicit lease. Owner-authenticated local Build CLI or linked Grok Bot persistent cloud teammate only; no unattended GitHub Action/token relay.
 
 These lanes generate artifacts, not activity theater. A finding that requires code is handed to the active implementer unless the specialist receives an explicit implementation lease.
 
