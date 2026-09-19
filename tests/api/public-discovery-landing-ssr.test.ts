@@ -57,7 +57,7 @@ describe('WU85 public discovery initial server render', () => {
     ]) {
       expect(html).not.toContain(secret);
     }
-    expect(listClinics).toHaveBeenCalledWith(2_000);
+    expect(listClinics).toHaveBeenCalledWith(2_000, expect.any(AbortSignal));
     expect(logError).not.toHaveBeenCalled();
   });
 
@@ -74,14 +74,19 @@ describe('WU85 public discovery initial server render', () => {
     );
   });
 
-  it('bounds a stalled connection and renders retryable HTML', async () => {
+  it('bounds a stalled service even when it ignores cancellation', async () => {
     vi.useFakeTimers();
-    listClinics.mockImplementation(() => new Promise(() => {}));
+    let signal: AbortSignal | undefined;
+    listClinics.mockImplementation((_timeout: number, suppliedSignal: AbortSignal) => {
+      signal = suppliedSignal;
+      return new Promise(() => {});
+    });
     const pending = Home();
     await vi.advanceTimersByTimeAsync(2_500);
     const html = renderToStaticMarkup(await pending);
     expect(html).toContain('Le répertoire est momentanément indisponible.');
     expect(html).toContain('Réessayer');
+    expect(signal?.aborted).toBe(true);
     expect(logError).toHaveBeenCalledWith(
       {
         err: expect.objectContaining({
@@ -90,6 +95,6 @@ describe('WU85 public discovery initial server render', () => {
       },
       'public discovery SSR fetch failed',
     );
-    expect(listClinics).toHaveBeenCalledWith(2_000);
+    expect(listClinics).toHaveBeenCalledWith(2_000, expect.any(AbortSignal));
   });
 });
