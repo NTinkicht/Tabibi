@@ -25,6 +25,7 @@ type LiveQueueEta = {
 type LiveQueueData = {
   bookingState: string;
   queueState: string;
+  activeConsultationRemainingMinutes: number | null;
   eta: LiveQueueEta | null;
 };
 
@@ -91,7 +92,19 @@ type Copy = {
   etaPatientsAhead: (count: number) => string;
   etaWaitRange: (minMinutes: number, maxMinutes: number) => string;
   etaConfidence: Record<'high' | 'medium' | 'low', string>;
+  activeConsultationHeading: string;
+  activeConsultationRemaining: (minutes: number) => string;
 };
+
+// Arabic noun-number agreement for دقيقة (minute): 1/2 take dedicated
+// singular/dual forms, 3–10 take the plural noun, 11+ reverts to the
+// singular noun after the numeral.
+function arabicMinuteCount(minutes: number): string {
+  if (minutes === 1) return 'دقيقة واحدة';
+  if (minutes === 2) return 'دقيقتان';
+  if (minutes >= 3 && minutes <= 10) return `${minutes} دقائق`;
+  return `${minutes} دقيقة`;
+}
 
 const COPY: Record<SupportedLocale, Copy> = {
   fr: {
@@ -148,6 +161,11 @@ const COPY: Record<SupportedLocale, Copy> = {
       medium: 'Confiance de l’estimation: moyenne',
       low: 'Confiance de l’estimation: faible',
     },
+    activeConsultationHeading: 'Consultation en cours',
+    activeConsultationRemaining: (minutes) =>
+      minutes === 1
+        ? 'Temps restant estimé : environ 1 min'
+        : `Temps restant estimé : environ ${minutes} min`,
     bookingStates: {
       confirmed: 'confirmée',
       checked_in: 'enregistré',
@@ -217,6 +235,9 @@ const COPY: Record<SupportedLocale, Copy> = {
       medium: 'ثقة التقدير: متوسطة',
       low: 'ثقة التقدير: منخفضة',
     },
+    activeConsultationHeading: 'الاستشارة جارية الآن',
+    activeConsultationRemaining: (minutes) =>
+      `الوقت المتبقي المقدر: حوالي ${arabicMinuteCount(minutes)}`,
     bookingStates: {
       confirmed: 'مؤكدة',
       checked_in: 'تم تسجيل الوصول',
@@ -276,6 +297,26 @@ function EtaStatus({ eta, copy }: { eta: LiveQueueEta; copy: Copy }) {
       <p>{copy.etaPatientsAhead(eta.patientsAhead)}</p>
       <p>{copy.etaWaitRange(eta.minWaitMinutes, eta.maxWaitMinutes)}</p>
       {eta.summary ? <p>{copy.etaConfidence[eta.summary.confidence]}</p> : null}
+    </div>
+  );
+}
+
+// Deliberately its own status region with its own heading, never merged into
+// EtaStatus above: once the guest's own entry is in_consultation, the
+// pre-existing waiting-range estimate no longer describes anything the
+// guest is waiting for, and conflating the two would misrepresent this
+// entry's own remaining consultation time as a queue wait.
+function ActiveConsultationStatus({
+  minutes,
+  copy,
+}: {
+  minutes: number;
+  copy: Copy;
+}) {
+  return (
+    <div role="status">
+      <h2>{copy.activeConsultationHeading}</h2>
+      <p>{copy.activeConsultationRemaining(minutes)}</p>
     </div>
   );
 }
@@ -718,12 +759,25 @@ function LiveQueueView({
         }
         // A clamped response is stale/out-of-order for queueState, so its own
         // eta was computed against that same stale row; keep the last
-        // authoritatively-displayed eta instead of regressing to it.
+        // authoritatively-displayed eta instead of regressing to it. The
+        // same applies to activeConsultationRemainingMinutes: a clamped
+        // (stale) response's own value was computed for the pre-clamp state
+        // and must not regress or reappear against the floor-held state.
         const eta =
           queueState === fetched.queueState
             ? fetched.eta
             : (lastDataRef.current?.eta ?? fetched.eta);
-        const data: LiveQueueData = { ...fetched, queueState, eta };
+        const activeConsultationRemainingMinutes =
+          queueState === fetched.queueState
+            ? fetched.activeConsultationRemainingMinutes
+            : (lastDataRef.current?.activeConsultationRemainingMinutes ??
+              fetched.activeConsultationRemainingMinutes);
+        const data: LiveQueueData = {
+          ...fetched,
+          queueState,
+          eta,
+          activeConsultationRemainingMinutes,
+        };
         lastDataRef.current = data;
         setState({ kind: 'active', data });
         scheduleNext(POLL_INTERVAL_MS);
@@ -891,6 +945,13 @@ function LiveQueueView({
         {state.data?.eta ? (
           <EtaStatus eta={state.data.eta} copy={copy} />
         ) : null}
+        {state.data?.activeConsultationRemainingMinutes !== null &&
+        state.data?.activeConsultationRemainingMinutes !== undefined ? (
+          <ActiveConsultationStatus
+            minutes={state.data.activeConsultationRemainingMinutes}
+            copy={copy}
+          />
+        ) : null}
         {checkInState.kind === 'done' ? (
           <p role="status">
             {checkInState.reconciled
@@ -924,6 +985,13 @@ function LiveQueueView({
         {copy.queueStates[state.data.queueState] ?? state.data.queueState}
       </p>
       {state.data.eta ? <EtaStatus eta={state.data.eta} copy={copy} /> : null}
+      {state.data.activeConsultationRemainingMinutes !== null &&
+      state.data.activeConsultationRemainingMinutes !== undefined ? (
+        <ActiveConsultationStatus
+          minutes={state.data.activeConsultationRemainingMinutes}
+          copy={copy}
+        />
+      ) : null}
       {state.data.queueState === 'waiting' || checkInState.kind !== 'idle' ? (
         <div role="status">
           {checkInState.kind === 'done' ? (

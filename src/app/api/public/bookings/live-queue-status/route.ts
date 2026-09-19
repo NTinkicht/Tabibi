@@ -18,10 +18,7 @@ const SECURITY_HEADERS = {
 };
 
 function rejected(requestId: string): { body: unknown; status: number } {
-  return {
-    body: { status: 'rejected', requestId },
-    status: 400,
-  };
+  return { body: { status: 'rejected', requestId }, status: 400 };
 }
 
 function bearerFrom(request: Request): string | null {
@@ -45,6 +42,8 @@ export async function GET(request: Request): Promise<Response> {
         body: {
           bookingState: result.bookingState,
           queueState: result.queueState,
+          activeConsultationRemainingMinutes:
+            result.activeConsultationRemainingMinutes,
           eta: result.eta
             ? {
                 patientsAhead: result.eta.patientsAhead,
