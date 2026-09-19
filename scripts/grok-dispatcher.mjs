@@ -90,6 +90,82 @@ function command(bin, args, { cwd = ROOT, input, timeout = 45_000, env } = {}) {
   return result.stdout.trim();
 }
 
+
+export function grokReviewEnvironment(base, grokHome, isolatedHome) {
+  const env = { ...base };
+  for (const key of Object.keys(env)) {
+    if (
+      key.startsWith('GITHUB_') ||
+      key.startsWith('GH_') ||
+      key.startsWith('CODESPACE_') ||
+      key.startsWith('GIT_CONFIG_') ||
+      ['GIT_ASKPASS', 'SSH_ASKPASS', 'SSH_AUTH_SOCK', 'GIT_CREDENTIAL_HELPER'].includes(key)
+    ) delete env[key];
+  }
+  // OAuth stays in the private Grok directory, while GitHub CLI and git
+  // credential/config paths are empty for the untrusted model subprocess.
+  env.HOME = isolatedHome;
+  env.GROK_HOME = grokHome;
+  env.XDG_CONFIG_HOME = isolatedHome;
+  env.GH_CONFIG_DIR = path.join(isolatedHome, 'gh');
+  env.GIT_CONFIG_GLOBAL = '/dev/null';
+  env.GIT_CONFIG_NOSYSTEM = '1';
+  env.GIT_TERMINAL_PROMPT = '0';
+  env.GH_PROMPT_DISABLED = '1';
+  return env;
+}
+
+export function assertSafeReviewOutput(text, authJson = '') {
+  if (typeof text !== 'string') throw new Error('unsafe_review_output');
+  // Block the most common credentials even if the local auth file format changes.
+  if (
+    /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{20,}\b/i.test(text) ||
+    /\bgithub_pat_[A-Za-z0-9_]{20,}\b/i.test(text) ||
+    /\bsk-[A-Za-z0-9_-]{20,}\b/.test(text) ||
+    /\bBearer\s+[A-Za-z0-9._~+/-]{16,}\b/i.test(text) ||
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(text) ||
+    /(?:access_token|refresh_token|client_secret)\s*[:=]\s*["']?[A-Za-z0-9._~+/-]{12,}/i.test(text)
+  ) throw new Error('unsafe_review_output');
+  // The existing owner OAuth is necessary for the CLI, but its actual
+  // secret leaf values must never be sent to a public PR comment.
+  let auth;
+  try {
+    auth = authJson ? JSON.parse(authJson) : null;
+  } catch {
+    throw new Error('oauth_not_verified');
+  }
+  const visit = (value, key = '') => {
+    if (value && typeof value === 'object') {
+      for (const [name, child] of Object.entries(value)) visit(child, name);
+    } else if (
+      typeof value === 'string' &&
+      value.length >= 12 &&
+      /token|secret|credential|api.?key|cookie|session/i.test(key) &&
+      text.includes(value)
+    ) {
+      throw new Error('unsafe_review_output');
+    }
+  };
+  visit(auth);
+  return text;
+}
+
+export function isReviewAuthorEligible(pr, commits) {
+  if (pr.commits > 100 || !Array.isArray(commits) || commits.length !== pr.commits)
+    return false;
+  return !commits.some((c) =>
+    /\b(?:grok build|actor:\s*grok|co-authored-by:\s*grok)\b/i.test(
+      [c.commit?.message, c.commit?.author?.name, c.commit?.committer?.name].join('\n'),
+    ),
+  );
+}
+
+export function outcomeNotice(outcome) {
+  return ['STALE_HEAD', 'STALE_HEAD_AFTER_REVIEW'].includes(outcome)
+    ? 'STALE_LEASE_DISCARDED'
+    : 'ROLE_FAILOVER_REQUIRED';
+}
+
 function gh(route) {
   return JSON.parse(command('gh', ['api', route]));
 }
@@ -136,15 +212,23 @@ function record(lease, outcome, pending = {}) {
     { mode: 0o600 },
   );
 }
-function trustedPosted(lease) {
-  const marker = `<!-- tabibi-grok-dispatch:${lease.key} -->`;
-  return recentComments(lease.pr).some(
-    (c) =>
-      c.user?.login === 'NTinkicht' &&
-      String(c.body || '').includes(marker) &&
-      String(c.body || '').includes(`exact_sha: ${lease.sha}`) &&
-      String(c.body || '').includes(`source_lease_comment: ${lease.commentId}`),
+export function isTrustedDeliveryComment(lease, c) {
+  return (
+    c.user?.login === 'NTinkicht' &&
+    String(c.body || '').includes(`<!-- tabibi-grok-dispatch:${lease.key} -->`) &&
+    String(c.body || '').includes(`exact_sha: ${lease.sha}`) &&
+    String(c.body || '').includes(`source_lease_comment: ${lease.commentId}`)
   );
+}
+function trustedPosted(lease, api = gh) {
+  // Delivery deduplication must search ALL pages, not the recent lease window:
+  // retrying after >100 new comments must never double-post a review.
+  const issue = api(`repos/${REPO}/issues/${lease.pr}`);
+  for (let page = Math.max(1, Math.ceil((issue.comments || 0) / 100)); page >= 1; page -= 1) {
+    const comments = api(`repos/${REPO}/issues/${lease.pr}/comments?per_page=100&page=${page}`);
+    if (comments.some((c) => isTrustedDeliveryComment(lease, c))) return true;
+  }
+  return false;
 }
 function deliver(lease, body, finalOutcome) {
   record(lease, 'DELIVERY_PENDING', { body, finalOutcome });
@@ -173,16 +257,8 @@ function ciStatus(sha) {
   );
 }
 function materialGrokAuthorship(pr) {
-  const commits = gh(`repos/${REPO}/pulls/${pr}/commits?per_page=100`);
-  return commits.some((c) =>
-    /\b(?:grok build|actor:\s*grok|co-authored-by:\s*grok)\b/i.test(
-      [
-        c.commit?.message,
-        c.commit?.author?.name,
-        c.commit?.committer?.name,
-      ].join('\n'),
-    ),
-  );
+  const commits = gh(`repos/${REPO}/pulls/${pr.number}/commits?per_page=100`);
+  return !isReviewAuthorEligible(pr, commits);
 }
 function currentHead(pr) {
   return gh(`repos/${REPO}/pulls/${pr}`);
@@ -220,8 +296,7 @@ function runReview(lease, { dryRun = false } = {}) {
   const pr = currentHead(lease.pr);
   if (!pr || pr.state !== 'open' || pr.draft || pr.head?.sha !== lease.sha)
     return 'STALE_HEAD';
-  if (pr.commits > 100 || materialGrokAuthorship(lease.pr))
-    return 'SELF_AUTHORSHIP_BLOCKED';
+  if (materialGrokAuthorship(pr)) return 'SELF_AUTHORSHIP_BLOCKED';
   const checks = ciStatus(lease.sha);
   const prompt = reviewPrompt(lease, checks);
   if (dryRun) {
@@ -229,6 +304,7 @@ function runReview(lease, { dryRun = false } = {}) {
     return 'DRY_RUN';
   }
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'tabibi-grok-review-'));
+  const isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), 'tabibi-grok-home-'));
   try {
     command('git', ['fetch', '--no-tags', 'origin', 'main'], {
       timeout: 90_000,
@@ -242,22 +318,18 @@ function runReview(lease, { dryRun = false } = {}) {
     if (command('git', ['rev-parse', 'FETCH_HEAD']) !== lease.sha)
       return 'STALE_HEAD';
     command('git', ['worktree', 'add', '--detach', work, lease.sha]);
-    const env = { ...process.env };
-    // Dispatcher owns GitHub writes. Do not pass Codespaces GitHub tokens to Grok.
-    for (const key of ['GITHUB_TOKEN', 'GH_TOKEN', 'GH_ENTERPRISE_TOKEN']) {
-      delete env[key];
-    }
-    const grokHome = env.GROK_HOME || path.join(os.homedir(), '.grok');
-    if (!fs.existsSync(path.join(grokHome, 'auth.json')))
-      throw new Error('oauth_not_verified');
+    const grokHome = process.env.GROK_HOME || path.join(os.homedir(), '.grok');
+    const authPath = path.join(grokHome, 'auth.json');
+    if (!fs.existsSync(authPath)) throw new Error('oauth_not_verified');
     if (
-      env.XAI_API_KEY ||
-      env.XAI_BASE_URL ||
-      env.OPENROUTER_API_KEY ||
-      env.GROK_API_KEY
+      process.env.XAI_API_KEY ||
+      process.env.XAI_BASE_URL ||
+      process.env.OPENROUTER_API_KEY ||
+      process.env.GROK_API_KEY
     ) {
       throw new Error('metered_auth_present');
     }
+    const env = grokReviewEnvironment(process.env, grokHome, isolatedHome);
     const raw = command(
       'grok',
       [
@@ -306,6 +378,7 @@ function runReview(lease, { dryRun = false } = {}) {
     ) {
       throw new Error('unusable_grok_response');
     }
+    assertSafeReviewOutput(answer.text, fs.readFileSync(authPath, 'utf8'));
     if (command('git', ['status', '--porcelain'], { cwd: work })) {
       throw new Error('review_changed_files');
     }
@@ -330,10 +403,12 @@ function runReview(lease, { dryRun = false } = {}) {
     } catch {
       /* original error wins */
     }
-    try {
-      fs.rmSync(work, { recursive: true, force: true });
-    } catch {
-      /* best effort */
+    for (const dir of [work, isolatedHome]) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* best effort */
+      }
     }
   }
 }
@@ -355,7 +430,7 @@ export function oneCycle({ dryRun = false } = {}) {
           deliver(
             lease,
             `<!-- tabibi-grok-dispatch:${lease.key} -->\n` +
-              `ROLE_FAILOVER_REQUIRED actor: grok capability: review exact_sha: ${lease.sha}\n` +
+              `${outcomeNotice(outcome)} actor: grok capability: review exact_sha: ${lease.sha}\n` +
               `source_lease_comment: ${lease.commentId}\nreason: ${outcome}\n` +
               'No review verdict produced. Reconcile and assign an eligible non-author actor.',
             outcome,
@@ -441,6 +516,7 @@ async function main() {
   }
   if (
     process.env.XAI_API_KEY ||
+    process.env.XAI_BASE_URL ||
     process.env.OPENROUTER_API_KEY ||
     process.env.GROK_API_KEY
   ) {
