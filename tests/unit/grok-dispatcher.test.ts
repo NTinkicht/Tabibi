@@ -69,7 +69,7 @@ describe('owner-private Grok dispatch lease parser', () => {
   it('rejects self-gating and missing explicit material authors', () => {
     const self = valid.replace('codex,claude', 'grok,claude');
     expect(parseLease(self, comment(self), pr())).toBeNull();
-    const missing = valid.replace('material_authors: codex,claude\n', '');
+    const missing = valid.replace('material_authors: codex,claude', '');
     expect(parseLease(missing, comment(missing), pr())).toBeNull();
   });
 
