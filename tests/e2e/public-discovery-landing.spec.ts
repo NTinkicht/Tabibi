@@ -89,7 +89,7 @@ test('a failed discovery read is retryable on the same page', async ({
     });
   });
   await page.goto('/');
-  await expect(page.getByRole('alert')).toContainText(
+  await expect(page.locator('.publicNotice[role="alert"]')).toContainText(
     'Le répertoire est momentanément indisponible.',
   );
   await page.getByRole('button', { name: 'Réessayer' }).click();
