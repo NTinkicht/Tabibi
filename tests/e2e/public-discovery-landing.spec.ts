@@ -96,7 +96,9 @@ test('a failed discovery read is retryable on the same page', async ({
   await expect(
     page.getByRole('heading', { name: 'Clinique du Centre' }),
   ).toBeVisible();
-  await expect(page.getByText('Aucun médecin affiché pour le moment.')).toBeVisible();
+  await expect(
+    page.getByText('Aucun médecin affiché pour le moment.'),
+  ).toBeVisible();
   expect(attempts).toBe(2);
 });
 
@@ -113,8 +115,12 @@ test('Arabic directory uses RTL on a mobile viewport', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'العربية' }).click();
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'ابحث عن عيادتك' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'عيادة الأمل' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'ابحث عن عيادتك' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'عيادة الأمل' }),
+  ).toBeVisible();
   await expect(page.getByText('د. مريم')).toBeVisible();
   await expect(page.getByRole('button', { name: 'العربية' })).toHaveAttribute(
     'aria-pressed',
