@@ -3,6 +3,7 @@ import { type ClinicScope, requireClinicRole } from '@/modules/identity';
 import type { QueueEntryState } from '@/modules/queue';
 import {
   MAX_HISTORICAL_SAMPLES,
+  computeActiveConsultationRemainingMinutes,
   type QueueEtaEstimateSource,
   selectConsultationEstimate,
 } from '@/modules/queue-eta-estimator';
@@ -39,6 +40,7 @@ export interface ReceptionistDashboardEntry {
   privateDisplayName: string;
   preferredLocale: 'ar' | 'fr';
   hasContact: boolean;
+  activeConsultationRemainingMinutes: number | null;
   eta: {
     patientsAhead: number;
     minWaitMinutes: number;
@@ -87,11 +89,15 @@ type Row = {
   private_display_name: string | null;
   preferred_locale: 'ar' | 'fr' | null;
   has_contact: boolean | null;
+  in_consultation_started_at: Date | null;
 };
 
 /** Private receptionist projection. Never reuse this query for public displays. */
 export class ReceptionistDashboardService {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly now: () => Date = () => new Date(),
+  ) {}
 
   async getSnapshot(
     scope: ClinicScope,
@@ -117,6 +123,7 @@ export class ReceptionistDashboardService {
                 entry.id AS entry_id, entry.state AS entry_state,
                 entry.registration_order, entry.eligibility_order,
                 entry.priority_order, entry.public_display_label,
+                entry.in_consultation_started_at,
                 patient.private_display_name, patient.preferred_locale,
                 (patient.contact_phone IS NOT NULL OR patient.contact_email IS NOT NULL) AS has_contact
            FROM consultation_sessions session
@@ -173,6 +180,7 @@ export class ReceptionistDashboardService {
         historicalDurationResult.rows.map((row) => row.duration_minutes),
       );
       const declaredDelayMinutes = first.declared_delay_minutes ?? 0;
+      const snapshotNow = this.now();
       let patientsAhead = 0;
 
       const entries = result.rows.flatMap((row) => {
@@ -219,13 +227,22 @@ export class ReceptionistDashboardService {
             privateDisplayName: row.private_display_name!,
             preferredLocale: row.preferred_locale!,
             hasContact: row.has_contact!,
+            activeConsultationRemainingMinutes:
+              state === 'in_consultation' && row.in_consultation_started_at
+                ? computeActiveConsultationRemainingMinutes({
+                    startedAt: row.in_consultation_started_at,
+                    now: snapshotNow,
+                    estimatedConsultationMinutes:
+                      estimate.estimatedConsultationMinutes,
+                  })
+                : null,
             eta,
           },
         ];
       });
 
       return {
-        generatedAt: new Date().toISOString(),
+        generatedAt: snapshotNow.toISOString(),
         refreshAfterSeconds: 30,
         session: {
           id: first.session_id,
