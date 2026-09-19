@@ -105,8 +105,9 @@ export function computeActiveConsultationRemainingMinutes({
     startedAtMs > nowMs ||
     !Number.isFinite(estimatedConsultationMinutes) ||
     estimatedConsultationMinutes <= 0
-  )
+  ) {
     return 0;
+  }
 
   const boundedEstimate = Math.min(
     MAX_SAMPLE_MINUTES,
