@@ -30,6 +30,6 @@ describe('WU82 deterministic ETA revision', () => {
   });
 
   it('uses an explicit versioned opaque prefix', () => {
-    expect(createEtaRevision(baseline)).toMatch(/^eta-v1-[0-9a-f]{8}$/);
+    expect(createEtaRevision(baseline)).toMatch(/^eta-v2-[0-9a-f]{32}$/);
   });
 });
