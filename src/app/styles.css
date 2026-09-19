@@ -516,3 +516,29 @@ h1 {
     border-radius: 1.25rem;
   }
 }
+
+.publicDirectoryHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.publicRefresh {
+  border: 1px solid #96b5ae;
+  border-radius: 999px;
+  background: white;
+  color: #164d45;
+  padding: 0.6rem 1rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.publicRefresh:focus-visible {
+  outline: 3px solid #d6a03c;
+  outline-offset: 3px;
+}
+.publicRefresh:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
