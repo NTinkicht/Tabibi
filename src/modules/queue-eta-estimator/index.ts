@@ -96,22 +96,20 @@ function absoluteTimestampMs(value: Date | string): number {
   if (value instanceof Date) return value.getTime();
 
   const match =
-    /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d{1,9}))?(Z|([+-])(\\d{2}):(\\d{2}))$/.exec(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|([+-])(\d{2}):(\d{2}))$/.exec(
       value,
     );
   if (!match) return Number.NaN;
 
-  const [, yearText, monthText, dayText, hourText, minuteText, secondText, fraction, zone, sign, offsetHourText, offsetMinuteText] =
-    match;
-  const year = Number(yearText);
-  const month = Number(monthText);
-  const day = Number(dayText);
-  const hour = Number(hourText);
-  const minute = Number(minuteText);
-  const second = Number(secondText);
-  const millis = Number((fraction ?? '').padEnd(3, '0').slice(0, 3));
-  const offsetHours = zone === 'Z' ? 0 : Number(offsetHourText);
-  const offsetMinutes = zone === 'Z' ? 0 : Number(offsetMinuteText);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const millis = Number((match[7] ?? '').padEnd(3, '0').slice(0, 3));
+  const offsetHours = match[8] === 'Z' ? 0 : Number(match[10]);
+  const offsetMinutes = match[8] === 'Z' ? 0 : Number(match[11]);
   if (
     month < 1 ||
     month > 12 ||
@@ -135,7 +133,7 @@ function absoluteTimestampMs(value: Date | string): number {
     return Number.NaN;
   }
 
-  const direction = sign === '-' ? -1 : 1;
+  const direction = match[9] === '-' ? -1 : 1;
   return calendar.getTime() - direction * (offsetHours * 60 + offsetMinutes) * 60_000;
 }
 
