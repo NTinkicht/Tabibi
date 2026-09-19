@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-test('explains ETA uncertainty and privacy in French by default', async ({ page }) => {
+test('explains ETA uncertainty and privacy in French by default', async ({
+  page,
+}) => {
   await page.goto('/guest/eta-explained');
 
   await expect(page.locator('main[lang="fr"][dir="ltr"]')).toBeVisible();
