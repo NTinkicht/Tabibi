@@ -4,11 +4,11 @@ import {
   verifierMatches,
 } from '@/modules/guest-access';
 import {
-  computeQueueEtaRange,
   MAX_HISTORICAL_SAMPLES,
   type QueueEtaEstimateSource,
   selectConsultationEstimate,
 } from '@/modules/queue-eta-estimator';
+import { createEtaSnapshot } from '@/modules/queue-eta-estimator/snapshot';
 import { abortableQuery } from '@/platform/database/abortable-query';
 
 const LIVE_QUEUE_STATES = new Set(['checked_in', 'called', 'in_consultation']);
@@ -18,6 +18,7 @@ export interface PublicGuestLiveQueueEta {
   patientsAhead: number;
   minWaitMinutes: number;
   maxWaitMinutes: number;
+  revision: string;
   estimateSource: QueueEtaEstimateSource;
 }
 
@@ -210,16 +211,19 @@ export class PublicGuestLiveQueueStatusService {
     );
     const declaredDelayMinutes = row.declared_delay_minutes ?? 0;
     const patientsAhead = Math.max(0, Number(row.service_position) - 1);
-    const range = computeQueueEtaRange({
+    const range = createEtaSnapshot({
       patientsAhead,
       declaredDelayMinutes,
       estimatedConsultationMinutes: estimate.estimatedConsultationMinutes,
+      estimateSource: estimate.estimateSource,
+      observedSampleCount: estimate.observedSampleCount,
     });
 
     return {
       patientsAhead,
       minWaitMinutes: range.minWaitMinutes,
       maxWaitMinutes: range.maxWaitMinutes,
+      revision: range.revision,
       estimateSource: estimate.estimateSource,
     };
   }
