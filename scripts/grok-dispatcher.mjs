@@ -198,6 +198,8 @@ function runReview(lease, { dryRun = false } = {}) {
 }
 
 export function oneCycle({ dryRun = false } = {}) {
+  persisted();
+  drainPending();
   const done = persisted();
   const prs = gh(`repos/${REPO}/pulls?state=open&per_page=50`);
   const comments = {};
@@ -206,20 +208,34 @@ export function oneCycle({ dryRun = false } = {}) {
   for (const lease of queue.slice(0, 1)) {
     try {
       const outcome = runReview(lease, { dryRun });
-      if (!dryRun) record(lease, outcome);
+      if (!dryRun && outcome !== 'REVIEW_POSTED') {
+        if (outcome === 'ALREADY_POSTED') record(lease, outcome);
+        else {
+          deliver(lease, `<!-- tabibi-grok-dispatch:${lease.key} -->\n` +
+            `ROLE_FAILOVER_REQUIRED actor: grok capability: review exact_sha: ${lease.sha}\n` +
+            `source_lease_comment: ${lease.commentId}\nreason: ${outcome}\n` +
+            'No review verdict produced. Reconcile and assign an eligible non-author actor.', outcome);
+        }
+      }
       process.stdout.write(`grok-dispatch: PR #${lease.pr} ${outcome}\n`);
     } catch {
       if (!dryRun) {
-        try {
-          post(lease.pr, `<!-- tabibi-grok-dispatch:${lease.key} -->\n` +
-            `CAPACITY_DEGRADED actor: grok capability: review exact_sha: ${lease.sha}. ` +
-            'Owner-private dispatcher could not publish a verified review. ' +
-            'Reconcile and fail over; no GitHub-verifiable review verdict exists.');
-        } finally {
-          record(lease, 'CAPACITY_DEGRADED');
+        const file = path.join(STATE, `${lease.key}.json`);
+        const pending = fs.existsSync(file) &&
+          JSON.parse(fs.readFileSync(file, 'utf8')).outcome === 'DELIVERY_PENDING';
+        if (!pending) {
+          try {
+            deliver(lease, `<!-- tabibi-grok-dispatch:${lease.key} -->\n` +
+              `CAPACITY_DEGRADED actor: grok capability: review exact_sha: ${lease.sha}\n` +
+              `source_lease_comment: ${lease.commentId}\n` +
+              'No GitHub-verifiable review verdict exists. Reconcile and fail over.',
+              'CAPACITY_DEGRADED');
+          } catch {
+            // Pending report is kept locally and retried before any new model call.
+          }
         }
       }
-      process.stderr.write(`grok-dispatch: PR #${lease.pr} failed; fail over.\n`);
+      process.stderr.write(`grok-dispatch: PR #${lease.pr} failed or pending delivery.\n`);
     }
   }
   return queue.length;
