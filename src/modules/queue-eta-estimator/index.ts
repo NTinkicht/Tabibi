@@ -134,7 +134,10 @@ function absoluteTimestampMs(value: Date | string): number {
   }
 
   const direction = match[9] === '-' ? -1 : 1;
-  return calendar.getTime() - direction * (offsetHours * 60 + offsetMinutes) * 60_000;
+  return (
+    calendar.getTime() -
+    direction * (offsetHours * 60 + offsetMinutes) * 60_000
+  );
 }
 
 /**
