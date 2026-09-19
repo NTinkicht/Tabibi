@@ -39,6 +39,10 @@ Grok Bot is a user-authorized subscription agent, **not** an unattended GitHub A
 
 Official: https://x.ai/news/grok-bot-more-plans ; https://docs.x.ai/grok-bot/get-started ; https://docs.x.ai/grok-bot/overview
 
+## Automatic review dispatch in the owner's Codespace
+
+After owner OAuth and one-time worker start, the Company OS may lease read-only Grok PR reviews without asking Nassim to copy a task into the Grok terminal. See `docs/coordination/GROK_AUTOMATIC_DISPATCH.md` and `node scripts/grok-dispatcher.mjs --watch`. The worker runs **only in an already-running owner-authenticated Codespace**; it neither wakes a stopped Codespace nor creates a Grok GitHub Action or new paid usage. It is currently review-only, requires a strict machine-readable lease on the canonical PR, and never self-gates, edits the branch or merges. Existing interactive, explicitly leased implementation remains available; automatic code-writing dispatch is a separate security/test milestone.
+
 ## Hard boundaries
 
 - Only existing **included SuperGrok weekly usage**; no xAI API key, independently billed API, Grok extra usage credits, PAYG, auto-topup, upgrade or OpenRouter. Never use `XAI_API_KEY`.
