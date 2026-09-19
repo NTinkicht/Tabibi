@@ -19,6 +19,7 @@ const copy = {
       'Découvrez les cliniques et les médecins disponibles sur Tabibi.',
     directory: 'Cliniques',
     refresh: 'Actualiser',
+    refreshed: (count: number) => `Répertoire actualisé : ${count} clinique${count === 1 ? '' : 's'}.`,
     doctors: 'Médecins',
     noDoctors: 'Aucun médecin affiché pour le moment.',
     languages: 'Langues',
@@ -33,6 +34,7 @@ const copy = {
     description: 'تعرّف على العيادات والأطباء المعروضين على طبيبي.',
     directory: 'العيادات',
     refresh: 'تحديث',
+    refreshed: (count: number) => `تم تحديث الدليل: ${count} عيادة.`,
     doctors: 'الأطباء',
     noDoctors: 'لا يوجد أطباء معروضون حاليًا.',
     languages: 'اللغات',
@@ -98,6 +100,7 @@ export default function PublicDiscoveryLandingClient({
   );
   const [clinics, setClinics] = useState<PublicClinic[]>(initialClinics ?? []);
   const [retry, setRetry] = useState(0);
+  const [refreshCount, setRefreshCount] = useState<number | null>(null);
   const t = copy[locale];
 
   useEffect(() => {
@@ -123,6 +126,7 @@ export default function PublicDiscoveryLandingClient({
         if (publicClinics === null) throw new Error('Invalid discovery shape');
         if (controller.signal.aborted) return;
         setClinics(publicClinics);
+        setRefreshCount(publicClinics.length);
         setState('ready');
       } catch {
         if (!controller.signal.aborted) setState('error');
@@ -136,6 +140,12 @@ export default function PublicDiscoveryLandingClient({
       controller.abort();
     };
   }, [retry]);
+
+  const beginRefresh = () => {
+    setRefreshCount(null);
+    setState('loading');
+    setRetry((value) => value + 1);
+  };
 
   return (
     <main
@@ -151,20 +161,10 @@ export default function PublicDiscoveryLandingClient({
           <h1>Tabibi</h1>
         </div>
         <nav className="publicLocales" aria-label="Langue / اللغة">
-          <button
-            type="button"
-            lang="fr"
-            aria-pressed={locale === 'fr'}
-            onClick={() => setLocale('fr')}
-          >
+          <button type="button" lang="fr" aria-pressed={locale === 'fr'} onClick={() => setLocale('fr')}>
             Français
           </button>
-          <button
-            type="button"
-            lang="ar"
-            aria-pressed={locale === 'ar'}
-            onClick={() => setLocale('ar')}
-          >
+          <button type="button" lang="ar" aria-pressed={locale === 'ar'} onClick={() => setLocale('ar')}>
             العربية
           </button>
         </nav>
@@ -179,15 +179,7 @@ export default function PublicDiscoveryLandingClient({
       <section aria-labelledby="publicDirectoryTitle">
         <div className="publicDirectoryHeading">
           <h2 id="publicDirectoryTitle">{t.directory}</h2>
-          <button
-            className="publicRefresh"
-            type="button"
-            disabled={state === 'loading'}
-            onClick={() => {
-              setState('loading');
-              setRetry((value) => value + 1);
-            }}
-          >
+          <button className="publicRefresh" type="button" disabled={state === 'loading'} onClick={beginRefresh}>
             {t.refresh}
           </button>
         </div>
@@ -196,16 +188,11 @@ export default function PublicDiscoveryLandingClient({
           {state === 'error' && (
             <div className="publicNotice" role="alert">
               <p>{t.error}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setState('loading');
-                  setRetry((value) => value + 1);
-                }}
-              >
-                {t.retry}
-              </button>
+              <button type="button" onClick={beginRefresh}>{t.retry}</button>
             </div>
+          )}
+          {state === 'ready' && refreshCount !== null && clinics.length > 0 && (
+            <p role="status">{t.refreshed(refreshCount)}</p>
           )}
           {state === 'ready' && clinics.length === 0 && (
             <p className="publicNotice">{t.empty}</p>
@@ -218,9 +205,7 @@ export default function PublicDiscoveryLandingClient({
                 <h3>{clinic.name}</h3>
                 <p className="publicLanguages">
                   {t.languages}:{' '}
-                  {clinic.enabledLocales
-                    .map((value) => (value === 'ar' ? 'العربية' : 'Français'))
-                    .join(' · ')}
+                  {clinic.enabledLocales.map((value) => (value === 'ar' ? 'العربية' : 'Français')).join(' · ')}
                 </p>
                 <h4>{t.doctors}</h4>
                 {clinic.doctors.length === 0 ? (
