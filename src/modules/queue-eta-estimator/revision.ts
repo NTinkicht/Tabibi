@@ -1,3 +1,6 @@
+import { createHmac } from 'node:crypto';
+import { guestBearerSigningSecret } from '@/modules/guest-access';
+
 export interface EtaRevisionInput {
   patientsAhead: number;
   declaredDelayMinutes: number;
@@ -7,9 +10,10 @@ export interface EtaRevisionInput {
 }
 
 /**
- * Produces a stable, opaque revision token from the committed inputs that
- * determine an ETA. It intentionally excludes wall-clock and random state so
- * identical committed inputs always produce the same revision.
+ * Produce a deterministic non-reversible ETA revision from committed inputs.
+ * The server-only guest signing secret is reused with an ETA-specific HMAC
+ * domain so this token cannot disclose low-entropy duration/sample evidence.
+ * A configured secret is mandatory; never fall back to an unkeyed checksum.
  */
 export function createEtaRevision(input: EtaRevisionInput): string {
   const canonical = [
@@ -20,11 +24,10 @@ export function createEtaRevision(input: EtaRevisionInput): string {
     input.observedSampleCount,
   ].join(':');
 
-  let hash = 2166136261;
-  for (let index = 0; index < canonical.length; index += 1) {
-    hash ^= canonical.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
+  const digest = createHmac('sha256', guestBearerSigningSecret())
+    .update('tabibi:eta-revision:v2\0', 'utf8')
+    .update(canonical, 'utf8')
+    .digest('hex');
 
-  return `eta-v1-${(hash >>> 0).toString(16).padStart(8, '0')}`;
+  return `eta-v2-${digest.slice(0, 32)}`;
 }
