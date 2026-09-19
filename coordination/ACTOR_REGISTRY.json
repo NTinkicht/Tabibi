@@ -179,11 +179,12 @@
       "included_capacity": "Existing SuperGrok included Grok Build pool OR included Grok Bot pool (separate weekly usage), no extra spend",
       "paid_fallback": false,
       "production_merge_authority": false,
-      "wake": "Official Grok Build via owner-private local OAuth OR owner-linked Grok Bot persistent cloud teammate signed into GitHub; no unattended GitHub Action/token relay.",
+      "wake": "Owner OAuth Grok Build CLI (interactive or opt-in PR review dispatch while the owner Codespace is running) OR owner-linked Grok Bot; no unattended GitHub Action/token relay.",
       "runtime_activation": "Verify owner OAuth/included usage (Build) or linked SuperGrok and shared cloud computer access/privacy (Bot); bounded probe before lease.",
       "unattended_wake": {
-        "mode": "disabled",
-        "reason": "No authorized shared OAuth runner; xAI API/PAYG forbidden."
+        "mode": "owner-private-opt-in-review-only",
+        "runner": "scripts/grok-dispatcher.mjs --watch",
+        "reason": "Codespace must already be running with owner OAuth. No GH-hosted unattended runner or paid xAI API; implementation dispatch not authorized."
       }
     }
   ],
