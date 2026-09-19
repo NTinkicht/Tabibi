@@ -123,12 +123,10 @@ describe('GET /api/public/discovery', () => {
 
   it('bounds a stalled discovery query and returns a retryable privacy-safe error', async () => {
     let querySignal: AbortSignal | undefined;
-    listClinics.mockImplementation(
-      (_timeout: unknown, signal: AbortSignal) => {
-        querySignal = signal;
-        return new Promise<never>(() => {});
-      },
-    );
+    listClinics.mockImplementation((_timeout: unknown, signal: AbortSignal) => {
+      querySignal = signal;
+      return new Promise<never>(() => {});
+    });
 
     vi.useFakeTimers();
     try {
@@ -148,5 +146,4 @@ describe('GET /api/public/discovery', () => {
       vi.useRealTimers();
     }
   });
-
 });
