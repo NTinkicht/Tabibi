@@ -102,7 +102,7 @@ describe('receptionist dashboard read model', () => {
       maxWaitMinutes: 20,
       estimatedConsultationMinutes: 15,
       estimateSource: 'fallback',
-      revision: expect.stringMatching(/^eta-v1-[0-9a-f]{8}$/),
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       observedSampleCount: 0,
     });
     expect(snapshot.entries[1]!.eta).toMatchObject({
@@ -111,7 +111,7 @@ describe('receptionist dashboard read model', () => {
       maxWaitMinutes: 43,
       estimatedConsultationMinutes: 15,
       estimateSource: 'fallback',
-      revision: expect.stringMatching(/^eta-v1-[0-9a-f]{8}$/),
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
     expect(snapshot.refreshAfterSeconds).toBe(30);
     expect(JSON.stringify(snapshot)).not.toContain('0555000000');
@@ -178,7 +178,7 @@ describe('receptionist dashboard read model', () => {
       maxWaitMinutes: 35,
       estimatedConsultationMinutes: 10,
       estimateSource: 'observed_median',
-      revision: expect.stringMatching(/^eta-v1-[0-9a-f]{8}$/),
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       observedSampleCount: 3,
     });
     expect(secondRead.entries.map((entry) => entry.eta)).toEqual(
