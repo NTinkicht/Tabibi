@@ -92,6 +92,11 @@ function materialGrokAuthorship(pr) {
     [c.commit?.message, c.commit?.author?.name, c.commit?.committer?.name].join('\n')));
 }
 function currentHead(pr) { return gh(`repos/${REPO}/pulls/${pr}`); }
+function recentComments(pr) {
+  const issue = gh(`repos/${REPO}/issues/${pr}`);
+  const page = Math.max(1, Math.ceil((issue.comments || 0) / 100));
+  return gh(`repos/${REPO}/issues/${pr}/comments?per_page=100&page=${page}`);
+}
 
 export function reviewPrompt(lease, checks) {
   return `You are actor=grok reviewing NTinkicht/Tabibi PR #${lease.pr} in READ-ONLY mode.\n` +
@@ -110,7 +115,7 @@ export function reviewPrompt(lease, checks) {
 function runReview(lease, { dryRun = false } = {}) {
   const pr = currentHead(lease.pr);
   if (!pr || pr.state !== 'open' || pr.draft || pr.head?.sha !== lease.sha) return 'STALE_HEAD';
-  if (materialGrokAuthorship(lease.pr)) return 'SELF_AUTHORSHIP_BLOCKED';
+  if (pr.commits > 100 || materialGrokAuthorship(lease.pr)) return 'SELF_AUTHORSHIP_BLOCKED';
   const checks = ciStatus(lease.sha);
   const prompt = reviewPrompt(lease, checks);
   if (dryRun) {
@@ -137,13 +142,19 @@ function runReview(lease, { dryRun = false } = {}) {
     ], { cwd: work, env, timeout: 12 * 60_000 });
     const answer = JSON.parse(raw);
     if (answer.stopReason !== 'end_turn' || typeof answer.text !== 'string' ||
-        !answer.text.trim() || answer.text.length > 18_000) throw new Error('unusable_grok_response');
+        !answer.text.trim() || answer.text.length > 18_000 ||
+        !answer.text.includes(lease.sha) ||
+        !/\b(PASS_WITH_MINOR_FINDINGS|CHANGES_REQUIRED|PASS)\b/.test(answer.text) ||
+        (!checks.every((c) => c.conclusion === 'success') &&
+          /^\s*MERGE_READY:\s*(yes|true)\b/im.test(answer.text))) {
+      throw new Error('unusable_grok_response');
+    }
     if (command('git', ['status', '--porcelain'], { cwd: work })) {
       throw new Error('review_changed_files');
     }
     if (currentHead(lease.pr).head.sha !== lease.sha) return 'STALE_HEAD_AFTER_REVIEW';
     const marker = `<!-- tabibi-grok-dispatch:${lease.key} -->`;
-    const already = gh(`repos/${REPO}/issues/${lease.pr}/comments?per_page=100`)
+    const already = recentComments(lease.pr)
       .some((c) => String(c.body || '').includes(marker));
     if (!already) {
       post(lease.pr, `${marker}\n**Automatic Grok Build review**\n\n` +
@@ -162,9 +173,7 @@ export function oneCycle({ dryRun = false } = {}) {
   const done = persisted();
   const prs = gh(`repos/${REPO}/pulls?state=open&per_page=50`);
   const comments = {};
-  for (const pr of prs) {
-    comments[pr.number] = gh(`repos/${REPO}/issues/${pr.number}/comments?per_page=100`);
-  }
+  for (const pr of prs) comments[pr.number] = recentComments(pr.number);
   const queue = pendingLeases(prs, comments, done);
   for (const lease of queue.slice(0, 1)) {
     try {
