@@ -35,7 +35,7 @@ The compact bootstrap and compressed context are indexes/convenience only. Sourc
 
 `coordination/AI_CAPACITY_POLICY.md` is binding. No actor, hook, workflow or scheduled task may introduce additional paid AI usage, OpenAI/Anthropic API credits, OpenRouter, Copilot overage, Mistral PAYG, paid Gemini/Vertex usage, auto-topups or another metered fallback without a new explicit owner decision.
 
-Gemini CLI may use the owner's configured free/non-billable allowance only. Mistral Vibe may use the owner's existing subscription allowance only, with PAYG disabled. Credentials never become repository assets or general-purpose workflow credentials. The only authorized workflow exception is the dedicated owner-only Issue #11 wake paths defined by `coordination/AI_CAPACITY_POLICY.md`: `GEMINI_API_KEY` may be used only by `.github/workflows/gemini-cli-wake.yml` when `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true`, and `MISTRAL_API_KEY` may be used only by `.github/workflows/mistral-vibe-wake.yml` when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`. No other unattended credential route is authorized. Grok Build uses owner-private subscription OAuth/included SuperGrok only; no `XAI_API_KEY`, Grok usage credits/PAYG, shared OAuth tokens or unattended GitHub Actions.
+Gemini CLI may use the owner's configured free/non-billable allowance only. Mistral Vibe may use the owner's existing subscription allowance only, with PAYG disabled. Credentials never become repository assets or general-purpose workflow credentials. The only authorized workflow exception is the dedicated owner-only Issue #11 wake paths defined by `coordination/AI_CAPACITY_POLICY.md`: `GEMINI_API_KEY` may be used only by `.github/workflows/gemini-cli-wake.yml` when `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true`, and `MISTRAL_API_KEY` may be used only by `.github/workflows/mistral-vibe-wake.yml` when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`. No other unattended credential route is authorized. Grok uses only included SuperGrok Grok Build or Grok Bot capacity (separate included weekly pools). Build uses owner-private OAuth; Bot uses owner-linked app sessions on its shared cloud computer. No `XAI_API_KEY`, extra usage credits/PAYG, shared OAuth tokens or unattended GitHub Actions.
 
 Quota exhaustion is `CAPACITY_DEGRADED`, not permission to spend. Fail over to another already-included actor, deterministic tooling, bounded scope or wait for reset.
 
@@ -69,7 +69,7 @@ Actor ID `gemini-cli`. Primary value is repository scouting, research, broad non
 
 ### Grok Build - Independent Code Challenger / Developer Reserve
 
-Actor ID `grok`. May independently challenge architecture, security/privacy/authorization, concurrency, UX and tests; may implement only under explicit lease on the existing canonical branch. Exact-SHA gating requires non-authorship plus CI/evidence reconciliation. Owner-private subscription OAuth must be verified before routing. No default production merge authority or unattended Action. See `GROK.md`.
+Actor ID `grok`. May independently challenge architecture, security/privacy/authorization, concurrency, UX and tests; may implement only under explicit lease on the existing canonical branch. Exact-SHA gating requires non-authorship plus CI/evidence reconciliation. Owner-private Build OAuth or SuperGrok-linked Bot access/privacy must be verified before routing. No default production merge authority or unattended Action. See `GROK.md`.
 
 ### Mistral Vibe - Developer Reserve / Design Challenger / Overflow Review
 
