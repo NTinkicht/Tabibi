@@ -30,6 +30,32 @@ async function submitBookingForm(
   await page.getByRole('button', { name: /Confirmer|تأكيد/ }).click();
 }
 
+test('an in_consultation response omitting the remaining-time field entirely renders no fabricated status', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      // A legacy or otherwise incomplete payload with the field omitted
+      // entirely (not `null`) must not be treated as "field applicable and
+      // present"; it must render exactly as if there were no active
+      // consultation, never "environ undefined min".
+      body: JSON.stringify({
+        bookingState: 'checked_in',
+        queueState: 'in_consultation',
+        eta: null,
+      }),
+    });
+  });
+
+  await submitBookingForm(page);
+  await expect(page.getByText(/en consultation/)).toBeVisible();
+  await expect(page.getByText('Consultation en cours')).toHaveCount(0);
+  await expect(page.getByText(/undefined/)).toHaveCount(0);
+});
+
 test('renders the remaining consultation time as its own status, distinct from the waiting ETA', async ({
   page,
 }) => {

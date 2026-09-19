@@ -985,7 +985,8 @@ function LiveQueueView({
         {copy.queueStates[state.data.queueState] ?? state.data.queueState}
       </p>
       {state.data.eta ? <EtaStatus eta={state.data.eta} copy={copy} /> : null}
-      {state.data.activeConsultationRemainingMinutes !== null ? (
+      {state.data.activeConsultationRemainingMinutes !== null &&
+      state.data.activeConsultationRemainingMinutes !== undefined ? (
         <ActiveConsultationStatus
           minutes={state.data.activeConsultationRemainingMinutes}
           copy={copy}
