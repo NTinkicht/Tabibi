@@ -38,7 +38,7 @@ describe('WU83 deterministic ETA snapshot', () => {
     const original = createEtaSnapshot(baseline);
     const changedEvidence = createEtaSnapshot({
       ...baseline,
-      estimateSource: 'configured_default',
+      estimateSource: 'fallback',
       observedSampleCount: 0,
     });
 
