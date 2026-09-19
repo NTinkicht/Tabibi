@@ -198,7 +198,7 @@ describe('receptionist dashboard concurrency snapshot', () => {
     expect(racedEntry.state).toBe('in_consultation');
     expect(racedEntry.eta).toMatchObject({
       estimateSource: 'fallback',
-      revision: expect.stringMatching(/^eta-v1-[0-9a-f]{8}$/),
+      revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       observedSampleCount: 2,
     });
 
