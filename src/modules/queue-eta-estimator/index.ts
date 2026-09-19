@@ -89,6 +89,57 @@ export function selectConsultationEstimate(
 }
 
 /**
+ * Resolves only absolute ISO date-times or valid Date instances. Rejects
+ * offset-free, calendar-normalized, or otherwise ambiguous timestamps.
+ */
+function absoluteTimestampMs(value: Date | string): number {
+  if (value instanceof Date) return value.getTime();
+
+  const match =
+    /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d{1,9}))?(Z|([+-])(\\d{2}):(\\d{2}))$/.exec(
+      value,
+    );
+  if (!match) return Number.NaN;
+
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, fraction, zone, sign, offsetHourText, offsetMinuteText] =
+    match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  const millis = Number((fraction ?? '').padEnd(3, '0').slice(0, 3));
+  const offsetHours = zone === 'Z' ? 0 : Number(offsetHourText);
+  const offsetMinutes = zone === 'Z' ? 0 : Number(offsetMinuteText);
+  if (
+    month < 1 ||
+    month > 12 ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59 ||
+    offsetHours > 23 ||
+    offsetMinutes > 59
+  ) {
+    return Number.NaN;
+  }
+
+  const calendar = new Date(0);
+  calendar.setUTCFullYear(year, month - 1, day);
+  calendar.setUTCHours(hour, minute, second, millis);
+  if (
+    calendar.getUTCFullYear() !== year ||
+    calendar.getUTCMonth() !== month - 1 ||
+    calendar.getUTCDate() !== day
+  ) {
+    return Number.NaN;
+  }
+
+  const direction = sign === '-' ? -1 : 1;
+  return calendar.getTime() - direction * (offsetHours * 60 + offsetMinutes) * 60_000;
+}
+
+/**
  * Computes the deterministic whole-minute contribution of an active
  * consultation. Invalid or future timestamps fail closed with no added wait.
  */
@@ -97,8 +148,8 @@ export function computeActiveConsultationRemainingMinutes({
   now,
   estimatedConsultationMinutes,
 }: ActiveConsultationRemainingInput): number {
-  const startedAtMs = new Date(startedAt).getTime();
-  const nowMs = new Date(now).getTime();
+  const startedAtMs = absoluteTimestampMs(startedAt);
+  const nowMs = absoluteTimestampMs(now);
   if (
     !Number.isFinite(startedAtMs) ||
     !Number.isFinite(nowMs) ||
