@@ -55,7 +55,9 @@ describe('AI capacity policy', () => {
   });
 
   it('does not introduce a Grok unattended Action', () => {
-    const files = fs.readdirSync(workflowDirectory).filter((file) => /\.ya?ml$/i.test(file));
+    const files = fs
+      .readdirSync(workflowDirectory)
+      .filter((file) => /\.ya?ml$/i.test(file));
     expect(files.some((file) => /grok/i.test(file))).toBe(false);
   });
 
