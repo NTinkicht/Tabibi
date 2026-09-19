@@ -187,10 +187,7 @@
       }
     }
   ],
-  "retired_actors": [
-    "gemini_agent",
-    "gemini_chat"
-  ],
+  "retired_actors": ["gemini_agent", "gemini_chat"],
   "routing": {
     "orchestration": [
       "chatgpt",
@@ -281,37 +278,10 @@
       "codex",
       "copilot"
     ],
-    "repository_intelligence": [
-      "gemini-cli",
-      "chatgpt",
-      "grok",
-      "claude"
-    ],
-    "regression_scouting": [
-      "gemini-cli",
-      "copilot",
-      "claude",
-      "grok"
-    ],
-    "failure_analysis": [
-      "mistral-vibe",
-      "claude",
-      "codex",
-      "chatgpt",
-      "grok"
-    ],
-    "test_design": [
-      "mistral-vibe",
-      "copilot",
-      "claude",
-      "grok",
-      "codex"
-    ],
-    "merge_execution": [
-      "codex",
-      "chatgpt",
-      "claude",
-      "copilot"
-    ]
+    "repository_intelligence": ["gemini-cli", "chatgpt", "grok", "claude"],
+    "regression_scouting": ["gemini-cli", "copilot", "claude", "grok"],
+    "failure_analysis": ["mistral-vibe", "claude", "codex", "chatgpt", "grok"],
+    "test_design": ["mistral-vibe", "copilot", "claude", "grok", "codex"],
+    "merge_execution": ["codex", "chatgpt", "claude", "copilot"]
   }
 }
