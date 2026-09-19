@@ -49,7 +49,7 @@ Before material work:
 
 ## Fixed budget
 
-No additional paid AI usage is authorized. Gemini uses only free/non-billable local allowance; Mistral Vibe uses only the existing subscription with PAYG disabled. Grok uses only included SuperGrok through owner-private OAuth; no xAI API/PAYG or shared tokens. No provider API key belongs in GitHub Actions without a separate owner decision.
+No additional paid AI usage is authorized. Gemini uses only free/non-billable local allowance; Mistral Vibe uses only the existing subscription with PAYG disabled. Grok uses only included SuperGrok through owner-private Build OAuth or linked Grok Bot (separate usage pool); no xAI API/PAYG or shared tokens. No provider API key belongs in GitHub Actions without a separate owner decision.
 
 ## Context efficiency
 
