@@ -69,7 +69,7 @@ Actor ID `gemini-cli`. Primary value is repository scouting, research, broad non
 
 ### Grok Build - Independent Code Challenger / Developer Reserve
 
-Actor ID `grok`. May independently challenge architecture, security/privacy/authorization, concurrency, UX and tests; may implement only under explicit lease on the existing canonical branch. Exact-SHA gating requires non-authorship plus CI/evidence reconciliation. Owner-private Build OAuth or SuperGrok-linked Bot access/privacy must be verified before routing. No default production merge authority or unattended Action. See `GROK.md`.
+Actor ID `grok`. May independently challenge architecture, security/privacy/authorization, concurrency, UX and tests; may implement only under explicit lease on the existing canonical branch. Exact-SHA gating requires non-authorship plus CI/evidence reconciliation. Owner-private Build OAuth or SuperGrok-linked Bot access/privacy must be verified before routing. An opt-in review-only dispatcher in the running owner Codespace may consume a precise `ROLE_LEASE_ASSIGNED` PR comment without an owner relay; the orchestrator records actual material authors and full head SHA, and Grok cannot self-gate. No default production merge authority, automatic code-writing lease or unattended GitHub Action. See `GROK.md` and `docs/coordination/GROK_AUTOMATIC_DISPATCH.md`.
 
 ### Mistral Vibe - Developer Reserve / Design Challenger / Overflow Review
 
