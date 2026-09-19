@@ -14,7 +14,8 @@ type LoadState = 'loading' | 'ready' | 'error';
 const copy = {
   fr: {
     intro: 'Trouvez votre clinique',
-    description: 'Découvrez les cliniques et les médecins disponibles sur Tabibi.',
+    description:
+      'Découvrez les cliniques et les médecins disponibles sur Tabibi.',
     directory: 'Cliniques',
     doctors: 'Médecins',
     noDoctors: 'Aucun médecin affiché pour le moment.',
@@ -116,10 +117,16 @@ export default function Home() {
   }, [retry]);
 
   return (
-    <main className="publicLanding" lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+    <main
+      className="publicLanding"
+      lang={locale}
+      dir={locale === 'ar' ? 'rtl' : 'ltr'}
+    >
       <header className="publicHeader">
         <div>
-          <span className="publicMark" aria-hidden="true">✚</span>
+          <span className="publicMark" aria-hidden="true">
+            ✚
+          </span>
           <h1>Tabibi</h1>
         </div>
         <nav className="publicLocales" aria-label="Langue / اللغة">
@@ -176,7 +183,10 @@ export default function Home() {
               <article className="publicClinic" key={index}>
                 <h3>{clinic.name}</h3>
                 <p className="publicLanguages">
-                  {t.languages}: {clinic.enabledLocales.map((value) => value === 'ar' ? 'العربية' : 'Français').join(' · ')}
+                  {t.languages}:{' '}
+                  {clinic.enabledLocales
+                    .map((value) => (value === 'ar' ? 'العربية' : 'Français'))
+                    .join(' · ')}
                 </p>
                 <h4>{t.doctors}</h4>
                 {clinic.doctors.length === 0 ? (
