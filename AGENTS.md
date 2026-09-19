@@ -40,7 +40,7 @@ Quota exhaustion is `CAPACITY_DEGRADED`, not permission to spend. Fail over to a
 
 ## Nassim - Product Owner
 
-Nassim owns decisions that genuinely require human/business authority. Nassim is not the routine scheduler, relay, reviewer coordinator, idle detector or merge coordinator.
+Nassim owns decisions that genuinely require human/business authority. Nassim is not the routine scheduler, relay, reviewer coordinator, idle detector or merge coordinator. Routine technical changes need green CI and independent non-author AI review, but do not need Nassim or another human to validate each PR before an authorized mechanical merge. Reserved owner-level decisions below remain separate.
 
 Escalate only for unavailable external accounts/credentials agents cannot repair, new spending commitments, owner-level legal/regulatory/business policy, irreversible destructive production actions or irreducible product-direction conflicts.
 
