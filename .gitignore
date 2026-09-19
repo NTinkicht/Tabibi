@@ -14,6 +14,7 @@ tsconfig.tsbuildinfo
 .gemini/
 .vibe/
 .mistral/
+.grok/
 gha-creds-*.json
 
 # Tabibi local context-router budget/metrics/lock/test state

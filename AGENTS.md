@@ -2,7 +2,7 @@
 
 ## Governing model
 
-Tabibi is a capability-resilient **six-actor engineering company**. Roles belong to the project, not permanently to a provider.
+Tabibi is a capability-resilient **seven-actor engineering company**. Roles belong to the project, not permanently to a provider.
 
 Active actor IDs:
 
@@ -12,6 +12,7 @@ Active actor IDs:
 - `copilot` - QA/Test Automation, bounded coding support, eligible non-author Code Review;
 - `gemini-cli` - scouting/research, long-context analysis, documentation, QA and overflow non-author review;
 - `mistral-vibe` - bounded coding/refactoring, alternative-design analysis, documentation, QA and overflow non-author review.
+- `grok` - existing-subscription Grok Build independent code/security challenger and bounded implementation reserve.
 
 `Gemini Agent` and `Gemini Chat` remain retired historical identities. They are not aliases for `gemini-cli`, are never woken/probed/routed, and have no leases or review authority.
 
@@ -23,7 +24,7 @@ Before material implementation, review, architecture arbitration or failover:
 
 1. read `coordination/BOOTSTRAP.md`;
 2. read current `coordination/STATE.json` and `coordination/WORK_QUEUE.md`;
-3. read `coordination/ACTOR_REGISTRY.json` and actor-specific instructions when applicable (`CLAUDE.md`, `.github/copilot-instructions.md`, `GEMINI.md`, `VIBE.md`);
+3. read `coordination/ACTOR_REGISTRY.json` and actor-specific instructions when applicable (`CLAUDE.md`, `.github/copilot-instructions.md`, `GEMINI.md`, `VIBE.md`, `GROK.md`);
 4. reconcile the live issue/PR, exact head, CI, review threads, role leases, material authors, capability state and selected overlays;
 5. retrieve only task-relevant sections of `PRODUCT.md`, `ARCHITECTURE.md`, `SECURITY.md` and binding coordination protocols;
 6. expand original evidence whenever correctness, security or review requires it.
@@ -34,7 +35,7 @@ The compact bootstrap and compressed context are indexes/convenience only. Sourc
 
 `coordination/AI_CAPACITY_POLICY.md` is binding. No actor, hook, workflow or scheduled task may introduce additional paid AI usage, OpenAI/Anthropic API credits, OpenRouter, Copilot overage, Mistral PAYG, paid Gemini/Vertex usage, auto-topups or another metered fallback without a new explicit owner decision.
 
-Gemini CLI may use the owner's configured free/non-billable allowance only. Mistral Vibe may use the owner's existing subscription allowance only, with PAYG disabled. Credentials never become repository assets or general-purpose workflow credentials. The only authorized workflow exception is the dedicated owner-only Issue #11 wake paths defined by `coordination/AI_CAPACITY_POLICY.md`: `GEMINI_API_KEY` may be used only by `.github/workflows/gemini-cli-wake.yml` when `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true`, and `MISTRAL_API_KEY` may be used only by `.github/workflows/mistral-vibe-wake.yml` when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`. No other unattended credential route is authorized.
+Gemini CLI may use the owner's configured free/non-billable allowance only. Mistral Vibe may use the owner's existing subscription allowance only, with PAYG disabled. Credentials never become repository assets or general-purpose workflow credentials. The only authorized workflow exception is the dedicated owner-only Issue #11 wake paths defined by `coordination/AI_CAPACITY_POLICY.md`: `GEMINI_API_KEY` may be used only by `.github/workflows/gemini-cli-wake.yml` when `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true`, and `MISTRAL_API_KEY` may be used only by `.github/workflows/mistral-vibe-wake.yml` when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`. No other unattended credential route is authorized. Grok uses only included SuperGrok Grok Build or Grok Bot capacity (separate included weekly pools). Build uses owner-private OAuth; Bot uses owner-linked app sessions on its shared cloud computer. No `XAI_API_KEY`, extra usage credits/PAYG, shared OAuth tokens or unattended GitHub Actions.
 
 Quota exhaustion is `CAPACITY_DEGRADED`, not permission to spend. Fail over to another already-included actor, deterministic tooling, bounded scope or wait for reset.
 
@@ -65,6 +66,10 @@ Owns independent tests/harnesses/fixtures, API-negative/property/migration/brows
 ### Gemini CLI - Scout / Research / Long-Context / Overflow Review
 
 Actor ID `gemini-cli`. Primary value is repository scouting, research, broad non-sensitive analysis, documentation synthesis, issue triage and QA. It may independently review an exact head when non-author. Bounded implementation requires an explicit lease and a separate eligible reviewer. It has no default production merge authority.
+
+### Grok Build - Independent Code Challenger / Developer Reserve
+
+Actor ID `grok`. May independently challenge architecture, security/privacy/authorization, concurrency, UX and tests; may implement only under explicit lease on the existing canonical branch. Exact-SHA gating requires non-authorship plus CI/evidence reconciliation. Owner-private Build OAuth or SuperGrok-linked Bot access/privacy must be verified before routing. No default production merge authority or unattended Action. See `GROK.md`.
 
 ### Mistral Vibe - Developer Reserve / Design Challenger / Overflow Review
 
@@ -126,9 +131,9 @@ The helper never creates a lease; it proposes the first eligible included-capaci
 Default preference includes:
 
 - orchestration: ChatGPT -> Claude -> Codex -> Mistral Vibe -> Gemini CLI -> Copilot;
-- implementation: Codex -> Claude -> ChatGPT -> Mistral Vibe -> Copilot -> Gemini CLI;
-- independent review: Claude -> eligible ChatGPT -> eligible Codex -> eligible Gemini CLI -> eligible Mistral Vibe -> eligible Copilot Code Review;
-- QA/system verification: Copilot -> Gemini CLI -> Claude -> Mistral Vibe -> ChatGPT -> Codex;
+- implementation: Codex -> Claude -> ChatGPT -> Grok -> Mistral Vibe -> Copilot -> Gemini CLI;
+- independent review: Claude -> eligible ChatGPT -> eligible Codex -> eligible Gemini CLI -> eligible Mistral Vibe -> eligible Grok -> eligible Copilot Code Review;
+- QA/system verification: Copilot -> Gemini CLI -> Claude -> Mistral Vibe -> Grok -> ChatGPT -> Codex;
 - research/scouting: Gemini CLI -> ChatGPT -> Claude -> Mistral Vibe -> Codex -> Copilot;
 - documentation: ChatGPT -> Gemini CLI -> Mistral Vibe -> Claude -> Codex -> Copilot;
 - merge execution: Codex -> ChatGPT -> Claude -> Copilot.

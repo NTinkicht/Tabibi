@@ -19,7 +19,7 @@ function route(capability: string, ...flags: string[]) {
   );
 }
 
-describe('six-actor capacity routing', () => {
+describe('seven-actor capacity routing', () => {
   it('prefers Codex for implementation', () => {
     expect(route('implementation').selected).toBe('codex');
   });
@@ -53,13 +53,29 @@ describe('six-actor capacity routing', () => {
     expect(result.selected).toBe('mistral-vibe');
   });
 
+  it('routes independent review to Grok after earlier reviewers are excluded', () => {
+    expect(
+      route(
+        'review',
+        '--authors=claude,chatgpt,codex',
+        '--unavailable=gemini-cli,mistral-vibe',
+      ).selected,
+    ).toBe('grok');
+  });
+
+  it('routes implementation to Grok when the first three actors are unavailable', () => {
+    expect(
+      route('implementation', '--unavailable=codex,claude,chatgpt').selected,
+    ).toBe('grok');
+  });
+
   it('fails closed when every review candidate is a material author', () => {
     const result = spawnSync(
       process.execPath,
       [
         router,
         'review',
-        '--authors=claude,chatgpt,codex,gemini-cli,mistral-vibe,copilot',
+        '--authors=claude,chatgpt,codex,gemini-cli,mistral-vibe,grok,copilot',
       ],
       { encoding: 'utf8' },
     );
@@ -81,6 +97,7 @@ describe('six-actor capacity routing', () => {
       'copilot',
       'gemini-cli',
       'mistral-vibe',
+      'grok',
     ]);
     expect(routedIds).not.toContain('gemini_agent');
     expect(routedIds).not.toContain('gemini_chat');
@@ -157,6 +174,7 @@ describe('six-actor capacity routing', () => {
 
     expect(content).toContain("'gemini-cli': 'Gemini CLI'");
     expect(content).toContain("'mistral-vibe': 'Mistral Vibe'");
+    expect(content).toContain("'grok': 'Grok Build'");
     expect(content).toContain('relayed by the ChatGPT Slack app');
     expect(content).not.toContain('SLACK_GEMINI');
     expect(content).not.toContain('SLACK_MISTRAL');

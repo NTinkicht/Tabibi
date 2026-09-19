@@ -4,7 +4,7 @@ This is a startup index, not a replacement for authoritative contracts. Source c
 
 ## Active company
 
-Active actor IDs: `chatgpt`, `codex`, `claude`, `copilot`, `gemini-cli`, `mistral-vibe`.
+Active actor IDs: `chatgpt`, `codex`, `claude`, `copilot`, `gemini-cli`, `mistral-vibe`, `grok`.
 
 Retired historical identities: `gemini_agent`, `gemini_chat`. `gemini-cli` is a distinct new actor.
 
@@ -16,7 +16,7 @@ Before material work:
 2. Read current `coordination/STATE.json` and `coordination/WORK_QUEUE.md`.
 3. Read `coordination/ACTOR_REGISTRY.json`.
 4. Reconcile live issue/PR, exact head, CI, review threads, material authors, active leases, capability state and selected overlay.
-5. Read actor-specific guidance when applicable: `CLAUDE.md`, `.github/copilot-instructions.md`, `GEMINI.md`, `VIBE.md`.
+5. Read actor-specific guidance when applicable: `CLAUDE.md`, `.github/copilot-instructions.md`, `GEMINI.md`, `VIBE.md`, `GROK.md`.
 6. Retrieve only task-relevant source-contract sections; expand original evidence when correctness/security/review requires it.
 
 ## Authoritative contract map
@@ -49,7 +49,7 @@ Before material work:
 
 ## Fixed budget
 
-No additional paid AI usage is authorized. Gemini uses only free/non-billable local allowance; Mistral Vibe uses only the existing subscription with PAYG disabled. No provider API key belongs in GitHub Actions without a separate owner decision.
+No additional paid AI usage is authorized. Gemini uses only free/non-billable local allowance; Mistral Vibe uses only the existing subscription with PAYG disabled. Grok uses only included SuperGrok through owner-private Build OAuth or linked Grok Bot (separate usage pool); no xAI API/PAYG or shared tokens. No provider API key belongs in GitHub Actions without a separate owner decision.
 
 ## Context efficiency
 

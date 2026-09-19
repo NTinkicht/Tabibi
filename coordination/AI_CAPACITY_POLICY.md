@@ -15,6 +15,7 @@ Unless Nassim makes a new explicit owner decision, the following are forbidden:
 - GitHub Copilot paid overage/additional usage;
 - paid Gemini API/Vertex AI billing;
 - Mistral PAYG/overage or separately funded API credits;
+- xAI API-key billing, Grok usage credits/PAYG or SuperGrok overage;
 - automatic top-ups, paid fallbacks or silent substitutions that can incur cost.
 
 No workflow, script, scheduled task, hook or actor may create a billing commitment on the owner's behalf.
@@ -27,17 +28,20 @@ No workflow, script, scheduled task, hook or actor may create a billing commitme
 - **GitHub Copilot education entitlement:** coding assistance, QA/Test Automation, eligible non-author Code Review and explicitly budgeted local context compression.
 - **Gemini CLI (`gemini-cli`):** only the owner's already-configured free/non-billable allowance. A Gemini API key may be used by the dedicated owner-only wake workflow only when `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true`; no Vertex AI or paid Gemini tier is authorized.
 - **Mistral Vibe (`mistral-vibe`):** the owner's existing included Mistral plan allowance only. The dedicated owner-only wake workflow may use a Vibe/API credential only when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`; PAYG/overage must remain disabled.
+- **Grok Build (`grok`):** owner-authenticated official Grok Build CLI using only existing SuperGrok included weekly allowance. Verify local OAuth/entitlement before lease; no xAI API key/PAYG or unattended wake.
+- **Grok Bot (`grok`, alternative runtime):** owner's existing SuperGrok-linked Grok Bot included weekly usage, separate from Grok Build's pool. Requires owner sign-in/link in the Grok Bot/Cursor app and conscious access/privacy setup on its shared persistent cloud computer; no extra plan or credit purchase. Same actor for author/reviewer-independence accounting; not an API-key GitHub Action.
 - **Headroom:** local read-only shadow compression under `HEADROOM_SHADOW_TRIAL.md`.
 - **Shell/Git/CI:** first choice for search, indexing, diffs, tests and logs.
 
 ## Credential boundary
 
-Gemini/Mistral credentials are runtime credentials, not repository assets.
+Gemini/Mistral/Grok credentials are runtime credentials, not repository assets.
 
-- Never commit API keys, OAuth material, `.gemini/`, `.vibe/`, `.mistral/` or generated auth files.
+- Never commit API keys, OAuth material, `.gemini/`, `.vibe/`, `.mistral/`, `.grok/`, `auth.json` or generated auth files.
 - `GEMINI_API_KEY` is permitted only in `.github/workflows/gemini-cli-wake.yml`, guarded by `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true` and an owner-only Issue #11 event trigger.
 - `MISTRAL_API_KEY` is permitted only in `.github/workflows/mistral-vibe-wake.yml`, guarded by `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true` and an owner-only Issue #11 event trigger.
 - `GOOGLE_API_KEY`, Vertex AI and other billable Gemini routes remain forbidden in active workflows.
+- `XAI_API_KEY`/metered xAI routes remain forbidden in workflows. Never copy `~/.grok/auth.json`, MCP credentials or OAuth tokens to hosted runners, GitHub Secrets, source, prompts or public issues.
 - The dedicated unattended wake workflows are read-only actor lanes: they may inspect repository evidence and return findings, but may not edit, commit, push, merge, label, create reviews or mutate GitHub state.
 - Issue #162 is the scoped owner authorization for these two unattended wake paths only; it is not blanket authorization for provider-key automation elsewhere.
 - Do not paste credentials into issues, PRs, Team Room, Slack or model prompts.
@@ -56,6 +60,7 @@ A strong actor may always request more original evidence when correctness requir
 
 ## Fail-closed degradation
 
+- Grok owner OAuth missing/expired, included allowance exhausted or spend state uncertain -> `AUTH_BLOCKED` / `CAPACITY_DEGRADED`, never API key/credits.
 - Gemini guard missing, quota exhausted, credential unavailable or billing uncertainty -> `CAPACITY_DEGRADED`; do not switch to paid Gemini/Vertex.
 - Mistral failures keep their actual class: missing spend guard -> `CONFIG_BLOCKED`; missing/rejected credential -> `AUTH_BLOCKED`; rejected Vibe entitlement -> `ENTITLEMENT_BLOCKED`; exhausted included allowance or explicit rate/quota signal -> `CAPACITY_DEGRADED`; wake timeout -> `WAKE_TIMEOUT`; incompatible CLI -> `CLI_INCOMPATIBLE`; unrelated nonzero runtime -> `EXECUTION_FAILED`. Every class fails closed and PAYG stays off.
 - Copilot compression unavailable -> deterministic retrieval/Headroom/targeted reads.
@@ -73,7 +78,7 @@ Copilot context compression remains a finite included resource. Local budget sta
 
 Scheduled tasks consume capacity. Use event-driven state and shared cooldown/lease signals rather than multiple staggered polling tasks. Quiet Git history alone is not proof of idleness when CI/tests or an active lease exist.
 
-Gemini CLI and Mistral Vibe unattended wakes are deliberately event-driven only. They must not add polling or cron schedules without another explicit owner decision.
+Gemini CLI and Mistral Vibe unattended wakes are deliberately event-driven only. Grok has no unattended wake, cron or subscriber OAuth token relay. They must not add polling or cron schedules without another explicit owner decision.
 
 ## Data/security exclusions
 
