@@ -54,11 +54,19 @@ describe('seven-actor capacity routing', () => {
   });
 
   it('routes independent review to Grok after earlier reviewers are excluded', () => {
-    expect(route('review', '--authors=claude,chatgpt,codex', '--unavailable=gemini-cli,mistral-vibe').selected).toBe('grok');
+    expect(
+      route(
+        'review',
+        '--authors=claude,chatgpt,codex',
+        '--unavailable=gemini-cli,mistral-vibe',
+      ).selected,
+    ).toBe('grok');
   });
 
   it('routes implementation to Grok when the first three actors are unavailable', () => {
-    expect(route('implementation', '--unavailable=codex,claude,chatgpt').selected).toBe('grok');
+    expect(
+      route('implementation', '--unavailable=codex,claude,chatgpt').selected,
+    ).toBe('grok');
   });
 
   it('fails closed when every review candidate is a material author', () => {
