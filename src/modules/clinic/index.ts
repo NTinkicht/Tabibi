@@ -85,7 +85,9 @@ export class PublicDiscoveryService {
          LEFT JOIN doctor_profiles doctor ON doctor.id = association.doctor_id
         WHERE clinic.status = 'active'
         ORDER BY clinic.name, clinic.id, doctor.display_name, doctor.id`,
-      ...(queryTimeoutMs === undefined ? {} : { query_timeout: queryTimeoutMs }),
+      ...(queryTimeoutMs === undefined
+        ? {}
+        : { query_timeout: queryTimeoutMs }),
     };
     const result = await this.pool.query<PublicDiscoveryRow>(query);
 
