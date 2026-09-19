@@ -71,14 +71,37 @@ function post(pr, body) {
 function persisted() {
   fs.mkdirSync(STATE, { recursive: true, mode: 0o700 });
   return new Set(fs.readdirSync(STATE).filter((x) => /^[a-f0-9]{64}\.json$/.test(x))
+    .filter((x) => JSON.parse(fs.readFileSync(path.join(STATE, x), 'utf8')).outcome !== 'DELIVERY_PENDING')
     .map((x) => x.slice(0, -5)));
 }
-function record(lease, outcome) {
+function record(lease, outcome, pending = {}) {
   fs.writeFileSync(path.join(STATE, `${lease.key}.json`),
     JSON.stringify({
-      pr: lease.pr, sha: lease.sha, commentId: lease.commentId,
-      outcome, at: new Date().toISOString(),
-    }), { flag: 'wx', mode: 0o600 });
+      key: lease.key, pr: lease.pr, sha: lease.sha, commentId: lease.commentId,
+      outcome, at: new Date().toISOString(), ...pending,
+    }), { mode: 0o600 });
+}
+function trustedPosted(lease) {
+  const marker = `<!-- tabibi-grok-dispatch:${lease.key} -->`;
+  return recentComments(lease.pr).some((c) =>
+    c.user?.login === 'NTinkicht' &&
+    String(c.body || '').includes(marker) &&
+    String(c.body || '').includes(`exact_sha: ${lease.sha}`) &&
+    String(c.body || '').includes(`source_lease_comment: ${lease.commentId}`));
+}
+function deliver(lease, body, finalOutcome) {
+  record(lease, 'DELIVERY_PENDING', { body, finalOutcome });
+  if (!trustedPosted(lease)) post(lease.pr, body);
+  record(lease, finalOutcome);
+}
+function drainPending() {
+  for (const file of fs.readdirSync(STATE).filter((x) => /^[a-f0-9]{64}\.json$/.test(x))) {
+    const state = JSON.parse(fs.readFileSync(path.join(STATE, file), 'utf8'));
+    if (state.outcome === 'DELIVERY_PENDING') {
+      if (!trustedPosted(state)) post(state.pr, state.body);
+      record(state, state.finalOutcome);
+    }
+  }
 }
 function ciStatus(sha) {
   const runs = gh(`repos/${REPO}/commits/${sha}/check-runs?per_page=100`).check_runs || [];
@@ -160,13 +183,12 @@ function runReview(lease, { dryRun = false } = {}) {
     }
     if (currentHead(lease.pr).head.sha !== lease.sha) return 'STALE_HEAD_AFTER_REVIEW';
     const marker = `<!-- tabibi-grok-dispatch:${lease.key} -->`;
-    const already = recentComments(lease.pr)
-      .some((c) => String(c.body || '').includes(marker));
+    const already = trustedPosted(lease);
     if (!already) {
-      post(lease.pr, `${marker}\n**Automatic Grok Build review**\n\n` +
+      deliver(lease, `${marker}\n**Automatic Grok Build review**\n\n` +
         `actor: grok\ncapability: review\nexact_sha: ${lease.sha}\n` +
         `source_lease_comment: ${lease.commentId}\n` +
-        `runtime: owner-authenticated Codespace, included SuperGrok\n\n${answer.text}`);
+        `runtime: owner-authenticated Codespace, included SuperGrok\n\n${answer.text}`, 'REVIEW_POSTED');
     }
     return already ? 'ALREADY_POSTED' : 'REVIEW_POSTED';
   } finally {
