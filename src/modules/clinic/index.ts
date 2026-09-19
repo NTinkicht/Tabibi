@@ -73,9 +73,9 @@ function clinicFromRow(row: ClinicRow): Clinic {
 export class PublicDiscoveryService {
   constructor(private readonly pool: Pool) {}
 
-  async listClinics(): Promise<PublicDiscoveryClinic[]> {
-    const result = await this.pool.query<PublicDiscoveryRow>(
-      `SELECT clinic.id AS clinic_id,
+  async listClinics(queryTimeoutMs?: number): Promise<PublicDiscoveryClinic[]> {
+    const query = {
+      text: `SELECT clinic.id AS clinic_id,
               clinic.name AS clinic_name,
               clinic.default_locale,
               clinic.enabled_locales,
@@ -85,7 +85,9 @@ export class PublicDiscoveryService {
          LEFT JOIN doctor_profiles doctor ON doctor.id = association.doctor_id
         WHERE clinic.status = 'active'
         ORDER BY clinic.name, clinic.id, doctor.display_name, doctor.id`,
-    );
+      ...(queryTimeoutMs === undefined ? {} : { query_timeout: queryTimeoutMs }),
+    };
+    const result = await this.pool.query<PublicDiscoveryRow>(query);
 
     const clinics: PublicDiscoveryClinic[] = [];
     let current: PublicDiscoveryClinic | undefined;
