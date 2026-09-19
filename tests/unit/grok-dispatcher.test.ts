@@ -4,12 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 // The dispatcher is intentionally plain Node ESM; no npm install needed for runtime.
 // @ts-expect-error The runtime .mjs file intentionally has no generated types.
-import {
-  MARKER,
-  parseLease,
-  pendingLeases,
-  reviewPrompt,
-} from '../../scripts/grok-dispatcher.mjs';
+import * as dispatcher from '../../scripts/grok-dispatcher.mjs';
+
+const { MARKER, parseLease, pendingLeases, reviewPrompt } = dispatcher;
 
 const sha = 'a'.repeat(40);
 const comment = (
@@ -48,22 +45,28 @@ describe('owner-private Grok dispatch lease parser', () => {
       authors: ['codex', 'claude'],
     });
     expect(result.key).toBe(
-      createHash('sha256')
-        .update(`456:${sha}:100:review`)
-        .digest('hex'),
+      createHash('sha256').update(`456:${sha}:100:review`).digest('hex'),
     );
   });
 
   it('rejects vague mentions and unleased tasks', () => {
-    expect(parseLease('@grok review this', comment('@grok review this'), pr())).toBeNull();
-    expect(parseLease('CI_GREEN_HANDOFF', comment('CI_GREEN_HANDOFF'), pr())).toBeNull();
+    expect(
+      parseLease('@grok review this', comment('@grok review this'), pr()),
+    ).toBeNull();
+    expect(
+      parseLease('CI_GREEN_HANDOFF', comment('CI_GREEN_HANDOFF'), pr()),
+    ).toBeNull();
   });
 
   it('rejects stale SHA, wrong PR, drafts, and closed PRs', () => {
     expect(parseLease(valid, comment(valid), pr('b'.repeat(40)))).toBeNull();
     expect(parseLease(valid, comment(valid), pr(sha, 123))).toBeNull();
-    expect(parseLease(valid, comment(valid), pr(sha, 456, 'closed'))).toBeNull();
-    expect(parseLease(valid, comment(valid), pr(sha, 456, 'open', true))).toBeNull();
+    expect(
+      parseLease(valid, comment(valid), pr(sha, 456, 'closed')),
+    ).toBeNull();
+    expect(
+      parseLease(valid, comment(valid), pr(sha, 456, 'open', true)),
+    ).toBeNull();
   });
 
   it('rejects self-gating and missing explicit material authors', () => {
@@ -75,9 +78,16 @@ describe('owner-private Grok dispatch lease parser', () => {
 
   it('rejects untrusted commenter and unexpected role/capability', () => {
     expect(parseLease(valid, comment(valid, 1, 'NONE'), pr())).toBeNull();
-    expect(parseLease(valid, comment(valid, 1, 'OWNER', 'stranger'), pr())).toBeNull();
-    const implementation = valid.replace('capability: review', 'capability: implementation');
-    expect(parseLease(implementation, comment(implementation), pr())).toBeNull();
+    expect(
+      parseLease(valid, comment(valid, 1, 'OWNER', 'stranger'), pr()),
+    ).toBeNull();
+    const implementation = valid.replace(
+      'capability: review',
+      'capability: implementation',
+    );
+    expect(
+      parseLease(implementation, comment(implementation), pr()),
+    ).toBeNull();
   });
 
   it('rejects duplicate/unknown fields, ambiguous authors and invalid hashes', () => {
