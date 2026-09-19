@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write src/app/page.tsx tests/e2e/public-discovery-landing.spec.ts && git diff -- src/app/page.tsx tests/e2e/public-discovery-landing.spec.ts && exit 1",
+    "format": "prettier --check .",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit --project api",
