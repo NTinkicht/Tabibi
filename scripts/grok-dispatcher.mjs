@@ -118,7 +118,10 @@ function currentHead(pr) { return gh(`repos/${REPO}/pulls/${pr}`); }
 function recentComments(pr) {
   const issue = gh(`repos/${REPO}/issues/${pr}`);
   const page = Math.max(1, Math.ceil((issue.comments || 0) / 100));
-  return gh(`repos/${REPO}/issues/${pr}/comments?per_page=100&page=${page}`);
+  const last = gh(`repos/${REPO}/issues/${pr}/comments?per_page=100&page=${page}`);
+  if (page === 1 || last.length === 100) return last;
+  const previous = gh(`repos/${REPO}/issues/${pr}/comments?per_page=100&page=${page - 1}`);
+  return [...previous, ...last].slice(-100);
 }
 
 export function reviewPrompt(lease, checks) {
