@@ -1,0 +1,11 @@
+/* WU85 public discovery control boundaries must remain visible at WCAG AA non-text contrast. */
+.publicLocales button,
+.publicNotice button,
+.publicRefresh {
+  border-color: #557b73;
+}
+
+.publicLocales button[aria-pressed='true'],
+.publicNotice button {
+  border-color: #0a6f61;
+}

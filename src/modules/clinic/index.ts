@@ -6,6 +6,7 @@ import {
   type ClinicScope,
   requireClinicRole,
 } from '@/modules/identity';
+import { abortableQuery } from '@/platform/database/abortable-query';
 import { inTransaction } from '@/platform/database/transaction';
 
 export interface Clinic {
@@ -73,9 +74,11 @@ function clinicFromRow(row: ClinicRow): Clinic {
 export class PublicDiscoveryService {
   constructor(private readonly pool: Pool) {}
 
-  async listClinics(): Promise<PublicDiscoveryClinic[]> {
-    const result = await this.pool.query<PublicDiscoveryRow>(
-      `SELECT clinic.id AS clinic_id,
+  async listClinics(
+    queryTimeoutMs?: number,
+    signal?: AbortSignal,
+  ): Promise<PublicDiscoveryClinic[]> {
+    const text = `SELECT clinic.id AS clinic_id,
               clinic.name AS clinic_name,
               clinic.default_locale,
               clinic.enabled_locales,
@@ -84,8 +87,15 @@ export class PublicDiscoveryService {
          LEFT JOIN doctor_clinics association ON association.clinic_id = clinic.id
          LEFT JOIN doctor_profiles doctor ON doctor.id = association.doctor_id
         WHERE clinic.status = 'active'
-        ORDER BY clinic.name, clinic.id, doctor.display_name, doctor.id`,
-    );
+        ORDER BY clinic.name, clinic.id, doctor.display_name, doctor.id`;
+    const result = signal
+      ? await abortableQuery<PublicDiscoveryRow>(this.pool, text, [], signal)
+      : await this.pool.query<PublicDiscoveryRow>({
+          text,
+          ...(queryTimeoutMs === undefined
+            ? {}
+            : { query_timeout: queryTimeoutMs }),
+        });
 
     const clinics: PublicDiscoveryClinic[] = [];
     let current: PublicDiscoveryClinic | undefined;
