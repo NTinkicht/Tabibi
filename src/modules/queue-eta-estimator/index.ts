@@ -30,6 +30,12 @@ export interface QueueEtaRange {
   maxWaitMinutes: number;
 }
 
+export interface ActiveConsultationRemainingInput {
+  startedAt: Date | string;
+  now: Date | string;
+  estimatedConsultationMinutes: number;
+}
+
 function normalizeSamples(samples: readonly DurationSample[]): number[] {
   return samples
     .map((value) =>
@@ -80,6 +86,34 @@ export function selectConsultationEstimate(
     estimateSource: 'fallback',
     observedSampleCount: current.length,
   };
+}
+
+/**
+ * Computes the deterministic whole-minute contribution of an active
+ * consultation. Invalid or future timestamps fail closed with no added wait.
+ */
+export function computeActiveConsultationRemainingMinutes({
+  startedAt,
+  now,
+  estimatedConsultationMinutes,
+}: ActiveConsultationRemainingInput): number {
+  const startedAtMs = new Date(startedAt).getTime();
+  const nowMs = new Date(now).getTime();
+  if (
+    !Number.isFinite(startedAtMs) ||
+    !Number.isFinite(nowMs) ||
+    startedAtMs > nowMs ||
+    !Number.isFinite(estimatedConsultationMinutes) ||
+    estimatedConsultationMinutes <= 0
+  )
+    return 0;
+
+  const boundedEstimate = Math.min(
+    MAX_SAMPLE_MINUTES,
+    Math.max(MIN_SAMPLE_MINUTES, estimatedConsultationMinutes),
+  );
+  const elapsedMinutes = (nowMs - startedAtMs) / 60_000;
+  return Math.max(0, Math.ceil(boundedEstimate - elapsedMinutes));
 }
 
 /** Applies the established WU9/WU10 delay and bounded uncertainty policy. */
