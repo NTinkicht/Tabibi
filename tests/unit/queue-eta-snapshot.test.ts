@@ -1,0 +1,79 @@
+import { describe, expect, it } from 'vitest';
+
+import { createEtaSnapshot } from '@/modules/queue-eta-estimator/snapshot';
+
+const baseline = {
+  patientsAhead: 2,
+  declaredDelayMinutes: 5,
+  estimatedConsultationMinutes: 15,
+  estimateSource: 'observed_median' as const,
+  observedSampleCount: 4,
+};
+
+describe('WU83 deterministic ETA snapshot', () => {
+  it('composes the established wait range with a revision token', () => {
+    expect(createEtaSnapshot(baseline)).toEqual({
+      minWaitMinutes: 28,
+      maxWaitMinutes: 50,
+      revision: createEtaSnapshot(baseline).revision,
+    });
+    expect(createEtaSnapshot(baseline).revision).toMatch(
+      /^eta-v1-[0-9a-f]{8}$/,
+    );
+  });
+
+  it('is deterministic for identical committed inputs', () => {
+    expect(createEtaSnapshot(baseline)).toEqual(
+      createEtaSnapshot({ ...baseline }),
+    );
+  });
+
+  it('changes revision when committed estimator evidence changes', () => {
+    expect(
+      createEtaSnapshot({ ...baseline, patientsAhead: 3 }).revision,
+    ).not.toBe(createEtaSnapshot(baseline).revision);
+  });
+
+  it('changes revision when estimator provenance changes even if the wait range does not', () => {
+    const original = createEtaSnapshot(baseline);
+    const changedEvidence = createEtaSnapshot({
+      ...baseline,
+      estimateSource: 'fallback',
+      observedSampleCount: 0,
+    });
+
+    expect(changedEvidence.minWaitMinutes).toBe(original.minWaitMinutes);
+    expect(changedEvidence.maxWaitMinutes).toBe(original.maxWaitMinutes);
+    expect(changedEvidence.revision).not.toBe(original.revision);
+  });
+
+  it('changes revision and wait range when declared delay changes', () => {
+    const delayed = createEtaSnapshot({
+      ...baseline,
+      declaredDelayMinutes: baseline.declaredDelayMinutes + 10,
+    });
+    const original = createEtaSnapshot(baseline);
+
+    expect(delayed.revision).not.toBe(original.revision);
+    expect(delayed.minWaitMinutes).toBeGreaterThan(original.minWaitMinutes);
+    expect(delayed.maxWaitMinutes).toBeGreaterThan(original.maxWaitMinutes);
+  });
+
+  it('returns a runtime-immutable snapshot', () => {
+    const snapshot = createEtaSnapshot(baseline);
+
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(() => {
+      (snapshot as { minWaitMinutes: number }).minWaitMinutes = 999;
+    }).toThrow(TypeError);
+    expect(snapshot.minWaitMinutes).toBe(28);
+  });
+
+  it('keeps the revision token immutable with the wait range', () => {
+    const snapshot = createEtaSnapshot(baseline);
+    const revision = snapshot.revision;
+
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(snapshot.revision).toBe(revision);
+  });
+});
