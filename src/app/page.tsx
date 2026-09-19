@@ -25,7 +25,7 @@ export default async function Home() {
     // Keep an independent response deadline even if a service implementation
     // fails to observe cancellation. The AbortSignal still cancels real DB work.
     const clinics = await Promise.race([
-      new PublicDiscoveryService(getPool()).listClinics(
+      new PublicDiscoveryService(getPool('public-discovery')).listClinics(
         SSR_QUERY_TIMEOUT_MS,
         controller.signal,
       ),
