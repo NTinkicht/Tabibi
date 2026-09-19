@@ -94,7 +94,7 @@ A slow response alone is not enough. Reconcile live evidence first.
 - Claude: persistent Claude Code review/session handoff; do not assume the stateless Action is available.
 - Copilot: `@copilot ...`, coding-agent assignment and/or GitHub Code Review request.
 - Gemini CLI: interactive `gemini` CLI in the owner's Codespace/local environment, plus the dedicated owner-only Issue #11 wake workflow `.github/workflows/gemini-cli-wake.yml` when `TABIBI_GEMINI_ZERO_BILLING_CONFIRMED=true`. Any other repository-wide unattended Gemini API-key automation remains unauthorized.
-- Grok: official `grok` Build CLI with owner OAuth in private local machine/persistent Codespace. Verify `grok inspect` and bounded included-capacity probe before lease; continue existing branch/PR; no Action/OAuth relay/xAI API or PAYG. See `GROK.md`.
+- Grok: official `grok` Build CLI with owner OAuth in private local machine/persistent Codespace **or** owner-linked Grok Bot (its included, separate SuperGrok usage pool) on an owner-authorized persistent cloud computer. Verify Build `grok inspect` + bounded probe or Bot login/privacy/access + bounded probe before lease; continue existing branch/PR; no unattended GitHub Action/OAuth relay/xAI API or PAYG. See `GROK.md`.
 - Mistral Vibe: interactive `vibe` CLI in the owner's Codespace/local environment, plus the dedicated owner-only Issue #11 wake workflow `.github/workflows/mistral-vibe-wake.yml` when `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true`. Any other PAYG/API-key automation remains unauthorized.
 
 A durable marker without a supported executable path is not a complete handoff.
@@ -123,7 +123,7 @@ Replacement developers inherit existing scope, tests, findings, branch history a
 - Use Headroom only under its shadow-mode rules.
 - Gemini local free/non-billable allowance only; if billing state is uncertain, mark unavailable.
 - Mistral existing subscription only with PAYG disabled.
-- Grok included SuperGrok only via owner-private OAuth; no extra credits/API/PAYG.
+- Grok included SuperGrok Build or Bot usage only via owner-authenticated runtimes; no extra credits/API/PAYG.
 - Never introduce paid fallback because included capacity is exhausted.
 
 ## Healthy seven-actor mesh
