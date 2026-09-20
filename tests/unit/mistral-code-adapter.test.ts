@@ -79,7 +79,9 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     );
     expect(model.env).not.toHaveProperty('GH_TOKEN');
     expect(model.env?.MISTRAL_API_KEY).toContain('secrets.MISTRAL_API_KEY');
-    expect(model.env?.TASK_OBJECTIVE).toContain('steps.lease.outputs.objective');
+    expect(model.env?.TASK_OBJECTIVE).toContain(
+      'steps.lease.outputs.objective',
+    );
     expect(model.run).toContain('--agent plan');
     expect(model.run).toContain('--workdir /tmp/tabibi-mistral-readonly');
     expect(model.run).toContain(
@@ -144,9 +146,7 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     expect(push.run).toContain('mistral-code-adapter.py publish');
     expect(push.env?.GH_TOKEN).toContain('secrets.GITHUB_TOKEN');
     expect(test.steps.some((step) => step.env?.MISTRAL_API_KEY)).toBe(false);
-    expect(publish.steps.some((step) => step.env?.MISTRAL_API_KEY)).toBe(
-      false,
-    );
+    expect(publish.steps.some((step) => step.env?.MISTRAL_API_KEY)).toBe(false);
     expect(
       publish.steps.some((step) => (step.run ?? '').includes('npm ')),
     ).toBe(false);
