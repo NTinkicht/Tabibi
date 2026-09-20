@@ -16,7 +16,11 @@ test('French ETA guidance distinguishes verified time from live freshness or a p
       /dernière vérification réussie jusqu’à une nouvelle actualisation confirmée/,
     ),
   ).toBeVisible();
-  await expect(page.getByText(/ne garantit pas/)).toBeVisible();
+  await expect(
+    page
+      .locator('section[aria-labelledby="verification-heading"]')
+      .getByText(/ne garantit pas/),
+  ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'Temps d’attente' }),
   ).toBeVisible();
