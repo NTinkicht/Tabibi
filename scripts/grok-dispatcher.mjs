@@ -455,20 +455,21 @@ function runReview(lease, { dryRun = false } = {}) {
     } catch {
       throw new Error('invalid_grok_json');
     }
+    // Precise allowlisted reasons avoid spending another full review just to
+    // discover whether the CLI stopped, returned empty JSON, or omitted a gate.
+    if (answer?.stopReason !== 'end_turn')
+      throw new Error('grok_incomplete');
+    if (typeof answer.text !== 'string' || !answer.text.trim())
+      throw new Error('grok_empty_result');
+    if (answer.text.length > 18_000) throw new Error('grok_response_too_long');
+    if (!answer.text.includes(lease.sha)) throw new Error('grok_missing_sha');
+    if (!/\\b(PASS_WITH_MINOR_FINDINGS|CHANGES_REQUIRED|PASS)\\b/.test(answer.text))
+      throw new Error('grok_missing_verdict');
     if (
-      answer.stopReason !== 'end_turn' ||
-      typeof answer.text !== 'string' ||
-      !answer.text.trim() ||
-      answer.text.length > 18_000 ||
-      !answer.text.includes(lease.sha) ||
-      !/\b(PASS_WITH_MINOR_FINDINGS|CHANGES_REQUIRED|PASS)\b/.test(
-        answer.text,
-      ) ||
-      (!checks.every((c) => c.conclusion === 'success') &&
-        /^\s*MERGE_READY:\s*(yes|true)\b/im.test(answer.text))
-    ) {
-      throw new Error('unusable_grok_response');
-    }
+      !checks.every((c) => c.conclusion === 'success') &&
+      /^\\s*MERGE_READY:\\s*(yes|true)\\b/im.test(answer.text)
+    )
+      throw new Error('grok_unsafe_merge_claim');
     assertSafeReviewOutput(answer.text, fs.readFileSync(authPath, 'utf8'));
     if (command('git', ['status', '--porcelain'], { cwd: work })) {
       throw new Error('review_changed_files');
@@ -512,6 +513,12 @@ export function dispatchFailureCode(error) {
       'metered_auth_present',
       'invalid_grok_json',
       'unusable_grok_response',
+      'grok_incomplete',
+      'grok_empty_result',
+      'grok_response_too_long',
+      'grok_missing_sha',
+      'grok_missing_verdict',
+      'grok_unsafe_merge_claim',
       'unsafe_review_output',
       'review_changed_files',
     ].includes(reason)
