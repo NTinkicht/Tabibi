@@ -24,7 +24,7 @@ Do not paste any connected account secrets or OAuth material into this repositor
 
 ## Bridge behavior
 
-`.github/workflows/savegrok-cloud-slack-bridge.yml` runs ONLY for owner-authored comments on a PR with exact `ROLE_LEASE_ASSIGNED`, actor `grok`, capability `review`, `pr`, `exact_sha`, `stream`, and `material_authors` fields. It checks the current SHA, same-repo main target, open state, non-Grok declared authors and the 3 configured successful CI jobs before posting **public engineering metadata only** to existing Slack room via its preexisting `SLACK_CHATGPT_BOT_TOKEN`. The Bot event trigger must be configured by the owner separately.
+`.github/workflows/savegrok-cloud-slack-bridge.yml` runs ONLY for owner-authored comments on a PR with exact `ROLE_LEASE_ASSIGNED`, actor `grok`, capability `review`, `pr`, `exact_sha`, `stream`, and `material_authors` fields. It checks the current SHA, same-repo main target, open state, non-Grok declared authors and the 3 configured successful CI jobs before posting **public engineering metadata only** to existing Slack room via its preexisting `SLACK_CHATGPT_BOT_TOKEN`. The Bot event trigger must be configured by the owner separately. **Default-off deployment:** only after the owner links included Grok Bot + approved Slack + GitHub and confirms the narrow Slack-phrase routine, set repository variable `TABIBI_GROK_CLOUD_BRIDGE_ENABLED=true`. Before that, the bridge reports `CONFIG_BLOCKED` and sends no Slack signal. This is an explicit scoped metadata relay exception to `coordination/AI_CAPACITY_POLICY.md` and `AGENTS.md`, NOT a paid/Grok-credential Actions wake.
 
 Example lease on canonical PR:
 
@@ -38,6 +38,6 @@ stream: WU<id>
 material_authors: chatgpt,codex
 ```
 
-List REAL material authors; this is not a license to hide Grok-authored changes. No Slack or GitHub Actions Grok OAuth, `XAI_API_KEY`, paid xAI API, PAYG, bought credits, Codespace keepalive or desktop installation is part of the bridge. The Slack message is **dispatch evidence only**; Grok cloud review is marked PROVEN only after a real Codespace-OFF live test posts valid exact-SHA independent evidence to GitHub. Until then, Grok cloud review and especially coding remain UNVERIFIED.
+List REAL material authors; this is not a license to hide Grok-authored changes. No Slack or GitHub Actions Grok OAuth, `XAI_API_KEY`, paid xAI API, PAYG, bought credits, Codespace keepalive or desktop installation is part of the bridge. The bridge checks the complete owner PR lease-comment history (fail-closed when pagination exceeds its bound), declines released/failover/replaced leases, and uses ONLY the latest CI run/attempt for the pinned SHA, never an older success that a later failure superseded. The Bot also rechecks the lease and SHA immediately before review publication. The Slack message is **dispatch evidence only**; Grok cloud review is marked PROVEN only after a real Codespace-OFF live test posts valid exact-SHA independent evidence to GitHub. Until then, Grok cloud review and especially coding remain UNVERIFIED.
 
 Writing/coding needs a separately reviewed DEFAULT-OFF parent-controlled canonical PR adapter under #339 after the cloud review proof; never interpret this review bridge as GitHub push authority.
