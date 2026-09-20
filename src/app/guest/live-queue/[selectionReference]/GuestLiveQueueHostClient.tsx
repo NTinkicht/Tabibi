@@ -970,10 +970,10 @@ function LiveQueueView({
           },
           signal: controller.signal,
         });
-        if (response.status === 400) {
-          stopForRejection();
-          return;
-        }
+        // Streaming is an optional change-hint lane. A 400 from that lane
+        // is not authoritative proof the guest capability is revoked (the
+        // endpoint might be disabled or an old test/deployment may lack it).
+        // Only the canonical status request can terminate guest access.
         if (!response.ok || !response.body) throw new Error('stream rejected');
         streamFailures = 0;
         const reader = response.body.getReader();
