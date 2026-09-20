@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 type Locale = 'ar' | 'fr';
 type ClinicLanguageFilter = Locale | 'all';
+type ClinicSort = 'original' | 'ascending' | 'descending';
 export type PublicClinic = {
   name: string;
   defaultLocale: Locale;
@@ -24,6 +25,10 @@ const copy = {
     clinicLanguageAll: 'Toutes les langues',
     clinicLanguageFrench: 'Français',
     clinicLanguageArabic: 'العربية',
+    clinicSortLabel: 'Trier les cliniques par nom',
+    clinicSortOriginal: 'Ordre initial',
+    clinicSortAscending: 'Nom : A à Z',
+    clinicSortDescending: 'Nom : Z à A',
     noFilteredMatches:
       'Aucune clinique ne correspond aux filtres sélectionnés.',
     searchPlaceholder: 'Nom de la clinique ou du médecin',
@@ -54,6 +59,10 @@ const copy = {
     clinicLanguageAll: 'كل اللغات',
     clinicLanguageFrench: 'الفرنسية',
     clinicLanguageArabic: 'العربية',
+    clinicSortLabel: 'ترتيب العيادات حسب الاسم',
+    clinicSortOriginal: 'الترتيب الأصلي',
+    clinicSortAscending: 'الاسم: تصاعديًا',
+    clinicSortDescending: 'الاسم: تنازليًا',
     noFilteredMatches: 'لا توجد عيادات تطابق عوامل التصفية المحددة.',
     searchPlaceholder: 'اسم العيادة أو الطبيب',
     clearSearch: 'مسح البحث',
@@ -139,6 +148,7 @@ export default function PublicDiscoveryLandingClient({
   const [search, setSearch] = useState('');
   const [clinicLanguage, setClinicLanguage] =
     useState<ClinicLanguageFilter>('all');
+  const [clinicSort, setClinicSort] = useState<ClinicSort>('original');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [refreshCount, setRefreshCount] = useState<number | null>(null);
   const t = copy[locale];
@@ -155,6 +165,26 @@ export default function PublicDiscoveryLandingClient({
           normalizeSearch(doctor.displayName).includes(query),
         )),
   );
+  const collator = new Intl.Collator(locale, {
+    sensitivity: 'base',
+    numeric: true,
+  });
+  const sortedClinics =
+    clinicSort === 'original'
+      ? matchingClinics
+      : matchingClinics
+          .map((clinic, originalIndex) => ({ clinic, originalIndex }))
+          .sort((left, right) => {
+            const compared = collator.compare(
+              left.clinic.name,
+              right.clinic.name,
+            );
+            return (
+              (clinicSort === 'ascending' ? compared : -compared) ||
+              left.originalIndex - right.originalIndex
+            );
+          })
+          .map(({ clinic }) => clinic);
 
   useEffect(() => {
     if (retry === 0) return;
@@ -289,6 +319,18 @@ export default function PublicDiscoveryLandingClient({
               <option value="fr">{t.clinicLanguageFrench}</option>
               <option value="ar">{t.clinicLanguageArabic}</option>
             </select>
+            <label htmlFor="publicClinicSort">{t.clinicSortLabel}</label>
+            <select
+              id="publicClinicSort"
+              value={clinicSort}
+              onChange={(event) =>
+                setClinicSort(event.target.value as ClinicSort)
+              }
+            >
+              <option value="original">{t.clinicSortOriginal}</option>
+              <option value="ascending">{t.clinicSortAscending}</option>
+              <option value="descending">{t.clinicSortDescending}</option>
+            </select>
             {(search.length > 0 || clinicLanguage !== 'all') && (
               <button
                 type="button"
@@ -335,7 +377,7 @@ export default function PublicDiscoveryLandingClient({
           )}
         {state === 'ready' && matchingClinics.length > 0 && (
           <div className="publicGrid">
-            {matchingClinics.map((clinic, index) => (
+            {sortedClinics.map((clinic, index) => (
               <article className="publicClinic" key={index}>
                 <h3>{clinic.name}</h3>
                 <p className="publicLanguages">
