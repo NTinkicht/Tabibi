@@ -404,9 +404,9 @@ test('Arabic language filter remains RTL across refresh', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: 'عيادة الأمل' }),
   ).toBeVisible();
-  await expect(
-    page.getByRole('heading', { name: 'عيادة السلام' }),
-  ).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'عيادة السلام' })).toHaveCount(
+    0,
+  );
   await page.getByRole('button', { name: 'تحديث' }).click();
   await expect(language).toHaveValue('ar');
   await page.getByRole('button', { name: 'Français' }).click();
