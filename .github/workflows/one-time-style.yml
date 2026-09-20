@@ -1,0 +1,46 @@
+name: PR Style Verification
+
+on:
+  push:
+    branches:
+      - chatgpt/issue-323-grok-private-dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  formatter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout canonical branch
+        uses: actions/checkout@v4
+        with:
+          ref: chatgpt/issue-323-grok-private-dispatch
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Apply exact pinned formatting and validate
+        run: |
+          set -euo pipefail
+          npm ci
+          ./node_modules/.bin/prettier --write scripts/grok-dispatcher.mjs tests/unit/grok-dispatcher.test.ts docs/coordination/GROK_AUTOMATIC_DISPATCH.md
+          npm run format
+          npm run typecheck
+          npm run lint
+          npm run test:unit -- tests/unit/grok-dispatcher.test.ts
+      - name: Push only exact formatting
+        run: |
+          set -euo pipefail
+          git add -- scripts/grok-dispatcher.mjs tests/unit/grok-dispatcher.test.ts docs/coordination/GROK_AUTOMATIC_DISPATCH.md
+          if git diff --cached --quiet; then
+            echo 'Already formatted'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'style: apply pinned formatting after Grok security fixes'
+          git push origin HEAD:chatgpt/issue-323-grok-private-dispatch
