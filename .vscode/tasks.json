@@ -3,12 +3,7 @@
   "tasks": [
     {
       "label": "SaveGrok — automatic GitHub review failover (owner Codespace)",
-      "type": "process",
-      "command": "node",
-      "args": ["scripts/grok-auto-start.mjs"],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
+      "type": "npm",
       "runOptions": {
         "runOn": "folderOpen",
         "instanceLimit": 1
@@ -22,7 +17,8 @@
         "clear": false,
         "echo": true
       },
-      "detail": "Opt-in trusted-workspace startup. Watches GitHub CI/PR leases only in NTinkicht's active authenticated Codespace; no automatic Codespace wake or model invocation without a trusted exact-SHA review lease."
+      "detail": "Fallback to VS Code's already-working npm task provider. Starts the guarded Codespace GitHub review watcher automatically on workspace opening once Automatic Tasks is allowed; never runs Grok without an authorized exact-head lease.",
+      "script": "grok:watch"
     }
   ]
 }
