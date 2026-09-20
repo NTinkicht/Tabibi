@@ -198,6 +198,21 @@ describe('seven-actor capacity routing', () => {
     }
   });
 
+  it('bounds Mistral wake and classifies token failures', () => {
+    const workflowPath = '.github/workflows/mistral-vibe-wake.yml';
+    const workflow = fs.readFileSync(workflowPath, 'utf8');
+    expect(workflow).toContain('github.event.issue.number == 11');
+    expect(workflow).toContain("github.actor == 'NTinkicht'");
+    expect(workflow).toContain('contents: read');
+    expect(workflow).toContain('--agent plan');
+    expect(workflow).toContain('--max-turns 8');
+    expect(workflow).toContain('--max-tokens 75000');
+    expect(workflow).toContain('token limit exceeded');
+    expect(workflow).toContain('TOKEN_BUDGET_EXCEEDED');
+    expect(workflow).not.toContain('contents: write');
+    expect(workflow).not.toContain('pull-requests: write');
+  });
+
   it('relays Gemini CLI and Mistral Vibe in Slack without new credentials', () => {
     const workflowPath = path.join(
       process.cwd(),
