@@ -494,3 +494,114 @@ test('Arabic one-tap reset clears the language-only filter in RTL', async ({
     page.getByRole('searchbox', { name: 'ابحث عن عيادة أو طبيب' }),
   ).toBeFocused();
 });
+
+test('clinic name sorting composes with name and language filters', async ({
+  page,
+}) => {
+  await mockDirectory(page, [
+    {
+      name: 'Clinique Zéphyr',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr'],
+      tenantKey: 'private-tenant-sort',
+      doctors: [{ displayName: 'Dr. Salem', id: 'private-doctor-sort' }],
+    },
+    {
+      name: 'Clinique Étoile',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr', 'ar'],
+      doctors: [{ displayName: 'Dr. Salem' }],
+    },
+    {
+      name: 'Clinique Alpha',
+      defaultLocale: 'fr',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'Dr. Rayan' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  const names = page.locator('.publicClinic h3');
+  const sort = page.getByRole('combobox', {
+    name: 'Trier les cliniques par nom',
+  });
+  await expect(names).toHaveText([
+    'Clinique Zéphyr',
+    'Clinique Étoile',
+    'Clinique Alpha',
+  ]);
+  await sort.selectOption('ascending');
+  await expect(names).toHaveText([
+    'Clinique Alpha',
+    'Clinique Étoile',
+    'Clinique Zéphyr',
+  ]);
+  await sort.selectOption('descending');
+  await expect(names).toHaveText([
+    'Clinique Zéphyr',
+    'Clinique Étoile',
+    'Clinique Alpha',
+  ]);
+  await page
+    .getByRole('searchbox', { name: 'Rechercher une clinique ou un médecin' })
+    .fill('salem');
+  await expect(names).toHaveText(['Clinique Zéphyr', 'Clinique Étoile']);
+  await page
+    .getByRole('combobox', { name: 'Langue proposée par la clinique' })
+    .selectOption('ar');
+  await expect(names).toHaveText(['Clinique Étoile']);
+  await page.getByRole('button', { name: 'Effacer tous les filtres' }).click();
+  await expect(sort).toHaveValue('descending');
+  await expect(names).toHaveText([
+    'Clinique Zéphyr',
+    'Clinique Étoile',
+    'Clinique Alpha',
+  ]);
+  const body = await page.locator('main').innerText();
+  expect(body).not.toContain('private-tenant-sort');
+  expect(body).not.toContain('private-doctor-sort');
+  await sort.selectOption('original');
+  await expect(names).toHaveText([
+    'Clinique Zéphyr',
+    'Clinique Étoile',
+    'Clinique Alpha',
+  ]);
+});
+
+test('Arabic sorting stays selected after locale switch and refresh', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDirectory(page, [
+    {
+      name: 'عيادة الورد',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [],
+    },
+    {
+      name: 'عيادة الأمل',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  const sort = page.getByRole('combobox', {
+    name: 'ترتيب العيادات حسب الاسم',
+  });
+  await sort.selectOption('ascending');
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.locator('.publicClinic h3')).toHaveText([
+    'عيادة الأمل',
+    'عيادة الورد',
+  ]);
+  await page.getByRole('button', { name: 'تحديث' }).click();
+  await expect(sort).toHaveValue('ascending');
+  await page.getByRole('button', { name: 'Français' }).click();
+  await expect(
+    page.getByRole('combobox', { name: 'Trier les cliniques par nom' }),
+  ).toHaveValue('ascending');
+});
