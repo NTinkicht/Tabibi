@@ -173,8 +173,8 @@ jobs:
             printf '\nTRUSTED REVIEW TARGET: PR #%s; exact checked-out SHA %s.\n' "$REVIEW_PR" "$REVIEW_SHA" >> /tmp/tabibi-mistral-prompt.txt
             printf 'All three configured CI jobs were verified green on the exact SHA by the trusted parent.\n' >> /tmp/tabibi-mistral-prompt.txt
             printf 'Inspect .tabibi_mistral_review.diff and only relevant original code/tests at this HEAD.\n' >> /tmp/tabibi-mistral-prompt.txt
-            printf 'Anchor every finding and PASS / CHANGES_REQUIRED or GATE_PASS / GATE_BLOCKED verdict to the full SHA.\n' >> /tmp/tabibi-mistral-prompt.txt
-            printf 'If evidence is insufficient or you materially authored this head, return GATE_BLOCKED, never PASS.\n' >> /tmp/tabibi-mistral-prompt.txt
+            printf 'Include the full exact SHA and ONE dedicated line VERDICT: PASS, VERDICT: PASS_WITH_MINOR_FINDINGS, or VERDICT: CHANGES_REQUIRED.\n' >> /tmp/tabibi-mistral-prompt.txt
+            printf 'If evidence is insufficient or you materially authored the SHA, use VERDICT: CHANGES_REQUIRED.\n' >> /tmp/tabibi-mistral-prompt.txt
           fi
           printf '\nDispatch text:\n%s\n' "$DISPATCH_BODY" >> /tmp/tabibi-mistral-prompt.txt
 
@@ -317,6 +317,43 @@ jobs:
           text = re.sub(r'(?i)(MISTRAL_API_KEY\s*[=:]\s*)\S+', r'\1[REDACTED]', text)
           target.write_text(text[:50000], encoding='utf-8')
           PY
+          fi
+
+          # Canonical review verdict must be a dedicated full line, not a
+          # substring of ordinary prose (e.g. "tests passed").
+          verdict_ready=false
+          if [[ "${TARGET_MODE:-main}" == "review" && -f /tmp/tabibi-mistral-public.txt ]] &&
+             grep -Fq -- "${REVIEW_SHA:-missing-exact-sha}" /tmp/tabibi-mistral-public.txt &&
+             [[ "$(grep -Ec '^[[:space:]]*VERDICT:[[:space:]]*(PASS|PASS_WITH_MINOR_FINDINGS|CHANGES_REQUIRED)[[:space:]]*
+            echo
+            if [[ "${TARGET_READY:-false}" != "true" ]]; then
+              echo "${TARGET_STATUS:-REVIEW_TARGET_BLOCKED} - Trusted target/CI check blocked execution. No paid fallback attempted."
+            elif [[ "${TARGET_MODE:-main}" == "review" && "${EVIDENCE_READY:-false}" != "true" ]]; then
+              echo "${EVIDENCE_STATUS:-REVIEW_EVIDENCE_BLOCKED} - Exact-head evidence could not be verified. No paid fallback attempted."
+            elif [[ "${READY:-false}" != "true" ]]; then
+              echo "${PREFLIGHT_STATUS:-PREFLIGHT_FAILED} - ${PREFLIGHT_REASON:-preflight failed}. No paid fallback was attempted."
+            elif [[ "${ACTOR_EXIT:-1}" != "0" ]]; then
+              echo "${ACTOR_STATUS:-EXECUTION_FAILED} - ${ACTOR_REASON:-Mistral Vibe exited without a usable result}. PAYG remains disabled and no paid fallback was attempted."
+            elif [[ "${TARGET_MODE:-main}" == "review" && "${RECHECK_READY:-false}" != "true" ]]; then
+              echo "${RECHECK_STATUS:-STALE_SHA} - PR head moved or could not be rechecked. Model result is NOT a gate."
+            elif [[ "${TARGET_MODE:-main}" == "review" && "$verdict_ready" != "true" ]]; then
+              echo "REVIEW_EVIDENCE_INCOMPLETE - Mistral result lacks anchored SHA/verdict; not a gate."
+            else
+              if [[ "${TARGET_MODE:-main}" == "review" ]]; then
+                printf 'Target PR #%s exact_sha=%s; parent verified 3/3 CI green and non-Mistral material-author declaration.\n\n' "$REVIEW_PR" "$REVIEW_SHA"
+              fi
+              echo '```text'
+              cat /tmp/tabibi-mistral-public.txt
+              echo
+              echo '```'
+            fi
+          } > /tmp/tabibi-mistral-comment.md
+          gh issue comment 11 --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-mistral-comment.md
+          if [[ "${TARGET_MODE:-main}" == "review" && "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" && "${RECHECK_READY:-false}" == "true" && "$verdict_ready" == "true" ]]; then
+            gh issue comment "$REVIEW_PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-mistral-comment.md
+          fi
+ /tmp/tabibi-mistral-public.txt || true)" == "1" ]]; then
+            verdict_ready=true
           fi
 
           {
