@@ -419,9 +419,9 @@ export function reviewPrompt(lease, checks) {
     'First read AGENTS.md, GROK.md and SECURITY.md for review guardrails. ' +
     'Inspect git diff origin/main...HEAD --stat, then git diff origin/main...HEAD, ' +
     'the touched source and tests. Consult ARCHITECTURE.md or PRODUCT.md ' +
-    'only when relevant; avoid rereading unrelated files.\\n' +
+    'only when relevant; avoid rereading unrelated files.\n' +
     `Exact head: ${lease.sha}. Material authors (as recorded by orchestrator): ${lease.authors.join(', ')}.\n` +
-    `Exact-head CI observations: ${JSON.stringify(checks)}. Inspect git diff origin/main...HEAD in the checkout.\n` +
+    `Exact-head CI observations: ${JSON.stringify(checks)}.\n` +
     'Review correctness, privacy, authorization, RTL/FR/AR, regressions and tests.\n' +
     'Report actor: grok, exact 40-character SHA, findings with severity/path/evidence, ' +
     'and PASS, PASS_WITH_MINOR_FINDINGS or CHANGES_REQUIRED. ' +
