@@ -326,7 +326,7 @@ test('clinic search remains stable in Turkish browser locale', async ({
   }
 });
 
-test('clinic language filter composes with name search and preserves privacy', async ({
+test('clinic language and search compose without exposing IDs', async ({
   page,
 }) => {
   await mockDirectory(page, [
@@ -356,8 +356,12 @@ test('clinic language filter composes with name search and preserves privacy', a
   await expect(page.locator('.publicClinic')).toHaveCount(1);
   await expect(page.getByText('1 clinique trouvée.')).toBeVisible();
   await search.fill('nora');
-  await expect(page.getByRole('heading', { name: 'Clinique Étoile' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Cabinet du Centre' })).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Clinique Étoile' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Cabinet du Centre' }),
+  ).toHaveCount(0);
   await search.fill('centre');
   await expect(
     page.getByText('Aucune clinique ne correspond aux filtres sélectionnés.'),
@@ -373,7 +377,7 @@ test('clinic language filter composes with name search and preserves privacy', a
   expect(body).not.toContain('private-doctor');
 });
 
-test('Arabic clinic-language filtering stays RTL across locale and refresh', async ({
+test('Arabic language filter remains RTL across refresh', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -399,8 +403,12 @@ test('Arabic clinic-language filtering stays RTL across locale and refresh', asy
   });
   await language.selectOption('ar');
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'عيادة الأمل' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'عيادة السلام' })).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'عيادة الأمل' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'عيادة السلام' }),
+  ).toHaveCount(0);
   await page.getByRole('button', { name: 'تحديث' }).click();
   await expect(language).toHaveValue('ar');
   await page.getByRole('button', { name: 'Français' }).click();
