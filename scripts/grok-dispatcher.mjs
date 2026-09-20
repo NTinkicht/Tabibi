@@ -210,7 +210,11 @@ export function readState(file, dir = STATE) {
   try {
     const state = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
     // Corrupt or incomplete local state is NOT proof the lease was delivered.
-    if (!state || typeof state !== 'object' || typeof state.outcome !== 'string')
+    if (
+      !state ||
+      typeof state !== 'object' ||
+      typeof state.outcome !== 'string'
+    )
       return null;
     return state;
   } catch {
@@ -235,7 +239,10 @@ export function writeStateAtomically(file, state, dir = STATE) {
   // Unique temporary sibling avoids torn JSON and concurrent temp-file clashes.
   const temporary = `${target}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`;
   try {
-    fs.writeFileSync(temporary, JSON.stringify(state), { mode: 0o600, flag: 'wx' });
+    fs.writeFileSync(temporary, JSON.stringify(state), {
+      mode: 0o600,
+      flag: 'wx',
+    });
     fs.renameSync(temporary, target);
   } finally {
     if (fs.existsSync(temporary)) fs.rmSync(temporary);
