@@ -236,7 +236,7 @@ def main():
             def provenance_api(route):
                 if "/pulls/" in route and "/commits?" in route:
                     return [{"sha": "a" * 40,
-                             "commit": {"message": "feat: demo\\n\\nMaterial-Author: chatgpt"},
+                             "commit": {"message": "feat: demo\n\nMaterial-Author: chatgpt"},
                              "author": {"login": "NTinkicht"}}]
                 raise ValueError("Unexpected mock API call")
             globals()["github_json"] = provenance_api
