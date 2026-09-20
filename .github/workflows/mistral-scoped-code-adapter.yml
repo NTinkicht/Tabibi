@@ -24,8 +24,8 @@ jobs:
       pull-requests: read
       actions: read
     concurrency:
-      group: mistral-code-${{ github.event.comment.id }}
-      cancel-in-progress: false
+      group: mistral-code-${{ github.event.issue.number }}
+      cancel-in-progress: true
     outputs:
       ready: ${{ steps.patch.outputs.ready }}
       status: ${{ steps.patch.outputs.status }}
