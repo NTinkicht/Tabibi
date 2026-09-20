@@ -235,13 +235,23 @@ def main():
                 blocked("REVIEW_TARGET_BLOCKED")
                 return
             subprocess.check_call(
-                ["git", "fetch", "--no-tags", "--depth=1", "origin", base_sha],
+                ["git", "fetch", "--no-tags", "origin", base_sha],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 timeout=40,
             )
+            # The checkout uses full history; calculate the PR fork point
+            # instead of comparing against main's moving tip, which would
+            # otherwise include unrelated base-branch changes as reversions.
+            merge_base = subprocess.check_output(
+                ["git", "merge-base", base_sha, exact_sha],
+                stderr=subprocess.DEVNULL, timeout=20,
+            ).decode("ascii").strip()
+            if not SHA.fullmatch(merge_base):
+                blocked("REVIEW_TARGET_BLOCKED")
+                return
             diff = subprocess.check_output(
                 ["git", "diff", "--no-ext-diff", "--binary",
-                 base_sha, exact_sha, "--"],
+                 merge_base, exact_sha, "--"],
                 stderr=subprocess.DEVNULL, timeout=35,
             )
             if not diff.startswith(b"diff --git ") or len(diff) > DIFF_LIMIT_BYTES:
