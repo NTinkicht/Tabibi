@@ -19,6 +19,20 @@ material_authors: codex,claude
 
 Substitute the live 40-character PR SHA and actual authors. Do not ask Nassim to paste routine leases. `@grok` or `CI_GREEN_HANDOFF` alone are not executable leases. Parser requires a trusted owner GitHub login, current open non-draft PR, explicit non-Grok authors and review-only role. A Grok review identifies `actor: grok` even when its comment appears from the owner's GitHub login. A falsified actor list or owner account compromise remains a coordination security risk; the executor additionally checks Git commit authorship markers but cannot infer every owner-authored patch's real AI material author.
 
+## GitHub-driven, no-routine-terminal mode (SaveGrok)
+
+The preferred owner experience is **no bash prompts to Grok**. GitHub Actions CI workflow-run handoffs and the orchestrator's exact-SHA ROLE_LEASE_ASSIGNED comments remain the durable work queue. The **already running** owner Codespace's Grok dispatcher polls GitHub PR conversations and fetches live GitHub check runs for each leased SHA; no one needs to paste a task or manually invoke --once for each PR. GitHub Actions sends signals and publishes CI evidence, but **does not receive owner Grok OAuth or invoke metered xAI API calls**.
+
+One-time, in the existing Codespace's **VS Code UI** after the startup-task PR merges:
+
+1. Open Tabibi's main workspace in VS Code (browser/desktop). Do not rebuild the container or delete the existing private Grok login.
+2. From Command Palette select **Tasks: Manage Automatic Tasks**, then **Allow Automatic Tasks** in this trusted workspace. VS Code's permission may apply to automatic tasks in other trusted workspaces: review any other repository's tasks before trusting it. If prompted instead, choose **Allow** for the visible SaveGrok startup task.
+3. Reopen/reload the Codespace workspace once to launch the **SaveGrok — automatic GitHub review failover (owner Codespace)** task. Its output terminal confirms whether the worker is active or why it fail-closed. The task is visible: no hidden shell, installer, keepalive or billing change. New reviewed leases are consumed automatically while the Codespace stays active. Stop the task, disallow automatic tasks or stop the Codespace to end it.
+
+Implementation: .vscode/tasks.json uses VS Code runOn: folderOpen, which the **owner allows in the UI**. scripts/grok-auto-start.mjs refuses every non-owner/non-Codespace/GitHub Actions context, paid-provider variables, non-main or dirty checked-out branches, absent private OAuth and missing local tools. It only fast-forwards **clean** main; no checkout, reset, rebase, push, auto-install or provider login. It launches the existing read-only --watch dispatcher and allows only that dispatcher's trusted, exact-head PR review lease to make a model call. Opening a feature branch does not start another worker; the current PR head is fetched separately in a disposable worktree, never merged locally.
+
+**Important limitations:** runOn: folderOpen is an editor task, not a GitHub-hosted agent or a guarantee the process survives a stopped Codespace. The VS Code workspace must be open once to launch it and the owner must allow automatic tasks. If an instance is already running, the dispatcher's local process lock prevents duplicate model calls. When a Codespace stops, no code can keep the subscription-only CLI awake, and GitHub events remain queued only while the leased SHA stays current. GitHub may bill Codespaces compute/storage; do not extend idle timeout or install a keepalive just to advertise 24/7 access. A native, truly always-on GitHub actor would require a separately authorized provider GitHub integration, persistent private runtime or paid API path; none is installed here.
+
 ## One-time activation in Codespaces
 
 After merging the adapter PR, inside the existing owner Codespace:
