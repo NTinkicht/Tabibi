@@ -161,12 +161,12 @@ export async function GET(request: Request): Promise<Response> {
           try {
             const next = await service.get(bearer, streamAbort.signal);
             if (streamAbort.signal.aborted) break;
-          const nextVersion = version(next);
-          if (nextVersion !== lastVersion) {
-            controller.enqueue(encodeChangeHint());
-            lastVersion = nextVersion;
-          }
-        } catch (error) {
+            const nextVersion = version(next);
+            if (nextVersion !== lastVersion) {
+              controller.enqueue(encodeChangeHint());
+              lastVersion = nextVersion;
+            }
+          } catch (error) {
             if (
               !streamAbort.signal.aborted &&
               !(error instanceof PublicGuestLiveQueueStatusRejectedError)
