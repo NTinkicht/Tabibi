@@ -83,9 +83,12 @@ function command(bin, args, { cwd = ROOT, input, timeout = 45_000, env } = {}) {
   });
   if (result.error || result.status !== 0) {
     // Auth/provider stderr can contain credentials. Never echo it.
-    throw new Error(
-      `${bin} exited unsuccessfully (${result.status ?? result.error?.code})`,
-    );
+    // Never expose provider or authentication stderr to public diagnostics.
+    const code =
+      Number.isInteger(result.status) && result.status >= 0
+        ? String(result.status)
+        : 'spawn_failure';
+    throw new Error(`${bin}_exit_${code}`);
   }
   return result.stdout.trim();
 }
@@ -208,12 +211,33 @@ function post(pr, body) {
 }
 export function readState(file, dir = STATE) {
   try {
+    if (!/^[a-f0-9]{64}\\.json$/.test(file)) return null;
     const state = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
-    // Corrupt or incomplete local state is NOT proof the lease was delivered.
+    // Parseable but incomplete JSON is not valid delivery evidence.
     if (
       !state ||
       typeof state !== 'object' ||
-      typeof state.outcome !== 'string'
+      Array.isArray(state) ||
+      state.key !== file.slice(0, -5) ||
+      !Number.isInteger(state.pr) ||
+      state.pr < 1 ||
+      typeof state.sha !== 'string' ||
+      !SHA.test(state.sha) ||
+      !Number.isSafeInteger(state.commentId) ||
+      state.commentId < 1 ||
+      typeof state.outcome !== 'string' ||
+      !state.outcome
+    )
+      return null;
+    if (
+      state.outcome === 'DELIVERY_PENDING' &&
+      (typeof state.body !== 'string' ||
+        !state.body.includes(`<!-- tabibi-grok-dispatch:${state.key} -->`) ||
+        !state.body.includes(`exact_sha: ${state.sha}`) ||
+        !state.body.includes(`source_lease_comment: ${state.commentId}`) ||
+        typeof state.finalOutcome !== 'string' ||
+        !state.finalOutcome ||
+        state.finalOutcome === 'DELIVERY_PENDING')
     )
       return null;
     return state;
@@ -425,7 +449,12 @@ function runReview(lease, { dryRun = false } = {}) {
       ],
       { cwd: work, env, timeout: 12 * 60_000 },
     );
-    const answer = JSON.parse(raw);
+    let answer;
+    try {
+      answer = JSON.parse(raw);
+    } catch {
+      throw new Error('invalid_grok_json');
+    }
     if (
       answer.stopReason !== 'end_turn' ||
       typeof answer.text !== 'string' ||
@@ -475,6 +504,26 @@ function runReview(lease, { dryRun = false } = {}) {
   }
 }
 
+export function dispatchFailureCode(error) {
+  const reason = error instanceof Error ? error.message : '';
+  if (
+    [
+      'oauth_not_verified',
+      'metered_auth_present',
+      'invalid_grok_json',
+      'unusable_grok_response',
+      'unsafe_review_output',
+      'review_changed_files',
+    ].includes(reason)
+  )
+    return reason.toUpperCase();
+  // Match only constructed error codes, never raw provider/error text.
+  const exit = /^(grok|git|gh)_exit_(\\d+|spawn_failure)$/.exec(reason);
+  if (exit)
+    return `${exit[1].toUpperCase()}_EXIT_${exit[2].toUpperCase()}`;
+  return 'DISPATCH_FAILURE_UNCLASSIFIED';
+}
+
 export function oneCycle({ dryRun = false } = {}) {
   persisted();
   drainPending();
@@ -500,7 +549,8 @@ export function oneCycle({ dryRun = false } = {}) {
         }
       }
       process.stdout.write(`grok-dispatch: PR #${lease.pr} ${outcome}\n`);
-    } catch {
+    } catch (error) {
+      const failure = dispatchFailureCode(error);
       if (!dryRun) {
         const file = path.join(STATE, `${lease.key}.json`);
         const pending =
@@ -513,6 +563,7 @@ export function oneCycle({ dryRun = false } = {}) {
               `<!-- tabibi-grok-dispatch:${lease.key} -->\n` +
                 `CAPACITY_DEGRADED actor: grok capability: review exact_sha: ${lease.sha}\n` +
                 `source_lease_comment: ${lease.commentId}\n` +
+                `reason: ${failure}\n` +
                 'No GitHub-verifiable review verdict exists. Reconcile and fail over.',
               'CAPACITY_DEGRADED',
             );
@@ -522,7 +573,7 @@ export function oneCycle({ dryRun = false } = {}) {
         }
       }
       process.stderr.write(
-        `grok-dispatch: PR #${lease.pr} failed or pending delivery.\n`,
+        `grok-dispatch: PR #${lease.pr} failure ${failure}; check PR for delivery status.\n`,
       );
     }
   }
