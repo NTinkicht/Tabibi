@@ -206,7 +206,7 @@ test('initial HTML contains discoverable clinic names without client JavaScript'
 });
 
 
-test('public search finds clinics or doctors, ignores accents, and clears without leaking identifiers', async ({
+test('filters public clinic and doctor names without leaking private IDs', async ({
   page,
 }) => {
   await mockDirectory(page, [
@@ -231,13 +231,21 @@ test('public search finds clinics or doctors, ignores accents, and clears withou
     name: 'Rechercher une clinique ou un médecin',
   });
   await search.fill('etoile');
-  await expect(page.getByRole('heading', { name: 'Clinique Étoile' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Cabinet du Centre' })).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Clinique Étoile' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Cabinet du Centre' }),
+  ).toHaveCount(0);
   await expect(page.getByText('1 clinique trouvée.')).toBeVisible();
 
   await search.fill('SALIMA');
-  await expect(page.getByRole('heading', { name: 'Cabinet du Centre' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Clinique Étoile' })).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Cabinet du Centre' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Clinique Étoile' }),
+  ).toHaveCount(0);
   await search.fill('does-not-exist');
   await expect(
     page.getByText('Aucune clinique ni aucun médecin ne correspond à votre recherche.'),
@@ -250,7 +258,7 @@ test('public search finds clinics or doctors, ignores accents, and clears withou
   expect(body).not.toContain('private-doctor-id');
 });
 
-test('Arabic directory search matches names without vowel marks and stays RTL after refresh', async ({
+test('Arabic search matches without vowel marks and remains RTL', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -274,11 +282,17 @@ test('Arabic directory search matches names without vowel marks and stays RTL af
   const search = page.getByRole('searchbox', { name: 'ابحث عن عيادة أو طبيب' });
   await search.fill('عيادة الامل');
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'عِيَادَة الأمل' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'عيادة الورد' })).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'عِيَادَة الأمل' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'عيادة الورد' }),
+  ).toHaveCount(0);
   await expect(page.getByText('نتائج البحث: 1 عيادة.')).toBeVisible();
 
   await page.getByRole('button', { name: 'تحديث' }).click();
   await expect(search).toHaveValue('عيادة الامل');
-  await expect(page.getByRole('heading', { name: 'عِيَادَة الأمل' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'عِيَادَة الأمل' }),
+  ).toBeVisible();
 });
