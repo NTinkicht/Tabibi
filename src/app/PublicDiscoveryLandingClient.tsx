@@ -25,6 +25,7 @@ const copy = {
     clinicLanguageAll: 'Toutes les langues',
     clinicLanguageFrench: 'Français',
     clinicLanguageArabic: 'العربية',
+    onlyListedDoctors: 'Cliniques avec médecins affichés uniquement',
     clinicSortLabel: 'Trier les cliniques par nom',
     clinicSortOriginal: 'Ordre initial',
     clinicSortAscending: 'Nom : A à Z',
@@ -59,6 +60,7 @@ const copy = {
     clinicLanguageAll: 'كل اللغات',
     clinicLanguageFrench: 'الفرنسية',
     clinicLanguageArabic: 'العربية',
+    onlyListedDoctors: 'العيادات التي تعرض أطباء فقط',
     clinicSortLabel: 'ترتيب العيادات حسب الاسم',
     clinicSortOriginal: 'الترتيب الأصلي',
     clinicSortAscending: 'الاسم: تصاعديًا',
@@ -149,16 +151,20 @@ export default function PublicDiscoveryLandingClient({
   const [clinicLanguage, setClinicLanguage] =
     useState<ClinicLanguageFilter>('all');
   const [clinicSort, setClinicSort] = useState<ClinicSort>('original');
+  const [onlyListedDoctors, setOnlyListedDoctors] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [refreshCount, setRefreshCount] = useState<number | null>(null);
   const t = copy[locale];
   const query = normalizeSearch(search.trim());
   const noMatchesCopy =
-    clinicLanguage !== 'all' ? t.noFilteredMatches : t.noSearchMatches;
+    clinicLanguage !== 'all' || onlyListedDoctors
+      ? t.noFilteredMatches
+      : t.noSearchMatches;
   const matchingClinics = clinics.filter(
     (clinic) =>
       (clinicLanguage === 'all' ||
         clinic.enabledLocales.includes(clinicLanguage)) &&
+      (!onlyListedDoctors || clinic.doctors.length > 0) &&
       (!query ||
         normalizeSearch(clinic.name).includes(query) ||
         clinic.doctors.some((doctor) =>
@@ -319,6 +325,17 @@ export default function PublicDiscoveryLandingClient({
               <option value="fr">{t.clinicLanguageFrench}</option>
               <option value="ar">{t.clinicLanguageArabic}</option>
             </select>
+            <label className="publicDoctorFilter" htmlFor="publicClinicsWithDoctors">
+              <input
+                id="publicClinicsWithDoctors"
+                type="checkbox"
+                checked={onlyListedDoctors}
+                onChange={(event) =>
+                  setOnlyListedDoctors(event.target.checked)
+                }
+              />
+              <span>{t.onlyListedDoctors}</span>
+            </label>
             <label htmlFor="publicClinicSort">{t.clinicSortLabel}</label>
             <select
               id="publicClinicSort"
@@ -331,19 +348,22 @@ export default function PublicDiscoveryLandingClient({
               <option value="ascending">{t.clinicSortAscending}</option>
               <option value="descending">{t.clinicSortDescending}</option>
             </select>
-            {(search.length > 0 || clinicLanguage !== 'all') && (
+            {(search.length > 0 ||
+              clinicLanguage !== 'all' ||
+              onlyListedDoctors) && (
               <button
                 type="button"
                 onClick={() => {
                   setSearch('');
                   setClinicLanguage('all');
+                  setOnlyListedDoctors(false);
                   searchInputRef.current?.focus();
                 }}
               >
                 {t.clearAllFilters}
               </button>
             )}
-            {(query || clinicLanguage !== 'all') && (
+            {(query || clinicLanguage !== 'all' || onlyListedDoctors) && (
               <p aria-live="polite" aria-atomic="true">
                 {t.searchCount(matchingClinics.length)}
               </p>
@@ -369,7 +389,7 @@ export default function PublicDiscoveryLandingClient({
         </div>
         {state === 'ready' &&
           clinics.length > 0 &&
-          (query || clinicLanguage !== 'all') &&
+          (query || clinicLanguage !== 'all' || onlyListedDoctors) &&
           matchingClinics.length === 0 && (
             <p className="publicNotice" role="status">
               {noMatchesCopy}
