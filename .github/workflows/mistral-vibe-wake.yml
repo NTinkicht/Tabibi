@@ -53,6 +53,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REVIEW_PR: ${{ steps.target.outputs.pr }}
           REVIEW_SHA: ${{ steps.target.outputs.sha }}
+          REVIEW_AUTHORS: ${{ steps.target.outputs.authors }}
         shell: bash
         run: python3 /tmp/tabibi-mistral-review-target.py evidence
 
@@ -142,6 +143,7 @@ jobs:
           TARGET_MODE: ${{ steps.target.outputs.mode }}
           REVIEW_PR: ${{ steps.target.outputs.pr }}
           REVIEW_SHA: ${{ steps.target.outputs.sha }}
+          REVIEW_AUTHORS: ${{ steps.target.outputs.authors }}
         shell: bash
         run: |
           set -euo pipefail
@@ -271,6 +273,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REVIEW_PR: ${{ steps.target.outputs.pr }}
           REVIEW_SHA: ${{ steps.target.outputs.sha }}
+          REVIEW_AUTHORS: ${{ steps.target.outputs.authors }}
         shell: bash
         run: python3 /tmp/tabibi-mistral-review-target.py recheck
 
@@ -294,6 +297,7 @@ jobs:
           RECHECK_STATUS: ${{ steps.recheck.outputs.status }}
           REVIEW_PR: ${{ steps.target.outputs.pr }}
           REVIEW_SHA: ${{ steps.target.outputs.sha }}
+          REVIEW_AUTHORS: ${{ steps.target.outputs.authors }}
         shell: bash
         run: |
           set -euo pipefail
