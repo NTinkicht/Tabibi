@@ -3,7 +3,9 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 // The owner Codespace launcher deliberately runs as plain Node ESM.
 // @ts-expect-error The runtime .mjs file intentionally has no generated types.
-import { isExactFetchedMain, startupDecision } from '../../scripts/grok-auto-start.mjs';
+import * as launcher from '../../scripts/grok-auto-start.mjs';
+
+const { isExactFetchedMain, startupDecision } = launcher;
 
 const ownerEnv = {
   CODESPACES: 'true',
