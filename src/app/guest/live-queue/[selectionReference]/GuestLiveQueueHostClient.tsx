@@ -95,6 +95,7 @@ type Copy = {
   activeConsultationHeading: string;
   activeConsultationRemaining: (minutes: number) => string;
   estimateExplainerLink: string;
+  estimateExplainerNewTab: string;
 };
 
 // Arabic noun-number agreement for دقيقة (minute): 1/2 take dedicated
@@ -168,6 +169,7 @@ const COPY: Record<SupportedLocale, Copy> = {
         ? 'Temps restant estimé : environ 1 min'
         : `Temps restant estimé : environ ${minutes} min`,
     estimateExplainerLink: 'Pourquoi ces estimations changent',
+    estimateExplainerNewTab: 's’ouvre dans un nouvel onglet',
     bookingStates: {
       confirmed: 'confirmée',
       checked_in: 'enregistré',
@@ -241,6 +243,7 @@ const COPY: Record<SupportedLocale, Copy> = {
     activeConsultationRemaining: (minutes) =>
       `الوقت المتبقي المقدر: حوالي ${arabicMinuteCount(minutes)}`,
     estimateExplainerLink: 'لماذا تتغير هذه التقديرات',
+    estimateExplainerNewTab: 'يُفتح في علامة تبويب جديدة',
     bookingStates: {
       confirmed: 'مؤكدة',
       checked_in: 'تم تسجيل الوصول',
@@ -313,9 +316,13 @@ function EtaStatus({
           href={`/guest/eta-explained?lang=${locale}`}
           target="_blank"
           rel="noopener noreferrer"
+          aria-describedby="tabibi-wait-eta-explainer-hint"
         >
           {copy.estimateExplainerLink}
-        </a>
+        </a>{' '}
+        <small id="tabibi-wait-eta-explainer-hint">
+          ({copy.estimateExplainerNewTab})
+        </small>
       </p>
     </div>
   );
@@ -344,9 +351,13 @@ function ActiveConsultationStatus({
           href={`/guest/eta-explained?lang=${locale}`}
           target="_blank"
           rel="noopener noreferrer"
+          aria-describedby="tabibi-consultation-eta-explainer-hint"
         >
           {copy.estimateExplainerLink}
-        </a>
+        </a>{' '}
+        <small id="tabibi-consultation-eta-explainer-hint">
+          ({copy.estimateExplainerNewTab})
+        </small>
       </p>
     </div>
   );
