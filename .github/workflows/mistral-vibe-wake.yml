@@ -119,6 +119,10 @@ jobs:
           cat > /tmp/tabibi-mistral-prompt.txt <<'EOF'
           You are actor=mistral-vibe in the Tabibi Company OS.
           This is an unattended READ-ONLY wake from the permanent GitHub wake bus.
+          Work from small, task-specific file excerpts. Avoid dumping complete large test
+          suites, scanning unrelated modules, or repeatedly loading governance files.
+          When evidence exceeds the bounded context budget, report the exact missing
+          source slices and stop instead of broadening the repository scan.
           Read VIBE.md, AGENTS.md, coordination/BOOTSTRAP.md, coordination/AI_CAPACITY_POLICY.md,
           coordination/ACTOR_REGISTRY.json and only the additional repository files necessary for the task.
           Do not edit files. Do not run mutating commands. Do not create branches, commits, pull requests,
@@ -143,7 +147,7 @@ jobs:
               --enabled-tools grep \
               --enabled-tools read_file \
               --max-turns 8 \
-              --max-tokens 30000 \
+              --max-tokens 75000 \
               --output text \
               --prompt "$(cat /tmp/tabibi-mistral-prompt.txt)" \
               > /tmp/tabibi-mistral-output.txt \
@@ -167,6 +171,9 @@ jobs:
             elif grep -Eqi '403|forbidden|entitlement|permission denied' /tmp/tabibi-mistral-error.txt; then
               status="ENTITLEMENT_BLOCKED"
               reason="Mistral Vibe entitlement was rejected by the runtime"
+            elif grep -Eqi 'token limit exceeded|context (window|length) exceeded|too many tokens' /tmp/tabibi-mistral-error.txt; then
+              status="TOKEN_BUDGET_EXCEEDED"
+              reason="Mistral bounded context/token budget was exceeded; narrow evidence and retry once"
             elif grep -Eqi '429|rate.?limit|quota|usage[^[:alnum:]]*limit|capacity' /tmp/tabibi-mistral-error.txt; then
               status="CAPACITY_DEGRADED"
               reason="Mistral included capacity is unavailable or exhausted"
