@@ -59,9 +59,7 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     expect(propose.outputs?.ready).toContain('steps.patch.outputs.ready');
     expect(propose.outputs?.lease).toContain('steps.lease.outputs.lease');
     expect(propose.outputs?.paths).toContain('steps.lease.outputs.paths');
-    expect(propose.concurrency?.group).toContain(
-      'github.event.issue.number',
-    );
+    expect(propose.concurrency?.group).toContain('github.event.issue.number');
     expect(propose.concurrency?.['cancel-in-progress']).toBe(true);
   });
 
