@@ -258,7 +258,13 @@ def main():
                 blocked("REVIEW_DIFF_UNAVAILABLE_OR_TOO_LARGE")
                 return
             write_evidence(diff)
-        elif command != "recheck":
+        elif command == "recheck":
+            # Required CI may be rerun (and fail) while the model is reading.
+            # Rechecking only HEAD is not a valid publication gate.
+            if not ci_green(repo, exact_sha):
+                blocked("CI_NOT_GREEN")
+                return
+        else:
             blocked("REVIEW_TARGET_BLOCKED")
             return
         output(ready="true", status="OK", mode="review")
