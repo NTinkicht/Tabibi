@@ -1,9 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 
 import { describe, expect, it } from 'vitest';
 
 const workflowDirectory = path.join(process.cwd(), '.github', 'workflows');
+const yaml = createRequire(import.meta.url)('js-yaml') as {
+  load: (source: string) => unknown;
+};
 const globallyForbiddenWorkflowPatterns = [
   { label: 'OpenRouter provider reference', pattern: /openrouter/i },
   { label: 'OpenRouter repository secret', pattern: /OPENROUTER_API_KEY/ },
@@ -54,11 +58,54 @@ describe('AI capacity policy', () => {
     expect(violations).toEqual([]);
   });
 
-  it('does not introduce a Grok unattended Action', () => {
+  it('allows only the bounded SaveGrok cloud signal, never Grok model execution', () => {
     const files = fs
       .readdirSync(workflowDirectory)
       .filter((file) => /\.ya?ml$/i.test(file));
-    expect(files.some((file) => /grok/i.test(file))).toBe(false);
+    expect(files.filter((file) => /grok/i.test(file))).toEqual([
+      'savegrok-cloud-slack-bridge.yml',
+    ]);
+    const bridge = fs.readFileSync(
+      path.join(workflowDirectory, 'savegrok-cloud-slack-bridge.yml'),
+      'utf8',
+    );
+    const parsed = yaml.load(bridge) as {
+      on: { issue_comment: { types: string[] } };
+      permissions: Record<string, string>;
+      jobs: {
+        'notify-grok-cloud': {
+          if: string;
+          env: Record<string, string>;
+          steps: { run?: string }[];
+        };
+      };
+    };
+    const job = parsed.jobs['notify-grok-cloud'];
+    expect(parsed.on.issue_comment.types).toEqual(['created']);
+    expect(parsed.permissions).toEqual({
+      contents: 'read',
+      'pull-requests': 'read',
+      actions: 'read',
+      issues: 'read',
+    });
+    expect(job.if).toContain("github.actor == 'NTinkicht'");
+    expect(job.env.GROK_CLOUD_BRIDGE_ENABLED).toContain(
+      'vars.TABIBI_GROK_CLOUD_BRIDGE_ENABLED',
+    );
+    expect(job.steps).toHaveLength(1);
+    const code = job.steps[0]?.run;
+    expect(code).toContain('CLOUD_SIGNAL_SENT');
+    expect(code).toContain("GROK_CLOUD_BRIDGE_ENABLED') != 'true'");
+    expect(code).not.toContain('grok -p');
+    expect(code).not.toContain('XAI_API_KEY');
+    expect(code).not.toContain('GROK_AUTH_JSON');
+    expect(bridge).toContain('SLACK_CHATGPT_BOT_TOKEN');
+    expect(bridge).toContain("github.actor == 'NTinkicht'");
+    expect(bridge).toContain('CLOUD_SIGNAL_SENT');
+    expect(bridge).not.toContain('grok -p');
+    expect(bridge).not.toContain('XAI_API_KEY');
+    expect(bridge).not.toContain('GROK_AUTH_JSON');
+    expect(bridge).not.toContain('contents: write');
   });
 
   it('keeps external actor wakes owner-only and read-only', () => {
