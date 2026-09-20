@@ -35,7 +35,7 @@ For a persistent cloud teammate instead of an interactive CLI, xAI separately in
 
 One-time owner setup: install Grok Bot from https://x.ai/bot (Windows/macOS/Linux, or mobile); sign in with its Cursor account, link the existing SuperGrok subscription when prompted, create a focused Bot named **Tabibi Code & Security Challenger**, and connect/sign in to GitHub `NTinkicht/Tabibi` on its cloud computer using the normal owner-controlled sign-in flow. Give it this `GROK.md` and `AGENTS.md`, then the bounded first-task prompt below. It must check live GitHub evidence before each action. If the cloud computer stores GitHub sessions or repo files, treat them as available to **all Bots on the same owner's shared computer**; grant the minimum needed access, keep production credentials/patient data off it, and inspect Grok Bot's cloud storage/privacy and approvals before connecting sensitive tools. Never export CLI OAuth secrets to it.
 
-Grok Bot is a user-authorized subscription agent, **not** an unattended GitHub Action or an automatic `@grok` wake. Its persistent sessions, costs and access must be verified in the app before any lease. Its GitHub activity must disclose `actor: grok` and exact SHA and respect the same lease/non-author gate and zero-extra-spend rules.
+Grok Bot is a user-authorized subscription agent, **not** a model-running GitHub Action or a generic automatic `@grok` wake. The narrowly authorized `.github/workflows/savegrok-cloud-slack-bridge.yml` is metadata-only, DEFAULT OFF until `TABIBI_GROK_CLOUD_BRIDGE_ENABLED=true` after owner-linked Bot/Slack/GitHub event routine setup. It checks owner-issued current PR leases, supersession and newest exact-head 3/3 CI, then signals the existing Slack room; it never receives Grok OAuth or executes Grok on GitHub Actions. A real Codespace-OFF PR review remains necessary to establish cloud capability. Its persistent sessions, costs and access must be verified in the app before any lease. Its GitHub activity must disclose `actor: grok` and exact SHA and respect the same lease/non-author gate and zero-extra-spend rules.
 
 Official: https://x.ai/news/grok-bot-more-plans ; https://docs.x.ai/grok-bot/get-started ; https://docs.x.ai/grok-bot/overview
 
@@ -47,7 +47,7 @@ Official: https://x.ai/news/grok-bot-more-plans ; https://docs.x.ai/grok-bot/get
 
 - Only existing **included SuperGrok weekly usage**; no xAI API key, independently billed API, Grok extra usage credits, PAYG, auto-topup, upgrade or OpenRouter. Never use `XAI_API_KEY`.
 - Never copy `~/.grok/auth.json`, `~/.grok/mcp_credentials.json`, OAuth tokens or `$GROK_HOME` into this repository, issues, prompts, Slack, GitHub Actions/secrets or shared runners. Local `.grok/` is ignored.
-- No unattended `@grok` GitHub Action/wake is installed: Issue #11 mentions do not execute Grok. A safe, included-subscription, owner-authenticated persistent unattended runtime would require separate verification and review.
+- Issue #11 mentions do not directly execute Grok. The separate owner-only, default-off GitHub-to-Slack **metadata** bridge is not a Grok model wake; only a verified owner-linked Grok Bot cloud routine may consume that signal. No cloud coding/review claim until an actual Codespace-off proof is posted on the target PR.
 - No secrets, real patient/production records, private provider payloads, database backups or PHI/PII in public/model evidence. Use synthetic data.
 
 ## Roles and handoff
