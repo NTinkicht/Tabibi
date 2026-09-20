@@ -415,3 +415,82 @@ test('Arabic language filter remains RTL across refresh', async ({ page }) => {
   ).toHaveValue('ar');
   await expect(page.getByText('1 clinique trouvée.')).toBeVisible();
 });
+
+test('reset all filters clears name and clinic language together', async ({
+  page,
+}) => {
+  await mockDirectory(page, [
+    {
+      name: 'Clinique Étoile',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr', 'ar'],
+      tenantKey: 'private-tenant',
+      doctors: [{ displayName: 'Dr. Amine', id: 'private-doctor' }],
+    },
+    {
+      name: 'Cabinet du Centre',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr'],
+      doctors: [{ displayName: 'Dr. Salima' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  const language = page.getByRole('combobox', {
+    name: 'Langue proposée par la clinique',
+  });
+  await language.selectOption('ar');
+  await search.fill('centre');
+  await expect(
+    page.getByText('Aucune clinique ne correspond aux filtres sélectionnés.'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Effacer tous les filtres' }).click();
+  await expect(search).toHaveValue('');
+  await expect(search).toBeFocused();
+  await expect(language).toHaveValue('all');
+  await expect(page.locator('.publicClinic')).toHaveCount(2);
+  await expect(
+    page.getByRole('button', { name: 'Effacer tous les filtres' }),
+  ).toHaveCount(0);
+  const body = await page.locator('main').innerText();
+  expect(body).not.toContain('private-tenant');
+  expect(body).not.toContain('private-doctor');
+});
+
+test('Arabic one-tap reset clears the language-only filter in RTL', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDirectory(page, [
+    {
+      name: 'عيادة الأمل',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [],
+    },
+    {
+      name: 'عيادة الورد',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr'],
+      doctors: [],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  const language = page.getByRole('combobox', {
+    name: 'اللغة المتاحة في العيادة',
+  });
+  await language.selectOption('fr');
+  await expect(page.locator('.publicClinic')).toHaveCount(1);
+  await page.getByRole('button', { name: 'مسح جميع عوامل التصفية' }).click();
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(language).toHaveValue('all');
+  await expect(page.locator('.publicClinic')).toHaveCount(2);
+  await expect(
+    page.getByRole('searchbox', { name: 'ابحث عن عيادة أو طبيب' }),
+  ).toBeFocused();
+});

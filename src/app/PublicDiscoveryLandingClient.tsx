@@ -28,6 +28,7 @@ const copy = {
       'Aucune clinique ne correspond aux filtres sélectionnés.',
     searchPlaceholder: 'Nom de la clinique ou du médecin',
     clearSearch: 'Effacer la recherche',
+    clearAllFilters: 'Effacer tous les filtres',
     searchCount: (count: number) =>
       `${count} clinique${count === 1 ? '' : 's'} trouvée${count === 1 ? '' : 's'}.`,
     noSearchMatches:
@@ -56,6 +57,7 @@ const copy = {
     noFilteredMatches: 'لا توجد عيادات تطابق عوامل التصفية المحددة.',
     searchPlaceholder: 'اسم العيادة أو الطبيب',
     clearSearch: 'مسح البحث',
+    clearAllFilters: 'مسح جميع عوامل التصفية',
     searchCount: (count: number) => `نتائج البحث: ${count} عيادة.`,
     noSearchMatches: 'لا توجد عيادات أو أطباء يطابقون بحثك.',
     refresh: 'تحديث',
@@ -287,6 +289,18 @@ export default function PublicDiscoveryLandingClient({
               <option value="fr">{t.clinicLanguageFrench}</option>
               <option value="ar">{t.clinicLanguageArabic}</option>
             </select>
+            {(search.length > 0 || clinicLanguage !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setClinicLanguage('all');
+                  searchInputRef.current?.focus();
+                }}
+              >
+                {t.clearAllFilters}
+              </button>
+            )}
             {(query || clinicLanguage !== 'all') && (
               <p aria-live="polite" aria-atomic="true">
                 {t.searchCount(matchingClinics.length)}
