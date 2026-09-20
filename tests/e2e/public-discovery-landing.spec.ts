@@ -935,6 +935,18 @@ test('filtered public results count only doctors actually visible in clinic card
     page.getByText('2 médecins affichés au total dans les résultats.'),
   ).toBeVisible();
   await expect(page.locator('.publicClinic li')).toHaveCount(2);
+  await search.fill('salima');
+  await expect(page.getByText('1 clinique trouvée.')).toBeVisible();
+  await expect(
+    page.getByText('1 médecin affiché au total dans les résultats.'),
+  ).toBeVisible();
+  await expect(page.locator('.publicClinic li')).toHaveCount(1);
+  await search.fill('sans medecin');
+  await expect(page.getByText('1 clinique trouvée.')).toBeVisible();
+  await expect(
+    page.getByText('0 médecins affichés au total dans les résultats.'),
+  ).toBeVisible();
+  await expect(page.locator('.publicClinic li')).toHaveCount(0);
   await search.fill('etoile');
   await expect(
     page.getByText('3 médecins affichés au total dans les résultats.'),
