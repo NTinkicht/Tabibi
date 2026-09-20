@@ -557,3 +557,71 @@ test('a stale clamped poll response cannot resurrect a cleared pause status', as
   await expect(page.getByText('File temporairement en pause')).toHaveCount(0);
   await expect(page.getByText(/en attente/)).toHaveCount(0);
 });
+
+test('French renders terminal queue closure, suppresses projections, and ignores later stale polls', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let attempts = 0;
+  await page.route(STATUS_URL, async (route) => {
+    attempts += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'completed',
+        queueState: 'completed',
+        pauseStatus: null,
+        closureStatus: 'closed',
+        activeConsultationRemainingMinutes: null,
+        eta: null,
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  const closed = page.getByRole('status').filter({
+    has: page.getByRole('heading', { name: 'File fermée' }),
+  });
+  await expect(closed).toBeVisible();
+  await expect(page.getByText('Temps d’attente estimé')).toHaveCount(0);
+  await expect(page.getByText('Consultation en cours')).toHaveCount(0);
+  await page.clock.fastForward(120_000);
+  expect(attempts).toBe(1);
+  await expect(closed).toBeVisible();
+});
+
+test('Arabic renders an accessible RTL terminal queue closure without false precision', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'language', { get: () => 'ar-DZ' });
+  });
+  await mockBooking(page);
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'cancelled',
+        queueState: 'cancelled',
+        pauseStatus: null,
+        closureStatus: 'closed',
+        activeConsultationRemainingMinutes: null,
+        eta: null,
+      }),
+    });
+  });
+
+  await submitBookingForm(page);
+  const shell = page.locator('section[lang="ar"][dir="rtl"]');
+  await expect(shell).toBeVisible();
+  await expect(
+    shell.getByRole('status').filter({
+      has: page.getByRole('heading', { name: 'قائمة الانتظار مغلقة' }),
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('وقت الانتظار المقدر')).toHaveCount(0);
+  await expect(page.getByText('الاستشارة جارية الآن')).toHaveCount(0);
+});
