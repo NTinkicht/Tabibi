@@ -870,10 +870,7 @@ test('Arabic doctor-only search ignores vowel marks and remains RTL', async ({
       name: 'عيادة الورد',
       defaultLocale: 'ar',
       enabledLocales: ['ar'],
-      doctors: [
-        { displayName: 'د. مَرْيَم' },
-        { displayName: 'د. سارة' },
-      ],
+      doctors: [{ displayName: 'د. مَرْيَم' }, { displayName: 'د. سارة' }],
     },
   ]);
   await page.goto('/');
@@ -893,4 +890,3 @@ test('Arabic doctor-only search ignores vowel marks and remains RTL', async ({
   await expect(clinic.locator('li')).toHaveCount(2);
   await expect(clinic.getByText('طبيبان في القائمة')).toBeVisible();
 });
-
