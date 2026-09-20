@@ -160,6 +160,10 @@ function parseClinics(value: unknown): PublicClinic[] | null {
   return result;
 }
 
+/**
+ * Render the public clinic directory and announce counts of the public doctor
+ * names actually visible after language, doctor and name filtering.
+ */
 export default function PublicDiscoveryLandingClient({
   initialClinics,
 }: {
