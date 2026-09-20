@@ -72,6 +72,30 @@ export function pendingLeases(prs, commentsByPr, done = new Set()) {
   return result.sort((a, b) => a.commentId - b.commentId);
 }
 
+// Grok's raw stdout/stderr may contain OAuth or provider details. Diagnose a
+// failed subprocess by allowlisted categories only; never return those streams.
+export function classifyGrokFailure({ stderr = '', stdout = '', error } = {}) {
+  if (error?.code === 'ETIMEDOUT') return 'GROK_TIMEOUT';
+  if (error?.code === 'ENOBUFS') return 'GROK_OUTPUT_LIMIT';
+  if (error?.code === 'ENOENT') return 'GROK_BINARY_NOT_FOUND';
+  const message = [stderr, stdout].filter((part) => typeof part === 'string').join('\\n');
+  if (/approval required|requires approval|needs approval|cannot prompt|not approved|user denied|tool use denied/i.test(message))
+    return 'GROK_APPROVAL_REQUIRED';
+  if (/sandbox violation|sandbox denied|bubblewrap|landlock|sandbox setup failed/i.test(message))
+    return 'GROK_SANDBOX_DENIED';
+  if (/unauthorized|unauthenticated|login required|oauth expired|invalid refresh token|invalid credentials/i.test(message))
+    return 'GROK_AUTH_FAILED';
+  if (/rate limit|too many requests|quota exceeded|insufficient credits|capacity exhausted/i.test(message))
+    return 'GROK_CAPACITY_LIMIT';
+  if (/max.turns|turn limit|maximum turns/i.test(message))
+    return 'GROK_TURN_LIMIT';
+  if (/permission denied|operation not permitted|access denied/i.test(message))
+    return 'GROK_FILE_PERMISSION';
+  if (/timed out|timeout|deadline exceeded/i.test(message))
+    return 'GROK_TIMEOUT';
+  return 'GROK_EXIT_UNCLASSIFIED';
+}
+
 function command(bin, args, { cwd = ROOT, input, timeout = 45_000, env } = {}) {
   const result = spawnSync(bin, args, {
     cwd,
@@ -88,6 +112,12 @@ function command(bin, args, { cwd = ROOT, input, timeout = 45_000, env } = {}) {
       Number.isInteger(result.status) && result.status >= 0
         ? String(result.status)
         : 'spawn_failure';
+    if (bin === 'grok') {
+      const cause = classifyGrokFailure(result);
+      throw new Error(
+        cause === 'GROK_EXIT_UNCLASSIFIED' ? `grok_exit_${code}` : cause.toLowerCase(),
+      );
+    }
     throw new Error(`${bin}_exit_${code}`);
   }
   return result.stdout.trim();
@@ -522,6 +552,15 @@ export function dispatchFailureCode(error) {
       'grok_unsafe_merge_claim',
       'unsafe_review_output',
       'review_changed_files',
+      'grok_timeout',
+      'grok_output_limit',
+      'grok_binary_not_found',
+      'grok_approval_required',
+      'grok_sandbox_denied',
+      'grok_auth_failed',
+      'grok_capacity_limit',
+      'grok_turn_limit',
+      'grok_file_permission',
     ].includes(reason)
   )
     return reason.toUpperCase();
