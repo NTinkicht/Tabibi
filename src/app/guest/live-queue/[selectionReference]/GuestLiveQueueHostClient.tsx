@@ -756,6 +756,10 @@ function LiveQueueView({
     let hideAbort = false;
     let resumeIfVisibleAfterHideAbort = false;
     let activeController: AbortController | null = null;
+    let streamController: AbortController | null = null;
+    let streamRetryId: ReturnType<typeof setTimeout> | null = null;
+    let streamFailures = 0;
+    let hintPending = false;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const clearScheduled = () => {
@@ -763,8 +767,15 @@ function LiveQueueView({
       timeoutId = null;
     };
 
+    const clearStreamRetry = () => {
+      if (streamRetryId) clearTimeout(streamRetryId);
+      streamRetryId = null;
+    };
+
     const scheduleNext = (delay: number) => {
       clearScheduled();
+      clearStreamRetry();
+      streamController?.abort();
       timeoutId = setTimeout(() => void poll(), delay);
     };
 
@@ -773,6 +784,8 @@ function LiveQueueView({
       currentBearer = null;
       initialBearerRef.current = undefined;
       clearScheduled();
+      clearStreamRetry();
+      streamController?.abort();
       if (!cancelled) setState({ kind: 'unavailable' });
     };
 
@@ -914,6 +927,11 @@ function LiveQueueView({
         clearTimeout(timeoutHandle);
         activeController = null;
         inFlight = false;
+        if (hintPending && !cancelled && !terminalReached) {
+          hintPending = false;
+          clearScheduled();
+          void poll();
+        }
         // A hide-triggered abort can settle after visibility has already
         // returned, in which case handleVisibilityChange's own immediate
         // refresh already saw inFlight=true and skipped. Self-heal here so
@@ -931,6 +949,70 @@ function LiveQueueView({
       }
     };
 
+    const startStream = async () => {
+      if (
+        cancelled ||
+        terminalReached ||
+        !currentBearer ||
+        document.visibilityState === 'hidden'
+      )
+        return;
+      clearStreamRetry();
+      const controller = new AbortController();
+      streamController = controller;
+      try {
+        const response = await fetch('/api/public/bookings/live-queue-stream', {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            authorization: `Bearer ${currentBearer}`,
+            accept: 'text/event-stream',
+          },
+          signal: controller.signal,
+        });
+        if (response.status === 400) {
+          stopForRejection();
+          return;
+        }
+        if (!response.ok || !response.body) throw new Error('stream rejected');
+        streamFailures = 0;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (!cancelled && !terminalReached) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let boundary = buffer.indexOf('\n\n');
+          while (boundary !== -1) {
+            const event = buffer.slice(0, boundary);
+            buffer = buffer.slice(boundary + 2);
+            if (event.split('\n').some((line) => line === 'event: change')) {
+              if (inFlight) hintPending = true;
+              else {
+                clearScheduled();
+                void poll();
+              }
+            }
+            boundary = buffer.indexOf('\n\n');
+          }
+        }
+      } catch {
+        // Polling remains authoritative and continues independently.
+      } finally {
+        if (streamController === controller) streamController = null;
+        if (
+          !cancelled &&
+          !terminalReached &&
+          document.visibilityState === 'visible'
+        ) {
+          streamFailures += 1;
+          const delay = Math.min(2 ** (streamFailures - 1) * 1_000, 30_000);
+          streamRetryId = setTimeout(() => void startStream(), delay);
+        }
+      }
+    };
+
     manualRetryRef.current = () => {
       if (cancelled || terminalReached || inFlight) return;
       consecutiveFailures = 0;
@@ -943,6 +1025,8 @@ function LiveQueueView({
       const exhausted = consecutiveFailures > MAX_TRANSIENT_FAILURES;
       if (document.visibilityState === 'hidden') {
         clearScheduled();
+        clearStreamRetry();
+        streamController?.abort();
         if (inFlight) {
           hideAbort = true;
           activeController?.abort();
@@ -964,16 +1048,20 @@ function LiveQueueView({
         clearScheduled();
         void poll();
       }
+      if (!streamController) void startStream();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     void poll();
+    void startStream();
 
     return () => {
       cancelled = true;
       currentBearer = null;
       activeController?.abort();
+      streamController?.abort();
       clearScheduled();
+      clearStreamRetry();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       // Defer the ref clear: React Strict Mode double-invokes this effect
       // (mount -> cleanup -> mount again) synchronously on the same instance
