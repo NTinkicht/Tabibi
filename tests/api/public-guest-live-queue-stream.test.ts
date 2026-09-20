@@ -105,6 +105,31 @@ describe('GET public booking live queue stream', () => {
     expect(get).not.toHaveBeenCalled();
   });
 
+  it('prunes expired rate buckets while preserving hashed limits', async () => {
+    const controller = new AbortController();
+    await GET(
+      request({ authorization: `Bearer ${bearer}` }, controller.signal),
+    );
+    const sql = String(query.mock.calls[0]?.[0] ?? '');
+    expect(sql).toContain('WITH cleanup AS');
+    expect(sql).toContain('DELETE FROM guest_status_rate_limit_buckets');
+    expect(sql).toContain('WHERE bucket_key <> $1');
+    expect(JSON.stringify(query.mock.calls)).not.toContain(bearer);
+    controller.abort();
+  });
+
+  it('stops pending stream DB reads on reader cancellation', async () => {
+    const response = await GET(
+      request({ authorization: `Bearer ${bearer}` }),
+    );
+    const reader = response.body!.getReader();
+    expect(get).toHaveBeenCalledTimes(1);
+    await reader.cancel();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(loggerError).not.toHaveBeenCalled();
+  });
+
   it('formats the only permitted event payload exactly', () => {
     expect(new TextDecoder().decode(encodeChangeHint())).toBe(
       'event: change\ndata: {}\n\n',
