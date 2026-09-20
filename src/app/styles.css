@@ -542,3 +542,92 @@ h1 {
   opacity: 0.6;
   cursor: wait;
 }
+
+/* WU94 clinic-staff delivery exceptions: scoped operational layout in FR/AR. */
+.deskHeader .notificationsLink,
+.notificationExceptionsHeader a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid #96b5ae;
+  border-radius: 999px;
+  color: #164d45;
+  background: white;
+  font-weight: 750;
+  text-decoration: none;
+}
+.deskHeader .notificationsLink:focus-visible,
+.notificationExceptions a:focus-visible,
+.notificationExceptions button:focus-visible {
+  outline: 3px solid #8a5c00;
+  outline-offset: 3px;
+}
+.notificationExceptions {
+  max-width: 72rem;
+}
+.notificationExceptionsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.notificationExceptionsLocales {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.notificationExceptionsLocales button,
+.notificationExceptionsRefresh {
+  min-height: 2.75rem;
+  border: 1px solid #96b5ae;
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+  font-weight: 700;
+  color: #164d45;
+  background: white;
+  cursor: pointer;
+}
+.notificationExceptionsLocales button[aria-pressed='true'],
+.notificationExceptionsRefresh {
+  color: white;
+  background: #0a6f61;
+  border-color: #0a6f61;
+}
+.notificationExceptionsRefresh:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.notificationExceptionsState {
+  margin-block: 1.5rem;
+}
+.notificationExceptionsList {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 1rem;
+}
+.notificationExceptionsList > li {
+  min-width: 0;
+  border: 1px solid #dce9e7;
+  border-radius: 1rem;
+  padding: 1.2rem;
+  background: white;
+  overflow-wrap: anywhere;
+}
+.notificationExceptionsList h2 {
+  margin-block: 0 0.75rem;
+  font-size: 1.15rem;
+}
+@media (max-width: 700px) {
+  .deskHeader {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .notificationExceptions h1 {
+    font-size: clamp(1.75rem, 7vw, 2.5rem);
+  }
+}
