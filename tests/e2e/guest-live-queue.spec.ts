@@ -108,6 +108,30 @@ test('a bearer-authenticated change hint triggers an authoritative refresh witho
   expect(await page.locator('body').innerText()).not.toContain(BEARER);
 });
 
+test('optional stream rejection never invalidates an authorized guest snapshot', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+  await page.route(STREAM_URL, async (route) => {
+    await route.fulfill({ status: 400, body: '{"status":"rejected"}' });
+  });
+  await submitBookingForm(page);
+  await expect(page.getByText('G-042')).toBeVisible();
+  await expect(page.getByText('en attente')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Confirmer ma présence' })).toBeVisible();
+  await expect(page.getByText('Accès indisponible')).toHaveCount(0);
+});
+
 test('booking failure shows a generic message and never reaches the live view', async ({
   page,
 }) => {
