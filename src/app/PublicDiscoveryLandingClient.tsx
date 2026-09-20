@@ -43,6 +43,8 @@ const copy = {
     refreshed: (count: number) =>
       `Répertoire actualisé : ${count} clinique${count === 1 ? '' : 's'}.`,
     doctors: 'Médecins',
+    listedDoctorCount: (count: number) =>
+      `${count} médecin${count === 1 ? '' : 's'} affiché${count === 1 ? '' : 's'}`,
     noDoctors: 'Aucun médecin affiché pour le moment.',
     languages: 'Langues',
     empty: 'Aucune clinique à afficher pour le moment.',
@@ -74,6 +76,12 @@ const copy = {
     refresh: 'تحديث',
     refreshed: (count: number) => `تم تحديث الدليل: ${count} عيادة.`,
     doctors: 'الأطباء',
+    listedDoctorCount: (count: number) =>
+      count === 1
+        ? 'طبيب واحد في القائمة'
+        : count === 2
+          ? 'طبيبان في القائمة'
+          : `${count} أطباء في القائمة`,
     noDoctors: 'لا يوجد أطباء معروضون حاليًا.',
     languages: 'اللغات',
     empty: 'لا توجد عيادات معروضة حاليًا.',
@@ -408,6 +416,11 @@ export default function PublicDiscoveryLandingClient({
                     .join(' · ')}
                 </p>
                 <h4>{t.doctors}</h4>
+                {clinic.doctors.length > 0 && (
+                  <p className="publicDoctorCount">
+                    {t.listedDoctorCount(clinic.doctors.length)}
+                  </p>
+                )}
                 {clinic.doctors.length === 0 ? (
                   <p>{t.noDoctors}</p>
                 ) : (
