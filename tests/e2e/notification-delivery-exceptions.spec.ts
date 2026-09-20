@@ -162,17 +162,25 @@ test('known internal dispatch failures have coarse French and Arabic labels with
   });
 
   await page.goto(`/operations/${clinicId}/notifications?locale=fr`);
-  await expect(page.getByText('Contexte de livraison indisponible')).toHaveCount(2);
-  await expect(page.getByText('Préparation de la notification impossible')).toBeVisible();
-  await expect(page.getByText('Enregistrement de la notification impossible')).toHaveCount(2);
-  for (const code of codes) expect(await page.locator('body').innerText()).not.toContain(code);
+  await expect(
+    page.getByText('Contexte de livraison indisponible'),
+  ).toHaveCount(2);
+  await expect(
+    page.getByText('Préparation de la notification impossible'),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Enregistrement de la notification impossible'),
+  ).toHaveCount(2);
+  for (const code of codes)
+    expect(await page.locator('body').innerText()).not.toContain(code);
 
   await page.getByRole('button', { name: 'العربية' }).click();
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
   await expect(page.getByText('تعذّر تحديد سياق التسليم')).toHaveCount(2);
   await expect(page.getByText('تعذّر إعداد الإشعار')).toBeVisible();
   await expect(page.getByText('تعذّر حفظ الإشعار')).toHaveCount(2);
-  for (const code of codes) expect(await page.locator('body').innerText()).not.toContain(code);
+  for (const code of codes)
+    expect(await page.locator('body').innerText()).not.toContain(code);
 });
 
 test('mobile exceptions page uses reception-desk layout rather than the landing-page margin', async ({

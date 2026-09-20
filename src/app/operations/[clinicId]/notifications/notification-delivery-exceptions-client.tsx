@@ -31,7 +31,10 @@ function categorizeOutcome(code: unknown): OutcomeCategory {
   if (code === 'retry_exhausted') return 'retries_exhausted';
   if (code === 'provider_exception' || code === 'provider_indeterminate_result')
     return 'provider_error';
-  if (code === 'delivery_context_failure' || code === 'in_app_delivery_context_mismatch')
+  if (
+    code === 'delivery_context_failure' ||
+    code === 'in_app_delivery_context_mismatch'
+  )
     return 'delivery_context_error';
   if (code === 'render_failure') return 'render_error';
   if (code === 'in_app_persist_rejected' || code === 'in_app_persist_exception')
@@ -201,7 +204,11 @@ function NotificationDeliveryExceptionsView({
         >
           {t.back}
         </Link>
-        <div className="notificationExceptionsLocales" role="group" aria-label={t.language}>
+        <div
+          className="notificationExceptionsLocales"
+          role="group"
+          aria-label={t.language}
+        >
           <button
             type="button"
             lang="fr"
@@ -230,7 +237,10 @@ function NotificationDeliveryExceptionsView({
       >
         {t.refresh}
       </button>
-      <section className="notificationExceptionsState" aria-busy={state.kind === 'loading'}>
+      <section
+        className="notificationExceptionsState"
+        aria-busy={state.kind === 'loading'}
+      >
         {state.kind === 'loading' ? <p role="status">{t.loading}</p> : null}
         {state.kind === 'error' ? <p role="alert">{t.error}</p> : null}
         {state.kind === 'ready' && state.records.length === 0 ? (
