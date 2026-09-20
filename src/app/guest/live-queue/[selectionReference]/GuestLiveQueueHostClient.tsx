@@ -54,6 +54,7 @@ const REQUEST_TIMEOUT_MS = 10_000;
 const RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000];
 const MAX_RETRY_AFTER_MS = 300_000;
 const MAX_TRANSIENT_FAILURES = RETRY_DELAYS_MS.length;
+const MANUAL_REFRESH_THROTTLE_MS = 1_000;
 
 type Copy = {
   dir: 'rtl' | 'ltr';
@@ -82,6 +83,8 @@ type Copy = {
   offline: string;
   offlineBody: string;
   manualRetry: string;
+  manualRefresh: string;
+  manualRefreshPending: string;
   visitStatus: string;
   bookingStates: Record<string, string>;
   queueStates: Record<string, string>;
@@ -148,6 +151,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     offlineBody:
       'Nous n’avons pas pu actualiser votre statut. Réessayez manuellement.',
     manualRetry: 'Réessayer maintenant',
+    manualRefresh: 'Actualiser mon statut',
+    manualRefreshPending: 'Actualisation en cours…',
     visitStatus: 'Statut de la visite',
     checkIn: 'Confirmer ma présence',
     checkInPending: 'Confirmation en cours…',
@@ -232,6 +237,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     offline: 'انقطع الاتصال',
     offlineBody: 'تعذر تحديث حالتك. أعد المحاولة يدويًا.',
     manualRetry: 'إعادة المحاولة الآن',
+    manualRefresh: 'تحديث حالتي',
+    manualRefreshPending: 'جارٍ تحديث حالتك…',
     visitStatus: 'حالة الزيارة',
     checkIn: 'تأكيد الحضور',
     checkInPending: 'جارٍ التأكيد…',
@@ -609,6 +616,8 @@ function LiveQueueView({
 }) {
   const [state, setState] = useState<ViewState>({ kind: 'loading' });
   const manualRetryRef = useRef<() => void>(() => undefined);
+  const manualRefreshRef = useRef<() => void>(() => undefined);
+  const [manualRefreshPending, setManualRefreshPending] = useState(false);
   // Captured once on mount; later re-renders may pass `undefined` once the
   // host clears its own copy, but this ref keeps the value this view needs.
   const initialBearerRef = useRef(bearer);
@@ -760,6 +769,8 @@ function LiveQueueView({
     let streamRetryId: ReturnType<typeof setTimeout> | null = null;
     let streamFailures = 0;
     let hintPending = false;
+    let manualRequestPending = false;
+    let lastManualRefreshAt = Number.NEGATIVE_INFINITY;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const clearScheduled = () => {
@@ -927,6 +938,10 @@ function LiveQueueView({
         clearTimeout(timeoutHandle);
         activeController = null;
         inFlight = false;
+        if (manualRequestPending) {
+          manualRequestPending = false;
+          if (!cancelled) setManualRefreshPending(false);
+        }
         if (hintPending && !cancelled && !terminalReached) {
           hintPending = false;
           clearScheduled();
@@ -1020,6 +1035,17 @@ function LiveQueueView({
       void poll();
     };
 
+    manualRefreshRef.current = () => {
+      if (cancelled || terminalReached || inFlight) return;
+      const now = Date.now();
+      if (now - lastManualRefreshAt < MANUAL_REFRESH_THROTTLE_MS) return;
+      lastManualRefreshAt = now;
+      manualRequestPending = true;
+      setManualRefreshPending(true);
+      clearScheduled();
+      void poll();
+    };
+
     const handleVisibilityChange = () => {
       if (cancelled || terminalReached) return;
       const exhausted = consecutiveFailures > MAX_TRANSIENT_FAILURES;
@@ -1091,6 +1117,17 @@ function LiveQueueView({
       </p>
       {content}
     </section>
+  );
+
+  const manualRefreshControl = (
+    <button
+      type="button"
+      onClick={() => manualRefreshRef.current()}
+      disabled={manualRefreshPending}
+      aria-busy={manualRefreshPending}
+    >
+      {manualRefreshPending ? copy.manualRefreshPending : copy.manualRefresh}
+    </button>
   );
 
   if (state.kind === 'loading') return shell(<p>{copy.loading}</p>);
@@ -1170,6 +1207,7 @@ function LiveQueueView({
             </button>
           ) : null}
         </div>
+        {state.data ? manualRefreshControl : null}
       </>,
     );
   }
@@ -1194,6 +1232,7 @@ function LiveQueueView({
           locale={locale}
         />
       ) : null}
+      {manualRefreshControl}
       {state.data.queueState === 'waiting' || checkInState.kind !== 'idle' ? (
         <div role="status">
           {checkInState.kind === 'done' ? (
