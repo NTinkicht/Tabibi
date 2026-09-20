@@ -236,6 +236,8 @@ describe('seven-actor capacity routing', () => {
     expect(helper).toContain('REQUIRED_JOBS');
     expect(helper).toContain('DIFF_LIMIT_BYTES');
     expect(helper).toContain('"git", "diff"');
+    expect(helper).toContain('"git", "merge-base"');
+    expect(workflow).toContain('fetch-depth: 0');
     expect(helper).not.toContain('"gh", "pr", "diff"');
     expect(helper).toContain('mistral-vibe');
     const check = spawnSync(
