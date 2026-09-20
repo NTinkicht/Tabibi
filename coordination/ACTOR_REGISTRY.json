@@ -158,6 +158,7 @@
     {
       "id": "grok",
       "active": true,
+      "runtime_verification_required": true,
       "standing_role": "independent-code-and-security-challenger",
       "role_mission": "Grok Build: independent exact-head review/code/security/architecture challenger; bounded code/test/CI implementation reserve only with lease.",
       "capabilities": [
