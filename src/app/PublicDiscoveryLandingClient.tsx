@@ -325,14 +325,15 @@ export default function PublicDiscoveryLandingClient({
               <option value="fr">{t.clinicLanguageFrench}</option>
               <option value="ar">{t.clinicLanguageArabic}</option>
             </select>
-            <label className="publicDoctorFilter" htmlFor="publicClinicsWithDoctors">
+            <label
+              className="publicDoctorFilter"
+              htmlFor="publicClinicsWithDoctors"
+            >
               <input
                 id="publicClinicsWithDoctors"
                 type="checkbox"
                 checked={onlyListedDoctors}
-                onChange={(event) =>
-                  setOnlyListedDoctors(event.target.checked)
-                }
+                onChange={(event) => setOnlyListedDoctors(event.target.checked)}
               />
               <span>{t.onlyListedDoctors}</span>
             </label>
