@@ -44,6 +44,9 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           additional_permissions: |
             actions: read
+          # Claude's issue/PR action is intentionally read-oriented by default.
+          # Only the owner-scoped WU94 code lane gets file editing plus bounded
+          # test commands; an action on another issue/PR retains old permissions.
           claude_args: >-
             --max-turns 60
-            --allowedTools "Bash(npm ci),Bash(npm run format:*),Bash(npx --no-install prettier:*)"
+            --allowedTools "${{ github.event_name == 'issue_comment' && startsWith(github.event.issue.title, 'WU94:') && 'Edit,Write,Bash(npm ci),Bash(npm run format:*),Bash(npx --no-install prettier:*),Bash(npm run lint),Bash(npm run typecheck),Bash(npm run build),Bash(npm run test:*),Bash(git status:*),Bash(git diff:*)' || 'Bash(npm ci),Bash(npm run format:*),Bash(npx --no-install prettier:*)' }}"
