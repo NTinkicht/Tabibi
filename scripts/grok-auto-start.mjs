@@ -46,9 +46,7 @@ export function startupDecision(
 
 export function isExactFetchedMain(head, fetched) {
   return (
-    typeof head === 'string' &&
-    /^[a-f0-9]{40}$/.test(head) &&
-    head === fetched
+    typeof head === 'string' && /^[a-f0-9]{40}$/.test(head) && head === fetched
   );
 }
 
