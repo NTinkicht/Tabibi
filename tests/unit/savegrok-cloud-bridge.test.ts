@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 
 import { describe, expect, it } from 'vitest';
 
@@ -8,9 +9,46 @@ const workflow = fs.readFileSync(
   'utf8',
 );
 
+const yaml = createRequire(import.meta.url)('js-yaml') as {
+  load: (source: string) => unknown;
+};
+const parsed = yaml.load(workflow) as {
+  on: { issue_comment: { types: string[] } };
+  permissions: Record<string, string>;
+  jobs: {
+    'notify-grok-cloud': {
+      if: string;
+      env: Record<string, string>;
+      steps: { run?: string }[];
+    };
+  };
+};
+const bridge = parsed.jobs['notify-grok-cloud'];
+const validator = bridge.steps.find((step) => step.run?.includes('python3'));
+if (!validator?.run) {
+  throw new Error('Missing executable Grok lease validator');
+}
+const trustedScript = validator.run;
+
 describe('SaveGrok cloud lease bridge', () => {
   it('accepts owner-authorized review leases without Grok credentials in Actions', () => {
-    expect(workflow).toContain("github.actor == 'NTinkicht'");
+    expect(parsed.on.issue_comment.types).toEqual(['created']);
+    expect(parsed.permissions).toEqual({
+      contents: 'read',
+      'pull-requests': 'read',
+      actions: 'read',
+      issues: 'read',
+    });
+    expect(bridge.if).toContain("github.actor == 'NTinkicht'");
+    expect(bridge.if).toContain('github.event.issue.pull_request');
+    expect(bridge.env.GROK_CLOUD_BRIDGE_ENABLED).toContain(
+      'vars.TABIBI_GROK_CLOUD_BRIDGE_ENABLED',
+    );
+    expect(bridge.env.SLACK_CHATGPT_BOT_TOKEN).toContain(
+      'secrets.SLACK_CHATGPT_BOT_TOKEN',
+    );
+    expect(trustedScript).toContain("GROK_CLOUD_BRIDGE_ENABLED') != 'true'");
+    expect(trustedScript).toContain('CLOUD_SIGNAL_SENT');
     expect(workflow).toContain('github.event.issue.pull_request');
     expect(workflow).toContain('ROLE_LEASE_ASSIGNED');
     expect(workflow).toContain('capability: review');
