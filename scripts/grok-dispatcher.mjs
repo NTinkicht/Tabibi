@@ -463,11 +463,11 @@ function runReview(lease, { dryRun = false } = {}) {
       throw new Error('grok_empty_result');
     if (answer.text.length > 18_000) throw new Error('grok_response_too_long');
     if (!answer.text.includes(lease.sha)) throw new Error('grok_missing_sha');
-    if (!/\\b(PASS_WITH_MINOR_FINDINGS|CHANGES_REQUIRED|PASS)\\b/.test(answer.text))
+    if (!/\b(PASS_WITH_MINOR_FINDINGS|CHANGES_REQUIRED|PASS)\b/.test(answer.text))
       throw new Error('grok_missing_verdict');
     if (
       !checks.every((c) => c.conclusion === 'success') &&
-      /^\\s*MERGE_READY:\\s*(yes|true)\\b/im.test(answer.text)
+      /^\s*MERGE_READY:\s*(yes|true)\b/im.test(answer.text)
     )
       throw new Error('grok_unsafe_merge_claim');
     assertSafeReviewOutput(answer.text, fs.readFileSync(authPath, 'utf8'));
