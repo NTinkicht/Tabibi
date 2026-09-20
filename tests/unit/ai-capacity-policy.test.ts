@@ -21,8 +21,11 @@ const globallyForbiddenWorkflowPatterns = [
 ];
 
 const providerSecretWorkflowAllowlist = [
-  { secret: 'GEMINI_API_KEY', workflow: 'gemini-cli-wake.yml' },
-  { secret: 'MISTRAL_API_KEY', workflow: 'mistral-vibe-wake.yml' },
+  { secret: 'GEMINI_API_KEY', workflows: ['gemini-cli-wake.yml'] },
+  {
+    secret: 'MISTRAL_API_KEY',
+    workflows: ['mistral-vibe-wake.yml', 'mistral-scoped-code-adapter.yml'],
+  },
 ];
 
 describe('AI capacity policy', () => {
@@ -47,7 +50,10 @@ describe('AI capacity policy', () => {
 
       for (const allowed of providerSecretWorkflowAllowlist) {
         lines.forEach((line, index) => {
-          if (line.includes(allowed.secret) && file !== allowed.workflow) {
+          if (
+            line.includes(allowed.secret) &&
+            !allowed.workflows.includes(file)
+          ) {
             const location = `${file}:${index + 1}`;
             violations.push(`${location} ${allowed.secret} workflow violation`);
           }
