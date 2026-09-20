@@ -757,7 +757,9 @@ test('clinic cards show public doctor counts for one and two names only', async 
   const twoDoctors = page.locator('.publicClinic', {
     has: page.getByRole('heading', { name: 'Clinique Deux' }),
   });
-  await expect(noDoctor.getByText('Aucun médecin affiché pour le moment.')).toBeVisible();
+  await expect(
+    noDoctor.getByText('Aucun médecin affiché pour le moment.'),
+  ).toBeVisible();
   await expect(noDoctor.locator('.publicDoctorCount')).toHaveCount(0);
   await expect(oneDoctor.getByText('1 médecin affiché')).toBeVisible();
   await expect(twoDoctors.getByText('2 médecins affichés')).toBeVisible();
