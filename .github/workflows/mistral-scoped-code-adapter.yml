@@ -1,0 +1,237 @@
+name: Mistral Scoped Code Adapter
+
+on:
+  issue_comment:
+    types: [created]
+
+# ONLY the trusted parent (never Vibe) receives a scoped repo write token.
+# This entire lane is OFF unless owner deliberately sets the variable below.
+permissions:
+  contents: write
+  issues: write
+  pull-requests: read
+  actions: read
+
+jobs:
+  mistral-code:
+    if: >-
+      github.event.issue.number == 11 &&
+      github.actor == 'NTinkicht' &&
+      contains(github.event.comment.body, '@mistral-vibe') &&
+      contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: mistral-code-${{ github.event.comment.id }}
+      cancel-in-progress: false
+    env:
+      DATABASE_URL: postgresql://tabibi:tabibi_test@127.0.0.1:5432/tabibi_test
+      GUEST_BEARER_SIGNING_SECRET: ci-only-guest-bearer-signing-secret-replace-in-production
+      PUBLIC_AVAILABILITY_SELECTION_SECRET: ci-only-public-availability-selection-secret-replace-in-production
+    steps:
+      - name: Checkout trusted parent code only
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Validate owner lease and default-OFF guards
+        id: lease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISPATCH_BODY: ${{ github.event.comment.body }}
+          ADAPTER_ENABLED: ${{ vars.TABIBI_MISTRAL_CODE_ADAPTER_ENABLED }}
+          PAYG_DISABLED_CONFIRMED: ${{ vars.TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp scripts/mistral-code-adapter.py /tmp/tabibi-mistral-code-adapter.py
+          python3 /tmp/tabibi-mistral-code-adapter.py selftest
+          python3 /tmp/tabibi-mistral-code-adapter.py prepare
+
+      - name: Checkout ONLY the verified canonical PR exact head
+        if: steps.lease.outputs.ready == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.lease.outputs.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify included Mistral entitlement (non-inference)
+        id: preflight
+        if: steps.lease.outputs.ready == 'true'
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${MISTRAL_API_KEY:-}" ]]; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'status=AUTH_BLOCKED' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          set +e
+          status="$(curl -sS --connect-timeout 10 --max-time 20 --output /dev/null --write-out '%{http_code}' --header "Authorization: Bearer ${MISTRAL_API_KEY}" 'https://console.mistral.ai/api/vibe/whoami')"
+          code=$?
+          set -e
+          if [[ "$code" == 0 && "$status" == 200 ]]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+            echo 'status=OK' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            case "$status" in
+              401) echo 'status=AUTH_BLOCKED' >> "$GITHUB_OUTPUT" ;;
+              403) echo 'status=ENTITLEMENT_BLOCKED' >> "$GITHUB_OUTPUT" ;;
+              429) echo 'status=CAPACITY_DEGRADED' >> "$GITHUB_OUTPUT" ;;
+              *) echo 'status=PREFLIGHT_UNAVAILABLE' >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+
+      - name: Configure Python and pinned Vibe
+        if: steps.preflight.outputs.ready == 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned Vibe
+        if: steps.preflight.outputs.ready == 'true'
+        shell: bash
+        run: python3 -m pip install --disable-pip-version-check 'mistral-vibe==2.25.3'
+
+      - name: Request a bounded NON-mutating code proposal from Mistral
+        id: model
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          VIBE_HOME: /tmp/tabibi-vibe-code-home
+          REVIEW_PR: ${{ steps.lease.outputs.pr }}
+          REVIEW_SHA: ${{ steps.lease.outputs.sha }}
+          REVIEW_STREAM: ${{ steps.lease.outputs.stream }}
+          ALLOWED_PATHS: ${{ steps.lease.outputs.paths }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -m 700 -p "$VIBE_HOME"
+          cat > "$VIBE_HOME/config.toml" <<'EOF'
+          enable_auto_update = false
+          enable_notifications = false
+          enable_telemetry = false
+          enabled_tools = ["grep", "read_file"]
+          EOF
+          cat > /tmp/tabibi-mistral-code-prompt.txt <<'EOF'
+          You are mistral-vibe, a SOLE-IMPLEMENTER only for this bounded Tabibi
+          canonical PR. You CANNOT edit or execute shell. The trusted parent will
+          apply a strictly validated proposal and run deterministic tests.
+          Read ONLY the explicitly leased paths, and ONLY the bounded relevant
+          excerpts within them; do not read AGENTS.md or large unrelated files.
+          Output exactly ONE JSON patch in the markers below, no Markdown fences.
+          BEGIN_TABIBI_PATCH_JSON
+          {"edits":[{"path":"src/example.ts","old":"EXACT unique existing text","new":"replacement"},{"path":"tests/example.test.ts","old":"EXACT unique existing text","new":"replacement"}]}
+          END_TABIBI_PATCH_JSON
+          Each edited path MUST be from the trusted list, each old text must
+          occur exactly once, no secrets/tokens, no shell commands, no new
+          files/paths, and modify BOTH production and deterministic test code.
+          If you lack enough evidence, output a short failure reason INSTEAD
+          of patch markers. Never claim a test ran until parent CI proves it.
+          EOF
+          printf '\nTrusted PR #%s stream=%s exact HEAD=%s paths=%s\n' "$REVIEW_PR" "$REVIEW_STREAM" "$REVIEW_SHA" "$ALLOWED_PATHS" >> /tmp/tabibi-mistral-code-prompt.txt
+          set +e
+          timeout --signal=TERM --kill-after=15s 480s vibe \
+            --trust --agent plan --workdir "$GITHUB_WORKSPACE" \
+            --enabled-tools grep --enabled-tools read_file \
+            --max-turns 3 --max-tokens 45000 --output text \
+            --prompt "$(cat /tmp/tabibi-mistral-code-prompt.txt)" \
+            > /tmp/tabibi-mistral-code.txt 2> /tmp/tabibi-mistral-code-error.txt
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          if [[ "$code" == 124 ]]; then
+            echo 'status=WAKE_TIMEOUT' >> "$GITHUB_OUTPUT"
+          elif [[ "$code" != 0 ]] && grep -Eqi 'token limit exceeded|context.*exceeded' /tmp/tabibi-mistral-code-error.txt; then
+            echo 'status=TOKEN_BUDGET_EXCEEDED' >> "$GITHUB_OUTPUT"
+          elif [[ "$code" != 0 ]] && grep -Eqi '429|rate.?limit|quota|capacity' /tmp/tabibi-mistral-code-error.txt; then
+            echo 'status=CAPACITY_DEGRADED' >> "$GITHUB_OUTPUT"
+          elif [[ "$code" != 0 ]]; then
+            echo 'status=EXECUTION_FAILED' >> "$GITHUB_OUTPUT"
+          else
+            echo 'status=PROPOSAL_READY' >> "$GITHUB_OUTPUT"
+          fi
+          # Raw model output and stderr NEVER enter PR comments or job logs.
+
+      - name: Validate model's exact edits in trusted parent
+        id: patch
+        if: steps.model.outputs.exit_code == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_PR: ${{ steps.lease.outputs.pr }}
+          REVIEW_SHA: ${{ steps.lease.outputs.sha }}
+          REVIEW_STREAM: ${{ steps.lease.outputs.stream }}
+          REVIEW_BRANCH: ${{ steps.lease.outputs.branch }}
+          ALLOWED_PATHS: ${{ steps.lease.outputs.paths }}
+          LEASE_ID: ${{ steps.lease.outputs.lease }}
+        run: python3 /tmp/tabibi-mistral-code-adapter.py apply
+
+      - name: Setup test runtime
+        if: steps.patch.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Deterministic format, lint, types, unit/API tests and build
+        id: tests
+        if: steps.patch.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run format
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run build
+          git diff --check
+
+      - name: Trusted parent fast-forward commit and push ONLY canonical branch
+        id: publish
+        if: steps.patch.outputs.ready == 'true' && steps.tests.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_PR: ${{ steps.lease.outputs.pr }}
+          REVIEW_SHA: ${{ steps.lease.outputs.sha }}
+          REVIEW_STREAM: ${{ steps.lease.outputs.stream }}
+          REVIEW_BRANCH: ${{ steps.lease.outputs.branch }}
+          ALLOWED_PATHS: ${{ steps.lease.outputs.paths }}
+          LEASE_ID: ${{ steps.lease.outputs.lease }}
+        run: python3 /tmp/tabibi-mistral-code-adapter.py publish
+
+      - name: Report machine-verified status without model text
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LEASE_READY: ${{ steps.lease.outputs.ready }}
+          LEASE_STATUS: ${{ steps.lease.outputs.status }}
+          PREFLIGHT_STATUS: ${{ steps.preflight.outputs.status }}
+          MODEL_STATUS: ${{ steps.model.outputs.status }}
+          PATCH_STATUS: ${{ steps.patch.outputs.status }}
+          TEST_STATUS: ${{ steps.tests.outcome }}
+          PUBLISH_STATUS: ${{ steps.publish.outputs.status }}
+          RESULT_SHA: ${{ steps.publish.outputs.result_sha }}
+          TARGET_PR: ${{ steps.lease.outputs.pr }}
+          TARGET_SHA: ${{ steps.lease.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '**Mistral scoped code adapter (DEFAULT OFF unless authorized)**\n\n' > /tmp/tabibi-code-status.md
+          printf 'Trusted parent: lease=%s; entitlement=%s; model=%s; patch=%s; tests=%s; publish=%s.\n' \
+            "${LEASE_STATUS:-BLOCKED}" "${PREFLIGHT_STATUS:-SKIPPED}" "${MODEL_STATUS:-SKIPPED}" \
+            "${PATCH_STATUS:-SKIPPED}" "${TEST_STATUS:-SKIPPED}" "${PUBLISH_STATUS:-SKIPPED}" >> /tmp/tabibi-code-status.md
+          if [[ "${PUBLISH_STATUS:-}" == 'PUSHED' ]]; then
+            printf '\nActual canonical PR #%s updated from %s to %s; fresh exact-head CI and NON-Mistral review required.\n' \
+              "$TARGET_PR" "$TARGET_SHA" "$RESULT_SHA" >> /tmp/tabibi-code-status.md
+          else
+            printf '\nNo code delivery is claimed. No paid fallback was attempted.\n' >> /tmp/tabibi-code-status.md
+          fi
+          gh issue comment 11 --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-code-status.md
+          if [[ "${PUBLISH_STATUS:-}" == 'PUSHED' ]]; then
+            gh issue comment "$TARGET_PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-code-status.md
+          fi
