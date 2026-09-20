@@ -37,6 +37,8 @@ const copy = {
     clearAllFilters: 'Effacer tous les filtres',
     searchCount: (count: number) =>
       `${count} clinique${count === 1 ? '' : 's'} trouvée${count === 1 ? '' : 's'}.`,
+    searchDoctorTotal: (count: number) =>
+      `${count} médecin${count === 1 ? '' : 's'} affiché${count === 1 ? '' : 's'} au total dans les résultats.`,
     noSearchMatches:
       'Aucune clinique ni aucun médecin ne correspond à votre recherche.',
     refresh: 'Actualiser',
@@ -72,6 +74,8 @@ const copy = {
     clearSearch: 'مسح البحث',
     clearAllFilters: 'مسح جميع عوامل التصفية',
     searchCount: (count: number) => `نتائج البحث: ${count} عيادة.`,
+    searchDoctorTotal: (count: number) =>
+      `إجمالي الأطباء المعروضين في النتائج: ${count}.`,
     noSearchMatches: 'لا توجد عيادات أو أطباء يطابقون بحثك.',
     refresh: 'تحديث',
     refreshed: (count: number) => `تم تحديث الدليل: ${count} عيادة.`,
@@ -190,6 +194,13 @@ export default function PublicDiscoveryLandingClient({
         clinic.doctors.some((doctor) =>
           normalizeSearch(doctor.displayName).includes(query),
         )),
+  );
+  // Count exactly the doctors rendered inside the matching clinic cards:
+  // a clinic-name match exposes its full public list; a doctor-name-only
+  // match exposes only matching public names (WU103).
+  const visibleDoctorTotal = matchingClinics.reduce(
+    (total, clinic) => total + doctorsVisibleForQuery(clinic, query).length,
+    0,
   );
   const collator = new Intl.Collator(locale, {
     sensitivity: 'base',
@@ -385,9 +396,10 @@ export default function PublicDiscoveryLandingClient({
               </button>
             )}
             {(query || clinicLanguage !== 'all' || onlyListedDoctors) && (
-              <p aria-live="polite" aria-atomic="true">
-                {t.searchCount(matchingClinics.length)}
-              </p>
+              <div role="status" aria-live="polite" aria-atomic="true">
+                <p>{t.searchCount(matchingClinics.length)}</p>
+                <p>{t.searchDoctorTotal(visibleDoctorTotal)}</p>
+              </div>
             )}
           </div>
         )}
