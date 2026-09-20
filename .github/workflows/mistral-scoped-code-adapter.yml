@@ -4,32 +4,42 @@ on:
   issue_comment:
     types: [created]
 
-# ONLY the trusted parent (never Vibe) receives a scoped repo write token.
-# This entire lane is OFF unless owner deliberately sets the variable below.
+# DEFAULT OFF. The Vibe child gets READ tools only. GitHub write token only
+# exists in the fresh publish job AFTER model and untrusted tests exit.
 permissions:
-  contents: write
-  issues: write
-  pull-requests: read
-  actions: read
+  contents: read
 
 jobs:
-  mistral-code:
+  propose:
     if: >-
       github.event.issue.number == 11 &&
       github.actor == 'NTinkicht' &&
       contains(github.event.comment.body, '@mistral-vibe') &&
       contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 14
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: read
     concurrency:
       group: mistral-code-${{ github.event.comment.id }}
       cancel-in-progress: false
-    env:
-      DATABASE_URL: postgresql://tabibi:tabibi_test@127.0.0.1:5432/tabibi_test
-      GUEST_BEARER_SIGNING_SECRET: ci-only-guest-bearer-signing-secret-replace-in-production
-      PUBLIC_AVAILABILITY_SELECTION_SECRET: ci-only-public-availability-selection-secret-replace-in-production
+    outputs:
+      ready: ${{ steps.patch.outputs.ready }}
+      status: ${{ steps.patch.outputs.status }}
+      pr: ${{ steps.lease.outputs.pr }}
+      sha: ${{ steps.lease.outputs.sha }}
+      stream: ${{ steps.lease.outputs.stream }}
+      branch: ${{ steps.lease.outputs.branch }}
+      paths: ${{ steps.lease.outputs.paths }}
+      lease: ${{ steps.lease.outputs.lease }}
+      model_status: ${{ steps.model.outputs.status }}
+      lease_status: ${{ steps.lease.outputs.status }}
+      preflight_status: ${{ steps.preflight.outputs.status }}
     steps:
-      - name: Checkout trusted parent code only
+      - name: Checkout trusted parent from default branch
         uses: actions/checkout@v6
         with:
           persist-credentials: false
@@ -56,7 +66,35 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Verify included Mistral entitlement (non-inference)
+      - name: Stage ONLY allowlisted read paths for Vibe
+        if: steps.lease.outputs.ready == 'true'
+        env:
+          ALLOWED_PATHS: ${{ steps.lease.outputs.paths }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import shutil
+          from pathlib import Path
+          root = Path.cwd().resolve()
+          stage = Path('/tmp/tabibi-mistral-readonly')
+          stage.mkdir(mode=0o700)
+          for path in os.environ['ALLOWED_PATHS'].split(','):
+              source = root / path
+              current = root
+              for part in Path(path).parts:
+                  current = current / part
+                  if current.is_symlink():
+                      raise SystemExit('READ_PATH_BLOCKED')
+              if not source.is_file() or source.stat().st_size > 200_000:
+                  raise SystemExit('READ_PATH_BLOCKED')
+              dest = stage / path
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(source, dest)
+          PY
+
+      - name: Verify included Mistral entitlement without inference
         id: preflight
         if: steps.lease.outputs.ready == 'true'
         env:
@@ -94,7 +132,6 @@ jobs:
 
       - name: Install pinned Vibe
         if: steps.preflight.outputs.ready == 'true'
-        shell: bash
         run: python3 -m pip install --disable-pip-version-check 'mistral-vibe==2.25.3'
 
       - name: Request a bounded NON-mutating code proposal from Mistral
@@ -107,6 +144,7 @@ jobs:
           REVIEW_SHA: ${{ steps.lease.outputs.sha }}
           REVIEW_STREAM: ${{ steps.lease.outputs.stream }}
           ALLOWED_PATHS: ${{ steps.lease.outputs.paths }}
+          TASK_OBJECTIVE: ${{ steps.lease.outputs.objective }}
         shell: bash
         run: |
           set -euo pipefail
@@ -118,25 +156,22 @@ jobs:
           enabled_tools = ["grep", "read_file"]
           EOF
           cat > /tmp/tabibi-mistral-code-prompt.txt <<'EOF'
-          You are mistral-vibe, a SOLE-IMPLEMENTER only for this bounded Tabibi
-          canonical PR. You CANNOT edit or execute shell. The trusted parent will
-          apply a strictly validated proposal and run deterministic tests.
-          Read ONLY the explicitly leased paths, and ONLY the bounded relevant
-          excerpts within them; do not read AGENTS.md or large unrelated files.
-          Output exactly ONE JSON patch in the markers below, no Markdown fences.
+          You are mistral-vibe. The TRUSTED PARENT is the sole writer/pusher.
+          You CANNOT edit files or run shell. Read ONLY your provided small
+          explicitly leased source+test files in this isolated workdir.
+          Return exactly one JSON patch bounded by the markers below.
           BEGIN_TABIBI_PATCH_JSON
           {"edits":[{"path":"src/example.ts","old":"EXACT unique existing text","new":"replacement"},{"path":"tests/example.test.ts","old":"EXACT unique existing text","new":"replacement"}]}
           END_TABIBI_PATCH_JSON
-          Each edited path MUST be from the trusted list, each old text must
-          occur exactly once, no secrets/tokens, no shell commands, no new
-          files/paths, and modify BOTH production and deterministic test code.
-          If you lack enough evidence, output a short failure reason INSTEAD
-          of patch markers. Never claim a test ran until parent CI proves it.
+          Each path MUST be leased and exist; old text occurs exactly once.
+          Change BOTH production code and its test. No secrets, no new paths,
+          no Markdown fences, no self-review and no claims tests have run.
+          If evidence insufficient, return a short reason without patch markers.
           EOF
-          printf '\nTrusted PR #%s stream=%s exact HEAD=%s paths=%s\n' "$REVIEW_PR" "$REVIEW_STREAM" "$REVIEW_SHA" "$ALLOWED_PATHS" >> /tmp/tabibi-mistral-code-prompt.txt
+          printf '\nTrusted PR #%s stream=%s SHA=%s allowed paths=%s\nOwner objective: %s\n' "$REVIEW_PR" "$REVIEW_STREAM" "$REVIEW_SHA" "$ALLOWED_PATHS" "$TASK_OBJECTIVE" >> /tmp/tabibi-mistral-code-prompt.txt
           set +e
           timeout --signal=TERM --kill-after=15s 480s vibe \
-            --trust --agent plan --workdir "$GITHUB_WORKSPACE" \
+            --trust --agent plan --workdir /tmp/tabibi-mistral-readonly \
             --enabled-tools grep --enabled-tools read_file \
             --max-turns 3 --max-tokens 45000 --output text \
             --prompt "$(cat /tmp/tabibi-mistral-code-prompt.txt)" \
@@ -155,9 +190,9 @@ jobs:
           else
             echo 'status=PROPOSAL_READY' >> "$GITHUB_OUTPUT"
           fi
-          # Raw model output and stderr NEVER enter PR comments or job logs.
+          # Raw model output/stderr never appear in PR comments or logs.
 
-      - name: Validate model's exact edits in trusted parent
+      - name: Validate model exact edits in trusted read-only parent
         id: patch
         if: steps.model.outputs.exit_code == '0'
         env:
@@ -170,16 +205,62 @@ jobs:
           LEASE_ID: ${{ steps.lease.outputs.lease }}
         run: python3 /tmp/tabibi-mistral-code-adapter.py apply
 
-      - name: Setup test runtime
+      - name: Upload ONLY the validated immutable patch before tests
         if: steps.patch.outputs.ready == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/upload-artifact@v4
+        with:
+          name: mistral-validated-patch
+          path: /tmp/tabibi-mistral-validated.json
+          if-no-files-found: error
+          retention-days: 1
+
+  test:
+    needs: propose
+    if: needs.propose.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    env:
+      DATABASE_URL: postgresql://tabibi:tabibi_test@127.0.0.1:5432/tabibi_test
+      GUEST_BEARER_SIGNING_SECRET: ci-only-guest-bearer-signing-secret-replace-in-production
+      PUBLIC_AVAILABILITY_SELECTION_SECRET: ci-only-public-availability-selection-secret-replace-in-production
+    steps:
+      - name: Checkout trusted verifier
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Copy verifier outside PR worktree
+        run: cp scripts/mistral-code-adapter.py /tmp/tabibi-mistral-code-adapter.py
+      - name: Checkout exact PR parent
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.propose.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: mistral-validated-patch
+          path: /tmp
+      - name: Re-validate and apply sealed patch without write-capable token
+        id: applied
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_PR: ${{ needs.propose.outputs.pr }}
+          REVIEW_SHA: ${{ needs.propose.outputs.sha }}
+          REVIEW_STREAM: ${{ needs.propose.outputs.stream }}
+          REVIEW_BRANCH: ${{ needs.propose.outputs.branch }}
+          ALLOWED_PATHS: ${{ needs.propose.outputs.paths }}
+          LEASE_ID: ${{ needs.propose.outputs.lease }}
+        run: python3 /tmp/tabibi-mistral-code-adapter.py applyartifact
+      - uses: actions/setup-node@v4
+        if: steps.applied.outputs.ready == 'true'
         with:
           node-version: '20'
           cache: npm
-
-      - name: Deterministic format, lint, types, unit/API tests and build
-        id: tests
-        if: steps.patch.outputs.ready == 'true'
+      - name: Unprivileged deterministic format lint typecheck unit/API and build
+        if: steps.applied.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -190,43 +271,93 @@ jobs:
           npm test
           npm run build
           git diff --check
+      - name: Reject unverified/no-test artifact
+        if: steps.applied.outputs.ready != 'true'
+        run: exit 1
 
-      - name: Trusted parent fast-forward commit and push ONLY canonical branch
-        id: publish
-        if: steps.patch.outputs.ready == 'true' && steps.tests.outcome == 'success'
+  publish:
+    needs: [propose, test]
+    if: needs.propose.outputs.ready == 'true' && needs.test.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: read
+    outputs:
+      status: ${{ steps.publish.outputs.status }}
+      result_sha: ${{ steps.publish.outputs.result_sha }}
+    steps:
+      - name: Fresh privileged runner checkout of trusted default branch
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Copy trusted parent and selftest before PR checkout
+        run: |
+          cp scripts/mistral-code-adapter.py /tmp/tabibi-mistral-code-adapter.py
+          python3 /tmp/tabibi-mistral-code-adapter.py selftest
+      - name: Checkout exact PR parent (no credentials retained)
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.propose.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: mistral-validated-patch
+          path: /tmp
+      - name: Re-verify same owner lease, SHA, allowlist and sealed patch
+        id: verified
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REVIEW_PR: ${{ steps.lease.outputs.pr }}
-          REVIEW_SHA: ${{ steps.lease.outputs.sha }}
-          REVIEW_STREAM: ${{ steps.lease.outputs.stream }}
-          REVIEW_BRANCH: ${{ steps.lease.outputs.branch }}
-          ALLOWED_PATHS: ${{ steps.lease.outputs.paths }}
-          LEASE_ID: ${{ steps.lease.outputs.lease }}
+          REVIEW_PR: ${{ needs.propose.outputs.pr }}
+          REVIEW_SHA: ${{ needs.propose.outputs.sha }}
+          REVIEW_STREAM: ${{ needs.propose.outputs.stream }}
+          REVIEW_BRANCH: ${{ needs.propose.outputs.branch }}
+          ALLOWED_PATHS: ${{ needs.propose.outputs.paths }}
+          LEASE_ID: ${{ needs.propose.outputs.lease }}
+        run: python3 /tmp/tabibi-mistral-code-adapter.py applyartifact
+      - name: Parent-only non-force canonical PR push AFTER isolated tests
+        id: publish
+        if: steps.verified.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_PR: ${{ needs.propose.outputs.pr }}
+          REVIEW_SHA: ${{ needs.propose.outputs.sha }}
+          REVIEW_STREAM: ${{ needs.propose.outputs.stream }}
+          REVIEW_BRANCH: ${{ needs.propose.outputs.branch }}
+          ALLOWED_PATHS: ${{ needs.propose.outputs.paths }}
+          LEASE_ID: ${{ needs.propose.outputs.lease }}
         run: python3 /tmp/tabibi-mistral-code-adapter.py publish
 
-      - name: Report machine-verified status without model text
-        if: always()
+  report:
+    needs: [propose, test, publish]
+    if: always() && github.event.issue.number == 11 && github.actor == 'NTinkicht' && contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Publish only machine-verified status without model text
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LEASE_READY: ${{ steps.lease.outputs.ready }}
-          LEASE_STATUS: ${{ steps.lease.outputs.status }}
-          PREFLIGHT_STATUS: ${{ steps.preflight.outputs.status }}
-          MODEL_STATUS: ${{ steps.model.outputs.status }}
-          PATCH_STATUS: ${{ steps.patch.outputs.status }}
-          TEST_STATUS: ${{ steps.tests.outcome }}
-          PUBLISH_STATUS: ${{ steps.publish.outputs.status }}
-          RESULT_SHA: ${{ steps.publish.outputs.result_sha }}
-          TARGET_PR: ${{ steps.lease.outputs.pr }}
-          TARGET_SHA: ${{ steps.lease.outputs.sha }}
+          LEASE_STATUS: ${{ needs.propose.outputs.lease_status }}
+          PREFLIGHT_STATUS: ${{ needs.propose.outputs.preflight_status }}
+          MODEL_STATUS: ${{ needs.propose.outputs.model_status }}
+          PATCH_STATUS: ${{ needs.propose.outputs.status }}
+          TEST_STATUS: ${{ needs.test.result }}
+          PUBLISH_STATUS: ${{ needs.publish.outputs.status }}
+          RESULT_SHA: ${{ needs.publish.outputs.result_sha }}
+          TARGET_PR: ${{ needs.propose.outputs.pr }}
+          TARGET_SHA: ${{ needs.propose.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
-          printf '**Mistral scoped code adapter (DEFAULT OFF unless authorized)**\n\n' > /tmp/tabibi-code-status.md
-          printf 'Trusted parent: lease=%s; entitlement=%s; model=%s; patch=%s; tests=%s; publish=%s.\n' \
+          printf '**Mistral default-off scoped code adapter**\n\n' > /tmp/tabibi-code-status.md
+          printf 'Parent gate: lease=%s; entitlement=%s; model=%s; patch=%s; isolated-tests=%s; publish=%s.\n' \
             "${LEASE_STATUS:-BLOCKED}" "${PREFLIGHT_STATUS:-SKIPPED}" "${MODEL_STATUS:-SKIPPED}" \
             "${PATCH_STATUS:-SKIPPED}" "${TEST_STATUS:-SKIPPED}" "${PUBLISH_STATUS:-SKIPPED}" >> /tmp/tabibi-code-status.md
           if [[ "${PUBLISH_STATUS:-}" == 'PUSHED' ]]; then
-            printf '\nActual canonical PR #%s updated from %s to %s; fresh exact-head CI and NON-Mistral review required.\n' \
+            printf '\nActual canonical PR #%s updated from %s to %s; fresh exact-head 3-job CI and NON-Mistral review required.\n' \
               "$TARGET_PR" "$TARGET_SHA" "$RESULT_SHA" >> /tmp/tabibi-code-status.md
           else
             printf '\nNo code delivery is claimed. No paid fallback was attempted.\n' >> /tmp/tabibi-code-status.md
