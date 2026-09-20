@@ -26,6 +26,7 @@ type LiveQueueEta = {
 type LiveQueueData = {
   bookingState: string;
   queueState: string;
+  pauseStatus?: 'paused' | null;
   activeConsultationRemainingMinutes: number | null;
   eta: LiveQueueEta | null;
 };
@@ -94,6 +95,8 @@ type Copy = {
   etaWaitRange: (minMinutes: number, maxMinutes: number) => string;
   etaConfidence: Record<'high' | 'medium' | 'low', string>;
   etaDelayNotice: string;
+  pausedHeading: string;
+  pausedBody: string;
   activeConsultationHeading: string;
   activeConsultationRemaining: (minutes: number) => string;
   estimateExplainerLink: string;
@@ -167,6 +170,9 @@ const COPY: Record<SupportedLocale, Copy> = {
     },
     etaDelayNotice:
       'Un retard du médecin est pris en compte dans cette estimation.',
+    pausedHeading: 'File temporairement en pause',
+    pausedBody:
+      'La clinique a temporairement interrompu la file. Une nouvelle estimation apparaîtra à la reprise.',
     activeConsultationHeading: 'Consultation en cours',
     activeConsultationRemaining: (minutes) =>
       minutes === 1
@@ -244,6 +250,9 @@ const COPY: Record<SupportedLocale, Copy> = {
       low: 'ثقة التقدير: منخفضة',
     },
     etaDelayNotice: 'تشمل هذه المدة المقدرة تأخر الطبيب.',
+    pausedHeading: 'قائمة الانتظار متوقفة مؤقتًا',
+    pausedBody:
+      'أوقفت العيادة قائمة الانتظار مؤقتًا. سيظهر تقدير جديد عند استئنافها.',
     activeConsultationHeading: 'الاستشارة جارية الآن',
     activeConsultationRemaining: (minutes) =>
       `الوقت المتبقي المقدر: حوالي ${arabicMinuteCount(minutes)}`,
@@ -330,6 +339,15 @@ function EtaStatus({
           ({copy.estimateExplainerNewTab})
         </small>
       </p>
+    </div>
+  );
+}
+
+function PausedStatus({ copy }: { copy: Copy }) {
+  return (
+    <div role="status">
+      <h2>{copy.pausedHeading}</h2>
+      <p>{copy.pausedBody}</p>
     </div>
   );
 }
@@ -820,11 +838,18 @@ function LiveQueueView({
             ? fetched.activeConsultationRemainingMinutes
             : (lastDataRef.current?.activeConsultationRemainingMinutes ??
               fetched.activeConsultationRemainingMinutes);
+        const pauseStatus =
+          queueState === fetched.queueState
+            ? fetched.pauseStatus
+            : lastDataRef.current
+              ? lastDataRef.current.pauseStatus
+              : fetched.pauseStatus;
         const data: LiveQueueData = {
           ...fetched,
           queueState,
           eta,
           activeConsultationRemainingMinutes,
+          pauseStatus,
         };
         lastDataRef.current = data;
         setState({ kind: 'active', data });
@@ -990,10 +1015,13 @@ function LiveQueueView({
             {copy.queueStates[state.data.queueState] ?? state.data.queueState}
           </p>
         ) : null}
-        {state.data?.eta ? (
+        {state.data?.pauseStatus === 'paused' ? (
+          <PausedStatus copy={copy} />
+        ) : state.data?.eta ? (
           <EtaStatus eta={state.data.eta} copy={copy} locale={locale} />
         ) : null}
-        {state.data?.activeConsultationRemainingMinutes !== null &&
+        {state.data?.pauseStatus !== 'paused' &&
+        state.data?.activeConsultationRemainingMinutes !== null &&
         state.data?.activeConsultationRemainingMinutes !== undefined ? (
           <ActiveConsultationStatus
             minutes={state.data.activeConsultationRemainingMinutes}
@@ -1033,10 +1061,13 @@ function LiveQueueView({
         <strong>{copy.status}</strong>{' '}
         {copy.queueStates[state.data.queueState] ?? state.data.queueState}
       </p>
-      {state.data.eta ? (
+      {state.data.pauseStatus === 'paused' ? (
+        <PausedStatus copy={copy} />
+      ) : state.data.eta ? (
         <EtaStatus eta={state.data.eta} copy={copy} locale={locale} />
       ) : null}
-      {state.data.activeConsultationRemainingMinutes !== null &&
+      {state.data.pauseStatus !== 'paused' &&
+      state.data.activeConsultationRemainingMinutes !== null &&
       state.data.activeConsultationRemainingMinutes !== undefined ? (
         <ActiveConsultationStatus
           minutes={state.data.activeConsultationRemainingMinutes}

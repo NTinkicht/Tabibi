@@ -469,6 +469,7 @@ describe('WU62/WU65 public guest booking check-in', () => {
     expect(await pollResponse.json()).toEqual({
       bookingState: 'confirmed',
       queueState: 'waiting',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
