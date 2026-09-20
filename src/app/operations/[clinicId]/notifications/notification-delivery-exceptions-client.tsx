@@ -4,13 +4,32 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 type Locale = 'ar' | 'fr';
+type OutcomeCategory =
+  | 'retry_timeout'
+  | 'retries_exhausted'
+  | 'provider_error'
+  | 'unspecified';
 type ExceptionView = {
   event: string;
   queueLabel: string | null;
+  outcomeCategory: OutcomeCategory;
   attempts: number;
   maximum: number;
   at: string;
 };
+
+// A strict allow-list: `outcomeCode` is arbitrary provider-supplied text (up
+// to 160 chars, no enum) persisted verbatim by NotificationDispatchService --
+// it must never reach the DOM. Only these known, non-identifying codes map
+// to a generic category; every other value (including any future/unknown
+// provider code) falls back to 'unspecified'.
+function categorizeOutcome(code: unknown): OutcomeCategory {
+  if (code === 'claim_lease_expired') return 'retry_timeout';
+  if (code === 'retry_exhausted') return 'retries_exhausted';
+  if (code === 'provider_exception' || code === 'provider_indeterminate_result')
+    return 'provider_error';
+  return 'unspecified';
+}
 type LoadState =
   | { kind: 'loading' }
   | { kind: 'error' }
@@ -31,6 +50,13 @@ const copy = {
     language: 'Langue',
     queueLabel: 'Passage',
     noQueueLabel: 'Passage non identifié',
+    outcome: 'Motif',
+    outcomes: {
+      retry_timeout: 'Délai de traitement dépassé',
+      retries_exhausted: 'Nombre maximal de tentatives atteint',
+      provider_error: 'Erreur du fournisseur de notification',
+      unspecified: 'Motif non précisé',
+    },
     events: {
       queue_entry_created: 'Inscription à la file',
       estimate_changed_materially: 'Changement important du délai',
@@ -53,6 +79,13 @@ const copy = {
     language: 'اللغة',
     queueLabel: 'الدور',
     noQueueLabel: 'دور غير محدد',
+    outcome: 'السبب',
+    outcomes: {
+      retry_timeout: 'تجاوز مهلة المعالجة',
+      retries_exhausted: 'بلغ الحد الأقصى لمحاولات الإرسال',
+      provider_error: 'خطأ لدى مزوّد الإشعارات',
+      unspecified: 'سبب غير محدد',
+    },
     events: {
       queue_entry_created: 'التسجيل في قائمة الانتظار',
       estimate_changed_materially: 'تغيير مهم في وقت الانتظار',
@@ -81,12 +114,14 @@ function toExceptionViews(payload: unknown): ExceptionView[] {
       typeof value.outcomeAt !== 'string' ||
       !Number.isSafeInteger(value.attemptCount) ||
       !Number.isSafeInteger(value.maxAttempts) ||
-      (value.queueLabel !== null && typeof value.queueLabel !== 'string')
+      (value.queueLabel !== null && typeof value.queueLabel !== 'string') ||
+      (value.outcomeCode !== null && typeof value.outcomeCode !== 'string')
     )
       throw new Error('Invalid response');
     return {
       event: value.eventKey,
       queueLabel: value.queueLabel as string | null,
+      outcomeCategory: categorizeOutcome(value.outcomeCode),
       attempts: value.attemptCount as number,
       maximum: value.maxAttempts as number,
       at: value.outcomeAt,
@@ -197,6 +232,9 @@ export function NotificationDeliveryExceptionsClient({
                   <h2>{eventLabel}</h2>
                   <p>
                     {t.queueLabel}: {record.queueLabel ?? t.noQueueLabel}
+                  </p>
+                  <p>
+                    {t.outcome}: {t.outcomes[record.outcomeCategory]}
                   </p>
                   <p>
                     {t.at}:{' '}

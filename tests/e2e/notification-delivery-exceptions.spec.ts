@@ -32,6 +32,7 @@ function deadLettersBody(
     attemptCount: number;
     maxAttempts: number;
     outcomeAt: string;
+    outcomeCode?: string | null;
   }>,
 ) {
   return {
@@ -39,7 +40,7 @@ function deadLettersBody(
       intentId: rawQueueEntryId,
       eventKey: record.eventKey,
       queueLabel: record.queueLabel,
-      outcomeCode: 'provider_unknown',
+      outcomeCode: record.outcomeCode ?? 'provider_unknown',
       attemptCount: record.attemptCount,
       maxAttempts: record.maxAttempts,
       outcomeAt: record.outcomeAt,
@@ -78,9 +79,13 @@ test('French view renders a labelled exception, hides raw identifiers, and refre
   await expect(page.getByText('Patient appelé')).toBeVisible();
   await expect(page.getByText('Passage: A-041')).toBeVisible();
   await expect(page.getByText('Tentatives de livraison: 3 / 5')).toBeVisible();
+  // The raw provider outcome code ('provider_unknown') must never reach the
+  // DOM -- only its generic, allow-listed category label may appear.
+  await expect(page.getByText('Motif: Motif non précisé')).toBeVisible();
 
   const bodyText = await page.locator('body').innerText();
   expect(bodyText).not.toContain(rawQueueEntryId);
+  expect(bodyText).not.toContain('provider_unknown');
 
   expect(requestCount).toBe(1);
   await page.getByRole('button', { name: 'Actualiser' }).click();
@@ -103,6 +108,7 @@ test('Arabic view renders RTL with a localized event label and unmapped events f
             attemptCount: 1,
             maxAttempts: 1,
             outcomeAt: '2026-09-13T11:00:00.000Z',
+            outcomeCode: 'retry_exhausted',
           },
         ]),
       ),
@@ -116,6 +122,13 @@ test('Arabic view renders RTL with a localized event label and unmapped events f
   await expect(page.getByText('إشعار قائمة الانتظار')).toBeVisible();
   await expect(page.getByText('some_future_event')).toHaveCount(0);
   await expect(page.getByText('دور غير محدد')).toBeVisible();
+  // A known outcome code maps to its generic category label; the raw
+  // provider code string must never appear in the DOM.
+  await expect(
+    page.getByText('بلغ الحد الأقصى لمحاولات الإرسال'),
+  ).toBeVisible();
+  const bodyText = await page.locator('body').innerText();
+  expect(bodyText).not.toContain('retry_exhausted');
 });
 
 test('shows the empty state when there are no delivery exceptions', async ({
