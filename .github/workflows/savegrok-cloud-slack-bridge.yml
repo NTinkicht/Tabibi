@@ -133,7 +133,11 @@ jobs:
                   run for run in runs
                   if run.get('name') == 'CI' and
                   run.get('head_sha') == exact_sha and
-                  run.get('event') == 'pull_request'
+                  run.get('event') == 'pull_request' and
+                  any(
+                      pr_ref.get('number') == int(number)
+                      for pr_ref in (run.get('pull_requests') or [])
+                  )
               ]
               if not eligible:
                   raise ValueError('No exact-head CI run found')
