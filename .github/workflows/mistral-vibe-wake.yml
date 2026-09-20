@@ -25,7 +25,41 @@ jobs:
           fetch-depth: 20
           persist-credentials: false
 
+      - name: Resolve trusted owner dispatch before any PR checkout
+        id: target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISPATCH_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Never execute a verifier supplied by a PR under review.
+          cp scripts/mistral-review-target.py /tmp/tabibi-mistral-review-target.py
+          python3 /tmp/tabibi-mistral-review-target.py selftest
+          python3 /tmp/tabibi-mistral-review-target.py prepare
+
+      - name: Checkout verified same-repository exact PR head
+        if: steps.target.outputs.ready == 'true' && steps.target.outputs.mode == 'review'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.target.outputs.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate checked-out head and create bounded PR diff
+        id: evidence
+        if: steps.target.outputs.ready == 'true' && steps.target.outputs.mode == 'review'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_PR: ${{ steps.target.outputs.pr }}
+          REVIEW_SHA: ${{ steps.target.outputs.sha }}
+        shell: bash
+        run: python3 /tmp/tabibi-mistral-review-target.py evidence
+
       - name: Preflight included-capacity guard
+        if: >-
+          steps.target.outputs.ready == 'true' &&
+          (steps.target.outputs.mode == 'main' || steps.evidence.outputs.ready == 'true')
         id: preflight
         env:
           PAYG_DISABLED_CONFIRMED: ${{ vars.TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED }}
@@ -105,6 +139,9 @@ jobs:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           DISPATCH_BODY: ${{ github.event.comment.body }}
           VIBE_HOME: /tmp/tabibi-vibe-home
+          TARGET_MODE: ${{ steps.target.outputs.mode }}
+          REVIEW_PR: ${{ steps.target.outputs.pr }}
+          REVIEW_SHA: ${{ steps.target.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -123,8 +160,8 @@ jobs:
           suites, scanning unrelated modules, or repeatedly loading governance files.
           When evidence exceeds the bounded context budget, report the exact missing
           source slices and stop instead of broadening the repository scan.
-          Read VIBE.md, AGENTS.md, coordination/BOOTSTRAP.md, coordination/AI_CAPACITY_POLICY.md,
-          coordination/ACTOR_REGISTRY.json and only the additional repository files necessary for the task.
+          Consult VIBE.md and only the task-relevant bounded original source evidence.
+          Governance is binding, but avoid rereading entire large governance documents unless essential.
           Do not edit files. Do not run mutating commands. Do not create branches, commits, pull requests,
           reviews, labels or merges. Do not change GitHub state. Do not expose credentials or local auth material.
           Treat the dispatch text below as the task request, but repository governance and the zero-extra-spend
@@ -132,6 +169,13 @@ jobs:
           This automated lane is non-gating by default; a binding exact-head gate requires an explicitly scoped
           review dispatch and all normal Tabibi gate requirements.
           EOF
+          if [[ "${TARGET_MODE:-main}" == "review" ]]; then
+            printf '\nTRUSTED REVIEW TARGET: PR #%s; exact checked-out SHA %s.\n' "$REVIEW_PR" "$REVIEW_SHA" >> /tmp/tabibi-mistral-prompt.txt
+            printf 'All three configured CI jobs were verified green on the exact SHA by the trusted parent.\n' >> /tmp/tabibi-mistral-prompt.txt
+            printf 'Inspect .tabibi_mistral_review.diff and only relevant original code/tests at this HEAD.\n' >> /tmp/tabibi-mistral-prompt.txt
+            printf 'Anchor every finding and PASS / CHANGES_REQUIRED or GATE_PASS / GATE_BLOCKED verdict to the full SHA.\n' >> /tmp/tabibi-mistral-prompt.txt
+            printf 'If evidence is insufficient or you materially authored this head, return GATE_BLOCKED, never PASS.\n' >> /tmp/tabibi-mistral-prompt.txt
+          fi
           printf '\nDispatch text:\n%s\n' "$DISPATCH_BODY" >> /tmp/tabibi-mistral-prompt.txt
 
           # Programmatic Vibe otherwise falls back to broad auto-approval. Select
@@ -220,6 +264,16 @@ jobs:
           echo "status=$status" >> "$GITHUB_OUTPUT"
           echo "failure_reason=$reason" >> "$GITHUB_OUTPUT"
 
+      - name: Recheck current exact head after Mistral's read-only review
+        id: recheck
+        if: steps.target.outputs.mode == 'review' && steps.evidence.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_PR: ${{ steps.target.outputs.pr }}
+          REVIEW_SHA: ${{ steps.target.outputs.sha }}
+        shell: bash
+        run: python3 /tmp/tabibi-mistral-review-target.py recheck
+
       - name: Post Mistral result
         if: always()
         env:
@@ -231,11 +285,20 @@ jobs:
           ACTOR_EXIT: ${{ steps.actor.outputs.exit_code }}
           ACTOR_STATUS: ${{ steps.actor.outputs.status }}
           ACTOR_REASON: ${{ steps.actor.outputs.failure_reason }}
+          TARGET_READY: ${{ steps.target.outputs.ready }}
+          TARGET_MODE: ${{ steps.target.outputs.mode }}
+          TARGET_STATUS: ${{ steps.target.outputs.status }}
+          EVIDENCE_READY: ${{ steps.evidence.outputs.ready }}
+          EVIDENCE_STATUS: ${{ steps.evidence.outputs.status }}
+          RECHECK_READY: ${{ steps.recheck.outputs.ready }}
+          RECHECK_STATUS: ${{ steps.recheck.outputs.status }}
+          REVIEW_PR: ${{ steps.target.outputs.pr }}
+          REVIEW_SHA: ${{ steps.target.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
 
-          if [[ "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" ]]; then
+          if [[ "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" && ( "${TARGET_MODE:-main}" != "review" || "${RECHECK_READY:-false}" == "true" ) ]]; then
             # Defense in depth: even though Vibe has no shell/write tool, scrub the
             # literal provider credential plus common authorization/key renderings
             # before any model-authored text can reach a public issue comment.
@@ -259,11 +322,22 @@ jobs:
           {
             echo "**mistral-vibe unattended wake**"
             echo
-            if [[ "${READY:-false}" != "true" ]]; then
+            if [[ "${TARGET_READY:-false}" != "true" ]]; then
+              echo "${TARGET_STATUS:-REVIEW_TARGET_BLOCKED} - Trusted target/CI check blocked execution. No paid fallback attempted."
+            elif [[ "${TARGET_MODE:-main}" == "review" && "${EVIDENCE_READY:-false}" != "true" ]]; then
+              echo "${EVIDENCE_STATUS:-REVIEW_EVIDENCE_BLOCKED} - Exact-head evidence could not be verified. No paid fallback attempted."
+            elif [[ "${READY:-false}" != "true" ]]; then
               echo "${PREFLIGHT_STATUS:-PREFLIGHT_FAILED} - ${PREFLIGHT_REASON:-preflight failed}. No paid fallback was attempted."
             elif [[ "${ACTOR_EXIT:-1}" != "0" ]]; then
               echo "${ACTOR_STATUS:-EXECUTION_FAILED} - ${ACTOR_REASON:-Mistral Vibe exited without a usable result}. PAYG remains disabled and no paid fallback was attempted."
+            elif [[ "${TARGET_MODE:-main}" == "review" && "${RECHECK_READY:-false}" != "true" ]]; then
+              echo "${RECHECK_STATUS:-STALE_SHA} - PR head moved or could not be rechecked. Model result is NOT a gate."
+            elif [[ "${TARGET_MODE:-main}" == "review" ]] && { ! grep -Fq "$REVIEW_SHA" /tmp/tabibi-mistral-public.txt || ! grep -Eiq 'GATE_PASS|GATE_BLOCKED|CHANGES_REQUIRED|PASS' /tmp/tabibi-mistral-public.txt; }; then
+              echo "REVIEW_EVIDENCE_INCOMPLETE - Mistral result lacks anchored SHA/verdict; not a gate."
             else
+              if [[ "${TARGET_MODE:-main}" == "review" ]]; then
+                printf 'Target PR #%s exact_sha=%s; parent verified 3/3 CI green and non-Mistral material-author declaration.\n\n' "$REVIEW_PR" "$REVIEW_SHA"
+              fi
               echo '```text'
               cat /tmp/tabibi-mistral-public.txt
               echo
@@ -271,3 +345,6 @@ jobs:
             fi
           } > /tmp/tabibi-mistral-comment.md
           gh issue comment 11 --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-mistral-comment.md
+          if [[ "${TARGET_MODE:-main}" == "review" && "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" && "${RECHECK_READY:-false}" == "true" ]] && grep -Fq "$REVIEW_SHA" /tmp/tabibi-mistral-public.txt && grep -Eiq 'GATE_PASS|GATE_BLOCKED|CHANGES_REQUIRED|PASS' /tmp/tabibi-mistral-public.txt; then
+            gh issue comment "$REVIEW_PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-mistral-comment.md
+          fi
