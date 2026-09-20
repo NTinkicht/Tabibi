@@ -199,23 +199,48 @@ describe('Grok dispatcher security and durability regression guards', () => {
     );
   });
 
-  it('atomically replaces state and treats truncated JSON as not delivered', () => {
+  it('rejects malformed and incomplete pending state without stalling delivery', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tabibi-grok-test-'));
     const name = lease.key + '.json';
+    const basis = {
+      key: lease.key,
+      pr: lease.pr,
+      sha: lease.sha,
+      commentId: lease.commentId,
+    };
+    const body = [
+      '<!-- tabibi-grok-dispatch:' + lease.key + ' -->',
+      'exact_sha: ' + lease.sha,
+      'source_lease_comment: ' + lease.commentId,
+      'No review verdict',
+    ].join('\\n');
     try {
       fs.writeFileSync(path.join(dir, name), '{"outcome":');
       expect(dispatcher.readState(name, dir)).toBeNull();
       dispatcher.writeStateAtomically(
         name,
-        { outcome: 'DELIVERY_PENDING', body: 'safe test report' },
+        { outcome: 'DELIVERY_PENDING', body: 'unsafe partial' },
+        dir,
+      );
+      expect(dispatcher.readState(name, dir)).toBeNull();
+      dispatcher.writeStateAtomically(
+        name,
+        { ...basis, outcome: 'DELIVERY_PENDING', body, finalOutcome: 'CAPACITY_DEGRADED' },
+        dir,
+      );
+      expect(dispatcher.readState(name, dir)).toMatchObject({
+        ...basis,
+        outcome: 'DELIVERY_PENDING',
+        body,
+        finalOutcome: 'CAPACITY_DEGRADED',
+      });
+      dispatcher.writeStateAtomically(
+        name,
+        { ...basis, outcome: 'REVIEW_POSTED' },
         dir,
       );
       expect(dispatcher.readState(name, dir)).toEqual({
-        outcome: 'DELIVERY_PENDING',
-        body: 'safe test report',
-      });
-      dispatcher.writeStateAtomically(name, { outcome: 'REVIEW_POSTED' }, dir);
-      expect(dispatcher.readState(name, dir)).toEqual({
+        ...basis,
         outcome: 'REVIEW_POSTED',
       });
       expect(fs.readdirSync(dir)).toEqual([name]);
@@ -223,6 +248,21 @@ describe('Grok dispatcher security and durability regression guards', () => {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('only emits safe categorical failures, never raw provider stderr', () => {
+    expect(dispatcher.dispatchFailureCode(new Error('oauth_not_verified'))).toBe(
+      'OAUTH_NOT_VERIFIED',
+    );
+    expect(dispatcher.dispatchFailureCode(new Error('grok_exit_1'))).toBe(
+      'GROK_EXIT_1',
+    );
+    expect(dispatcher.dispatchFailureCode(new Error('git_exit_spawn_failure'))).toBe(
+      'GIT_EXIT_SPAWN_FAILURE',
+    );
+    expect(
+      dispatcher.dispatchFailureCode(new Error('token: sensitive-value-123456')),
+    ).toBe('DISPATCH_FAILURE_UNCLASSIFIED');
   });
 
   it('requires complete review history and rejects Grok-authored commits', () => {
