@@ -841,7 +841,9 @@ function LiveQueueView({
         const pauseStatus =
           queueState === fetched.queueState
             ? fetched.pauseStatus
-            : (lastDataRef.current?.pauseStatus ?? fetched.pauseStatus);
+            : lastDataRef.current
+              ? lastDataRef.current.pauseStatus
+              : fetched.pauseStatus;
         const data: LiveQueueData = {
           ...fetched,
           queueState,

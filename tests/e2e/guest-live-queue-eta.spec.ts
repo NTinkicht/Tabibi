@@ -477,3 +477,83 @@ test('Arabic renders an accessible RTL pause status without false precision', as
   await expect(page.getByText('وقت الانتظار المقدر')).toHaveCount(0);
   await expect(page.getByText('الاستشارة جارية الآن')).toHaveCount(0);
 });
+
+test('a stale clamped poll response cannot resurrect a cleared pause status', async ({
+  page,
+}) => {
+  await mockBooking(page);
+
+  let statusAttempt = 0;
+  const releaseStaleStatusHolder: { current: (() => void) | null } = {
+    current: null,
+  };
+  const staleStatusReleased = new Promise<void>((resolve) => {
+    releaseStaleStatusHolder.current = resolve;
+  });
+  const staleStatusStartedHolder: { current: (() => void) | null } = {
+    current: null,
+  };
+  const staleStatusStarted = new Promise<void>((resolve) => {
+    staleStatusStartedHolder.current = resolve;
+  });
+
+  await page.route(STATUS_URL, async (route) => {
+    statusAttempt += 1;
+    if (statusAttempt === 1) {
+      // Authoritatively resumed: pauseStatus is explicitly null, not absent.
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          bookingState: 'checked_in',
+          queueState: 'checked_in',
+          pauseStatus: null,
+          activeConsultationRemainingMinutes: null,
+          eta: {
+            patientsAhead: 1,
+            minWaitMinutes: 5,
+            maxWaitMinutes: 10,
+            estimateSource: 'fallback',
+          },
+        }),
+      });
+      return;
+    }
+    // The second poll is held open to simulate a slow response that only
+    // resolves, with an out-of-order stale 'waiting'/paused snapshot, after
+    // the resumed (pauseStatus: null) state has already been authoritatively
+    // displayed. clampQueueState holds queueState at the 'checked_in' floor,
+    // so this pauseStatus must not resurrect the pause banner either.
+    staleStatusStartedHolder.current?.();
+    await staleStatusReleased;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+        pauseStatus: 'paused',
+        activeConsultationRemainingMinutes: null,
+        eta: null,
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect(page.getByText(/enregistré/)).toBeVisible();
+  await expect(page.getByText('Environ 5–10 min')).toBeVisible();
+  await expect(page.getByText('File temporairement en pause')).toHaveCount(0);
+
+  await page.clock.fastForward(30_000);
+  await staleStatusStarted;
+  releaseStaleStatusHolder.current?.();
+  await page.waitForTimeout(200);
+
+  // The display must not regress: the resumed ETA must still be showing and
+  // the pause banner must not have reappeared from the stale response.
+  await expect(page.getByText(/enregistré/)).toBeVisible();
+  await expect(page.getByText('Environ 5–10 min')).toBeVisible();
+  await expect(page.getByText('File temporairement en pause')).toHaveCount(0);
+  await expect(page.getByText(/en attente/)).toHaveCount(0);
+});
