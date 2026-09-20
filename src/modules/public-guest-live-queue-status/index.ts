@@ -14,6 +14,7 @@ import { abortableQuery } from '@/platform/database/abortable-query';
 
 const LIVE_QUEUE_STATES = new Set(['checked_in', 'called', 'in_consultation']);
 const TERMINAL_BOOKING_STATES = new Set(['completed', 'cancelled', 'no_show']);
+const TERMINAL_GRACE_MS = 15 * 60 * 1000;
 
 export interface PublicGuestLiveQueueEta {
   patientsAhead: number;
@@ -28,6 +29,7 @@ export interface PublicGuestLiveQueueStatusResult {
   bookingState: string;
   queueState: string;
   pauseStatus: 'paused' | null;
+  closureStatus: 'closed' | null;
   activeConsultationRemainingMinutes: number | null;
   eta: PublicGuestLiveQueueEta | null;
 }
@@ -46,6 +48,7 @@ type StatusRow = {
   appointment_status: string;
   queue_state: string;
   session_status: string;
+  session_closed_at: Date | null;
   in_consultation_started_at: Date | null;
   service_position: string | null;
   declared_delay_minutes: number | null;
@@ -146,6 +149,7 @@ export class PublicGuestLiveQueueStatusService {
               appointment.status::text AS appointment_status,
               entry.state::text AS queue_state,
               session.status::text AS session_status,
+              session.closed_at AS session_closed_at,
               entry.in_consultation_started_at,
               ordered.service_position::text AS service_position,
               session.declared_delay_minutes,
@@ -193,6 +197,15 @@ export class PublicGuestLiveQueueStatusService {
       row.historical_duration_samples ?? [],
     );
     const isTerminal = TERMINAL_BOOKING_STATES.has(row.appointment_status);
+    const isClosed = !isTerminal && row.session_status === 'closed';
+    if (
+      isClosed &&
+      (!row.session_closed_at ||
+        snapshotNow.getTime() - row.session_closed_at.getTime() >
+          TERMINAL_GRACE_MS)
+    ) {
+      throw new PublicGuestLiveQueueStatusRejectedError();
+    }
     const isPaused = !isTerminal && row.session_status === 'paused';
     const activeConsultationRemainingMinutes =
       !isTerminal &&
@@ -210,6 +223,7 @@ export class PublicGuestLiveQueueStatusService {
       bookingState: row.appointment_status,
       queueState: row.queue_state,
       pauseStatus: isPaused ? 'paused' : null,
+      closureStatus: isClosed ? 'closed' : null,
       activeConsultationRemainingMinutes,
       eta: this.computeEta(row, estimate),
     };
@@ -222,6 +236,7 @@ export class PublicGuestLiveQueueStatusService {
     if (
       TERMINAL_BOOKING_STATES.has(row.appointment_status) ||
       row.session_status === 'paused' ||
+      row.session_status === 'closed' ||
       !LIVE_QUEUE_STATES.has(row.queue_state) ||
       !row.service_position
     )

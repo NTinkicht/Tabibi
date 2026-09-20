@@ -470,6 +470,7 @@ describe('WU62/WU65 public guest booking check-in', () => {
       bookingState: 'confirmed',
       queueState: 'waiting',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });

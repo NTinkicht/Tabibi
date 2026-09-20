@@ -205,6 +205,7 @@ describe('WU63 public guest live queue status', () => {
       bookingState: 'confirmed',
       queueState: 'waiting',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -218,6 +219,7 @@ describe('WU63 public guest live queue status', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 0,
@@ -245,6 +247,7 @@ describe('WU63 public guest live queue status', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 0,
@@ -259,6 +262,7 @@ describe('WU63 public guest live queue status', () => {
       bookingState: 'confirmed',
       queueState: 'waiting',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -284,6 +288,7 @@ describe('WU63 public guest live queue status', () => {
       bookingState: 'confirmed',
       queueState: 'waiting',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -291,6 +296,7 @@ describe('WU63 public guest live queue status', () => {
       bookingState: 'confirmed',
       queueState: 'waiting',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -358,6 +364,7 @@ describe('WU63 public guest live queue status', () => {
       bookingState: 'cancelled',
       queueState: 'cancelled',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -365,6 +372,7 @@ describe('WU63 public guest live queue status', () => {
       bookingState: 'cancelled',
       queueState: 'cancelled',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -381,6 +389,7 @@ describe('WU63 public guest live queue status', () => {
       bookingState: 'no_show',
       queueState: 'no_show',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -401,6 +410,7 @@ describe('WU63 public guest live queue status', () => {
       bookingState: 'completed',
       queueState: 'completed',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -464,6 +474,7 @@ describe('WU63 public guest live queue status', () => {
         bookingState: 'confirmed',
         queueState: 'waiting',
         pauseStatus: null,
+        closureStatus: null,
         activeConsultationRemainingMinutes: null,
         eta: null,
       },
@@ -471,6 +482,7 @@ describe('WU63 public guest live queue status', () => {
         bookingState: 'confirmed',
         queueState: 'waiting',
         pauseStatus: null,
+        closureStatus: null,
         activeConsultationRemainingMinutes: null,
         eta: null,
       },
@@ -478,6 +490,7 @@ describe('WU63 public guest live queue status', () => {
         bookingState: 'confirmed',
         queueState: 'waiting',
         pauseStatus: null,
+        closureStatus: null,
         activeConsultationRemainingMinutes: null,
         eta: null,
       },
@@ -503,6 +516,7 @@ describe('WU63 public guest live queue status', () => {
       bookingState: 'confirmed',
       queueState: 'waiting',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -597,6 +611,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 0,
@@ -635,6 +650,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 1,
@@ -677,6 +693,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 1,
@@ -722,6 +739,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 1,
@@ -752,6 +770,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 2,
@@ -780,6 +799,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
       bookingState: 'checked_in',
       queueState: 'called',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 0,
@@ -810,6 +830,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 0,
@@ -824,6 +845,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 1,
@@ -854,6 +876,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 0,
@@ -911,6 +934,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 1,
@@ -997,6 +1021,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 2,
@@ -1026,6 +1051,7 @@ describe('WU88 guest active-consultation remaining time', () => {
     await expect(service.get(booking.bearer)).resolves.toMatchObject({
       queueState: 'called',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
     });
 
@@ -1039,6 +1065,7 @@ describe('WU88 guest active-consultation remaining time', () => {
       bookingState: 'checked_in',
       queueState: 'in_consultation',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: 10,
     });
   });
@@ -1064,6 +1091,7 @@ describe('WU88 guest active-consultation remaining time', () => {
     await expect(service.get(booking.bearer)).resolves.toMatchObject({
       bookingState: 'completed',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
     });
   });
@@ -1094,6 +1122,7 @@ describe('WU88 guest active-consultation remaining time', () => {
     await expect(service.get(booking.bearer)).resolves.toMatchObject({
       queueState: 'in_consultation',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
     });
   });
@@ -1119,6 +1148,7 @@ describe('WU88 guest active-consultation remaining time', () => {
     await expect(service.get(booking.bearer)).resolves.toMatchObject({
       queueState: 'in_consultation',
       pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: 0,
     });
   });
@@ -1167,6 +1197,7 @@ describe('WU92 guest-safe session pause status', () => {
 
     await expect(service.get(target.bearer)).resolves.toMatchObject({
       pauseStatus: null,
+      closureStatus: null,
       eta: { patientsAhead: 0 },
     });
 
@@ -1178,11 +1209,13 @@ describe('WU92 guest-safe session pause status', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: 'paused',
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
     await expect(service.get(unrelated.bearer)).resolves.toMatchObject({
       pauseStatus: null,
+      closureStatus: null,
       eta: { patientsAhead: 0 },
     });
 
@@ -1198,6 +1231,7 @@ describe('WU92 guest-safe session pause status', () => {
       bookingState: 'checked_in',
       queueState: 'checked_in',
       pauseStatus: 'paused',
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -1208,6 +1242,7 @@ describe('WU92 guest-safe session pause status', () => {
     );
     await expect(service.get(target.bearer)).resolves.toMatchObject({
       pauseStatus: null,
+      closureStatus: null,
       eta: { patientsAhead: 0 },
     });
   });
@@ -1234,6 +1269,107 @@ describe('WU92 guest-safe session pause status', () => {
       bookingState: 'cancelled',
       queueState: 'cancelled',
       pauseStatus: null,
+      closureStatus: null,
+      activeConsultationRemainingMinutes: null,
+      eta: null,
+    });
+  });
+});
+
+describe('WU93 guest-safe session closure status', () => {
+  it('projects only a bounded closure status during terminal grace and isolates unrelated sessions', async () => {
+    const target = await createBooking('9301');
+    const unrelated = await createBooking('9302');
+    await openSession(target);
+    await openSession(unrelated);
+    await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
+      target.bearer,
+      'wu93-status-9301',
+    );
+    await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
+      unrelated.bearer,
+      'wu93-status-9302',
+    );
+    await pool.query(
+      `UPDATE consultation_sessions
+          SET status='closed', closed_at=$3
+        WHERE id=$1 AND clinic_id=$2`,
+      [target.sessionId, target.clinicId, now],
+    );
+
+    const service = new PublicGuestLiveQueueStatusService(pool, () => now);
+    await expect(service.get(target.bearer)).resolves.toEqual({
+      bookingState: 'checked_in',
+      queueState: 'checked_in',
+      pauseStatus: null,
+      closureStatus: 'closed',
+      activeConsultationRemainingMinutes: null,
+      eta: null,
+    });
+    await expect(service.get(unrelated.bearer)).resolves.toMatchObject({
+      closureStatus: null,
+      eta: { patientsAhead: 0 },
+    });
+
+    const response = await GET(
+      new Request('http://localhost/api/public/bookings/live-queue-status', {
+        headers: { authorization: `Bearer ${target.bearer}` },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    const body = await response.json();
+    expect(body).toEqual({
+      bookingState: 'checked_in',
+      queueState: 'checked_in',
+      pauseStatus: null,
+      closureStatus: 'closed',
+      activeConsultationRemainingMinutes: null,
+      eta: null,
+    });
+    expect(Object.keys(body).sort()).toEqual([
+      'activeConsultationRemainingMinutes',
+      'bookingState',
+      'closureStatus',
+      'eta',
+      'pauseStatus',
+      'queueState',
+    ]);
+    expect(JSON.stringify(body)).not.toMatch(
+      /reason|note|staff|doctor|closedAt|timestamp|patient/i,
+    );
+  });
+
+  it('rejects closure snapshots outside terminal grace and never projects closure for a terminal booking', async () => {
+    const expired = await createBooking('9303');
+    const terminal = await createBooking('9304');
+    await openSession(expired);
+    await openSession(terminal);
+    await pool.query(
+      `UPDATE consultation_sessions SET status='closed', closed_at=$2 WHERE id=$1`,
+      [expired.sessionId, new Date(now.getTime() - 15 * 60 * 1000 - 1)],
+    );
+    await pool.query(
+      `UPDATE consultation_sessions SET status='closed', closed_at=$2 WHERE id=$1`,
+      [terminal.sessionId, now],
+    );
+    await pool.query(`UPDATE appointments SET status='cancelled' WHERE id=$1`, [
+      terminal.appointmentId,
+    ]);
+    await pool.query(`UPDATE queue_entries SET state='cancelled' WHERE id=$1`, [
+      terminal.queueEntryId,
+    ]);
+
+    const service = new PublicGuestLiveQueueStatusService(pool, () => now);
+    await expect(service.get(expired.bearer)).rejects.toBeInstanceOf(
+      PublicGuestLiveQueueStatusRejectedError,
+    );
+    await expect(service.get(terminal.bearer)).resolves.toEqual({
+      bookingState: 'cancelled',
+      queueState: 'cancelled',
+      pauseStatus: null,
+      closureStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });

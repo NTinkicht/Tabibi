@@ -27,6 +27,7 @@ type LiveQueueData = {
   bookingState: string;
   queueState: string;
   pauseStatus?: 'paused' | null;
+  closureStatus?: 'closed' | null;
   activeConsultationRemainingMinutes: number | null;
   eta: LiveQueueEta | null;
 };
@@ -97,6 +98,8 @@ type Copy = {
   etaDelayNotice: string;
   pausedHeading: string;
   pausedBody: string;
+  closedHeading: string;
+  closedBody: string;
   activeConsultationHeading: string;
   activeConsultationRemaining: (minutes: number) => string;
   estimateExplainerLink: string;
@@ -173,6 +176,9 @@ const COPY: Record<SupportedLocale, Copy> = {
     pausedHeading: 'File temporairement en pause',
     pausedBody:
       'La clinique a temporairement interrompu la file. Une nouvelle estimation apparaîtra à la reprise.',
+    closedHeading: 'File fermée',
+    closedBody:
+      'La clinique a fermé cette file. Aucune nouvelle estimation n’est disponible.',
     activeConsultationHeading: 'Consultation en cours',
     activeConsultationRemaining: (minutes) =>
       minutes === 1
@@ -253,6 +259,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     pausedHeading: 'قائمة الانتظار متوقفة مؤقتًا',
     pausedBody:
       'أوقفت العيادة قائمة الانتظار مؤقتًا. سيظهر تقدير جديد عند استئنافها.',
+    closedHeading: 'قائمة الانتظار مغلقة',
+    closedBody: 'أغلقت العيادة قائمة الانتظار. لا يتوفر تقدير جديد.',
     activeConsultationHeading: 'الاستشارة جارية الآن',
     activeConsultationRemaining: (minutes) =>
       `الوقت المتبقي المقدر: حوالي ${arabicMinuteCount(minutes)}`,
@@ -348,6 +356,15 @@ function PausedStatus({ copy }: { copy: Copy }) {
     <div role="status">
       <h2>{copy.pausedHeading}</h2>
       <p>{copy.pausedBody}</p>
+    </div>
+  );
+}
+
+function ClosedStatus({ copy }: { copy: Copy }) {
+  return (
+    <div role="status">
+      <h2>{copy.closedHeading}</h2>
+      <p>{copy.closedBody}</p>
     </div>
   );
 }
@@ -809,6 +826,11 @@ function LiveQueueView({
           stopForTerminal(fetched);
           return;
         }
+        if (fetched.closureStatus === 'closed') {
+          lastDataRef.current = fetched;
+          stopForTerminal(fetched);
+          return;
+        }
         // Never let this response regress the queue state below what a
         // prior poll or a successful/reconciled check-in already
         // established, in case it was in flight before that happened and
@@ -850,6 +872,12 @@ function LiveQueueView({
           eta,
           activeConsultationRemainingMinutes,
           pauseStatus,
+          closureStatus:
+            queueState === fetched.queueState
+              ? fetched.closureStatus
+              : lastDataRef.current
+                ? lastDataRef.current.closureStatus
+                : fetched.closureStatus,
         };
         lastDataRef.current = data;
         setState({ kind: 'active', data });
@@ -989,6 +1017,9 @@ function LiveQueueView({
   }
 
   if (state.kind === 'terminal') {
+    if (state.data.closureStatus === 'closed') {
+      return shell(<ClosedStatus copy={copy} />);
+    }
     return shell(
       <>
         <h2>{copy.visitStatus}</h2>

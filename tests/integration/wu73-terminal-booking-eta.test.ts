@@ -126,6 +126,7 @@ describe('WU73 terminal booking ETA suppression', () => {
         bookingState: 'checked_in',
         queueState: 'checked_in',
         pauseStatus: null,
+        closureStatus: null,
         activeConsultationRemainingMinutes: null,
       });
       expect(beforeTerminalTransition.eta).not.toBeNull();
@@ -140,6 +141,7 @@ describe('WU73 terminal booking ETA suppression', () => {
         queueState: 'checked_in',
         eta: null,
         pauseStatus: null,
+        closureStatus: null,
         activeConsultationRemainingMinutes: null,
       });
     });
