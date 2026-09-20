@@ -85,6 +85,7 @@ type Copy = {
   manualRetry: string;
   manualRefresh: string;
   manualRefreshPending: string;
+  lastVerified: string;
   visitStatus: string;
   bookingStates: Record<string, string>;
   queueStates: Record<string, string>;
@@ -153,6 +154,7 @@ const COPY: Record<SupportedLocale, Copy> = {
     manualRetry: 'Réessayer maintenant',
     manualRefresh: 'Actualiser mon statut',
     manualRefreshPending: 'Actualisation en cours…',
+    lastVerified: 'Dernière vérification :',
     visitStatus: 'Statut de la visite',
     checkIn: 'Confirmer ma présence',
     checkInPending: 'Confirmation en cours…',
@@ -239,6 +241,7 @@ const COPY: Record<SupportedLocale, Copy> = {
     manualRetry: 'إعادة المحاولة الآن',
     manualRefresh: 'تحديث حالتي',
     manualRefreshPending: 'جارٍ تحديث حالتك…',
+    lastVerified: 'آخر تحقق من الحالة:',
     visitStatus: 'حالة الزيارة',
     checkIn: 'تأكيد الحضور',
     checkInPending: 'جارٍ التأكيد…',
@@ -618,6 +621,7 @@ function LiveQueueView({
   const manualRetryRef = useRef<() => void>(() => undefined);
   const manualRefreshRef = useRef<() => void>(() => undefined);
   const [manualRefreshPending, setManualRefreshPending] = useState(false);
+  const [lastVerifiedAt, setLastVerifiedAt] = useState<Date | null>(null);
   // Captured once on mount; later re-renders may pass `undefined` once the
   // host clears its own copy, but this ref keeps the value this view needs.
   const initialBearerRef = useRef(bearer);
@@ -904,6 +908,9 @@ function LiveQueueView({
                 : fetched.closureStatus,
         };
         lastDataRef.current = data;
+        // Only a successfully parsed canonical snapshot establishes freshness.
+        // Stream hints, failed requests, and retries never advance this clock.
+        setLastVerifiedAt(new Date());
         setState({ kind: 'active', data });
         scheduleNext(POLL_INTERVAL_MS);
       } catch {
@@ -1130,6 +1137,18 @@ function LiveQueueView({
     </button>
   );
 
+  const lastVerifiedStatus = lastVerifiedAt ? (
+    <p>
+      <strong>{copy.lastVerified}</strong>{' '}
+      <time dateTime={lastVerifiedAt.toISOString()}>
+        {new Intl.DateTimeFormat(locale === 'ar' ? 'ar-DZ' : 'fr-FR', {
+          dateStyle: 'short',
+          timeStyle: 'short',
+        }).format(lastVerifiedAt)}
+      </time>
+    </p>
+  ) : null;
+
   if (state.kind === 'loading') return shell(<p>{copy.loading}</p>);
 
   if (state.kind === 'unavailable') {
@@ -1207,6 +1226,7 @@ function LiveQueueView({
             </button>
           ) : null}
         </div>
+        {state.data ? lastVerifiedStatus : null}
         {state.data ? manualRefreshControl : null}
       </>,
     );
@@ -1232,6 +1252,7 @@ function LiveQueueView({
           locale={locale}
         />
       ) : null}
+      {lastVerifiedStatus}
       {manualRefreshControl}
       {state.data.queueState === 'waiting' || checkInState.kind !== 'idle' ? (
         <div role="status">
