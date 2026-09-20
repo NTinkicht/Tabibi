@@ -45,7 +45,8 @@ test('manual refresh uses the canonical bearer-header request without disclosure
   await expect.poll(() => authorizations.length).toBe(2);
   expect(authorizations).toEqual([`Bearer ${BEARER}`, `Bearer ${BEARER}`]);
   expect(statusRequestUrls).toHaveLength(2);
-  for (const requestUrl of statusRequestUrls) expect(requestUrl).not.toContain(BEARER);
+  for (const requestUrl of statusRequestUrls)
+    expect(requestUrl).not.toContain(BEARER);
   expect(page.url()).not.toContain(BEARER);
   expect(await page.locator('body').innerText()).not.toContain(BEARER);
   expect(
@@ -130,7 +131,6 @@ test('Arabic active view exposes an RTL refresh control and terminal state remov
     page.getByRole('heading', { name: 'حالة الزيارة' }),
   ).toBeVisible();
 });
-
 
 test('data-bearing stale view can refresh without losing guest access after transient failure', async ({
   page,
