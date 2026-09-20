@@ -213,7 +213,7 @@ describe('Grok dispatcher security and durability regression guards', () => {
       'exact_sha: ' + lease.sha,
       'source_lease_comment: ' + lease.commentId,
       'No review verdict',
-    ].join('\\n');
+    ].join('\n');
     try {
       fs.writeFileSync(path.join(dir, name), '{"outcome":');
       expect(dispatcher.readState(name, dir)).toBeNull();
