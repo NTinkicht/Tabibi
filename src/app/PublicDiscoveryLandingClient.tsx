@@ -102,6 +102,18 @@ function normalizeSearch(value: string): string {
     .toLowerCase();
 }
 
+function doctorsVisibleForQuery(
+  clinic: PublicClinic,
+  query: string,
+): PublicClinic['doctors'] {
+  if (!query || normalizeSearch(clinic.name).includes(query)) {
+    return clinic.doctors;
+  }
+  return clinic.doctors.filter((doctor) =>
+    normalizeSearch(doctor.displayName).includes(query),
+  );
+}
+
 function parseClinics(value: unknown): PublicClinic[] | null {
   if (typeof value !== 'object' || value === null || !('clinics' in value)) {
     return null;
@@ -406,32 +418,37 @@ export default function PublicDiscoveryLandingClient({
           )}
         {state === 'ready' && matchingClinics.length > 0 && (
           <div className="publicGrid">
-            {sortedClinics.map((clinic, index) => (
-              <article className="publicClinic" key={index}>
-                <h3>{clinic.name}</h3>
-                <p className="publicLanguages">
-                  {t.languages}:{' '}
-                  {clinic.enabledLocales
-                    .map((value) => (value === 'ar' ? 'العربية' : 'Français'))
-                    .join(' · ')}
-                </p>
-                <h4>{t.doctors}</h4>
-                {clinic.doctors.length > 0 && (
-                  <p className="publicDoctorCount">
-                    {t.listedDoctorCount(clinic.doctors.length)}
+            {sortedClinics.map((clinic, index) => {
+              const visibleDoctors = doctorsVisibleForQuery(clinic, query);
+              return (
+                <article className="publicClinic" key={index}>
+                  <h3>{clinic.name}</h3>
+                  <p className="publicLanguages">
+                    {t.languages}:{' '}
+                    {clinic.enabledLocales
+                      .map((value) =>
+                        value === 'ar' ? 'العربية' : 'Français',
+                      )
+                      .join(' · ')}
                   </p>
-                )}
-                {clinic.doctors.length === 0 ? (
-                  <p>{t.noDoctors}</p>
-                ) : (
-                  <ul>
-                    {clinic.doctors.map((doctor, doctorIndex) => (
-                      <li key={doctorIndex}>{doctor.displayName}</li>
-                    ))}
-                  </ul>
-                )}
-              </article>
-            ))}
+                  <h4>{t.doctors}</h4>
+                  {visibleDoctors.length > 0 && (
+                    <p className="publicDoctorCount">
+                      {t.listedDoctorCount(visibleDoctors.length)}
+                    </p>
+                  )}
+                  {visibleDoctors.length === 0 ? (
+                    <p>{t.noDoctors}</p>
+                  ) : (
+                    <ul>
+                      {visibleDoctors.map((doctor, doctorIndex) => (
+                        <li key={doctorIndex}>{doctor.displayName}</li>
+                      ))}
+                    </ul>
+                  )}
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
