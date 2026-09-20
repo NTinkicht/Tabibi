@@ -172,7 +172,7 @@ def main():
         allowlist = [p for p in os.environ["ALLOWED_PATHS"].split(",") if p]
         extract_patch("/tmp/tabibi-mistral-code-output.txt", "/tmp/tabibi-mistral.patch")
         changed = validate_patch_file("/tmp/tabibi-mistral.patch", allowlist)
-        output(ready="true", changed_paths=",".join(changed))
+        output(ready="true", changed_paths=" ".join(changed))
         return
 
     if command == "recheck":
