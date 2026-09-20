@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 // The owner Codespace launcher deliberately runs as plain Node ESM.
 // @ts-expect-error The runtime .mjs file intentionally has no generated types.
-import { startupDecision } from '../../scripts/grok-auto-start.mjs';
+import { isExactFetchedMain, startupDecision } from '../../scripts/grok-auto-start.mjs';
 
 const ownerEnv = {
   CODESPACES: 'true',
@@ -65,6 +65,14 @@ describe('SaveGrok automatic owner-Codespace startup', () => {
         'LOCAL_CLI_UNAVAILABLE',
       );
     }
+  });
+
+  it('rejects locally ahead or stale main even when pull --ff-only exits successfully', () => {
+    const remote = 'a'.repeat(40);
+    expect(isExactFetchedMain(remote, remote)).toBe(true);
+    expect(isExactFetchedMain('b'.repeat(40), remote)).toBe(false);
+    expect(isExactFetchedMain(null, remote)).toBe(false);
+    expect(isExactFetchedMain(remote, null)).toBe(false);
   });
 
   it('defines a visible opt-in editor task, never an unconditional GitHub-hosted Grok Action', () => {
