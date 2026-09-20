@@ -297,3 +297,28 @@ test('Arabic search matches without vowel marks and remains RTL', async ({
     page.getByRole('heading', { name: 'عِيَادَة الأمل' }),
   ).toBeVisible();
 });
+
+test('clinic search remains stable in Turkish browser locale', async ({ browser }) => {
+  const context = await browser.newContext({ locale: 'tr-TR' });
+  try {
+    const page = await context.newPage();
+    await mockDirectory(page, [
+      {
+        name: 'Istanbul Clinic',
+        defaultLocale: 'fr',
+        enabledLocales: ['fr'],
+        doctors: [],
+      },
+    ]);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Actualiser' }).click();
+    await page
+      .getByRole('searchbox', { name: 'Rechercher une clinique ou un médecin' })
+      .fill('istanbul');
+    await expect(
+      page.getByRole('heading', { name: 'Istanbul Clinic' }),
+    ).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
