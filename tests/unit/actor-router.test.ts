@@ -218,24 +218,31 @@ describe('seven-actor capacity routing', () => {
       '.github/workflows/mistral-vibe-wake.yml',
       'utf8',
     );
-    const helper = fs.readFileSync(
-      'scripts/mistral-review-target.py',
-      'utf8',
+    const helper = fs.readFileSync('scripts/mistral-review-target.py', 'utf8');
+    expect(workflow).toContain(
+      'python3 /tmp/tabibi-mistral-review-target.py prepare',
     );
-    expect(workflow).toContain('python3 /tmp/tabibi-mistral-review-target.py prepare');
     expect(workflow).toContain('ref: ${{ steps.target.outputs.sha }}');
     expect(workflow).toContain('persist-credentials: false');
-    expect(workflow).toContain('python3 /tmp/tabibi-mistral-review-target.py evidence');
-    expect(workflow).toContain('python3 /tmp/tabibi-mistral-review-target.py recheck');
+    expect(workflow).toContain(
+      'python3 /tmp/tabibi-mistral-review-target.py evidence',
+    );
+    expect(workflow).toContain(
+      'python3 /tmp/tabibi-mistral-review-target.py recheck',
+    );
     expect(workflow).toContain('REVIEW_EVIDENCE_INCOMPLETE');
     expect(workflow).not.toContain('contents: write');
     expect(workflow).not.toContain('pull-requests: write');
     expect(helper).toContain('REQUIRED_JOBS');
     expect(helper).toContain('DIFF_LIMIT_BYTES');
     expect(helper).toContain('mistral-vibe');
-    const check = spawnSync('python3', ['scripts/mistral-review-target.py', 'selftest'], {
-      encoding: 'utf8',
-    });
+    const check = spawnSync(
+      'python3',
+      ['scripts/mistral-review-target.py', 'selftest'],
+      {
+        encoding: 'utf8',
+      },
+    );
     expect(check.status).toBe(0);
   });
 
