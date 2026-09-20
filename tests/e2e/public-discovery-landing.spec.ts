@@ -298,7 +298,9 @@ test('Arabic search matches without vowel marks and remains RTL', async ({
   ).toBeVisible();
 });
 
-test('clinic search remains stable in Turkish browser locale', async ({ browser }) => {
+test('clinic search remains stable in Turkish browser locale', async ({
+  browser,
+}) => {
   const context = await browser.newContext({ locale: 'tr-TR' });
   try {
     const page = await context.newPage();
