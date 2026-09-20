@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 const BOOKING_URL = '**/api/public/bookings';
 const STATUS_URL = '**/api/public/bookings/live-queue-status';
+const STREAM_URL = '**/api/public/bookings/live-queue-stream';
 const BEARER = 'test-selection.test-guest-bearer-secret.signature';
 
 async function mockBooking(page: Page, bearer = BEARER) {
@@ -64,6 +65,73 @@ test('guest live queue completes the booking-to-live handoff using only the Auth
   ).not.toContain(BEARER);
   expect(response?.headers()['cache-control']).toContain('no-store');
   expect(response?.headers()['referrer-policy']).toBe('no-referrer');
+});
+
+test('a bearer-authenticated change hint triggers an authoritative refresh without credential leakage', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let snapshots = 0;
+  let streamAuthorization = '';
+  await page.route(STATUS_URL, async (route) => {
+    snapshots += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'checked_in',
+        activeConsultationRemainingMinutes: null,
+        eta: {
+          patientsAhead: snapshots === 1 ? 2 : 1,
+          minWaitMinutes: 10,
+          maxWaitMinutes: 20,
+          estimateSource: 'fallback',
+          revision: `revision-${snapshots}`,
+        },
+      }),
+    });
+  });
+  await page.route(STREAM_URL, async (route) => {
+    streamAuthorization = route.request().headers()['authorization'] ?? '';
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: 'event: change\ndata: {}\n\n',
+    });
+  });
+
+  await submitBookingForm(page);
+  await expect.poll(() => snapshots).toBeGreaterThan(1);
+  expect(streamAuthorization).toBe(`Bearer ${BEARER}`);
+  expect(page.url()).not.toContain(BEARER);
+  expect(await page.locator('body').innerText()).not.toContain(BEARER);
+});
+
+test('optional stream rejection never invalidates an authorized guest snapshot', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+  await page.route(STREAM_URL, async (route) => {
+    await route.fulfill({ status: 400, body: '{"status":"rejected"}' });
+  });
+  await submitBookingForm(page);
+  await expect(page.getByText('G-042')).toBeVisible();
+  await expect(page.getByText('en attente')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Confirmer ma présence' }),
+  ).toBeVisible();
+  await expect(page.getByText('Accès indisponible')).toHaveCount(0);
 });
 
 test('booking failure shows a generic message and never reaches the live view', async ({
