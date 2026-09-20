@@ -457,13 +457,14 @@ function runReview(lease, { dryRun = false } = {}) {
     }
     // Precise allowlisted reasons avoid spending another full review just to
     // discover whether the CLI stopped, returned empty JSON, or omitted a gate.
-    if (answer?.stopReason !== 'end_turn')
-      throw new Error('grok_incomplete');
+    if (answer?.stopReason !== 'end_turn') throw new Error('grok_incomplete');
     if (typeof answer.text !== 'string' || !answer.text.trim())
       throw new Error('grok_empty_result');
     if (answer.text.length > 18_000) throw new Error('grok_response_too_long');
     if (!answer.text.includes(lease.sha)) throw new Error('grok_missing_sha');
-    if (!/\b(PASS_WITH_MINOR_FINDINGS|CHANGES_REQUIRED|PASS)\b/.test(answer.text))
+    if (
+      !/\b(PASS_WITH_MINOR_FINDINGS|CHANGES_REQUIRED|PASS)\b/.test(answer.text)
+    )
       throw new Error('grok_missing_verdict');
     if (
       !checks.every((c) => c.conclusion === 'success') &&
