@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Locale = 'ar' | 'fr';
 export type PublicClinic = {
@@ -123,6 +123,7 @@ export default function PublicDiscoveryLandingClient({
   const [clinics, setClinics] = useState<PublicClinic[]>(initialClinics ?? []);
   const [retry, setRetry] = useState(0);
   const [search, setSearch] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [refreshCount, setRefreshCount] = useState<number | null>(null);
   const t = copy[locale];
   const query = normalizeSearch(search.trim());
@@ -235,6 +236,7 @@ export default function PublicDiscoveryLandingClient({
             <div className="publicSearchControls">
               <input
                 id="publicClinicSearch"
+                ref={searchInputRef}
                 type="search"
                 autoComplete="off"
                 maxLength={120}
@@ -243,7 +245,13 @@ export default function PublicDiscoveryLandingClient({
                 onChange={(event) => setSearch(event.target.value)}
               />
               {search.length > 0 && (
-                <button type="button" onClick={() => setSearch('')}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch('');
+                    searchInputRef.current?.focus();
+                  }}
+                >
                   {t.clearSearch}
                 </button>
               )}
