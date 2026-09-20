@@ -87,9 +87,9 @@ describe('SaveGrok cloud lease bridge', () => {
   });
 
   it('parses the embedded lease validator without executing external actions', () => {
-    const body = workflow
+    const body = trustedScript
       .split("python3 - <<'PY'\n")[1]
-      ?.split('\n          PY')[0];
+      ?.split('\nPY')[0];
     expect(body).toBeDefined();
     const script = body
       ?.split('\n')
