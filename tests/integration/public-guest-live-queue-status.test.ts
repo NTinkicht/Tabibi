@@ -222,6 +222,7 @@ describe('WU63 public guest live queue status', () => {
         minWaitMinutes: 0,
         maxWaitMinutes: 0,
         estimateSource: 'fallback',
+        delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
@@ -247,6 +248,7 @@ describe('WU63 public guest live queue status', () => {
         minWaitMinutes: 0,
         maxWaitMinutes: 0,
         estimateSource: 'fallback',
+        delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
@@ -517,6 +519,53 @@ describe('WU63 public guest live queue status', () => {
 });
 
 describe('WU67 public guest deterministic ETA projection', () => {
+  it('declares, updates, and clears only the target session delay without exposing identity', async () => {
+    const target = await createBooking('7001');
+    const unrelated = await createBooking('7002');
+    await openSession(target);
+    await openSession(unrelated);
+    await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
+      target.bearer,
+      'wu91-status-7001',
+    );
+    await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
+      unrelated.bearer,
+      'wu91-status-7002',
+    );
+
+    const service = new PublicGuestLiveQueueStatusService(pool, () => now);
+    const original = await service.get(target.bearer);
+    expect(original.eta?.delayStatus).toBeNull();
+
+    await pool.query(
+      `UPDATE consultation_sessions SET declared_delay_minutes=10, delay_updated_at=$2 WHERE id=$1`,
+      [target.sessionId, now],
+    );
+    const declared = await service.get(target.bearer);
+    expect(declared.eta?.delayStatus).toBe('declared');
+    expect(declared.eta?.revision).not.toBe(original.eta?.revision);
+    expect(await service.get(unrelated.bearer)).toMatchObject({
+      eta: { delayStatus: null },
+    });
+
+    await pool.query(
+      `UPDATE consultation_sessions SET declared_delay_minutes=25, delay_updated_at=$2 WHERE id=$1`,
+      [target.sessionId, new Date(now.getTime() + 60_000)],
+    );
+    const updated = await service.get(target.bearer);
+    expect(updated.eta?.delayStatus).toBe('declared');
+    expect(updated.eta?.revision).not.toBe(declared.eta?.revision);
+
+    await pool.query(
+      `UPDATE consultation_sessions SET declared_delay_minutes=0, delay_updated_at=NULL WHERE id=$1`,
+      [target.sessionId],
+    );
+    const cleared = await service.get(target.bearer);
+    expect(cleared.eta?.delayStatus).toBeNull();
+    expect(cleared.eta?.revision).not.toBe(updated.eta?.revision);
+    expect(JSON.stringify(declared)).not.toContain(target.doctorId);
+  });
+
   it('isolates the declared session delay from the per-entry consultation estimate', async () => {
     const booking = await createBooking('7011');
     await openSession(booking);
@@ -539,6 +588,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: 20,
         maxWaitMinutes: 20,
         estimateSource: 'fallback',
+        delayStatus: 'declared',
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
@@ -575,6 +625,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(1 * 15 * 0.75),
         maxWaitMinutes: Math.round(1 * 15 * 1.5),
         estimateSource: 'fallback',
+        delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
@@ -615,6 +666,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(1 * 20 * 0.75),
         maxWaitMinutes: Math.round(1 * 20 * 1.5),
         estimateSource: 'observed_median',
+        delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
@@ -658,6 +710,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(1 * 2 * 0.75),
         maxWaitMinutes: Math.round(1 * 2 * 1.5),
         estimateSource: 'observed_median',
+        delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
@@ -686,6 +739,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(2 * 15 * 0.75),
         maxWaitMinutes: Math.round(2 * 15 * 1.5),
         estimateSource: 'fallback',
+        delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
@@ -712,6 +766,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: 0,
         maxWaitMinutes: 0,
         estimateSource: 'fallback',
+        delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
@@ -740,6 +795,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: 0,
         maxWaitMinutes: 0,
         estimateSource: 'fallback',
+        delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
@@ -752,6 +808,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(1 * 15 * 0.75),
         maxWaitMinutes: Math.round(1 * 15 * 1.5),
         estimateSource: 'fallback',
+        delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });
@@ -780,6 +837,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: 0,
         maxWaitMinutes: 0,
         estimateSource: 'fallback',
+        delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
         summary: {
           midpointMinutes: 0,
@@ -834,6 +892,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(1 * 15 * 0.75),
         maxWaitMinutes: Math.round(1 * 15 * 1.5),
         estimateSource: 'fallback' as const,
+        delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     };
@@ -918,6 +977,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         minWaitMinutes: Math.round(20 + 2 * 12 * 0.75),
         maxWaitMinutes: Math.round(20 + 2 * 12 * 1.5),
         estimateSource: 'observed_median',
+        delayStatus: 'declared',
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       },
     });

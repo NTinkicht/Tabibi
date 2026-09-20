@@ -13,6 +13,7 @@ export interface EtaSnapshot {
   readonly minWaitMinutes: number;
   readonly maxWaitMinutes: number;
   readonly revision: string;
+  readonly delayStatus: 'declared' | null;
 }
 
 /** Composes an immutable deterministic wait range and revision from committed inputs. */
@@ -21,5 +22,6 @@ export function createEtaSnapshot(input: EtaSnapshotInput): EtaSnapshot {
   return Object.freeze({
     ...range,
     revision: createEtaRevision(input),
+    delayStatus: input.declaredDelayMinutes > 0 ? 'declared' : null,
   });
 }

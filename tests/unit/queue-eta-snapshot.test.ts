@@ -16,6 +16,7 @@ describe('WU83 deterministic ETA snapshot', () => {
       minWaitMinutes: 28,
       maxWaitMinutes: 50,
       revision: createEtaSnapshot(baseline).revision,
+      delayStatus: 'declared',
     });
     expect(createEtaSnapshot(baseline).revision).toMatch(
       /^eta-v2-[0-9a-f]{32}$/,
@@ -57,6 +58,12 @@ describe('WU83 deterministic ETA snapshot', () => {
     expect(delayed.revision).not.toBe(original.revision);
     expect(delayed.minWaitMinutes).toBeGreaterThan(original.minWaitMinutes);
     expect(delayed.maxWaitMinutes).toBeGreaterThan(original.maxWaitMinutes);
+  });
+
+  it('omits the delay marker when no positive delay affects the estimate', () => {
+    expect(
+      createEtaSnapshot({ ...baseline, declaredDelayMinutes: 0 }).delayStatus,
+    ).toBeNull();
   });
 
   it('returns a runtime-immutable snapshot', () => {

@@ -15,6 +15,7 @@ type LiveQueueEta = {
   minWaitMinutes: number;
   maxWaitMinutes: number;
   estimateSource: 'fallback' | 'historical_median' | 'observed_median';
+  delayStatus?: 'declared' | null;
   summary?: {
     midpointMinutes: number;
     uncertaintyWidthMinutes: number;
@@ -92,6 +93,7 @@ type Copy = {
   etaPatientsAhead: (count: number) => string;
   etaWaitRange: (minMinutes: number, maxMinutes: number) => string;
   etaConfidence: Record<'high' | 'medium' | 'low', string>;
+  etaDelayNotice: string;
   activeConsultationHeading: string;
   activeConsultationRemaining: (minutes: number) => string;
   estimateExplainerLink: string;
@@ -163,6 +165,8 @@ const COPY: Record<SupportedLocale, Copy> = {
       medium: 'Confiance de l’estimation: moyenne',
       low: 'Confiance de l’estimation: faible',
     },
+    etaDelayNotice:
+      'Un retard du médecin est pris en compte dans cette estimation.',
     activeConsultationHeading: 'Consultation en cours',
     activeConsultationRemaining: (minutes) =>
       minutes === 1
@@ -239,6 +243,7 @@ const COPY: Record<SupportedLocale, Copy> = {
       medium: 'ثقة التقدير: متوسطة',
       low: 'ثقة التقدير: منخفضة',
     },
+    etaDelayNotice: 'تشمل هذه المدة المقدرة تأخر الطبيب.',
     activeConsultationHeading: 'الاستشارة جارية الآن',
     activeConsultationRemaining: (minutes) =>
       `الوقت المتبقي المقدر: حوالي ${arabicMinuteCount(minutes)}`,
@@ -310,6 +315,7 @@ function EtaStatus({
       <h2>{copy.etaHeading}</h2>
       <p>{copy.etaPatientsAhead(eta.patientsAhead)}</p>
       <p>{copy.etaWaitRange(eta.minWaitMinutes, eta.maxWaitMinutes)}</p>
+      {eta.delayStatus === 'declared' ? <p>{copy.etaDelayNotice}</p> : null}
       {eta.summary ? <p>{copy.etaConfidence[eta.summary.confidence]}</p> : null}
       <p>
         <a

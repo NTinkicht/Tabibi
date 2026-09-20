@@ -75,6 +75,7 @@ describe('WU81 guest ETA confidence HTTP contract', () => {
           maxWaitMinutes,
           estimateSource: 'historical_median',
           revision: 'eta-v2-a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4',
+          delayStatus: 'declared',
         },
       });
 
@@ -83,7 +84,8 @@ describe('WU81 guest ETA confidence HTTP contract', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('cache-control')).toBe('no-store');
       expect(response.headers.get('referrer-policy')).toBe('no-referrer');
-      expect(await response.json()).toEqual({
+      const body = await response.json();
+      expect(body).toEqual({
         bookingState: 'checked_in',
         queueState: 'checked_in',
         eta: {
@@ -92,6 +94,7 @@ describe('WU81 guest ETA confidence HTTP contract', () => {
           maxWaitMinutes,
           estimateSource: 'historical_median',
           revision: 'eta-v2-a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4',
+          delayStatus: 'declared',
           summary: {
             midpointMinutes,
             uncertaintyWidthMinutes,
@@ -99,6 +102,10 @@ describe('WU81 guest ETA confidence HTTP contract', () => {
           },
         },
       });
+
+      expect(body.eta).not.toHaveProperty('declaredDelayMinutes');
+      expect(body.eta).not.toHaveProperty('delayReason');
+      expect(body.eta).not.toHaveProperty('doctorId');
     },
   );
 
