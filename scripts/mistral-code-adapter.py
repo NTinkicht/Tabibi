@@ -336,7 +336,7 @@ def main():
             blob = Path("/tmp/tabibi-mistral-validated.json").read_text(encoding="utf-8")
             if len(blob.encode("utf-8")) > MAX_PATCH_BYTES:
                 raise ValueError("Artifact too large")
-            changed = apply_patch(f"{BEGIN}\\n{blob}\\n{END}", paths, Path.cwd())
+            changed = apply_patch(f"{BEGIN}\n{blob}\n{END}", paths, Path.cwd())
             run(["git", "diff", "--check"])
             actual = run(["git", "diff", "--name-only"], capture=True).stdout.splitlines()
             if set(changed) != set(actual):
