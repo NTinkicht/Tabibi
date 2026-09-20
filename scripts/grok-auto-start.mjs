@@ -44,6 +44,14 @@ export function startupDecision(
   return 'ELIGIBLE';
 }
 
+export function isExactFetchedMain(head, fetched) {
+  return (
+    typeof head === 'string' &&
+    /^[a-f0-9]{40}$/.test(head) &&
+    head === fetched
+  );
+}
+
 function safeCommand(bin, args, timeout = 30_000) {
   const result = spawnSync(bin, args, {
     cwd: ROOT,
@@ -104,6 +112,20 @@ async function main() {
   ) {
     process.stdout.write(
       'SaveGrok: MAIN_FAST_FORWARD_UNAVAILABLE; no worker started.\n',
+    );
+    return;
+  }
+  // --ff-only does NOT reject a locally ahead-of-origin main. Never execute
+  // an unreviewed local dispatcher with the owner's private OAuth/GitHub access.
+  // FETCH_HEAD is the exact remote main fetched by the pull just above.
+  if (
+    !isExactFetchedMain(
+      safeCommand('git', ['rev-parse', 'HEAD']),
+      safeCommand('git', ['rev-parse', 'FETCH_HEAD']),
+    )
+  ) {
+    process.stdout.write(
+      'SaveGrok: MAIN_NOT_EXACT_REMOTE_HEAD; no worker started.\\n',
     );
     return;
   }
