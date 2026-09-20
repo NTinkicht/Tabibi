@@ -197,19 +197,19 @@ export class PublicGuestLiveQueueStatusService {
       row.historical_duration_samples ?? [],
     );
     const isTerminal = TERMINAL_BOOKING_STATES.has(row.appointment_status);
-    // Normal session closure is only reachable after every queue entry is
-    // terminal. During the bounded terminal-summary grace period, closure is
-    // therefore intentionally the user-visible status even though this
-    // guest's booking is also terminal.
-    const isClosed = row.session_status === 'closed';
-    if (
-      isClosed &&
+    // Legal session closure requires terminal queue entries. Show the
+    // closure notice only during its bounded grace window, then preserve
+    // the existing terminal booking summary for the credential's normal TTL.
+    const sessionClosed = row.session_status === 'closed';
+    const closureGraceExpired =
+      sessionClosed &&
       (!row.session_closed_at ||
         snapshotNow.getTime() - row.session_closed_at.getTime() >
-          TERMINAL_GRACE_MS)
-    ) {
+          TERMINAL_GRACE_MS);
+    if (closureGraceExpired && !isTerminal) {
       throw new PublicGuestLiveQueueStatusRejectedError();
     }
+    const isClosed = sessionClosed && !closureGraceExpired;
     const isPaused = !isTerminal && row.session_status === 'paused';
     const activeConsultationRemainingMinutes =
       !isTerminal &&
