@@ -108,8 +108,12 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     expect(propose.steps.some((s) => s.uses?.includes('upload-artifact'))).toBe(
       true,
     );
-    expect(validate.steps.some((s) => s.uses?.includes('download-artifact'))).toBe(true);
-    expect(validate.steps.some((s) => s.uses?.includes('upload-artifact'))).toBe(true);
+    expect(
+      validate.steps.some((s) => s.uses?.includes('download-artifact')),
+    ).toBe(true);
+    expect(
+      validate.steps.some((s) => s.uses?.includes('upload-artifact')),
+    ).toBe(true);
     expect(test.steps.some((s) => s.uses?.includes('download-artifact'))).toBe(
       true,
     );
@@ -128,8 +132,14 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
       'Validate model exact edits in isolated trusted read-only parent',
     );
     expect(patch.run).toContain('mistral-code-adapter.py apply');
-    expect(validate.steps[0]?.name).toBe('Fresh trusted read-only runner checkout');
-    expect(propose.steps.some((step) => step.env?.GH_TOKEN && step.name?.includes('patch'))).toBe(false);
+    expect(validate.steps[0]?.name).toBe(
+      'Fresh trusted read-only runner checkout',
+    );
+    expect(
+      propose.steps.some(
+        (step) => step.env?.GH_TOKEN && step.name?.includes('patch'),
+      ),
+    ).toBe(false);
     const tests = named(
       test,
       'Unprivileged deterministic format lint typecheck unit/API and build',
