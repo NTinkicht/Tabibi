@@ -1119,7 +1119,9 @@ test('Arabic mobile Escape restores vowel-insensitive doctor results and keeps R
   const search = page.getByRole('searchbox', { name: 'ابحث عن عيادة أو طبيب' });
   await search.fill('مريم');
   await expect(page.locator('.publicClinic li')).toHaveCount(1);
-  await expect(page.getByText('إجمالي الأطباء المعروضين في النتائج: 1.')).toBeVisible();
+  await expect(
+    page.getByText('إجمالي الأطباء المعروضين في النتائج: 1.'),
+  ).toBeVisible();
   await search.press('Escape');
   await expect(search).toHaveValue('');
   await expect(search).toBeFocused();
