@@ -23,7 +23,8 @@ const copy = {
     clearSearch: 'Effacer la recherche',
     searchCount: (count: number) =>
       `${count} clinique${count === 1 ? '' : 's'} trouvée${count === 1 ? '' : 's'}.`,
-    noSearchMatches: 'Aucune clinique ni aucun médecin ne correspond à votre recherche.',
+    noSearchMatches:
+      'Aucune clinique ni aucun médecin ne correspond à votre recherche.',
     refresh: 'Actualiser',
     refreshed: (count: number) =>
       `Répertoire actualisé : ${count} clinique${count === 1 ? '' : 's'}.`,
