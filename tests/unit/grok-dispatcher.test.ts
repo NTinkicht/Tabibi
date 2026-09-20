@@ -255,6 +255,36 @@ describe('Grok dispatcher security and durability regression guards', () => {
     }
   });
 
+  it('categorizes Grok failures without returning sensitive subprocess output', () => {
+    const classify = dispatcher.classifyGrokFailure;
+    expect(classify({ stderr: 'This command requires approval' })).toBe(
+      'GROK_APPROVAL_REQUIRED',
+    );
+    expect(classify({ stderr: 'sandbox violation: operation blocked' })).toBe(
+      'GROK_SANDBOX_DENIED',
+    );
+    expect(classify({ stderr: 'Unauthorized: refresh token expired' })).toBe(
+      'GROK_AUTH_FAILED',
+    );
+    expect(classify({ stderr: 'Rate limit exceeded' })).toBe(
+      'GROK_CAPACITY_LIMIT',
+    );
+    expect(classify({ stderr: 'Maximum turns reached' })).toBe(
+      'GROK_TURN_LIMIT',
+    );
+    expect(classify({ error: { code: 'ETIMEDOUT' } })).toBe('GROK_TIMEOUT');
+    expect(classify({ stderr: 'secret: actual-value-123456' })).toBe(
+      'GROK_EXIT_UNCLASSIFIED',
+    );
+    expect(
+      dispatcher.dispatchFailureCode(
+        new Error(
+          classify({ stderr: 'Requires approval. token: real-secret-123456' }).toLowerCase(),
+        ),
+      ),
+    ).toBe('GROK_APPROVAL_REQUIRED');
+  });
+
   it('only emits safe categorical failures, never raw provider stderr', () => {
     expect(
       dispatcher.dispatchFailureCode(new Error('oauth_not_verified')),
