@@ -197,7 +197,11 @@ export class PublicGuestLiveQueueStatusService {
       row.historical_duration_samples ?? [],
     );
     const isTerminal = TERMINAL_BOOKING_STATES.has(row.appointment_status);
-    const isClosed = !isTerminal && row.session_status === 'closed';
+    // Normal session closure is only reachable after every queue entry is
+    // terminal. During the bounded terminal-summary grace period, closure is
+    // therefore intentionally the user-visible status even though this
+    // guest's booking is also terminal.
+    const isClosed = row.session_status === 'closed';
     if (
       isClosed &&
       (!row.session_closed_at ||
@@ -210,6 +214,7 @@ export class PublicGuestLiveQueueStatusService {
     const activeConsultationRemainingMinutes =
       !isTerminal &&
       !isPaused &&
+      !isClosed &&
       row.queue_state === 'in_consultation' &&
       row.in_consultation_started_at
         ? computeActiveConsultationRemainingMinutes({

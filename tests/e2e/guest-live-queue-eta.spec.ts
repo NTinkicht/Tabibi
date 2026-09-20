@@ -569,8 +569,8 @@ test('French renders terminal queue closure, suppresses projections, and ignores
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        bookingState: 'checked_in',
-        queueState: 'in_consultation',
+        bookingState: 'completed',
+        queueState: 'completed',
         pauseStatus: null,
         closureStatus: 'closed',
         activeConsultationRemainingMinutes: null,
@@ -604,8 +604,8 @@ test('Arabic renders an accessible RTL terminal queue closure without false prec
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        bookingState: 'checked_in',
-        queueState: 'checked_in',
+        bookingState: 'cancelled',
+        queueState: 'cancelled',
         pauseStatus: null,
         closureStatus: 'closed',
         activeConsultationRemainingMinutes: null,

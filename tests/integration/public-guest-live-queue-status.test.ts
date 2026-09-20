@@ -5,10 +5,12 @@ import { GET } from '@/app/api/public/bookings/live-queue-status/route';
 import { PublicAvailabilitySelectionService } from '@/modules/public-availability-selection';
 import { PublicGuestBookingService } from '@/modules/public-guest-booking';
 import { PublicGuestBookingCheckInService } from '@/modules/public-guest-booking-check-in';
+import { PublicGuestBookingCancellationService } from '@/modules/public-guest-booking-cancellation';
 import {
   PublicGuestLiveQueueStatusRejectedError,
   PublicGuestLiveQueueStatusService,
 } from '@/modules/public-guest-live-queue-status';
+import { SessionService } from '@/modules/session';
 import { migrate } from '../../scripts/db/lib';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
@@ -32,6 +34,7 @@ type Booking = {
   sessionId: string;
   queueEntryId: string;
   appointmentId: string;
+  actorUserId: string;
   bearer: string;
   privateDisplayName: string;
   contactPhone: string;
@@ -44,16 +47,16 @@ async function createBooking(
   const clinicId = existing?.clinicId ?? randomUUID();
   const doctorId = existing?.doctorId ?? randomUUID();
   const sessionId = existing?.sessionId ?? randomUUID();
+  const actorUserId = existing?.actorUserId ?? randomUUID();
   const startsAt = '2099-05-15T08:00:00.000Z';
   const endsAt = '2099-05-15T09:00:00.000Z';
   const privateDisplayName = `Private Guest ${suffix}`;
   const contactPhone = `+21355504${suffix.padStart(4, '0')}`;
 
   if (!existing) {
-    const doctorUserId = randomUUID();
     await pool.query(
       `INSERT INTO users (id, auth_subject, display_name) VALUES ($1,$2,'Private Doctor')`,
-      [doctorUserId, `wu63-doctor-${doctorUserId}`],
+      [actorUserId, `wu63-doctor-${actorUserId}`],
     );
     await pool.query(
       `INSERT INTO clinics (id, tenant_key, name, status) VALUES ($1,$2,'Private Clinic','active')`,
@@ -61,7 +64,11 @@ async function createBooking(
     );
     await pool.query(
       `INSERT INTO doctor_profiles (id, user_id, display_name) VALUES ($1,$2,'Private Doctor')`,
-      [doctorId, doctorUserId],
+      [doctorId, actorUserId],
+    );
+    await pool.query(
+      `INSERT INTO clinic_memberships (clinic_id, user_id, role) VALUES ($1,$2,'doctor')`,
+      [clinicId, actorUserId],
     );
     await pool.query(
       `INSERT INTO doctor_clinics (clinic_id, doctor_id) VALUES ($1,$2)`,
@@ -118,10 +125,35 @@ async function createBooking(
     sessionId,
     queueEntryId: row.queue_entry_id,
     appointmentId: row.id,
+    actorUserId,
     bearer: booked.guestBearer,
     privateDisplayName,
     contactPhone,
   };
+}
+
+async function closeSessionAfterGuestCancellation(
+  booking: Booking,
+  closedAt: Date,
+) {
+  await new PublicGuestBookingCancellationService(pool, () => now).cancel(
+    booking.bearer,
+  );
+  await new SessionService(pool).command(
+    { clinicId: booking.clinicId, actorUserId: booking.actorUserId },
+    booking.sessionId,
+    {
+      command: 'close',
+      idempotencyKey: `wu93-close-${booking.sessionId}`,
+      correlationId: `wu93-close-${booking.sessionId}`,
+    },
+  );
+  // The fixture clock is intentionally fixed in 2099. Preserve the real
+  // lifecycle transition above while aligning its timestamp with that clock.
+  await pool.query(
+    `UPDATE consultation_sessions SET closed_at=$2 WHERE id=$1 AND clinic_id=$3`,
+    [booking.sessionId, closedAt, booking.clinicId],
+  );
 }
 
 async function openSession(booking: Booking) {
@@ -1277,30 +1309,21 @@ describe('WU92 guest-safe session pause status', () => {
 });
 
 describe('WU93 guest-safe session closure status', () => {
-  it('projects only a bounded closure status during terminal grace and isolates unrelated sessions', async () => {
+  it('projects closure after a valid terminal lifecycle and isolates unrelated sessions', async () => {
     const target = await createBooking('9301');
     const unrelated = await createBooking('9302');
     await openSession(target);
     await openSession(unrelated);
     await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
-      target.bearer,
-      'wu93-status-9301',
-    );
-    await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
       unrelated.bearer,
       'wu93-status-9302',
     );
-    await pool.query(
-      `UPDATE consultation_sessions
-          SET status='closed', closed_at=$3
-        WHERE id=$1 AND clinic_id=$2`,
-      [target.sessionId, target.clinicId, now],
-    );
+    await closeSessionAfterGuestCancellation(target, now);
 
     const service = new PublicGuestLiveQueueStatusService(pool, () => now);
     await expect(service.get(target.bearer)).resolves.toEqual({
-      bookingState: 'checked_in',
-      queueState: 'checked_in',
+      bookingState: 'cancelled',
+      queueState: 'cancelled',
       pauseStatus: null,
       closureStatus: 'closed',
       activeConsultationRemainingMinutes: null,
@@ -1321,8 +1344,8 @@ describe('WU93 guest-safe session closure status', () => {
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
     const body = await response.json();
     expect(body).toEqual({
-      bookingState: 'checked_in',
-      queueState: 'checked_in',
+      bookingState: 'cancelled',
+      queueState: 'cancelled',
       pauseStatus: null,
       closureStatus: 'closed',
       activeConsultationRemainingMinutes: null,
@@ -1341,25 +1364,16 @@ describe('WU93 guest-safe session closure status', () => {
     );
   });
 
-  it('rejects closure snapshots outside terminal grace and never projects closure for a terminal booking', async () => {
+  it('rejects expired closure snapshots and gives recent closure precedence over terminal booking state', async () => {
     const expired = await createBooking('9303');
     const terminal = await createBooking('9304');
     await openSession(expired);
     await openSession(terminal);
-    await pool.query(
-      `UPDATE consultation_sessions SET status='closed', closed_at=$2 WHERE id=$1`,
-      [expired.sessionId, new Date(now.getTime() - 15 * 60 * 1000 - 1)],
+    await closeSessionAfterGuestCancellation(
+      expired,
+      new Date(now.getTime() - 15 * 60 * 1000 - 1),
     );
-    await pool.query(
-      `UPDATE consultation_sessions SET status='closed', closed_at=$2 WHERE id=$1`,
-      [terminal.sessionId, now],
-    );
-    await pool.query(`UPDATE appointments SET status='cancelled' WHERE id=$1`, [
-      terminal.appointmentId,
-    ]);
-    await pool.query(`UPDATE queue_entries SET state='cancelled' WHERE id=$1`, [
-      terminal.queueEntryId,
-    ]);
+    await closeSessionAfterGuestCancellation(terminal, now);
 
     const service = new PublicGuestLiveQueueStatusService(pool, () => now);
     await expect(service.get(expired.bearer)).rejects.toBeInstanceOf(
@@ -1369,7 +1383,7 @@ describe('WU93 guest-safe session closure status', () => {
       bookingState: 'cancelled',
       queueState: 'cancelled',
       pauseStatus: null,
-      closureStatus: null,
+      closureStatus: 'closed',
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
