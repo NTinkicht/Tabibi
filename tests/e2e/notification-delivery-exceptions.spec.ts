@@ -131,6 +131,74 @@ test('Arabic view renders RTL with a localized event label and unmapped events f
   expect(bodyText).not.toContain('retry_exhausted');
 });
 
+test('known internal dispatch failures have coarse French and Arabic labels without raw codes', async ({
+  page,
+}) => {
+  await authenticate(page);
+  const codes = [
+    'delivery_context_failure',
+    'in_app_delivery_context_mismatch',
+    'render_failure',
+    'in_app_persist_rejected',
+    'in_app_persist_exception',
+  ];
+  await page.route(DEAD_LETTERS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        deadLettersBody(
+          codes.map((outcomeCode) => ({
+            eventKey: 'patient_called',
+            queueLabel: 'A-041',
+            attemptCount: 3,
+            maxAttempts: 5,
+            outcomeAt: '2026-09-13T11:00:00.000Z',
+            outcomeCode,
+          })),
+        ),
+      ),
+    });
+  });
+
+  await page.goto(`/operations/${clinicId}/notifications?locale=fr`);
+  await expect(page.getByText('Contexte de livraison indisponible')).toHaveCount(2);
+  await expect(page.getByText('Préparation de la notification impossible')).toBeVisible();
+  await expect(page.getByText('Enregistrement de la notification impossible')).toHaveCount(2);
+  for (const code of codes) expect(await page.locator('body').innerText()).not.toContain(code);
+
+  await page.getByRole('button', { name: 'العربية' }).click();
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.getByText('تعذّر تحديد سياق التسليم')).toHaveCount(2);
+  await expect(page.getByText('تعذّر إعداد الإشعار')).toBeVisible();
+  await expect(page.getByText('تعذّر حفظ الإشعار')).toHaveCount(2);
+  for (const code of codes) expect(await page.locator('body').innerText()).not.toContain(code);
+});
+
+test('mobile exceptions page uses reception-desk layout rather than the landing-page margin', async ({
+  page,
+}) => {
+  await authenticate(page);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.route(DEAD_LETTERS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(deadLettersBody([])),
+    });
+  });
+  await page.goto(`/operations/${clinicId}/notifications?locale=ar`);
+  const main = page.locator('main.notificationExceptions.desk');
+  await expect(main).toBeVisible();
+  await expect(page.locator('main[dir="rtl"]')).toBeVisible();
+  expect(
+    await main.evaluate((element) => getComputedStyle(element).marginTop),
+  ).toBe('0px');
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(375);
+});
+
 test('shows the empty state when there are no delivery exceptions', async ({
   page,
 }) => {
