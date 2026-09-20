@@ -18,6 +18,12 @@ const copy = {
     description:
       'Découvrez les cliniques et les médecins disponibles sur Tabibi.',
     directory: 'Cliniques',
+    searchLabel: 'Rechercher une clinique ou un médecin',
+    searchPlaceholder: 'Nom de la clinique ou du médecin',
+    clearSearch: 'Effacer la recherche',
+    searchCount: (count: number) =>
+      `${count} clinique${count === 1 ? '' : 's'} trouvée${count === 1 ? '' : 's'}.`,
+    noSearchMatches: 'Aucune clinique ni aucun médecin ne correspond à votre recherche.',
     refresh: 'Actualiser',
     refreshed: (count: number) =>
       `Répertoire actualisé : ${count} clinique${count === 1 ? '' : 's'}.`,
@@ -34,6 +40,11 @@ const copy = {
     intro: 'ابحث عن عيادتك',
     description: 'تعرّف على العيادات والأطباء المعروضين على طبيبي.',
     directory: 'العيادات',
+    searchLabel: 'ابحث عن عيادة أو طبيب',
+    searchPlaceholder: 'اسم العيادة أو الطبيب',
+    clearSearch: 'مسح البحث',
+    searchCount: (count: number) => `نتائج البحث: ${count} عيادة.`,
+    noSearchMatches: 'لا توجد عيادات أو أطباء يطابقون بحثك.',
     refresh: 'تحديث',
     refreshed: (count: number) => `تم تحديث الدليل: ${count} عيادة.`,
     doctors: 'الأطباء',
@@ -46,6 +57,16 @@ const copy = {
     note: 'ستتاح المواعيد والحجوزات عبر مسار آمن مخصص لها.',
   },
 } as const;
+
+// Compare public display names only; ignore accents and Arabic vowel marks
+// without modifying the visible clinic/doctor names.
+function normalizeSearch(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .replace(/\u0640/g, '')
+    .toLocaleLowerCase();
+}
 
 function parseClinics(value: unknown): PublicClinic[] | null {
   if (typeof value !== 'object' || value === null || !('clinics' in value)) {
@@ -100,8 +121,19 @@ export default function PublicDiscoveryLandingClient({
   );
   const [clinics, setClinics] = useState<PublicClinic[]>(initialClinics ?? []);
   const [retry, setRetry] = useState(0);
+  const [search, setSearch] = useState('');
   const [refreshCount, setRefreshCount] = useState<number | null>(null);
   const t = copy[locale];
+  const query = normalizeSearch(search.trim());
+  const matchingClinics = query
+    ? clinics.filter(
+        (clinic) =>
+          normalizeSearch(clinic.name).includes(query) ||
+          clinic.doctors.some((doctor) =>
+            normalizeSearch(doctor.displayName).includes(query),
+          ),
+      )
+    : clinics;
 
   useEffect(() => {
     if (retry === 0) return;
@@ -196,6 +228,33 @@ export default function PublicDiscoveryLandingClient({
             {t.refresh}
           </button>
         </div>
+        {state === 'ready' && clinics.length > 0 && (
+          <div className="publicSearch">
+            <label htmlFor="publicClinicSearch">{t.searchLabel}</label>
+            <div className="publicSearchControls">
+              <input
+                id="publicClinicSearch"
+                type="search"
+                autoComplete="off"
+                maxLength={120}
+                placeholder={t.searchPlaceholder}
+                aria-controls="publicClinicResults"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+              {search.length > 0 && (
+                <button type="button" onClick={() => setSearch('')}>
+                  {t.clearSearch}
+                </button>
+              )}
+            </div>
+            {query && (
+              <p aria-live="polite" aria-atomic="true">
+                {t.searchCount(matchingClinics.length)}
+              </p>
+            )}
+          </div>
+        )}
         <div aria-live="polite" aria-atomic="true">
           {state === 'loading' && <p role="status">{t.loading}</p>}
           {state === 'error' && (
@@ -213,9 +272,14 @@ export default function PublicDiscoveryLandingClient({
             <p className="publicNotice">{t.empty}</p>
           )}
         </div>
-        {state === 'ready' && clinics.length > 0 && (
-          <div className="publicGrid">
-            {clinics.map((clinic, index) => (
+        {state === 'ready' && clinics.length > 0 && query && matchingClinics.length === 0 && (
+          <p className="publicNotice" role="status">
+            {t.noSearchMatches}
+          </p>
+        )}
+        {state === 'ready' && matchingClinics.length > 0 && (
+          <div className="publicGrid" id="publicClinicResults">
+            {matchingClinics.map((clinic, index) => (
               <article className="publicClinic" key={index}>
                 <h3>{clinic.name}</h3>
                 <p className="publicLanguages">
