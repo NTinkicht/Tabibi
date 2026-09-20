@@ -263,6 +263,12 @@ describe('Grok dispatcher security and durability regression guards', () => {
       'GROK_EXIT_1',
     );
     expect(
+      dispatcher.dispatchFailureCode(new Error('grok_missing_verdict')),
+    ).toBe('GROK_MISSING_VERDICT');
+    expect(dispatcher.dispatchFailureCode(new Error('grok_incomplete'))).toBe(
+      'GROK_INCOMPLETE',
+    );
+    expect(
       dispatcher.dispatchFailureCode(new Error('git_exit_spawn_failure')),
     ).toBe('GIT_EXIT_SPAWN_FAILURE');
     expect(
