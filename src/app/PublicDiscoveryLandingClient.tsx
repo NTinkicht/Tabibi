@@ -24,7 +24,8 @@ const copy = {
     clinicLanguageAll: 'Toutes les langues',
     clinicLanguageFrench: 'Français',
     clinicLanguageArabic: 'العربية',
-    noFilteredMatches: 'Aucune clinique ne correspond aux filtres sélectionnés.',
+    noFilteredMatches:
+      'Aucune clinique ne correspond aux filtres sélectionnés.',
     searchPlaceholder: 'Nom de la clinique ou du médecin',
     clearSearch: 'Effacer la recherche',
     searchCount: (count: number) =>
@@ -140,6 +141,8 @@ export default function PublicDiscoveryLandingClient({
   const [refreshCount, setRefreshCount] = useState<number | null>(null);
   const t = copy[locale];
   const query = normalizeSearch(search.trim());
+  const noMatchesCopy =
+    clinicLanguage !== 'all' ? t.noFilteredMatches : t.noSearchMatches;
   const matchingClinics = clinics.filter(
     (clinic) =>
       (clinicLanguage === 'all' ||
@@ -313,9 +316,7 @@ export default function PublicDiscoveryLandingClient({
           (query || clinicLanguage !== 'all') &&
           matchingClinics.length === 0 && (
             <p className="publicNotice" role="status">
-              {clinicLanguage !== 'all'
-                ? t.noFilteredMatches
-                : t.noSearchMatches}
+              {noMatchesCopy}
             </p>
           )}
         {state === 'ready' && matchingClinics.length > 0 && (
