@@ -14,9 +14,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-SHA = re.compile(r"[a-f0-9]{40}\\Z")
-SAFE_PATH = re.compile(r"(?:src|tests)/[A-Za-z0-9_./\\[\\]-]+\\Z")
-FIELD_PATH = re.compile(r"(?m)^([a-z_]+):[ \\t]*(.*?)[ \\t]*$")
+SHA = re.compile(r"[a-f0-9]{40}\Z")
+SAFE_PATH = re.compile(r"(?:src|tests)/[A-Za-z0-9_./\[\]-]+\Z")
+FIELD_PATH = re.compile(r"(?m)^([a-z_]+):[ \t]*(.*?)[ \t]*$")
 BEGIN = "BEGIN_TABIBI_PATCH_JSON"
 END = "END_TABIBI_PATCH_JSON"
 MAX_PATCH_BYTES = 28_000
@@ -24,8 +24,8 @@ MAX_FILE_BYTES = 200_000
 REDACT = re.compile(
     r"(?im)-----BEGIN [A-Z ]*PRIVATE KEY-----|"
     r"(?<![A-Za-z0-9])(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{16,}|"
-    r"(?<![A-Za-z0-9])(?:sk|xai|mistral)-[A-Za-z0-9_\\-]{20,}|"
-    r"(?:GITHUB_TOKEN|MISTRAL_API_KEY|XAI_API_KEY)[ \\t]*[:=][ \\t]*[^\\s]+"
+    r"(?<![A-Za-z0-9])(?:sk|xai|mistral)-[A-Za-z0-9_\-]{20,}|"
+    r"(?:GITHUB_TOKEN|MISTRAL_API_KEY|XAI_API_KEY)[ \t]*[:=][ \t]*[^\s]+"
 )
 
 
@@ -39,7 +39,7 @@ def github(route):
 def emit(**values):
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
         for key, value in values.items():
-            out.write(f"{key}={value}\\n")
+            out.write(f"{key}={value}\n")
 
 
 def fail(code):
@@ -207,8 +207,8 @@ def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else ""
     if mode == "selftest":
         sha = "a" * 40
-        body = (f"MISTRAL_LEASED_CODE_V1\\npr: 2\\nexact_sha: {sha}\\n"
-                "stream: WU101\\nallowed_paths: src/a.ts,tests/a.test.ts")
+        body = (f"MISTRAL_LEASED_CODE_V1\npr: 2\nexact_sha: {sha}\n"
+                "stream: WU101\nallowed_paths: src/a.ts,tests/a.test.ts")
         assert parse_owner_dispatch(body) == (
             2, sha, "WU101", ["src/a.ts", "tests/a.test.ts"]
         )
@@ -228,14 +228,14 @@ def main():
             root = Path(d)
             (root / "src").mkdir()
             (root / "tests").mkdir()
-            (root / "src/a.ts").write_text("const foo = 1;\\n")
-            (root / "tests/a.test.ts").write_text("expect(1).toBe(1);\\n")
+            (root / "src/a.ts").write_text("const foo = 1;\n")
+            (root / "tests/a.test.ts").write_text("expect(1).toBe(1);\n")
             body = json.dumps({"edits": [
                 {"path": "src/a.ts", "old": "foo = 1", "new": "foo = 2"},
                 {"path": "tests/a.test.ts",
                  "old": "expect(1)", "new": "expect(2)"},
             ]})
-            payload = f"{BEGIN}\\n{body}\\n{END}"
+            payload = f"{BEGIN}\n{body}\n{END}"
             changed = apply_patch(
                 payload, ["src/a.ts", "tests/a.test.ts"], root
             )
@@ -249,7 +249,7 @@ def main():
                  "old": "expect(2)", "new": "expect(3)"},
             ]})
             try:
-                apply_patch(f"{BEGIN}\\n{attack}\\n{END}",
+                apply_patch(f"{BEGIN}\n{attack}\n{END}",
                             ["src/link.ts", "tests/a.test.ts"], root)
             except ValueError:
                 pass
