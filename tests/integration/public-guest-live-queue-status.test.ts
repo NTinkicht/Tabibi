@@ -557,7 +557,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     expect(updated.eta?.revision).not.toBe(declared.eta?.revision);
 
     await pool.query(
-      `UPDATE consultation_sessions SET declared_delay_minutes=0, delay_updated_at=NULL WHERE id=$1`,
+      `UPDATE consultation_sessions SET declared_delay_minutes=NULL, delay_updated_at=NULL WHERE id=$1`,
       [target.sessionId],
     );
     const cleared = await service.get(target.bearer);
@@ -852,6 +852,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         'minWaitMinutes',
         'maxWaitMinutes',
         'estimateSource',
+        'delayStatus',
         'revision',
         'summary',
       ].sort(),
