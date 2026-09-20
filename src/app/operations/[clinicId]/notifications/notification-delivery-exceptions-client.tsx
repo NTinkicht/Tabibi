@@ -97,13 +97,13 @@ export function NotificationDeliveryExceptionsClient({
   const t = copy[locale];
 
   const refresh = useCallback(() => {
+    setState({ kind: 'loading' });
     setGeneration((current) => current + 1);
   }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     const currentRequest = ++requestId.current;
-    setState({ kind: 'loading' });
     void (async () => {
       try {
         const response = await fetch(
