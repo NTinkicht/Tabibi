@@ -104,7 +104,7 @@ LEASE_EVENTS = frozenset({
     "ROLE_LEASE_ASSIGNED", "ROLE_LEASE_RELEASED", "ROLE_LEASE_REPLACED",
     "ROLE_FAILOVER", "ROLE_LEASE_CANCELLED",
 })
-LEASE_EVENT_LINE = re.compile(r"(?m)^(ROLE_LEASE_[A-Z_]+|ROLE_FAILOVER)[ \\t]*$")
+LEASE_EVENT_LINE = re.compile(r"(?m)^(ROLE_LEASE_[A-Z_]+|ROLE_FAILOVER)[ ]*$")
 
 
 def replay_owner_lease(comments, number, sha, stream):
