@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 type Locale = 'ar' | 'fr';
+type ClinicLanguageFilter = Locale | 'all';
 export type PublicClinic = {
   name: string;
   defaultLocale: Locale;
@@ -19,6 +20,12 @@ const copy = {
       'Découvrez les cliniques et les médecins disponibles sur Tabibi.',
     directory: 'Cliniques',
     searchLabel: 'Rechercher une clinique ou un médecin',
+    clinicLanguageLabel: 'Langue proposée par la clinique',
+    clinicLanguageAll: 'Toutes les langues',
+    clinicLanguageFrench: 'Français',
+    clinicLanguageArabic: 'العربية',
+    noFilteredMatches:
+      'Aucune clinique ne correspond aux filtres sélectionnés.',
     searchPlaceholder: 'Nom de la clinique ou du médecin',
     clearSearch: 'Effacer la recherche',
     searchCount: (count: number) =>
@@ -42,6 +49,11 @@ const copy = {
     description: 'تعرّف على العيادات والأطباء المعروضين على طبيبي.',
     directory: 'العيادات',
     searchLabel: 'ابحث عن عيادة أو طبيب',
+    clinicLanguageLabel: 'اللغة المتاحة في العيادة',
+    clinicLanguageAll: 'كل اللغات',
+    clinicLanguageFrench: 'الفرنسية',
+    clinicLanguageArabic: 'العربية',
+    noFilteredMatches: 'لا توجد عيادات تطابق عوامل التصفية المحددة.',
     searchPlaceholder: 'اسم العيادة أو الطبيب',
     clearSearch: 'مسح البحث',
     searchCount: (count: number) => `نتائج البحث: ${count} عيادة.`,
@@ -123,19 +135,24 @@ export default function PublicDiscoveryLandingClient({
   const [clinics, setClinics] = useState<PublicClinic[]>(initialClinics ?? []);
   const [retry, setRetry] = useState(0);
   const [search, setSearch] = useState('');
+  const [clinicLanguage, setClinicLanguage] =
+    useState<ClinicLanguageFilter>('all');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [refreshCount, setRefreshCount] = useState<number | null>(null);
   const t = copy[locale];
   const query = normalizeSearch(search.trim());
-  const matchingClinics = query
-    ? clinics.filter(
-        (clinic) =>
-          normalizeSearch(clinic.name).includes(query) ||
-          clinic.doctors.some((doctor) =>
-            normalizeSearch(doctor.displayName).includes(query),
-          ),
-      )
-    : clinics;
+  const noMatchesCopy =
+    clinicLanguage !== 'all' ? t.noFilteredMatches : t.noSearchMatches;
+  const matchingClinics = clinics.filter(
+    (clinic) =>
+      (clinicLanguage === 'all' ||
+        clinic.enabledLocales.includes(clinicLanguage)) &&
+      (!query ||
+        normalizeSearch(clinic.name).includes(query) ||
+        clinic.doctors.some((doctor) =>
+          normalizeSearch(doctor.displayName).includes(query),
+        )),
+  );
 
   useEffect(() => {
     if (retry === 0) return;
@@ -256,7 +273,21 @@ export default function PublicDiscoveryLandingClient({
                 </button>
               )}
             </div>
-            {query && (
+            <label htmlFor="publicClinicLanguage">
+              {t.clinicLanguageLabel}
+            </label>
+            <select
+              id="publicClinicLanguage"
+              value={clinicLanguage}
+              onChange={(event) =>
+                setClinicLanguage(event.target.value as ClinicLanguageFilter)
+              }
+            >
+              <option value="all">{t.clinicLanguageAll}</option>
+              <option value="fr">{t.clinicLanguageFrench}</option>
+              <option value="ar">{t.clinicLanguageArabic}</option>
+            </select>
+            {(query || clinicLanguage !== 'all') && (
               <p aria-live="polite" aria-atomic="true">
                 {t.searchCount(matchingClinics.length)}
               </p>
@@ -282,10 +313,10 @@ export default function PublicDiscoveryLandingClient({
         </div>
         {state === 'ready' &&
           clinics.length > 0 &&
-          query &&
+          (query || clinicLanguage !== 'all') &&
           matchingClinics.length === 0 && (
             <p className="publicNotice" role="status">
-              {t.noSearchMatches}
+              {noMatchesCopy}
             </p>
           )}
         {state === 'ready' && matchingClinics.length > 0 && (
