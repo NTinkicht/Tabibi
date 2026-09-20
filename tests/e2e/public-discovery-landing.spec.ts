@@ -949,7 +949,7 @@ test('filtered public results count only doctors actually visible in clinic card
   ).toBeVisible();
   await search.fill('introuvable');
   await expect(
-    page.getByText('0 médecin affiché au total dans les résultats.'),
+    page.getByText('0 médecins affichés au total dans les résultats.'),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Effacer tous les filtres' }).click();
   await expect(total).toHaveCount(0);
@@ -961,6 +961,26 @@ test('filtered public results count only doctors actually visible in clinic card
   await expect(
     page.getByText('4 médecins affichés au total dans les résultats.'),
   ).toBeVisible();
+  const language = page.getByRole('combobox', {
+    name: 'Langue proposée par la clinique',
+  });
+  await language.selectOption('ar');
+  await expect(page.getByText('1 clinique trouvée.')).toBeVisible();
+  await expect(
+    page.getByText('3 médecins affichés au total dans les résultats.'),
+  ).toBeVisible();
+  await expect(page.locator('.publicClinic')).toHaveCount(1);
+  await expect(
+    page.locator('.publicClinic').getByText('3 médecins affichés'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Effacer tous les filtres' }).click();
+  await expect(language).toHaveValue('all');
+  await expect(
+    page.getByRole('checkbox', {
+      name: 'Cliniques avec médecins affichés uniquement',
+    }),
+  ).not.toBeChecked();
+  await expect(total).toHaveCount(0);
   const body = await page.locator('main').innerText();
   expect(body).not.toContain('private-total-tenant');
   expect(body).not.toContain('private-total-doctor');
