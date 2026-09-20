@@ -1,0 +1,27 @@
+name: WU101 temporary formatter diagnostic
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  print-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install formatting tool
+        env:
+          npm_config_engine_strict: 'false'
+        run: npm ci --ignore-scripts
+      - name: Exact delta
+        run: |
+          npx --no-install prettier --write src/app/PublicDiscoveryLandingClient.tsx
+          git diff -- src/app/PublicDiscoveryLandingClient.tsx
