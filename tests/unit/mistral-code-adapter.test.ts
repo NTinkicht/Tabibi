@@ -159,7 +159,7 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     );
   });
 
-  it('runs parent's synthetic attack and fail-closed security selftest', () => {
+  it('runs parent synthetic attack and fail-closed security selftest', () => {
     const testRun = spawnSync(
       'python3',
       ['scripts/mistral-code-adapter.py', 'selftest'],
