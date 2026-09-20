@@ -132,21 +132,37 @@ export function NotificationDeliveryExceptionsClient({
   return (
     <main lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <header>
-        <Link href={`/operations/${encodeURIComponent(clinicId)}?locale=${locale}`}>
+        <Link
+          href={`/operations/${encodeURIComponent(clinicId)}?locale=${locale}`}
+        >
           {t.back}
         </Link>
         <div aria-label="Language">
-          <button type="button" lang="fr" onClick={() => setLocale('fr')} aria-pressed={locale === 'fr'}>
+          <button
+            type="button"
+            lang="fr"
+            onClick={() => setLocale('fr')}
+            aria-pressed={locale === 'fr'}
+          >
             Français
           </button>
-          <button type="button" lang="ar" onClick={() => setLocale('ar')} aria-pressed={locale === 'ar'}>
+          <button
+            type="button"
+            lang="ar"
+            onClick={() => setLocale('ar')}
+            aria-pressed={locale === 'ar'}
+          >
             العربية
           </button>
         </div>
       </header>
       <h1>{t.title}</h1>
       <p>{t.note}</p>
-      <button type="button" onClick={refresh} disabled={state.kind === 'loading'}>
+      <button
+        type="button"
+        onClick={refresh}
+        disabled={state.kind === 'loading'}
+      >
         {t.refresh}
       </button>
       <section aria-live="polite" aria-busy={state.kind === 'loading'}>
@@ -168,10 +184,15 @@ export function NotificationDeliveryExceptionsClient({
               return (
                 <li key={index}>
                   <h2>{eventLabel}</h2>
-                  <p>{t.at}: {Number.isFinite(instant.getTime())
-                    ? instant.toLocaleString(locale === 'ar' ? 'ar' : 'fr')
-                    : '—'}</p>
-                  <p>{t.attempt}: {record.attempts} / {record.maximum}</p>
+                  <p>
+                    {t.at}:{' '}
+                    {Number.isFinite(instant.getTime())
+                      ? instant.toLocaleString(locale === 'ar' ? 'ar' : 'fr')
+                      : '—'}
+                  </p>
+                  <p>
+                    {t.attempt}: {record.attempts} / {record.maximum}
+                  </p>
                 </li>
               );
             })}
