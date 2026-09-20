@@ -326,9 +326,7 @@ test('clinic search remains stable in Turkish browser locale', async ({
   }
 });
 
-test('clinic language and search compose without exposing IDs', async ({
-  page,
-}) => {
+test('clinic language and search compose without exposing IDs', async ({ page }) => {
   await mockDirectory(page, [
     {
       name: 'Clinique Étoile',
@@ -377,9 +375,7 @@ test('clinic language and search compose without exposing IDs', async ({
   expect(body).not.toContain('private-doctor');
 });
 
-test('Arabic language filter remains RTL across refresh', async ({
-  page,
-}) => {
+test('Arabic language filter remains RTL across refresh', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockDirectory(page, [
     {
