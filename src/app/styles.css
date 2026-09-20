@@ -543,6 +543,47 @@ h1 {
   cursor: wait;
 }
 
+/* WU96: public directory search uses public display names only. */
+.publicSearch {
+  display: grid;
+  gap: 0.55rem;
+  margin-block: 1rem 1.5rem;
+  max-width: 40rem;
+}
+.publicSearch label {
+  font-weight: 700;
+}
+.publicSearchControls {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.publicSearch input {
+  flex: 1 1 16rem;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #96b5ae;
+  border-radius: 0.7rem;
+  font: inherit;
+}
+.publicSearch button {
+  min-height: 2.75rem;
+  border: 1px solid #96b5ae;
+  border-radius: 999px;
+  background: white;
+  color: #164d45;
+  font: inherit;
+  font-weight: 700;
+  padding-inline: 1rem;
+  cursor: pointer;
+}
+.publicSearch input:focus-visible,
+.publicSearch button:focus-visible {
+  outline: 3px solid #8a5c00;
+  outline-offset: 3px;
+}
+
 /* WU94 clinic-staff delivery exceptions: scoped operational layout in FR/AR. */
 .deskHeader .notificationsLink,
 .notificationExceptionsHeader a {

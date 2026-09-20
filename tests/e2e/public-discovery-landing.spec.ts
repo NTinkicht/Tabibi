@@ -204,3 +204,124 @@ test('initial HTML contains discoverable clinic names without client JavaScript'
     await pool.end();
   }
 });
+
+test('filters public clinic and doctor names without leaking private IDs', async ({
+  page,
+}) => {
+  await mockDirectory(page, [
+    {
+      name: 'Clinique Étoile',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr', 'ar'],
+      id: 'private-clinic-id',
+      doctors: [{ displayName: 'Dr. Amine', id: 'private-doctor-id' }],
+    },
+    {
+      name: 'Cabinet du Centre',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr'],
+      doctors: [{ displayName: 'Dr. Salima' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  await search.fill('etoile');
+  await expect(
+    page.getByRole('heading', { name: 'Clinique Étoile' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Cabinet du Centre' }),
+  ).toHaveCount(0);
+  await expect(page.getByText('1 clinique trouvée.')).toBeVisible();
+
+  await search.fill('SALIMA');
+  await expect(
+    page.getByRole('heading', { name: 'Cabinet du Centre' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Clinique Étoile' }),
+  ).toHaveCount(0);
+  await search.fill('does-not-exist');
+  await expect(
+    page.getByText(
+      'Aucune clinique ni aucun médecin ne correspond à votre recherche.',
+    ),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Effacer la recherche' }).click();
+  await expect(search).toHaveValue('');
+  await expect(search).toBeFocused();
+  await expect(page.locator('.publicClinic')).toHaveCount(2);
+  const body = await page.locator('main').innerText();
+  expect(body).not.toContain('private-clinic-id');
+  expect(body).not.toContain('private-doctor-id');
+});
+
+test('Arabic search matches without vowel marks and remains RTL', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDirectory(page, [
+    {
+      name: 'عِيَادَة الأمل',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'د. مريم' }],
+    },
+    {
+      name: 'عيادة الورد',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'د. أحمد' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  const search = page.getByRole('searchbox', { name: 'ابحث عن عيادة أو طبيب' });
+  await search.fill('عيادة الامل');
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'عِيَادَة الأمل' }),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'عيادة الورد' })).toHaveCount(
+    0,
+  );
+  await expect(page.getByText('نتائج البحث: 1 عيادة.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'تحديث' }).click();
+  await expect(search).toHaveValue('عيادة الامل');
+  await expect(
+    page.getByRole('heading', { name: 'عِيَادَة الأمل' }),
+  ).toBeVisible();
+});
+
+test('clinic search remains stable in Turkish browser locale', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ locale: 'tr-TR' });
+  try {
+    const page = await context.newPage();
+    await mockDirectory(page, [
+      {
+        name: 'Istanbul Clinic',
+        defaultLocale: 'fr',
+        enabledLocales: ['fr'],
+        doctors: [],
+      },
+    ]);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Actualiser' }).click();
+    await page
+      .getByRole('searchbox', { name: 'Rechercher une clinique ou un médecin' })
+      .fill('istanbul');
+    await expect(
+      page.getByRole('heading', { name: 'Istanbul Clinic' }),
+    ).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
