@@ -198,7 +198,7 @@ describe('seven-actor capacity routing', () => {
     }
   });
 
-  it('bounds the owner-only Mistral wake and classifies token-budget failures', () => {
+  it('bounds Mistral wake and classifies token failures', () => {
     const workflowPath = path.join(
       process.cwd(),
       '.github',
