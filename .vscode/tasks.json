@@ -5,9 +5,7 @@
       "label": "SaveGrok — automatic GitHub review failover (owner Codespace)",
       "type": "process",
       "command": "node",
-      "args": [
-        "scripts/grok-auto-start.mjs"
-      ],
+      "args": ["scripts/grok-auto-start.mjs"],
       "options": {
         "cwd": "${workspaceFolder}"
       },

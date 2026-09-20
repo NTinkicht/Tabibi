@@ -10,19 +10,33 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO = 'NTinkicht/Tabibi';
-const PAID_KEYS = ['XAI_API_KEY', 'XAI_BASE_URL', 'GROK_API_KEY', 'OPENROUTER_API_KEY'];
+const PAID_KEYS = [
+  'XAI_API_KEY',
+  'XAI_BASE_URL',
+  'GROK_API_KEY',
+  'OPENROUTER_API_KEY',
+];
 
 export function startupDecision(
   env,
-  { branch, clean, authAvailable, hasNode = true, hasGrok = true, hasGh = true } = {},
+  {
+    branch,
+    clean,
+    authAvailable,
+    hasNode = true,
+    hasGrok = true,
+    hasGh = true,
+  } = {},
 ) {
   if (
     env.CODESPACES !== 'true' ||
     env.GITHUB_REPOSITORY !== REPO ||
     env.GITHUB_USER !== 'NTinkicht' ||
     env.GITHUB_ACTIONS
-  ) return 'OWNER_CODESPACE_REQUIRED';
-  if (PAID_KEYS.some((key) => Boolean(env[key]))) return 'METERED_ENVIRONMENT_FORBIDDEN';
+  )
+    return 'OWNER_CODESPACE_REQUIRED';
+  if (PAID_KEYS.some((key) => Boolean(env[key])))
+    return 'METERED_ENVIRONMENT_FORBIDDEN';
   if (branch !== 'main') return 'MAIN_BRANCH_REQUIRED';
   if (!clean) return 'UNCOMMITTED_CHANGES';
   if (!authAvailable) return 'PRIVATE_GROK_LOGIN_REQUIRED';
@@ -51,7 +65,9 @@ async function main() {
     env.GITHUB_USER !== 'NTinkicht' ||
     env.GITHUB_ACTIONS
   ) {
-    process.stdout.write('SaveGrok: owner Codespace required; no process started.\n');
+    process.stdout.write(
+      'SaveGrok: owner Codespace required; no process started.\n',
+    );
     return;
   }
   const branch = safeCommand('git', ['branch', '--show-current']);
@@ -69,27 +85,34 @@ async function main() {
     hasGh: safeCommand('gh', ['auth', 'status']) !== null,
   });
   if (decision !== 'ELIGIBLE') {
-    process.stdout.write(`SaveGrok: ${decision}; no model call or worker started.\n`);
+    process.stdout.write(
+      `SaveGrok: ${decision}; no model call or worker started.\n`,
+    );
     return;
   }
   // A fresh Codespace often has stale local main. Update ONLY clean main,
   // fast-forward ONLY; no reset, rebase, commit, force push or branch switch.
-  if (safeCommand('git', ['pull', '--ff-only', 'origin', 'main'], 60_000) === null) {
-    process.stdout.write('SaveGrok: MAIN_FAST_FORWARD_UNAVAILABLE; no worker started.\n');
+  if (
+    safeCommand('git', ['pull', '--ff-only', 'origin', 'main'], 60_000) === null
+  ) {
+    process.stdout.write(
+      'SaveGrok: MAIN_FAST_FORWARD_UNAVAILABLE; no worker started.\n',
+    );
     return;
   }
   process.stdout.write(
     'SaveGrok: GitHub/CI lease watcher active in owner Codespace. ' +
       'No Grok call unless an eligible review lease exists; stop this task to stop.\n',
   );
-  const worker = spawn(process.execPath, [
-    path.join(ROOT, 'scripts', 'grok-dispatcher.mjs'),
-    '--watch',
-  ], {
-    cwd: ROOT,
-    stdio: 'inherit',
-    env,
-  });
+  const worker = spawn(
+    process.execPath,
+    [path.join(ROOT, 'scripts', 'grok-dispatcher.mjs'), '--watch'],
+    {
+      cwd: ROOT,
+      stdio: 'inherit',
+      env,
+    },
+  );
   const forward = (signal) => {
     if (!worker.killed) worker.kill(signal);
   };
@@ -104,7 +127,10 @@ async function main() {
   });
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   main().catch(() => {
     // No stack traces, environment contents, auth details or raw git/CLI errors.
     process.stderr.write('SaveGrok: STARTUP_FAILED; no worker started.\n');
