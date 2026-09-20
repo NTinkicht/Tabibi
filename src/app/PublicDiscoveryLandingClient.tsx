@@ -66,7 +66,7 @@ function normalizeSearch(value: string): string {
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')
     .replace(/\u0640/g, '')
-    .toLocaleLowerCase();
+    .toLowerCase();
 }
 
 function parseClinics(value: unknown): PublicClinic[] | null {
