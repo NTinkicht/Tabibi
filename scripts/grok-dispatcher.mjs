@@ -519,8 +519,7 @@ export function dispatchFailureCode(error) {
     return reason.toUpperCase();
   // Match only constructed error codes, never raw provider/error text.
   const exit = /^(grok|git|gh)_exit_(\d+|spawn_failure)$/.exec(reason);
-  if (exit)
-    return `${exit[1].toUpperCase()}_EXIT_${exit[2].toUpperCase()}`;
+  if (exit) return `${exit[1].toUpperCase()}_EXIT_${exit[2].toUpperCase()}`;
   return 'DISPATCH_FAILURE_UNCLASSIFIED';
 }
 

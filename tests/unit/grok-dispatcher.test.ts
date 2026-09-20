@@ -225,7 +225,12 @@ describe('Grok dispatcher security and durability regression guards', () => {
       expect(dispatcher.readState(name, dir)).toBeNull();
       dispatcher.writeStateAtomically(
         name,
-        { ...basis, outcome: 'DELIVERY_PENDING', body, finalOutcome: 'CAPACITY_DEGRADED' },
+        {
+          ...basis,
+          outcome: 'DELIVERY_PENDING',
+          body,
+          finalOutcome: 'CAPACITY_DEGRADED',
+        },
         dir,
       );
       expect(dispatcher.readState(name, dir)).toMatchObject({
@@ -251,17 +256,19 @@ describe('Grok dispatcher security and durability regression guards', () => {
   });
 
   it('only emits safe categorical failures, never raw provider stderr', () => {
-    expect(dispatcher.dispatchFailureCode(new Error('oauth_not_verified'))).toBe(
-      'OAUTH_NOT_VERIFIED',
-    );
+    expect(
+      dispatcher.dispatchFailureCode(new Error('oauth_not_verified')),
+    ).toBe('OAUTH_NOT_VERIFIED');
     expect(dispatcher.dispatchFailureCode(new Error('grok_exit_1'))).toBe(
       'GROK_EXIT_1',
     );
-    expect(dispatcher.dispatchFailureCode(new Error('git_exit_spawn_failure'))).toBe(
-      'GIT_EXIT_SPAWN_FAILURE',
-    );
     expect(
-      dispatcher.dispatchFailureCode(new Error('token: sensitive-value-123456')),
+      dispatcher.dispatchFailureCode(new Error('git_exit_spawn_failure')),
+    ).toBe('GIT_EXIT_SPAWN_FAILURE');
+    expect(
+      dispatcher.dispatchFailureCode(
+        new Error('token: sensitive-value-123456'),
+      ),
     ).toBe('DISPATCH_FAILURE_UNCLASSIFIED');
   });
 
