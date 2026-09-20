@@ -500,17 +500,17 @@ test('clinic name sorting composes with name and language filters', async ({
 }) => {
   await mockDirectory(page, [
     {
+      name: 'Clinique Étoile',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr', 'ar'],
+      doctors: [{ displayName: 'Dr. Salem' }],
+    },
+    {
       name: 'Clinique Zéphyr',
       defaultLocale: 'fr',
       enabledLocales: ['fr'],
       tenantKey: 'private-tenant-sort',
       doctors: [{ displayName: 'Dr. Salem', id: 'private-doctor-sort' }],
-    },
-    {
-      name: 'Clinique Étoile',
-      defaultLocale: 'fr',
-      enabledLocales: ['fr', 'ar'],
-      doctors: [{ displayName: 'Dr. Salem' }],
     },
     {
       name: 'Clinique Alpha',
@@ -526,8 +526,8 @@ test('clinic name sorting composes with name and language filters', async ({
     name: 'Trier les cliniques par nom',
   });
   await expect(names).toHaveText([
-    'Clinique Zéphyr',
     'Clinique Étoile',
+    'Clinique Zéphyr',
     'Clinique Alpha',
   ]);
   await sort.selectOption('ascending');
@@ -562,8 +562,8 @@ test('clinic name sorting composes with name and language filters', async ({
   expect(body).not.toContain('private-doctor-sort');
   await sort.selectOption('original');
   await expect(names).toHaveText([
-    'Clinique Zéphyr',
     'Clinique Étoile',
+    'Clinique Zéphyr',
     'Clinique Alpha',
   ]);
 });
