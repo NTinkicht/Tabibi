@@ -166,7 +166,7 @@ describe('notification dead-letter HTTP boundary', () => {
       {
         intentId: newer.id,
         eventKey: 'turn_approaching',
-        queueEntryId: null,
+        queueLabel: null,
         outcomeCode: 'provider_unknown',
         attemptCount: 1,
         maxAttempts: 1,

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 type Locale = 'ar' | 'fr';
 type ExceptionView = {
   event: string;
+  queueLabel: string | null;
   attempts: number;
   maximum: number;
   at: string;
@@ -27,6 +28,9 @@ const copy = {
     attempt: 'Tentatives de livraison',
     at: 'Dernier échec',
     otherEvent: 'Notification de file',
+    language: 'Langue',
+    queueLabel: 'Passage',
+    noQueueLabel: 'Passage non identifié',
     events: {
       queue_entry_created: 'Inscription à la file',
       estimate_changed_materially: 'Changement important du délai',
@@ -46,6 +50,9 @@ const copy = {
     attempt: 'محاولات التسليم',
     at: 'آخر إخفاق',
     otherEvent: 'إشعار قائمة الانتظار',
+    language: 'اللغة',
+    queueLabel: 'الدور',
+    noQueueLabel: 'دور غير محدد',
     events: {
       queue_entry_created: 'التسجيل في قائمة الانتظار',
       estimate_changed_materially: 'تغيير مهم في وقت الانتظار',
@@ -60,8 +67,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-// An explicit UI allow-list: never put record IDs, patient/contact details,
-// raw provider failure text, or notification payloads into the DOM.
+// An explicit UI allow-list: never put raw record/queue-entry IDs,
+// patient/contact details, raw provider failure text, or notification
+// payloads into the DOM. `queueLabel` is the same privacy-safe,
+// receptionist-facing code already shown on the live queue board.
 function toExceptionViews(payload: unknown): ExceptionView[] {
   if (!isRecord(payload) || !Array.isArray(payload.deadLetters))
     throw new Error('Invalid response');
@@ -71,11 +80,13 @@ function toExceptionViews(payload: unknown): ExceptionView[] {
       typeof value.eventKey !== 'string' ||
       typeof value.outcomeAt !== 'string' ||
       !Number.isSafeInteger(value.attemptCount) ||
-      !Number.isSafeInteger(value.maxAttempts)
+      !Number.isSafeInteger(value.maxAttempts) ||
+      (value.queueLabel !== null && typeof value.queueLabel !== 'string')
     )
       throw new Error('Invalid response');
     return {
       event: value.eventKey,
+      queueLabel: value.queueLabel as string | null,
       attempts: value.attemptCount as number,
       maximum: value.maxAttempts as number,
       at: value.outcomeAt,
@@ -107,7 +118,7 @@ export function NotificationDeliveryExceptionsClient({
     void (async () => {
       try {
         const response = await fetch(
-          `/api/clinics/${encodeURIComponent(clinicId)}/notifications/dead-letters?limit=25`,
+          `/api/clinics/${encodeURIComponent(clinicId)}/notifications/dead-letters?limit=100`,
           {
             credentials: 'same-origin',
             cache: 'no-store',
@@ -137,7 +148,7 @@ export function NotificationDeliveryExceptionsClient({
         >
           {t.back}
         </Link>
-        <div aria-label="Language">
+        <div role="group" aria-label={t.language}>
           <button
             type="button"
             lang="fr"
@@ -165,7 +176,7 @@ export function NotificationDeliveryExceptionsClient({
       >
         {t.refresh}
       </button>
-      <section aria-live="polite" aria-busy={state.kind === 'loading'}>
+      <section aria-busy={state.kind === 'loading'}>
         {state.kind === 'loading' ? <p role="status">{t.loading}</p> : null}
         {state.kind === 'error' ? <p role="alert">{t.error}</p> : null}
         {state.kind === 'ready' && state.records.length === 0 ? (
@@ -184,6 +195,9 @@ export function NotificationDeliveryExceptionsClient({
               return (
                 <li key={index}>
                   <h2>{eventLabel}</h2>
+                  <p>
+                    {t.queueLabel}: {record.queueLabel ?? t.noQueueLabel}
+                  </p>
                   <p>
                     {t.at}:{' '}
                     {Number.isFinite(instant.getTime())

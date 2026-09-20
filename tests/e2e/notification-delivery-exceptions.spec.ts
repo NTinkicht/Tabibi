@@ -1,0 +1,226 @@
+import type { Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { createStaffSessionToken } from '@/platform/http/staff-auth';
+
+const clinicId = '30000000-0000-4000-8000-000000000001';
+const DEAD_LETTERS_URL = `**/api/clinics/${clinicId}/notifications/dead-letters**`;
+const rawQueueEntryId = '30000000-0000-4000-8000-000000000099';
+
+async function authenticate(page: Page) {
+  const secret =
+    process.env.STAFF_SESSION_SECRET ??
+    'browser-test-session-secret-at-least-32-characters';
+  process.env.STAFF_SESSION_SECRET = secret;
+  await page.context().addCookies([
+    {
+      name: 'tabibi_staff_session',
+      value: createStaffSessionToken(
+        'browser-notifications-reception',
+        new Date(Date.now() + 60_000),
+      ),
+      url: 'http://127.0.0.1:3000',
+      httpOnly: true,
+      sameSite: 'Strict',
+    },
+  ]);
+}
+
+function deadLettersBody(
+  records: Array<{
+    eventKey: string;
+    queueLabel: string | null;
+    attemptCount: number;
+    maxAttempts: number;
+    outcomeAt: string;
+  }>,
+) {
+  return {
+    deadLetters: records.map((record) => ({
+      intentId: rawQueueEntryId,
+      eventKey: record.eventKey,
+      queueLabel: record.queueLabel,
+      outcomeCode: 'provider_unknown',
+      attemptCount: record.attemptCount,
+      maxAttempts: record.maxAttempts,
+      outcomeAt: record.outcomeAt,
+    })),
+  };
+}
+
+test('French view renders a labelled exception, hides raw identifiers, and refresh re-fetches', async ({
+  page,
+}) => {
+  await authenticate(page);
+  let requestCount = 0;
+  await page.route(DEAD_LETTERS_URL, async (route) => {
+    requestCount += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        deadLettersBody([
+          {
+            eventKey: 'patient_called',
+            queueLabel: 'A-041',
+            attemptCount: 3,
+            maxAttempts: 5,
+            outcomeAt: '2026-09-13T11:00:00.000Z',
+          },
+        ]),
+      ),
+    });
+  });
+
+  await page.goto(`/operations/${clinicId}/notifications?locale=fr`);
+  await expect(
+    page.getByRole('heading', { name: 'Notifications non remises' }),
+  ).toBeVisible();
+  await expect(page.getByText('Patient appelé')).toBeVisible();
+  await expect(page.getByText('Passage: A-041')).toBeVisible();
+  await expect(page.getByText('Tentatives de livraison: 3 / 5')).toBeVisible();
+
+  const bodyText = await page.locator('body').innerText();
+  expect(bodyText).not.toContain(rawQueueEntryId);
+
+  expect(requestCount).toBe(1);
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await expect.poll(() => requestCount).toBe(2);
+});
+
+test('Arabic view renders RTL with a localized event label and unmapped events fall back safely', async ({
+  page,
+}) => {
+  await authenticate(page);
+  await page.route(DEAD_LETTERS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        deadLettersBody([
+          {
+            eventKey: 'some_future_event',
+            queueLabel: null,
+            attemptCount: 1,
+            maxAttempts: 1,
+            outcomeAt: '2026-09-13T11:00:00.000Z',
+          },
+        ]),
+      ),
+    });
+  });
+
+  await page.goto(`/operations/${clinicId}/notifications?locale=ar`);
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.getByText('إشعارات تعذّر تسليمها')).toBeVisible();
+  // Unrecognized event keys fall back to the generic label, never the raw key.
+  await expect(page.getByText('إشعار قائمة الانتظار')).toBeVisible();
+  await expect(page.getByText('some_future_event')).toHaveCount(0);
+  await expect(page.getByText('دور غير محدد')).toBeVisible();
+});
+
+test('shows the empty state when there are no delivery exceptions', async ({
+  page,
+}) => {
+  await authenticate(page);
+  await page.route(DEAD_LETTERS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(deadLettersBody([])),
+    });
+  });
+
+  await page.goto(`/operations/${clinicId}/notifications?locale=fr`);
+  await expect(
+    page.getByText('Aucune notification en échec de livraison.'),
+  ).toBeVisible();
+});
+
+test('shows an error state and recovers on refresh after a failed fetch', async ({
+  page,
+}) => {
+  await authenticate(page);
+  let attempt = 0;
+  await page.route(DEAD_LETTERS_URL, async (route) => {
+    attempt += 1;
+    if (attempt === 1) {
+      await route.fulfill({ status: 500, body: 'error' });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(deadLettersBody([])),
+    });
+  });
+
+  await page.goto(`/operations/${clinicId}/notifications?locale=fr`);
+  await expect(
+    page.getByText(
+      'Impossible de charger les notifications. Veuillez réessayer.',
+    ),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await expect(
+    page.getByText('Aucune notification en échec de livraison.'),
+  ).toBeVisible();
+});
+
+test('refresh is disabled while a request is in flight, so overlapping requests are never user-reachable', async ({
+  page,
+}) => {
+  await authenticate(page);
+  let requestCount = 0;
+  const releaseHolder: { current: (() => void) | null } = { current: null };
+  const released = new Promise<void>((resolve) => {
+    releaseHolder.current = resolve;
+  });
+
+  await page.route(DEAD_LETTERS_URL, async (route) => {
+    requestCount += 1;
+    if (requestCount === 2) await released;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(deadLettersBody([])),
+    });
+  });
+
+  await page.goto(`/operations/${clinicId}/notifications?locale=fr`);
+  await expect(
+    page.getByText('Aucune notification en échec de livraison.'),
+  ).toBeVisible();
+
+  const refresh = page.getByRole('button', { name: 'Actualiser' });
+  await refresh.click();
+  // While the refresh request is held open, the button must stay disabled --
+  // this is what makes a second, overlapping dead-letters request
+  // unreachable through the UI in the first place.
+  await expect(refresh).toBeDisabled();
+  await expect.poll(() => requestCount).toBe(2);
+  await expect(refresh).toBeDisabled();
+
+  releaseHolder.current?.();
+  await expect(refresh).toBeEnabled();
+});
+
+test('reception desk links to the notification delivery exceptions page', async ({
+  page,
+}) => {
+  await authenticate(page);
+  await page.route(`**/api/clinics/${clinicId}/sessions**`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ sessions: [], timezone: 'UTC' }),
+    });
+  });
+
+  await page.goto(`/operations/${clinicId}?locale=fr`);
+  const link = page.getByRole('link', { name: 'Notifications non remises' });
+  await expect(link).toHaveAttribute(
+    'href',
+    `/operations/${clinicId}/notifications?locale=fr`,
+  );
+});
