@@ -1,0 +1,260 @@
+name: Mistral Vibe bounded coding adapter
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: read
+  issues: write
+  actions: read
+
+jobs:
+  mistral-code:
+    if: >-
+      github.event.issue.number == 11 &&
+      github.actor == 'NTinkicht' &&
+      contains(github.event.comment.body, '@mistral-vibe') &&
+      contains(github.event.comment.body, 'MISTRAL_CODE_LEASE_V1')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MISTRAL_CODE_ADAPTER_ENABLED: ${{ vars.TABIBI_MISTRAL_CODE_ADAPTER_ENABLED }}
+      PAYG_DISABLED_CONFIRMED: ${{ vars.TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED }}
+
+    steps:
+      - name: Checkout trusted parent from main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Copy and self-test trusted parent verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp scripts/mistral-code-lease.py /tmp/tabibi-mistral-code-lease.py
+          python3 /tmp/tabibi-mistral-code-lease.py selftest
+
+      - name: Validate owner coding lease and exact canonical PR head
+        id: lease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISPATCH_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: python3 /tmp/tabibi-mistral-code-lease.py prepare
+
+      - name: Checkout exact leased PR head without credentials
+        if: steps.lease.outputs.ready == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.lease.outputs.base_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Preflight included Mistral entitlement
+        id: preflight
+        if: steps.lease.outputs.ready == 'true'
+        env:
+          PROVIDER_KEY: ${{ secrets.MISTRAL_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${PAYG_DISABLED_CONFIRMED:-}" != "true" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "status=CONFIG_BLOCKED" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ -z "${PROVIDER_KEY:-}" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "status=AUTH_BLOCKED" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          set +e
+          code="$(curl --silent --show-error --connect-timeout 10 --max-time 20             --output /dev/null --write-out '%{http_code}'             --header "Authorization: Bearer ${PROVIDER_KEY}"             'https://console.mistral.ai/api/vibe/whoami')"
+          curl_rc=$?
+          set -e
+          if [[ "$curl_rc" != "0" ]]; then status=PREFLIGHT_UNAVAILABLE
+          elif [[ "$code" == "200" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "status=OK" >> "$GITHUB_OUTPUT"
+            exit 0
+          elif [[ "$code" == "401" ]]; then status=AUTH_BLOCKED
+          elif [[ "$code" == "403" ]]; then status=ENTITLEMENT_BLOCKED
+          elif [[ "$code" == "429" ]]; then status=CAPACITY_DEGRADED
+          else status=PREFLIGHT_FAILED
+          fi
+          echo "ready=false" >> "$GITHUB_OUTPUT"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        if: steps.preflight.outputs.ready == 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned Mistral Vibe
+        if: steps.preflight.outputs.ready == 'true'
+        run: python -m pip install --disable-pip-version-check 'mistral-vibe==2.25.3'
+
+      - name: Build bounded task prompt from owner issue
+        id: prompt
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_ISSUE: ${{ steps.lease.outputs.issue }}
+          TARGET_PR: ${{ steps.lease.outputs.pr }}
+          BASE_SHA: ${{ steps.lease.outputs.base_sha }}
+          ALLOWED_PATHS: ${{ steps.lease.outputs.allowed_paths }}
+          TEST_PROFILE: ${{ steps.lease.outputs.test_profile }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh issue view "$TARGET_ISSUE" --repo "$GITHUB_REPOSITORY" --json body --jq .body > /tmp/tabibi-mistral-task.txt
+          {
+            cat <<'EOF'
+          You are mistral-vibe, the sole leased implementer for one tightly bounded Tabibi work unit.
+          Produce CODE as a standard unified git patch, but DO NOT edit the repository yourself.
+          The trusted parent will apply and test your patch. You have no shell, GitHub, commit, push,
+          merge, credential, deployment or network mutation authority.
+          Read only the explicitly relevant source/test files. Do not broaden scope.
+          Your patch MUST change at least one production file under src/ and at least one deterministic
+          test file under tests/, and MUST touch only the exact allowlisted paths below.
+          Do not add secrets, credentials, generated files, workflows, dependencies or migrations.
+          Keep the change small and preserve FR/AR/RTL, tenant isolation and guest bearer privacy.
+          Return exactly one patch envelope:
+          ---BEGIN_TABIBI_PATCH---
+          <valid unified diff usable by git apply>
+          ---END_TABIBI_PATCH---
+          After the envelope you may add at most 8 short lines explaining the change/tests.
+          EOF
+            printf '\nTrusted target PR: #%s\nExact base SHA: %s\nAllowed paths: %s\nTest profile: %s\n'               "$TARGET_PR" "$BASE_SHA" "$ALLOWED_PATHS" "$TEST_PROFILE"
+            printf '\nOwner-authored work item:\n'
+            cat /tmp/tabibi-mistral-task.txt
+          } > /tmp/tabibi-mistral-code-prompt.txt
+
+      - name: Run Mistral Vibe patch author in bounded read-only workspace
+        id: actor
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          VIBE_HOME: /tmp/tabibi-vibe-code-home
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$VIBE_HOME"
+          cat > "$VIBE_HOME/config.toml" <<'EOF'
+          enable_auto_update = false
+          enable_notifications = false
+          enable_telemetry = false
+          enabled_tools = ["grep", "read_file"]
+          EOF
+          set +e
+          timeout --signal=TERM --kill-after=15s 480s             vibe --trust --agent plan --workdir "$GITHUB_WORKSPACE"               --enabled-tools grep --enabled-tools read_file               --max-turns 5 --max-tokens 45000 --output text               --prompt "$(cat /tmp/tabibi-mistral-code-prompt.txt)"               > /tmp/tabibi-mistral-code-output.txt               2> /tmp/tabibi-mistral-code-error.txt
+          rc=$?
+          set -e
+          status=OK
+          if [[ "$rc" == "124" ]]; then status=WAKE_TIMEOUT
+          elif [[ "$rc" != "0" ]] && grep -Eqi 'token limit exceeded|context (window|length) exceeded|too many tokens' /tmp/tabibi-mistral-code-error.txt; then status=TOKEN_BUDGET_EXCEEDED
+          elif [[ "$rc" != "0" ]] && grep -Eqi '429|rate.?limit|quota|usage[^[:alnum:]]*limit|capacity' /tmp/tabibi-mistral-code-error.txt; then status=CAPACITY_DEGRADED
+          elif [[ "$rc" != "0" ]]; then status=EXECUTION_FAILED
+          fi
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Extract, validate and apply Mistral patch
+        id: apply
+        if: steps.preflight.outputs.ready == 'true' && steps.actor.outputs.exit_code == '0'
+        env:
+          ALLOWED_PATHS: ${{ steps.lease.outputs.allowed_paths }}
+        shell: bash
+        run: python3 /tmp/tabibi-mistral-code-lease.py apply
+
+      - name: Set up Node.js
+        if: steps.apply.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install project dependencies
+        if: steps.apply.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Run deterministic parent validation
+        if: steps.apply.outputs.ready == 'true'
+        env:
+          TEST_PROFILE: ${{ steps.lease.outputs.test_profile }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run format
+          npm run lint
+          npm run typecheck
+          npm test
+          case "$TEST_PROFILE" in
+            unit) npm run test:unit ;;
+            api) npm run test:api ;;
+            public-e2e)
+              npx playwright install --with-deps chromium
+              npx playwright test tests/e2e/public-discovery-landing.spec.ts
+              ;;
+            *) exit 64 ;;
+          esac
+          git diff --check
+
+      - name: Recheck exact remote head before parent commit
+        id: recheck
+        if: steps.apply.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_PR: ${{ steps.lease.outputs.pr }}
+          TARGET_BRANCH: ${{ steps.lease.outputs.branch }}
+          BASE_SHA: ${{ steps.lease.outputs.base_sha }}
+        shell: bash
+        run: python3 /tmp/tabibi-mistral-code-lease.py recheck
+
+      - name: Parent commits and pushes verified Mistral work
+        id: push
+        if: steps.recheck.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_BRANCH: ${{ steps.lease.outputs.branch }}
+          TARGET_ISSUE: ${{ steps.lease.outputs.issue }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "mistral-vibe"
+          git config user.email "mistral-vibe@users.noreply.github.com"
+          git add -- ${{ steps.apply.outputs.changed_paths }}
+          git commit -m "feat(mistral): bounded leased implementation for #$TARGET_ISSUE"             -m "Material-Author: mistral-vibe"
+          new_sha="$(git rev-parse HEAD)"
+          gh auth setup-git
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          echo "sha=$new_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Post bounded adapter result
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_PR: ${{ steps.lease.outputs.pr }}
+          LEASE_READY: ${{ steps.lease.outputs.ready }}
+          LEASE_STATUS: ${{ steps.lease.outputs.status }}
+          PREFLIGHT_READY: ${{ steps.preflight.outputs.ready }}
+          PREFLIGHT_STATUS: ${{ steps.preflight.outputs.status }}
+          ACTOR_STATUS: ${{ steps.actor.outputs.status }}
+          APPLY_READY: ${{ steps.apply.outputs.ready }}
+          NEW_SHA: ${{ steps.push.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${NEW_SHA:-}" ]]; then
+            body="MISTRAL_CODE_PATCH_PUSHED — parent-verified Mistral-authored commit `$NEW_SHA`. Model had no GitHub/write credentials. Full PR CI + independent non-Mistral exact-head review still REQUIRED; no merge authority granted."
+            gh issue comment "$TARGET_PR" --repo "$GITHUB_REPOSITORY" --body "$body"
+            gh issue comment 11 --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            status="${LEASE_STATUS:-${PREFLIGHT_STATUS:-${ACTOR_STATUS:-PATCH_VALIDATION_BLOCKED}}}"
+            gh issue comment 11 --repo "$GITHUB_REPOSITORY" --body "MISTRAL_CODE_ADAPTER_NO_PUSH — `$status`. No branch mutation was accepted; no paid fallback attempted."
+          fi
