@@ -144,7 +144,14 @@ export function assertSafeReviewOutput(text, authJson = '') {
   }
   const visit = (value, key = '') => {
     if (value && typeof value === 'object') {
-      for (const [name, child] of Object.entries(value)) visit(child, name);
+      for (const [name, child] of Object.entries(value))
+        visit(
+          child,
+          Array.isArray(value) ||
+            /token|secret|credential|api.?key|cookie|session/i.test(key)
+            ? key
+            : name,
+        );
     } else if (
       typeof value === 'string' &&
       value.length >= 12 &&
@@ -199,34 +206,51 @@ function post(pr, body) {
     { input: JSON.stringify({ body }) },
   );
 }
+export function readState(file, dir = STATE) {
+  try {
+    const state = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+    // Corrupt or incomplete local state is NOT proof the lease was delivered.
+    if (!state || typeof state !== 'object' || typeof state.outcome !== 'string')
+      return null;
+    return state;
+  } catch {
+    return null;
+  }
+}
 function persisted() {
   fs.mkdirSync(STATE, { recursive: true, mode: 0o700 });
   return new Set(
     fs
       .readdirSync(STATE)
       .filter((x) => /^[a-f0-9]{64}\.json$/.test(x))
-      .filter(
-        (x) =>
-          JSON.parse(fs.readFileSync(path.join(STATE, x), 'utf8')).outcome !==
-          'DELIVERY_PENDING',
-      )
+      .filter((x) => {
+        const state = readState(x);
+        return state && state.outcome !== 'DELIVERY_PENDING';
+      })
       .map((x) => x.slice(0, -5)),
   );
 }
+export function writeStateAtomically(file, state, dir = STATE) {
+  const target = path.join(dir, file);
+  // Unique temporary sibling avoids torn JSON and concurrent temp-file clashes.
+  const temporary = `${target}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`;
+  try {
+    fs.writeFileSync(temporary, JSON.stringify(state), { mode: 0o600, flag: 'wx' });
+    fs.renameSync(temporary, target);
+  } finally {
+    if (fs.existsSync(temporary)) fs.rmSync(temporary);
+  }
+}
 function record(lease, outcome, pending = {}) {
-  fs.writeFileSync(
-    path.join(STATE, `${lease.key}.json`),
-    JSON.stringify({
-      key: lease.key,
-      pr: lease.pr,
-      sha: lease.sha,
-      commentId: lease.commentId,
-      outcome,
-      at: new Date().toISOString(),
-      ...pending,
-    }),
-    { mode: 0o600 },
-  );
+  writeStateAtomically(`${lease.key}.json`, {
+    key: lease.key,
+    pr: lease.pr,
+    sha: lease.sha,
+    commentId: lease.commentId,
+    outcome,
+    at: new Date().toISOString(),
+    ...pending,
+  });
 }
 export function isTrustedDeliveryComment(lease, c) {
   return (
@@ -268,8 +292,8 @@ function drainPending() {
   for (const file of fs
     .readdirSync(STATE)
     .filter((x) => /^[a-f0-9]{64}\.json$/.test(x))) {
-    const state = JSON.parse(fs.readFileSync(path.join(STATE, file), 'utf8'));
-    if (state.outcome === 'DELIVERY_PENDING') {
+    const state = readState(file);
+    if (state?.outcome === 'DELIVERY_PENDING') {
       if (!trustedPosted(state)) post(state.pr, state.body);
       record(state, state.finalOutcome);
     }
@@ -474,8 +498,7 @@ export function oneCycle({ dryRun = false } = {}) {
         const file = path.join(STATE, `${lease.key}.json`);
         const pending =
           fs.existsSync(file) &&
-          JSON.parse(fs.readFileSync(file, 'utf8')).outcome ===
-            'DELIVERY_PENDING';
+          readState(`${lease.key}.json`)?.outcome === 'DELIVERY_PENDING';
         if (!pending) {
           try {
             deliver(
