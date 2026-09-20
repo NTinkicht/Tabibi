@@ -78,14 +78,32 @@ export function classifyGrokFailure({ stderr = '', stdout = '', error } = {}) {
   if (error?.code === 'ETIMEDOUT') return 'GROK_TIMEOUT';
   if (error?.code === 'ENOBUFS') return 'GROK_OUTPUT_LIMIT';
   if (error?.code === 'ENOENT') return 'GROK_BINARY_NOT_FOUND';
-  const message = [stderr, stdout].filter((part) => typeof part === 'string').join('\\n');
-  if (/approval required|requires approval|needs approval|cannot prompt|not approved|user denied|tool use denied/i.test(message))
+  const message = [stderr, stdout]
+    .filter((part) => typeof part === 'string')
+    .join('\\n');
+  if (
+    /approval required|requires approval|needs approval|cannot prompt|not approved|user denied|tool use denied/i.test(
+      message,
+    )
+  )
     return 'GROK_APPROVAL_REQUIRED';
-  if (/sandbox violation|sandbox denied|bubblewrap|landlock|sandbox setup failed/i.test(message))
+  if (
+    /sandbox violation|sandbox denied|bubblewrap|landlock|sandbox setup failed/i.test(
+      message,
+    )
+  )
     return 'GROK_SANDBOX_DENIED';
-  if (/unauthorized|unauthenticated|login required|oauth expired|invalid refresh token|invalid credentials/i.test(message))
+  if (
+    /unauthorized|unauthenticated|login required|oauth expired|invalid refresh token|invalid credentials/i.test(
+      message,
+    )
+  )
     return 'GROK_AUTH_FAILED';
-  if (/rate limit|too many requests|quota exceeded|insufficient credits|capacity exhausted/i.test(message))
+  if (
+    /rate limit|too many requests|quota exceeded|insufficient credits|capacity exhausted/i.test(
+      message,
+    )
+  )
     return 'GROK_CAPACITY_LIMIT';
   if (/max.turns|turn limit|maximum turns/i.test(message))
     return 'GROK_TURN_LIMIT';
@@ -115,7 +133,9 @@ function command(bin, args, { cwd = ROOT, input, timeout = 45_000, env } = {}) {
     if (bin === 'grok') {
       const cause = classifyGrokFailure(result);
       throw new Error(
-        cause === 'GROK_EXIT_UNCLASSIFIED' ? `grok_exit_${code}` : cause.toLowerCase(),
+        cause === 'GROK_EXIT_UNCLASSIFIED'
+          ? `grok_exit_${code}`
+          : cause.toLowerCase(),
       );
     }
     throw new Error(`${bin}_exit_${code}`);

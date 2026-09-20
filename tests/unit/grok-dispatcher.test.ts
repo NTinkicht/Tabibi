@@ -279,7 +279,9 @@ describe('Grok dispatcher security and durability regression guards', () => {
     expect(
       dispatcher.dispatchFailureCode(
         new Error(
-          classify({ stderr: 'Requires approval. token: real-secret-123456' }).toLowerCase(),
+          classify({
+            stderr: 'Requires approval. token: real-secret-123456',
+          }).toLowerCase(),
         ),
       ),
     ).toBe('GROK_APPROVAL_REQUIRED');
