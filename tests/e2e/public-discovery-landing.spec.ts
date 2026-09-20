@@ -890,3 +890,150 @@ test('Arabic doctor-only search ignores vowel marks and remains RTL', async ({
   await expect(clinic.locator('li')).toHaveCount(2);
   await expect(clinic.getByText('طبيبان في القائمة')).toBeVisible();
 });
+
+test('filtered public results count only doctors actually visible in clinic cards', async ({
+  page,
+}) => {
+  await mockDirectory(page, [
+    {
+      name: 'Clinique Étoile',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr', 'ar'],
+      tenantKey: 'private-total-tenant',
+      doctors: [
+        { displayName: 'Dr. Amine', id: 'private-total-doctor' },
+        { displayName: 'Dr. Salima' },
+        { displayName: 'Dr. Nora' },
+      ],
+    },
+    {
+      name: 'Cabinet du Centre',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr'],
+      doctors: [{ displayName: 'Dr. Amine' }],
+    },
+    {
+      name: 'Clinique Sans Médecin',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr'],
+      doctors: [],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+
+  const total = page.getByText(
+    /médecins? affichés? au total dans les résultats\./,
+  );
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  await expect(total).toHaveCount(0);
+  await search.fill('amine');
+  await expect(page.getByText('2 cliniques trouvées.')).toBeVisible();
+  await expect(
+    page.getByText('2 médecins affichés au total dans les résultats.'),
+  ).toBeVisible();
+  await expect(page.locator('.publicClinic li')).toHaveCount(2);
+  await search.fill('salima');
+  await expect(page.getByText('1 clinique trouvée.')).toBeVisible();
+  await expect(
+    page.getByText('1 médecin affiché au total dans les résultats.'),
+  ).toBeVisible();
+  await expect(page.locator('.publicClinic li')).toHaveCount(1);
+  await search.fill('sans medecin');
+  await expect(page.getByText('1 clinique trouvée.')).toBeVisible();
+  await expect(
+    page.getByText('0 médecins affichés au total dans les résultats.'),
+  ).toBeVisible();
+  await expect(page.locator('.publicClinic li')).toHaveCount(0);
+  await search.fill('etoile');
+  await expect(
+    page.getByText('3 médecins affichés au total dans les résultats.'),
+  ).toBeVisible();
+  await expect(page.locator('.publicClinic li')).toHaveCount(3);
+
+  await page
+    .getByRole('combobox', { name: 'Langue proposée par la clinique' })
+    .selectOption('ar');
+  await expect(
+    page.getByText('3 médecins affichés au total dans les résultats.'),
+  ).toBeVisible();
+  await search.fill('introuvable');
+  await expect(
+    page.getByText('0 médecins affichés au total dans les résultats.'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Effacer tous les filtres' }).click();
+  await expect(total).toHaveCount(0);
+  await page
+    .getByRole('checkbox', {
+      name: 'Cliniques avec médecins affichés uniquement',
+    })
+    .check();
+  await expect(
+    page.getByText('4 médecins affichés au total dans les résultats.'),
+  ).toBeVisible();
+  const language = page.getByRole('combobox', {
+    name: 'Langue proposée par la clinique',
+  });
+  await language.selectOption('ar');
+  await expect(page.getByText('1 clinique trouvée.')).toBeVisible();
+  await expect(
+    page.getByText('3 médecins affichés au total dans les résultats.'),
+  ).toBeVisible();
+  await expect(page.locator('.publicClinic')).toHaveCount(1);
+  await expect(
+    page.locator('.publicClinic').getByText('3 médecins affichés'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Effacer tous les filtres' }).click();
+  await expect(language).toHaveValue('all');
+  await expect(
+    page.getByRole('checkbox', {
+      name: 'Cliniques avec médecins affichés uniquement',
+    }),
+  ).not.toBeChecked();
+  await expect(total).toHaveCount(0);
+  const body = await page.locator('main').innerText();
+  expect(body).not.toContain('private-total-tenant');
+  expect(body).not.toContain('private-total-doctor');
+});
+
+test('Arabic RTL public result doctor total follows visible vowel-insensitive matches', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDirectory(page, [
+    {
+      name: 'عيادة الورد',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'د. مَرْيَم' }, { displayName: 'د. سارة' }],
+    },
+    {
+      name: 'عيادة الأمل',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'د. مريم' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  const search = page.getByRole('searchbox', { name: 'ابحث عن عيادة أو طبيب' });
+  await search.fill('مريم');
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.getByText('نتائج البحث: 2 عيادة.')).toBeVisible();
+  await expect(
+    page.getByText('إجمالي الأطباء المعروضين في النتائج: 2.'),
+  ).toBeVisible();
+  await expect(page.locator('.publicClinic li')).toHaveCount(2);
+  await search.fill('الورد');
+  await expect(
+    page.getByText('إجمالي الأطباء المعروضين في النتائج: 2.'),
+  ).toBeVisible();
+  await expect(page.locator('.publicClinic li')).toHaveCount(2);
+  await page.getByRole('button', { name: 'مسح جميع عوامل التصفية' }).click();
+  await expect(
+    page.getByText(/إجمالي الأطباء المعروضين في النتائج:/),
+  ).toHaveCount(0);
+});
