@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ steps.target.outputs.sha }}
-          fetch-depth: 1
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Validate checked-out head and create bounded PR diff
