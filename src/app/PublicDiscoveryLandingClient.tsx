@@ -238,7 +238,6 @@ export default function PublicDiscoveryLandingClient({
                 autoComplete="off"
                 maxLength={120}
                 placeholder={t.searchPlaceholder}
-                aria-controls="publicClinicResults"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -272,13 +271,16 @@ export default function PublicDiscoveryLandingClient({
             <p className="publicNotice">{t.empty}</p>
           )}
         </div>
-        {state === 'ready' && clinics.length > 0 && query && matchingClinics.length === 0 && (
-          <p className="publicNotice" role="status">
-            {t.noSearchMatches}
-          </p>
-        )}
+        {state === 'ready' &&
+          clinics.length > 0 &&
+          query &&
+          matchingClinics.length === 0 && (
+            <p className="publicNotice" role="status">
+              {t.noSearchMatches}
+            </p>
+          )}
         {state === 'ready' && matchingClinics.length > 0 && (
-          <div className="publicGrid" id="publicClinicResults">
+          <div className="publicGrid">
             {matchingClinics.map((clinic, index) => (
               <article className="publicClinic" key={index}>
                 <h3>{clinic.name}</h3>
