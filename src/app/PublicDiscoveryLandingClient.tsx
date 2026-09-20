@@ -426,9 +426,7 @@ export default function PublicDiscoveryLandingClient({
                   <p className="publicLanguages">
                     {t.languages}:{' '}
                     {clinic.enabledLocales
-                      .map((value) =>
-                        value === 'ar' ? 'العربية' : 'Français',
-                      )
+                      .map((value) => (value === 'ar' ? 'العربية' : 'Français'))
                       .join(' · ')}
                   </p>
                   <h4>{t.doctors}</h4>
