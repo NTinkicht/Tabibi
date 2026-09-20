@@ -89,10 +89,9 @@ describe('SaveGrok cloud lease bridge', () => {
   it('parses the embedded lease validator without executing external actions', () => {
     const body = trustedScript.split("python3 - <<'PY'\n")[1]?.split('\nPY')[0];
     expect(body).toBeDefined();
-    const script = body
-      ?.split('\n')
-      .map((line) => line.replace(/^          /, ''))
-      .join('\n');
+    // YAML.parse has already removed the block scalar's common indentation;
+    // stripping another ten spaces corrupts nested Python block indentation.
+    const script = body;
     const check = spawnSync(
       'python3',
       ['-c', 'import ast,sys; ast.parse(sys.stdin.read())'],
