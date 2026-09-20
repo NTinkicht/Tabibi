@@ -25,7 +25,7 @@ The preferred owner experience is **no bash prompts to Grok**. GitHub Actions CI
 
 One-time, in the existing Codespace's **VS Code UI** after the startup-task PR merges:
 
-1. Open Tabibi's main workspace in VS Code (browser/desktop). Do not rebuild the container or delete the existing private Grok login.
+1. Open Tabibi's main workspace in VS Code (browser/desktop). After this PR merges, use Command Palette **Git: Pull** once to obtain the new startup task (or use VS Code's Source Control Pull button); no Bash command. Do not rebuild the container or delete the existing private Grok login.
 2. From Command Palette select **Tasks: Manage Automatic Tasks**, then **Allow Automatic Tasks** in this trusted workspace. VS Code's permission may apply to automatic tasks in other trusted workspaces: review any other repository's tasks before trusting it. If prompted instead, choose **Allow** for the visible SaveGrok startup task.
 3. Reopen/reload the Codespace workspace once to launch the **SaveGrok — automatic GitHub review failover (owner Codespace)** task. Its output terminal confirms whether the worker is active or why it fail-closed. The task is visible: no hidden shell, installer, keepalive or billing change. New reviewed leases are consumed automatically while the Codespace stays active. Stop the task, disallow automatic tasks or stop the Codespace to end it.
 
