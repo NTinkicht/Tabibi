@@ -54,11 +54,24 @@ describe('AI capacity policy', () => {
     expect(violations).toEqual([]);
   });
 
-  it('does not introduce a Grok unattended Action', () => {
+  it('allows only the bounded SaveGrok cloud signal, never Grok model execution', () => {
     const files = fs
       .readdirSync(workflowDirectory)
       .filter((file) => /\.ya?ml$/i.test(file));
-    expect(files.some((file) => /grok/i.test(file))).toBe(false);
+    expect(files.filter((file) => /grok/i.test(file))).toEqual([
+      'savegrok-cloud-slack-bridge.yml',
+    ]);
+    const bridge = fs.readFileSync(
+      path.join(workflowDirectory, 'savegrok-cloud-slack-bridge.yml'),
+      'utf8',
+    );
+    expect(bridge).toContain('SLACK_CHATGPT_BOT_TOKEN');
+    expect(bridge).toContain("github.actor == 'NTinkicht'");
+    expect(bridge).toContain('CLOUD_SIGNAL_SENT');
+    expect(bridge).not.toContain('grok -p');
+    expect(bridge).not.toContain('XAI_API_KEY');
+    expect(bridge).not.toContain('GROK_AUTH_JSON');
+    expect(bridge).not.toContain('contents: write');
   });
 
   it('keeps external actor wakes owner-only and read-only', () => {
