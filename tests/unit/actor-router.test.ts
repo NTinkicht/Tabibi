@@ -199,12 +199,7 @@ describe('seven-actor capacity routing', () => {
   });
 
   it('bounds Mistral wake and classifies token failures', () => {
-    const workflowPath = path.join(
-      process.cwd(),
-      '.github',
-      'workflows',
-      'mistral-vibe-wake.yml',
-    );
+    const workflowPath = '.github/workflows/mistral-vibe-wake.yml';
     const workflow = fs.readFileSync(workflowPath, 'utf8');
     expect(workflow).toContain("github.event.issue.number == 11");
     expect(workflow).toContain("github.actor == 'NTinkicht'");
