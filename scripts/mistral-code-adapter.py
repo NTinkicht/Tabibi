@@ -293,19 +293,19 @@ def main():
                 raise AssertionError("Symlink attack accepted")
         assigned = {
             "id": 10, "user": {"login": "NTinkicht"},
-            "body": (f"ROLE_LEASE_ASSIGNED\\nactor: mistral-vibe\\n"
-                     f"capability: implementation\\npr: #2\\nexact_sha: {sha}\\n"
+            "body": (f"ROLE_LEASE_ASSIGNED\nactor: mistral-vibe\n"
+                     f"capability: implementation\npr: #2\nexact_sha: {sha}\n"
                      "stream: WU101"),
         }
         assert replay_owner_lease([assigned], 2, sha, "WU101") == 10
         release = {
             "id": 11, "user": {"login": "NTinkicht"},
-            "body": ("ROLE_LEASE_RELEASED\\n"
+            "body": ("ROLE_LEASE_RELEASED\n"
                      "reason: releasing prior ROLE_LEASE_ASSIGNED actor"),
         }
         for history in ([assigned, release], [assigned, dict(assigned, id=11)],
                         [assigned, {"id": 11, "user": {"login": "NTinkicht"},
-                                    "body": "ROLE_LEASE_CANCELLED\\nROLE_LEASE_ASSIGNED"}]):
+                                    "body": "ROLE_LEASE_CANCELLED\nROLE_LEASE_ASSIGNED"}]):
             try:
                 replay_owner_lease(history, 2, sha, "WU101")
             except ValueError:
