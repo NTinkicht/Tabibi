@@ -128,7 +128,9 @@ test('optional stream rejection never invalidates an authorized guest snapshot',
   await submitBookingForm(page);
   await expect(page.getByText('G-042')).toBeVisible();
   await expect(page.getByText('en attente')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Confirmer ma présence' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Confirmer ma présence' }),
+  ).toBeVisible();
   await expect(page.getByText('Accès indisponible')).toHaveCount(0);
 });
 
