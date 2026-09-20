@@ -53,20 +53,55 @@ describe('seven-actor capacity routing', () => {
     expect(result.selected).toBe('mistral-vibe');
   });
 
-  it('routes independent review to Grok after earlier reviewers are excluded', () => {
-    expect(
-      route(
-        'review',
-        '--authors=claude,chatgpt,codex',
-        '--unavailable=gemini-cli,mistral-vibe',
-      ).selected,
-    ).toBe('grok');
+  it('does not treat a registered but unproven Grok runtime as available', () => {
+    const review = route(
+      'review',
+      '--authors=claude,chatgpt,codex',
+      '--unavailable=gemini-cli,mistral-vibe',
+    );
+    expect(review.selected).toBe('copilot');
+    expect(review.considered).toContainEqual({
+      id: 'grok',
+      eligible: false,
+      reason: 'runtime_not_verified_for_capability',
+    });
+    const implementation = route(
+      'implementation',
+      '--unavailable=codex,claude,chatgpt',
+    );
+    expect(implementation.selected).toBe('mistral-vibe');
   });
 
-  it('routes implementation to Grok when the first three actors are unavailable', () => {
-    expect(
-      route('implementation', '--unavailable=codex,claude,chatgpt').selected,
-    ).toBe('grok');
+  it('permits an explicitly verified Grok review fallback without granting coding', () => {
+    const review = route(
+      'review',
+      '--authors=claude,chatgpt,codex',
+      '--unavailable=gemini-cli,mistral-vibe',
+      '--verified=grok:review',
+    );
+    expect(review.selected).toBe('grok');
+    const implementation = route(
+      'implementation',
+      '--unavailable=codex,claude,chatgpt',
+      '--verified=grok:review',
+    );
+    expect(implementation.selected).toBe('mistral-vibe');
+  });
+
+  it('permits a separate proven Grok implementation fallback', () => {
+    const implementation = route(
+      'implementation',
+      '--unavailable=codex,claude,chatgpt',
+      '--verified=grok:implementation',
+    );
+    expect(implementation.selected).toBe('grok');
+    const review = route(
+      'review',
+      '--authors=claude,chatgpt,codex',
+      '--unavailable=gemini-cli,mistral-vibe',
+      '--verified=grok:implementation',
+    );
+    expect(review.selected).toBe('copilot');
   });
 
   it('fails closed when every review candidate is a material author', () => {

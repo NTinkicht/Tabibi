@@ -65,6 +65,7 @@ export const receptionistCopy = {
     stale: 'Données anciennes — actualisez',
     patientCancellation:
       'Confirmer : annulation demandée par le patient ? Annuler = décision de la clinique.',
+    notifications: 'Notifications non remises',
     queueStatuses: {
       waiting: 'En attente',
       checked_in: 'Arrivé',
@@ -148,6 +149,7 @@ export const receptionistCopy = {
     stale: 'البيانات قديمة — قم بالتحديث',
     patientCancellation:
       'تأكيد: هل طلب المريض الإلغاء؟ اختر إلغاء إذا كان القرار من العيادة.',
+    notifications: 'إشعارات تعذّر تسليمها',
     queueStatuses: {
       waiting: 'في الانتظار',
       checked_in: 'حاضر',

@@ -9,6 +9,9 @@ import { fileURLToPath } from 'node:url';
 
 export const REPO = 'NTinkicht/Tabibi';
 export const MARKER = 'ROLE_LEASE_ASSIGNED';
+// Focused full PR reviews need more than 12 turns; a lease still runs once with
+// a strict finite turn budget and an independent 12-minute wall-clock timeout.
+export const GROK_REVIEW_MAX_TURNS = 28;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STATE = path.join(ROOT, '.tabibi', 'grok-dispatch');
 const SHA = /^[a-f0-9]{40}$/;
@@ -380,15 +383,77 @@ function drainPending() {
     }
   }
 }
-function ciStatus(sha) {
-  const runs =
-    gh(`repos/${REPO}/commits/${sha}/check-runs?per_page=100`).check_runs || [];
-  return ['Quality and build', 'PostgreSQL integration', 'Browser smoke'].map(
-    (name) => ({
+// CI evidence is fetched by the trusted parent GitHub CLI, never by letting
+// the model read OAuth, shell credentials, raw workflow logs or provider secrets.
+const REQUIRED_CI = [
+  'Quality and build',
+  'PostgreSQL integration',
+  'Browser smoke',
+];
+const CI_STEP_ALLOWLIST = new Set([
+  'Initialize containers',
+  'Set up job',
+  'Checkout',
+  'Set up Node.js',
+  'Install dependencies',
+  'Formatting',
+  'Lint',
+  'Typecheck',
+  'Unit and API tests',
+  'Production build',
+  'Dependency audit',
+  'Run PostgreSQL integration tests',
+  'Install PostgreSQL 16 client tools',
+  'Rehearse PostgreSQL backup and restore',
+  'Run bounded clinic-day load rehearsal',
+  'Apply migrations',
+  'Build application',
+  'Install Chromium',
+  'Run browser smoke tests',
+  'Stop containers',
+]);
+export function summarizeCiChecks(runs) {
+  return REQUIRED_CI.map((name) => {
+    const run = Array.isArray(runs)
+      ? runs.find((item) => item.name === name)
+      : null;
+    const url =
+      typeof run?.details_url === 'string' &&
+      /^https:\/\/github\.com\/NTinkicht\/Tabibi\/actions\/runs\/[0-9]+\/job\/[0-9]+$/.test(
+        run.details_url,
+      )
+        ? run.details_url
+        : undefined;
+    return {
       name,
-      conclusion: runs.find((r) => r.name === name)?.conclusion || 'not_run',
-    }),
-  );
+      status: run?.status || 'not_run',
+      conclusion: run?.conclusion || 'not_run',
+      ...(url ? { url } : {}),
+      ...(run?.app?.slug === 'github-actions' && Number.isSafeInteger(run.id)
+        ? { jobId: run.id }
+        : {}),
+    };
+  });
+}
+function ciStatus(sha) {
+  const raw = gh(`repos/${REPO}/commits/${sha}/check-runs?per_page=100`);
+  return summarizeCiChecks(raw.check_runs || []).map(({ jobId, ...check }) => {
+    if (check.conclusion !== 'failure' || !jobId) return check;
+    try {
+      const job = gh(`repos/${REPO}/actions/jobs/${jobId}`);
+      const failedSteps = (job.steps || [])
+        .filter((step) =>
+          ['failure', 'timed_out'].includes(String(step.conclusion)),
+        )
+        .map((step) => step.name)
+        .filter((name) => CI_STEP_ALLOWLIST.has(name))
+        .slice(0, 8);
+      return failedSteps.length ? { ...check, failedSteps } : check;
+    } catch {
+      // A failed CI job's summary must not become a Grok dispatch failure.
+      return check;
+    }
+  });
 }
 function materialGrokAuthorship(pr) {
   const commits = gh(`repos/${REPO}/pulls/${pr.number}/commits?per_page=100`);
@@ -413,9 +478,12 @@ function recentComments(pr) {
 export function reviewPrompt(lease, checks) {
   return (
     `You are actor=grok reviewing NTinkicht/Tabibi PR #${lease.pr} in READ-ONLY mode.\n` +
-    'Read AGENTS.md, GROK.md, SECURITY.md, ARCHITECTURE.md, PRODUCT.md and relevant files.\n' +
+    'First read AGENTS.md, GROK.md and SECURITY.md for review guardrails. ' +
+    'Inspect git diff origin/main...HEAD --stat, then git diff origin/main...HEAD, ' +
+    'the touched source and tests. Consult ARCHITECTURE.md or PRODUCT.md ' +
+    'only when relevant; avoid rereading unrelated files.\n' +
     `Exact head: ${lease.sha}. Material authors (as recorded by orchestrator): ${lease.authors.join(', ')}.\n` +
-    `Exact-head CI observations: ${JSON.stringify(checks)}. Inspect git diff origin/main...HEAD in the checkout.\n` +
+    `Exact-head CI observations: ${JSON.stringify(checks)}.\n` +
     'Review correctness, privacy, authorization, RTL/FR/AR, regressions and tests.\n' +
     'Report actor: grok, exact 40-character SHA, findings with severity/path/evidence, ' +
     'and PASS, PASS_WITH_MINOR_FINDINGS or CHANGES_REQUIRED. ' +
@@ -491,7 +559,7 @@ function runReview(lease, { dryRun = false } = {}) {
         '--allow',
         'Bash(git show *)',
         '--max-turns',
-        '12',
+        String(GROK_REVIEW_MAX_TURNS),
         '-p',
         prompt,
         '--output-format',
@@ -627,11 +695,13 @@ export function oneCycle({ dryRun = false } = {}) {
             deliver(
               lease,
               `<!-- tabibi-grok-dispatch:${lease.key} -->\n` +
-                `CAPACITY_DEGRADED actor: grok capability: review exact_sha: ${lease.sha}\n` +
+                `${failure === 'GROK_TURN_LIMIT' ? 'EXECUTION_INCOMPLETE' : 'CAPACITY_DEGRADED'} actor: grok capability: review exact_sha: ${lease.sha}\n` +
                 `source_lease_comment: ${lease.commentId}\n` +
                 `reason: ${failure}\n` +
                 'No GitHub-verifiable review verdict exists. Reconcile and fail over.',
-              'CAPACITY_DEGRADED',
+              failure === 'GROK_TURN_LIMIT'
+                ? 'EXECUTION_INCOMPLETE'
+                : 'CAPACITY_DEGRADED',
             );
           } catch {
             // Pending report is kept locally and retried before any new model call.

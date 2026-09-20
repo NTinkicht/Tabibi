@@ -122,6 +122,52 @@ describe('owner-private Grok dispatch lease parser', () => {
     expect(prompt).toContain('READ-ONLY');
     expect(prompt).toContain('never say MERGE_READY');
     expect(prompt).toContain('DO NOT EDIT, COMMIT, PUSH, MERGE');
+    expect(prompt).toContain('git diff origin/main...HEAD --stat');
+    expect(prompt).toContain('only when relevant');
+    expect(dispatcher.GROK_REVIEW_MAX_TURNS).toBe(28);
+  });
+});
+
+describe('GitHub Actions CI context for bounded Grok reviews', () => {
+  it('supplies only the required current-SHA job results and trusted action URLs', () => {
+    const jobUrl =
+      'https://github.com/NTinkicht/Tabibi/actions/runs/12345/job/67890';
+    const checks = dispatcher.summarizeCiChecks([
+      {
+        name: 'Quality and build',
+        id: 67890,
+        app: { slug: 'github-actions' },
+        status: 'completed',
+        conclusion: 'success',
+        details_url: jobUrl,
+      },
+      {
+        name: 'PostgreSQL integration',
+        status: 'completed',
+        conclusion: 'failure',
+        details_url: 'https://evil.example/steal?token=SECRET',
+      },
+      {
+        name: 'Untrusted arbitrary check',
+        status: 'completed',
+        conclusion: 'success',
+      },
+    ]);
+    expect(checks).toHaveLength(3);
+    expect(checks[0]).toMatchObject({
+      name: 'Quality and build',
+      conclusion: 'success',
+      url: jobUrl,
+      jobId: 67890,
+    });
+    expect(checks[1]).toMatchObject({
+      name: 'PostgreSQL integration',
+      conclusion: 'failure',
+    });
+    expect(checks[1]).not.toHaveProperty('url');
+    expect(checks[2].name).toBe('Browser smoke');
+    expect(checks[2].conclusion).toBe('not_run');
+    expect(JSON.stringify(checks)).not.toContain('evil.example');
   });
 });
 

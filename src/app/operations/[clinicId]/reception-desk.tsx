@@ -193,6 +193,12 @@ export function ReceptionDesk({
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
         </div>
+        <Link
+          className="notificationsLink"
+          href={`/operations/${clinicId}/notifications?locale=${locale}`}
+        >
+          {t.notifications}
+        </Link>
         <button
           className="locale"
           onClick={() => setLocale(locale === 'ar' ? 'fr' : 'ar')}
