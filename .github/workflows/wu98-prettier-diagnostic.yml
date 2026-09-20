@@ -1,0 +1,27 @@
+name: WU98 formatter diagnostic
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  formatter-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install formatter despite runner engine mismatch
+        env:
+          npm_config_engine_strict: 'false'
+        run: npm ci --ignore-scripts
+      - name: Print exact formatter delta
+        run: |
+          npx --no-install prettier --write 'tests/e2e/guest-live-queue-manual-refresh.spec.ts'
+          git diff -- 'tests/e2e/guest-live-queue-manual-refresh.spec.ts'
