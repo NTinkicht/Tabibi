@@ -1,4 +1,7 @@
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -180,6 +183,46 @@ describe('Grok dispatcher security and durability regression guards', () => {
     expect(() => assertSafe('PASS', '{invalid JSON')).toThrow(
       'oauth_not_verified',
     );
+  });
+
+  it('protects secret values in arrays and nested objects from public output', () => {
+    const token = 'sensitive-credential-value-123456';
+    const auth = JSON.stringify({
+      tokens: [token, { value: token }],
+      credentials: { list: [{ value: token }] },
+    });
+    expect(() => dispatcher.assertSafeReviewOutput(token, auth)).toThrow(
+      'unsafe_review_output',
+    );
+    expect(dispatcher.assertSafeReviewOutput('PASS: no secrets', auth)).toBe(
+      'PASS: no secrets',
+    );
+  });
+
+  it('atomically replaces state and treats truncated JSON as not delivered', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tabibi-grok-test-'));
+    const name = lease.key + '.json';
+    try {
+      fs.writeFileSync(path.join(dir, name), '{"outcome":');
+      expect(dispatcher.readState(name, dir)).toBeNull();
+      dispatcher.writeStateAtomically(
+        name,
+        { outcome: 'DELIVERY_PENDING', body: 'safe test report' },
+        dir,
+      );
+      expect(dispatcher.readState(name, dir)).toEqual({
+        outcome: 'DELIVERY_PENDING',
+        body: 'safe test report',
+      });
+      dispatcher.writeStateAtomically(name, { outcome: 'REVIEW_POSTED' }, dir);
+      expect(dispatcher.readState(name, dir)).toEqual({
+        outcome: 'REVIEW_POSTED',
+      });
+      expect(fs.readdirSync(dir)).toEqual([name]);
+      expect(fs.statSync(path.join(dir, name)).mode & 0o777).toBe(0o600);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('requires complete review history and rejects Grok-authored commits', () => {
