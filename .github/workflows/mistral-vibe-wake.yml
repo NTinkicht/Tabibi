@@ -182,6 +182,33 @@ jobs:
             fi
           fi
 
+          if [[ "$code" != "0" ]] && [[ -s /tmp/tabibi-mistral-error.txt ]]; then
+            # Job-log-only diagnostics. Scrub the literal credential plus common
+            # bearer/key renderings before the excerpt can reach the Actions log;
+            # it is never posted to the public issue comment.
+            python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          source = Path('/tmp/tabibi-mistral-error.txt')
+          target = Path('/tmp/tabibi-mistral-error-scrubbed.txt')
+          text = source.read_text(encoding='utf-8', errors='replace')
+          secret = os.environ.get('MISTRAL_API_KEY', '')
+          if secret:
+              text = text.replace(secret, '[REDACTED]')
+          text = re.sub(r'(?i)(authorization\s*:\s*bearer\s+)\S+', r'\1[REDACTED]', text)
+          text = re.sub(r'(?i)(mistral_api_key\s*[=:]\s*)\S+', r'\1[REDACTED]', text)
+          lines = text.splitlines()
+          target.write_text('\n'.join(lines[-20:]) + '\n', encoding='utf-8')
+          PY
+            {
+              echo "::group::Mistral Vibe runtime stderr (scrubbed, last 20 lines)"
+              cat /tmp/tabibi-mistral-error-scrubbed.txt
+              echo "::endgroup::"
+            }
+          fi
+
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           echo "status=$status" >> "$GITHUB_OUTPUT"
           echo "failure_reason=$reason" >> "$GITHUB_OUTPUT"
