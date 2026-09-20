@@ -317,7 +317,7 @@ export default function PublicDiscoveryLandingClient({
                 ? t.noFilteredMatches
                 : t.noSearchMatches}
             </p>
-          )
+          )}
         {state === 'ready' && matchingClinics.length > 0 && (
           <div className="publicGrid">
             {matchingClinics.map((clinic, index) => (
