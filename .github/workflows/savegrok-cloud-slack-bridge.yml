@@ -54,13 +54,13 @@ jobs:
               raise SystemExit('CONFIG_BLOCKED: existing Slack relay token is absent')
 
           def field(name):
-              values = re.findall(rf'(?m)^{re.escape(name)}:\\s*(.*?)\\s*$', body)
+              values = re.findall(rf'(?m)^{re.escape(name)}:\s*(.*?)\s*$', body)
               if len(values) != 1 or not values[0]:
                   raise ValueError('Missing or duplicated trusted lease field')
               return values[0].strip()
 
           try:
-              if len(re.findall(r'(?m)^ROLE_LEASE_ASSIGNED\\s*$', body)) != 1:
+              if len(re.findall(r'(?m)^ROLE_LEASE_ASSIGNED\s*$', body)) != 1:
                   raise ValueError('Lease marker missing or repeated')
               if field('actor') != 'grok' or field('capability') != 'review':
                   raise ValueError('Wrong actor or capability')
@@ -122,16 +122,16 @@ jobs:
           # Only public engineering metadata travels to Slack. It is a wake
           # signal, NOT proof that the Bot actually executed or posted a review.
           signal = (
-              'TABIBI_GROK_CLOUD_REVIEW_LEASE_V1\\n'
-              f'repo: {repo}\\n'
-              f'pr: {number}\\n'
-              f'exact_sha: {exact_sha}\\n'
-              f'stream: {stream}\\n'
-              f'source_lease_comment: {os.environ["LEASE_COMMENT_ID"]}\\n'
-              f'source: {os.environ["LEASE_URL"]}\\n'
+              'TABIBI_GROK_CLOUD_REVIEW_LEASE_V1\n'
+              f'repo: {repo}\n'
+              f'pr: {number}\n'
+              f'exact_sha: {exact_sha}\n'
+              f'stream: {stream}\n'
+              f'source_lease_comment: {os.environ["LEASE_COMMENT_ID"]}\n'
+              f'source: {os.environ["LEASE_URL"]}\n'
               'required: included SuperGrok Bot only; read-only; nonauthor; '
               'reverify latest PR SHA + 3 CI jobs; post evidence on PR; '
-              'no paid API, no new branch, no self-gate.\\n'
+              'no paid API, no new branch, no self-gate.\n'
           )
           payload = json.dumps({
               'channel': os.environ['SLACK_CHANNEL_ID'],
