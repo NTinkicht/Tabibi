@@ -235,6 +235,8 @@ describe('seven-actor capacity routing', () => {
     expect(workflow).not.toContain('pull-requests: write');
     expect(helper).toContain('REQUIRED_JOBS');
     expect(helper).toContain('DIFF_LIMIT_BYTES');
+    expect(helper).toContain('"git", "diff"');
+    expect(helper).not.toContain('"gh", "pr", "diff"');
     expect(helper).toContain('mistral-vibe');
     const check = spawnSync(
       'python3',
