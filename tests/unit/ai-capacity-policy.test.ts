@@ -50,7 +50,10 @@ describe('AI capacity policy', () => {
 
       for (const allowed of providerSecretWorkflowAllowlist) {
         lines.forEach((line, index) => {
-          if (line.includes(allowed.secret) && !allowed.workflows.includes(file)) {
+          if (
+            line.includes(allowed.secret) &&
+            !allowed.workflows.includes(file)
+          ) {
             const location = `${file}:${index + 1}`;
             violations.push(`${location} ${allowed.secret} workflow violation`);
           }
