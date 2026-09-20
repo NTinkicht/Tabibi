@@ -483,6 +483,10 @@ h1 {
 .publicClinic h4 {
   margin: 1.5rem 0 0.5rem;
 }
+.publicDoctorCount {
+  font-weight: 700;
+  margin-block: 0 0.65rem;
+}
 .publicClinic ul {
   margin: 0;
   padding-inline-start: 1.4rem;
