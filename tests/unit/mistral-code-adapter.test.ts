@@ -32,9 +32,10 @@ const workflow = fs.readFileSync(
 const parsed = yaml.load(workflow) as {
   on: { issue_comment: { types: string[] } };
   permissions: Record<string, string>;
-  jobs: Record<'propose' | 'test' | 'publish' | 'report', Job>;
+  env?: Record<string, string>;
+  jobs: Record<'propose' | 'validate' | 'test' | 'publish' | 'report', Job>;
 };
-const { propose, test, publish, report } = parsed.jobs;
+const { propose, validate, test, publish, report } = parsed.jobs;
 const named = (job: Job, name: string) => {
   const found = job.steps.find((step) => step.name === name);
   if (!found) throw new Error(`Missing trusted stage: ${name}`);
@@ -56,7 +57,8 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     );
     expect(gate.run).toContain('mistral-code-adapter.py selftest');
     expect(gate.run).toContain('mistral-code-adapter.py prepare');
-    expect(propose.outputs?.ready).toContain('steps.patch.outputs.ready');
+    expect(propose.outputs?.ready).toContain('steps.model.outputs.exit_code');
+    expect(validate.outputs?.ready).toContain('steps.patch.outputs.ready');
     expect(propose.outputs?.lease).toContain('steps.lease.outputs.lease');
     expect(propose.outputs?.paths).toContain('steps.lease.outputs.paths');
     expect(propose.concurrency?.group).toContain('github.event.issue.number');
@@ -65,7 +67,15 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
 
   it('isolates the model and deterministic tests from ALL repository write tokens', () => {
     expect(parsed.permissions).toEqual({ contents: 'read' });
+    for (const job of [propose, validate, test, publish, report]) {
+      expect(job.env).not.toHaveProperty('GH_TOKEN');
+      expect(job.env).not.toHaveProperty('MISTRAL_API_KEY');
+    }
+    expect(parsed.env).not.toHaveProperty('GH_TOKEN');
+    expect(parsed.env).not.toHaveProperty('MISTRAL_API_KEY');
     expect(propose.permissions.contents).toBe('read');
+    expect(validate.permissions.contents).toBe('read');
+    expect(validate.permissions.issues).toBe('read');
     expect(test.permissions.contents).toBe('read');
     expect(test.permissions.issues).toBe('read');
     expect(propose.permissions['pull-requests']).toBe('read');
@@ -73,8 +83,9 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     expect(publish.permissions.issues).toBe('write');
     expect(report.permissions.contents).toBe('read');
     expect(report.permissions.issues).toBe('write');
-    expect(test.needs).toBe('propose');
-    expect(publish.needs).toEqual(['propose', 'test']);
+    expect(validate.needs).toBe('propose');
+    expect(test.needs).toEqual(['propose', 'validate']);
+    expect(publish.needs).toEqual(['propose', 'validate', 'test']);
     expect(publish.if).toContain("needs.test.result == 'success'");
     const model = named(
       propose,
@@ -97,6 +108,8 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     expect(propose.steps.some((s) => s.uses?.includes('upload-artifact'))).toBe(
       true,
     );
+    expect(validate.steps.some((s) => s.uses?.includes('download-artifact'))).toBe(true);
+    expect(validate.steps.some((s) => s.uses?.includes('upload-artifact'))).toBe(true);
     expect(test.steps.some((s) => s.uses?.includes('download-artifact'))).toBe(
       true,
     );
@@ -111,10 +124,12 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     expect(stage.run).toContain('current.is_symlink()');
     expect(stage.run).toContain('shutil.copyfile(source, dest)');
     const patch = named(
-      propose,
-      'Validate model exact edits in trusted read-only parent',
+      validate,
+      'Validate model exact edits in isolated trusted read-only parent',
     );
     expect(patch.run).toContain('mistral-code-adapter.py apply');
+    expect(validate.steps[0]?.name).toBe('Fresh trusted read-only runner checkout');
+    expect(propose.steps.some((step) => step.env?.GH_TOKEN && step.name?.includes('patch'))).toBe(false);
     const tests = named(
       test,
       'Unprivileged deterministic format lint typecheck unit/API and build',
@@ -175,6 +190,9 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
       'MISTRAL_LEASED_CODE_V1',
       'Material-Author: mistral-vibe',
       'active_owner_lease',
+      'replay_owner_lease',
+      'LEASE_EVENT_LINE',
+      'Overlapping active implementation leases',
       'source.count(edit["old"]) != 1',
       'stat.S_ISREG',
       'metadata.st_nlink != 1',
