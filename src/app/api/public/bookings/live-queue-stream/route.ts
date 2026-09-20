@@ -171,7 +171,9 @@ export async function GET(request: Request): Promise<Response> {
               !streamAbort.signal.aborted &&
               !(error instanceof PublicGuestLiveQueueStatusRejectedError)
             ) {
-              getLogger().error('public guest live queue stream refresh failed');
+              getLogger().error(
+                'public guest live queue stream refresh failed',
+              );
             }
             break;
           }
