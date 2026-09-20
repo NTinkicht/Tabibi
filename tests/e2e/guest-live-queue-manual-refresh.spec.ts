@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 const BOOKING_URL = '**/api/public/bookings';
 const STATUS_URL = '**/api/public/bookings/live-queue-status';
+const STREAM_URL = '**/api/public/bookings/live-queue-stream';
 const BEARER = 'manual-refresh.test-bearer.signature';
 
 async function openLiveQueue(page: Page) {
@@ -21,8 +22,10 @@ test('manual refresh uses the canonical bearer-header request without disclosure
   page,
 }) => {
   const authorizations: string[] = [];
+  const statusRequestUrls: string[] = [];
   await page.route(STATUS_URL, async (route) => {
     authorizations.push(route.request().headers()['authorization'] ?? '');
+    statusRequestUrls.push(route.request().url());
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -41,6 +44,8 @@ test('manual refresh uses the canonical bearer-header request without disclosure
   await refresh.click();
   await expect.poll(() => authorizations.length).toBe(2);
   expect(authorizations).toEqual([`Bearer ${BEARER}`, `Bearer ${BEARER}`]);
+  expect(statusRequestUrls).toHaveLength(2);
+  for (const requestUrl of statusRequestUrls) expect(requestUrl).not.toContain(BEARER);
   expect(page.url()).not.toContain(BEARER);
   expect(await page.locator('body').innerText()).not.toContain(BEARER);
   expect(
@@ -84,7 +89,7 @@ test('manual refresh is disabled while pending and repeated clicks do not create
   });
   await expect(pending).toBeDisabled();
   await pending.evaluate((button: HTMLButtonElement) => button.click());
-  expect(requests).toBe(2);
+  await expect.poll(() => requests).toBe(2);
   releaseRefresh?.();
   await expect(refresh).toBeEnabled();
   expect(requests).toBe(2);
@@ -124,4 +129,85 @@ test('Arabic active view exposes an RTL refresh control and terminal state remov
   await expect(
     page.getByRole('heading', { name: 'حالة الزيارة' }),
   ).toBeVisible();
+});
+
+
+test('data-bearing stale view can refresh without losing guest access after transient failure', async ({
+  page,
+}) => {
+  let requests = 0;
+  await page.route(STREAM_URL, (route) =>
+    route.fulfill({ status: 503, body: 'stream temporarily unavailable' }),
+  );
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    if (requests === 2) {
+      await route.fulfill({ status: 503, body: 'temporary status failure' });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: requests >= 3 ? 'checked_in' : 'waiting',
+        eta: null,
+        activeConsultationRemainingMinutes: null,
+      }),
+    });
+  });
+
+  await openLiveQueue(page);
+  const refresh = page.getByRole('button', { name: 'Actualiser mon statut' });
+  await expect(refresh).toBeVisible();
+
+  await refresh.click();
+  await expect(
+    page.getByRole('heading', { name: 'Statut potentiellement obsolète' }),
+  ).toBeVisible();
+  await expect(refresh).toBeVisible();
+
+  await page.waitForTimeout(1_050);
+  await refresh.click();
+  await expect.poll(() => requests).toBe(3);
+  await expect(page.getByText('enregistré')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Accès indisponible' }),
+  ).toHaveCount(0);
+});
+
+test('manual refresh survives an optional stream failure and does not restart the stream immediately', async ({
+  page,
+}) => {
+  let streamRequests = 0;
+  let statusRequests = 0;
+  await page.route(STREAM_URL, (route) => {
+    streamRequests += 1;
+    return route.fulfill({ status: 503, body: 'optional stream unavailable' });
+  });
+  await page.route(STATUS_URL, async (route) => {
+    statusRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+        eta: null,
+        activeConsultationRemainingMinutes: null,
+      }),
+    });
+  });
+
+  await openLiveQueue(page);
+  await expect.poll(() => streamRequests).toBeGreaterThanOrEqual(1);
+  const streamCountBeforeRefresh = streamRequests;
+  const refresh = page.getByRole('button', { name: 'Actualiser mon statut' });
+  await refresh.click();
+  await expect.poll(() => statusRequests).toBe(2);
+  expect(streamRequests).toBe(streamCountBeforeRefresh);
+  await expect(
+    page.getByRole('heading', { name: 'Accès indisponible' }),
+  ).toHaveCount(0);
+  await expect(refresh).toBeVisible();
 });
