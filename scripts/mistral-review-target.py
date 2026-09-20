@@ -65,7 +65,7 @@ def parse(body):
         or "mistral" in material_authors
     ):
         raise ValueError("Invalid or self-authored exact-head review target")
-    return int(number), exact_sha
+    return int(number), exact_sha, ",".join(material_authors)
 
 
 def read_current_pr(repo, number, exact_sha):
@@ -79,6 +79,54 @@ def read_current_pr(repo, number, exact_sha):
     ):
         raise ValueError("PR no longer matches a trusted canonical exact head")
     return data
+
+
+def verify_provenance(repo, number, exact_sha, declared):
+    """Correlate the declared actors with each commit's explicit provenance.
+
+    Under Tabibi's owner-dispatched model most commits have NTinkicht as
+    GitHub committer regardless of the material AI author. A GitHub login
+    alone therefore cannot prove an AI's identity. For binding Mistral gates
+    every reviewed commit MUST have exactly one owner-committed
+    "Material-Author: <actor>" trailer. Missing/conflicting evidence is
+    blocked rather than assumed to match the dispatch's declaration.
+    """
+    actors = set(declared.split(","))
+    observed = set()
+    found = 0
+    last_sha = None
+    for page in range(1, 21):
+        commits = github_json(
+            f"repos/{repo}/pulls/{number}/commits?per_page=100&page={page}"
+        )
+        if not isinstance(commits, list):
+            raise ValueError("Commit provenance unavailable")
+        for commit in commits:
+            found += 1
+            last_sha = commit.get("sha")
+            if not SHA.fullmatch(last_sha or ""):
+                raise ValueError("Commit provenance SHA is invalid")
+            message = commit.get("commit", {}).get("message", "")
+            trailers = re.findall(
+                r"(?mi)^Material-Author:[ \\t]*([a-z0-9_-]+)[ \\t]*$", message
+            )
+            if len(trailers) != 1:
+                raise ValueError("Missing or conflicting per-commit actor provenance")
+            actor = trailers[0].lower()
+            if actor in ("mistral-vibe", "mistral") or actor not in actors:
+                raise ValueError("Self-authored or undeclared commit actor")
+            # Model-linked GitHub accounts must not contradict their trailer.
+            login = (commit.get("author") or {}).get("login", "").lower()
+            if login in ("mistral-vibe", "mistral"):
+                raise ValueError("GitHub commit has Mistral authorship")
+            observed.add(actor)
+        if len(commits) < 100:
+            break
+    else:
+        raise ValueError("Commit provenance exceeds the safety bound")
+    if not found or last_sha != exact_sha or observed != actors:
+        raise ValueError("Commit provenance does not match owner dispatch")
+    return True
 
 
 def ci_green(repo, exact_sha):
@@ -131,7 +179,7 @@ def main():
         assert parse(
             "BINDING_EXACT_HEAD_REVIEW\nreview_pr: 345\n"
             + "review_sha: " + "a" * 40 + "\nmaterial_authors: chatgpt"
-        ) == (345, "a" * 40)
+        ) == (345, "a" * 40, "chatgpt")
         for bad in (
             "BINDING_EXACT_HEAD_REVIEW\nreview_pr: 1\nreview_sha: bad\n"
             "material_authors: codex",
@@ -185,6 +233,21 @@ def main():
             assert not ci_green("owner/repo", "a" * 40), (
                 "Older green CI masked latest failure"
             )
+            def provenance_api(route):
+                if "/pulls/" in route and "/commits?" in route:
+                    return [{"sha": "a" * 40,
+                             "commit": {"message": "feat: demo\\n\\nMaterial-Author: chatgpt"},
+                             "author": {"login": "NTinkicht"}}]
+                raise ValueError("Unexpected mock API call")
+            globals()["github_json"] = provenance_api
+            assert verify_provenance("owner/repo", 1, "a" * 40, "chatgpt")
+            for mismatched in ("mistral-vibe", "codex"):
+                try:
+                    verify_provenance("owner/repo", 1, "a" * 40, mismatched)
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError("Self/undeclared material author accepted")
         finally:
             globals()["github_json"] = original_api
         print("Mistral review-target parser and security selftests passed")
@@ -197,14 +260,15 @@ def main():
             if target is None:
                 output(ready="true", status="OK", mode="main")
                 return
-            number, exact_sha = target
+            number, exact_sha, authors = target
             read_current_pr(repo, number, exact_sha)
+            verify_provenance(repo, number, exact_sha, authors)
             if not ci_green(repo, exact_sha):
                 blocked("CI_NOT_GREEN")
                 return
             output(
                 ready="true", status="OK", mode="review",
-                pr=number, sha=exact_sha
+                pr=number, sha=exact_sha, authors=authors
             )
         except (ValueError, subprocess.SubprocessError, json.JSONDecodeError):
             blocked("REVIEW_TARGET_BLOCKED")
@@ -212,11 +276,16 @@ def main():
 
     number = os.environ.get("REVIEW_PR", "")
     exact_sha = os.environ.get("REVIEW_SHA", "")
+    authors = os.environ.get("REVIEW_AUTHORS", "")
     try:
         if not number.isascii() or not number.isdigit() or not SHA.fullmatch(exact_sha):
             blocked("REVIEW_TARGET_BLOCKED")
             return
         read_current_pr(repo, int(number), exact_sha)
+        if not re.fullmatch(r"[a-z0-9_-]+(?:,[a-z0-9_-]+)*", authors):
+            blocked("REVIEW_PROVENANCE_BLOCKED")
+            return
+        verify_provenance(repo, int(number), exact_sha, authors)
         if subprocess.check_output(
             ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
         ).decode().strip() != exact_sha:
