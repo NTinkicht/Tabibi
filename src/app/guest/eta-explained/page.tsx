@@ -53,6 +53,10 @@ const COPY: Record<Locale, Copy> = {
   },
 };
 
+/**
+ * Explain bilingual queue estimates and the limits of last-verified timestamps
+ * without accepting or rendering any guest bearer or patient identifiers.
+ */
 export default async function GuestEtaExplainedPage({
   searchParams,
 }: {
