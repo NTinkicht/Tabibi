@@ -68,6 +68,27 @@ The example authors are placeholders: identify the actual material actors on the
 
 The separate coding/CI-repair adapter remains default OFF until a later reviewed WU implements scoped sole-implementer leases, restricted file ownership, parent-only commits/pushes, test/CI evidence and another actor's non-author gate. Do not represent this read-only review enhancement as the write adapter.
 
+## Default-off bounded coding adapter
+
+After the exact-head review lane has been independently proven, a separate workflow may be used for one explicitly leased coding proof: `.github/workflows/mistral-vibe-code.yml`. It is **disabled by default** and must not run unless the repository variable `TABIBI_MISTRAL_CODE_ADAPTER_ENABLED=true` is deliberately set while the PAYG-disabled guard remains true.
+
+A coding dispatch is owner-only on Issue #11 and uses one exact marker plus one copy of each field:
+
+```text
+@mistral-vibe
+MISTRAL_CODE_LEASE_V1
+pr: <existing canonical open PR>
+issue: <open bounded work item>
+branch: <same-repository canonical branch>
+base_sha: <exact current 40-hex PR head>
+allowed_paths: src/one-file.ts,tests/one-test.test.ts
+test_profile: unit
+```
+
+The model itself receives **no GitHub token and no mutation tools**. It can only read with `grep` and `read_file` and emit one bounded unified-diff envelope. A trusted parent validates the current canonical PR head, path allowlist, path/symlink safety, patch size, secret-like material, production+test coverage, deterministic fixed test profile, formatter/lint/typecheck/tests, and the remote head again immediately before any commit. Only the parent may commit and push, and every accepted model-authored commit must carry `Material-Author: mistral-vibe`. Normal non-force push semantics make a head drift fail closed.
+
+The adapter has no deploy or merge authority. Any stale SHA, unsupported test profile, path escape, patch envelope failure, secret-like text, missing production or deterministic test change, failed test, quota/auth failure or head drift means **no push**. Full three-job PR CI and a non-Mistral exact-head review remain mandatory before merge. Do not call Mistral coding operational until a real small non-security product/test work unit has passed this full proof.
+
 ## Review boundary
 
 A Vibe review can gate only when `mistral-vibe` did not author/materially modify the exact reviewed SHA, required CI is green, original evidence is inspected, and the verdict explicitly names the exact SHA. Use Tabibi severities and `PASS`, `PASS_WITH_MINOR_FINDINGS`, or `CHANGES_REQUIRED`.
