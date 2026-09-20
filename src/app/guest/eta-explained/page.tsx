@@ -8,6 +8,8 @@ type Copy = {
   queueBody: string;
   consultationHeading: string;
   consultationBody: string;
+  verificationHeading: string;
+  verificationBody: string;
   privacyHeading: string;
   privacyBody: string;
 };
@@ -24,6 +26,9 @@ const COPY: Record<Locale, Copy> = {
     consultationHeading: 'Consultation en cours',
     consultationBody:
       'Le temps restant est une approximation fondée sur l’état validé de votre consultation (durée attendue et temps déjà écoulé) au moment du calcul. La durée réelle dépend de la consultation.',
+    verificationHeading: 'Dernière vérification du statut',
+    verificationBody:
+      'Cette heure indique la dernière fois où Tabibi a réussi à vérifier votre statut auprès de la file sécurisée. Elle ne garantit pas que le statut est encore à jour ni une heure précise de passage. Si un avertissement de connexion ou de statut potentiellement obsolète apparaît, l’heure reste celle de la dernière vérification réussie jusqu’à une nouvelle actualisation confirmée.',
     privacyHeading: 'Votre vie privée',
     privacyBody:
       'Ces explications n’affichent ni identité d’un autre patient, ni motif de consultation, ni donnée clinique.',
@@ -39,6 +44,9 @@ const COPY: Record<Locale, Copy> = {
     consultationHeading: 'الاستشارة جارية',
     consultationBody:
       'الوقت المتبقي تقريب يعتمد على الحالة المعتمدة لاستشارتك (المدة المتوقعة والوقت المنقضي) وقت الحساب. المدة الفعلية تعتمد على الاستشارة نفسها.',
+    verificationHeading: 'آخر تحقق من الحالة',
+    verificationBody:
+      'يشير هذا الوقت إلى آخر مرة نجح فيها طبيبي في التحقق من حالتك عبر الطابور الآمن. لا يضمن أن الحالة لا تزال محدّثة ولا يحدد موعدًا مضمونًا للدخول. عند ظهور تنبيه بانقطاع الاتصال أو احتمال قِدم الحالة، يبقى وقت آخر تحقق ناجح كما هو حتى يكتمل تحديث جديد مؤكّد.',
     privacyHeading: 'خصوصيتك',
     privacyBody:
       'لا تعرض هذه التوضيحات هوية أي مريض آخر أو سبب الاستشارة أو أي بيانات سريرية.',
@@ -65,6 +73,10 @@ export default async function GuestEtaExplainedPage({
       <section aria-labelledby="consultation-estimate-heading">
         <h2 id="consultation-estimate-heading">{copy.consultationHeading}</h2>
         <p>{copy.consultationBody}</p>
+      </section>
+      <section aria-labelledby="verification-heading">
+        <h2 id="verification-heading">{copy.verificationHeading}</h2>
+        <p>{copy.verificationBody}</p>
       </section>
       <section aria-labelledby="privacy-heading">
         <h2 id="privacy-heading">{copy.privacyHeading}</h2>
