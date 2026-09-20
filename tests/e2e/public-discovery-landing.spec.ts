@@ -326,7 +326,9 @@ test('clinic search remains stable in Turkish browser locale', async ({
   }
 });
 
-test('clinic language and search compose without exposing IDs', async ({ page }) => {
+test('clinic language and search compose without exposing IDs', async ({
+  page,
+}) => {
   await mockDirectory(page, [
     {
       name: 'Clinique Étoile',
