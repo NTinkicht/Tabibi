@@ -162,9 +162,23 @@ def main():
             if not ci_green(repo, exact_sha):
                 blocked("CI_NOT_GREEN")
                 return
+            # The reviewed diff must come from the already-pinned local
+            # exact head, not a second live gh pr diff request (TOCTOU).
+            base_sha = read_current_pr(repo, int(number), exact_sha)[
+                "base"
+            ]["sha"]
+            if not SHA.fullmatch(base_sha):
+                blocked("REVIEW_TARGET_BLOCKED")
+                return
+            subprocess.check_call(
+                ["git", "fetch", "--no-tags", "--depth=1", "origin", base_sha],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=40,
+            )
             diff = subprocess.check_output(
-                ["gh", "pr", "diff", number, "--repo", repo],
-                stderr=subprocess.DEVNULL, timeout=35
+                ["git", "diff", "--no-ext-diff", "--binary",
+                 base_sha, exact_sha, "--"],
+                stderr=subprocess.DEVNULL, timeout=35,
             )
             if not diff.startswith(b"diff --git ") or len(diff) > DIFF_LIMIT_BYTES:
                 blocked("REVIEW_DIFF_UNAVAILABLE_OR_TOO_LARGE")
