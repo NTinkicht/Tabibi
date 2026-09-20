@@ -605,3 +605,119 @@ test('Arabic sorting stays selected after locale switch and refresh', async ({
     page.getByRole('combobox', { name: 'Trier les cliniques par nom' }),
   ).toHaveValue('ascending');
 });
+
+test('listed-doctors filter composes with search, clinic language and sorting', async ({
+  page,
+}) => {
+  await mockDirectory(page, [
+    {
+      name: 'Clinique Zulu',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'Dr. Aya' }],
+    },
+    {
+      name: 'Clinique Beta',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr'],
+      doctors: [],
+    },
+    {
+      name: 'Clinique Alpha',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr', 'ar'],
+      tenantKey: 'private-listed-tenant',
+      doctors: [{ displayName: 'Dr. Amine', id: 'private-listed-doctor' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+
+  const listed = page.getByRole('checkbox', {
+    name: 'Cliniques avec médecins affichés uniquement',
+  });
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  const language = page.getByRole('combobox', {
+    name: 'Langue proposée par la clinique',
+  });
+  const sort = page.getByRole('combobox', {
+    name: 'Trier les cliniques par nom',
+  });
+  const names = page.locator('.publicClinic h3');
+
+  await listed.check();
+  await expect(names).toHaveText(['Clinique Zulu', 'Clinique Alpha']);
+  await expect(page.getByText('2 cliniques trouvées.')).toBeVisible();
+  await sort.selectOption('ascending');
+  await expect(names).toHaveText(['Clinique Alpha', 'Clinique Zulu']);
+  await search.fill('amine');
+  await language.selectOption('ar');
+  await expect(names).toHaveText(['Clinique Alpha']);
+  await search.fill('introuvable');
+  await expect(
+    page.getByText('Aucune clinique ne correspond aux filtres sélectionnés.'),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Effacer tous les filtres' }).click();
+  await expect(listed).not.toBeChecked();
+  await expect(search).toHaveValue('');
+  await expect(search).toBeFocused();
+  await expect(language).toHaveValue('all');
+  await expect(sort).toHaveValue('ascending');
+  await expect(names).toHaveText([
+    'Clinique Alpha',
+    'Clinique Beta',
+    'Clinique Zulu',
+  ]);
+  const body = await page.locator('main').innerText();
+  expect(body).not.toContain('private-listed-tenant');
+  expect(body).not.toContain('private-listed-doctor');
+});
+
+test('Arabic listed-doctors filter survives refresh and locale changes', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDirectory(page, [
+    {
+      name: 'عيادة الأمل',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [],
+    },
+    {
+      name: 'عيادة الورد',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'د. نورة' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  const listed = page.getByRole('checkbox', {
+    name: 'العيادات التي تعرض أطباء فقط',
+  });
+  await listed.check();
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.locator('.publicClinic h3')).toHaveText(['عيادة الورد']);
+  await expect(page.getByText('نتائج البحث: 1 عيادة.')).toBeVisible();
+  await page.getByRole('button', { name: 'تحديث' }).click();
+  await expect(listed).toBeChecked();
+  await expect(page.locator('.publicClinic h3')).toHaveText(['عيادة الورد']);
+  await page.getByRole('button', { name: 'Français' }).click();
+  await expect(
+    page.getByRole('checkbox', {
+      name: 'Cliniques avec médecins affichés uniquement',
+    }),
+  ).toBeChecked();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  await page.getByRole('button', { name: 'مسح جميع عوامل التصفية' }).click();
+  await expect(listed).not.toBeChecked();
+  await expect(page.locator('.publicClinic h3')).toHaveText([
+    'عيادة الأمل',
+    'عيادة الورد',
+  ]);
+});
