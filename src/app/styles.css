@@ -588,6 +588,22 @@ h1 {
   padding-inline: 1rem;
   cursor: pointer;
 }
+.publicDoctorFilter {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+.publicSearch input[type='checkbox'] {
+  flex: 0 0 auto;
+  width: 1.3rem;
+  min-width: 1.3rem;
+  min-height: 1.3rem;
+  height: 1.3rem;
+  accent-color: #0a6f61;
+}
+
 .publicSearch input:focus-visible,
 .publicSearch select:focus-visible,
 .publicSearch button:focus-visible {
