@@ -51,6 +51,22 @@ test('guest status renders provisional waiting state without leaking bearer mate
   await expect(page.getByText('G-018')).toBeVisible();
   await expect(page.getByText(/Expected arrival window:/)).toBeVisible();
   await expect(page.getByText(/Declared clinic delay:/)).toBeVisible();
+  const explainer = page.getByRole('link', {
+    name: 'Why estimates can change',
+  });
+  await expect(explainer).toHaveAttribute(
+    'href',
+    '/guest/eta-explained?lang=fr',
+  );
+  await expect(explainer).toHaveAttribute('target', '_blank');
+  await expect(explainer).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(explainer).toHaveAttribute(
+    'aria-describedby',
+    'tabibi-guest-status-eta-explainer-hint',
+  );
+  await expect(
+    page.locator('#tabibi-guest-status-eta-explainer-hint'),
+  ).toHaveText('(opens in a new tab)');
   expect(statusRequestCookie).toContain(`__Host-tabibi_guest=${rawBearer}`);
   expect(await page.locator('body').innerText()).not.toContain(rawBearer);
   expect(page.url()).not.toContain(rawBearer);
@@ -102,6 +118,9 @@ test('guest status stops on terminal response', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: 'Visit status' }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Why estimates can change' }),
+  ).toHaveCount(0);
   await page.waitForTimeout(500);
   expect(requests).toBe(1);
 });
@@ -196,6 +215,14 @@ test('guest status selects French copy from browser locale', async ({
   await page.goto('/guest/status');
   await expect(page.getByText('Patients avant vous : 2')).toBeVisible();
   await expect(page.locator('section[lang="fr"][dir="ltr"]')).toBeVisible();
+  const explainer = page.getByRole('link', {
+    name: 'Pourquoi ces estimations changent',
+  });
+  await expect(explainer).toHaveAttribute(
+    'href',
+    '/guest/eta-explained?lang=fr',
+  );
+  await expect(explainer).toHaveAttribute('rel', 'noopener noreferrer');
 });
 
 test('guest status selects Arabic RTL copy from browser locale', async ({
@@ -215,6 +242,18 @@ test('guest status selects Arabic RTL copy from browser locale', async ({
   await page.goto('/guest/status');
   await expect(page.getByText('المرضى قبلك: 2')).toBeVisible();
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
+  const explainer = page.getByRole('link', {
+    name: 'لماذا تتغير هذه التقديرات',
+  });
+  await expect(explainer).toHaveAttribute(
+    'href',
+    '/guest/eta-explained?lang=ar',
+  );
+  await expect(explainer).toHaveAttribute('target', '_blank');
+  await expect(explainer).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(
+    page.locator('#tabibi-guest-status-eta-explainer-hint'),
+  ).toHaveText('(يُفتح في علامة تبويب جديدة)');
 });
 
 test('guest status formats arrival times in the clinic timezone', async ({

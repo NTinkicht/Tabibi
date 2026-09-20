@@ -43,3 +43,16 @@ test('provides equivalent accessible Arabic RTL guidance', async ({ page }) => {
   await expect(page.getByText(/الحالة المعتمدة لاستشارتك/)).toBeVisible();
   await expect(page.getByText(/هوية أي مريض آخر/)).toBeVisible();
 });
+
+test('preserves explicit language switching and defaults unexpected lang to French', async ({
+  page,
+}) => {
+  await page.goto('/guest/eta-explained?lang=unexpected');
+  await expect(page.locator('main[lang="fr"][dir="ltr"]')).toBeVisible();
+  await page.getByRole('link', { name: 'العربية' }).click();
+  await expect(page).toHaveURL(/\/guest\/eta-explained\?lang=ar$/);
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await page.getByRole('link', { name: 'Français' }).click();
+  await expect(page).toHaveURL(/\/guest\/eta-explained\?lang=fr$/);
+  await expect(page.locator('main[lang="fr"][dir="ltr"]')).toBeVisible();
+});

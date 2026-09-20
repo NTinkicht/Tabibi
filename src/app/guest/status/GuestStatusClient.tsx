@@ -60,6 +60,8 @@ type Copy = {
   sessionState: string;
   minute: string;
   updated: string;
+  estimateExplainerLink: string;
+  estimateExplainerNewTab: string;
   queueStates: Record<string, string>;
   sessionStates: Record<string, string>;
   terminalStates: Record<string, string>;
@@ -85,6 +87,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     sessionState: 'Clinic session:',
     minute: 'min',
     updated: 'Updated',
+    estimateExplainerLink: 'Why estimates can change',
+    estimateExplainerNewTab: 'opens in a new tab',
     queueStates: {
       waiting: 'waiting',
       checked_in: 'checked in',
@@ -122,6 +126,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     sessionState: 'Session de la clinique :',
     minute: 'min',
     updated: 'Mis à jour',
+    estimateExplainerLink: 'Pourquoi ces estimations changent',
+    estimateExplainerNewTab: 's’ouvre dans un nouvel onglet',
     queueStates: {
       waiting: 'en attente',
       checked_in: 'enregistré',
@@ -157,6 +163,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     sessionState: 'جلسة العيادة:',
     minute: 'دقيقة',
     updated: 'آخر تحديث',
+    estimateExplainerLink: 'لماذا تتغير هذه التقديرات',
+    estimateExplainerNewTab: 'يُفتح في علامة تبويب جديدة',
     queueStates: {
       waiting: 'في الانتظار',
       checked_in: 'تم تسجيل الوصول',
@@ -458,6 +466,19 @@ export function GuestStatusClient() {
           {snapshot.session.declaredDelayMinutes} {copy.minute}
         </p>
       ) : null}
+      <p>
+        <a
+          href={`/guest/eta-explained?lang=${locale === 'ar' ? 'ar' : 'fr'}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-describedby="tabibi-guest-status-eta-explainer-hint"
+        >
+          {copy.estimateExplainerLink}
+        </a>{' '}
+        <small id="tabibi-guest-status-eta-explainer-hint">
+          ({copy.estimateExplainerNewTab})
+        </small>
+      </p>
       <p>
         <small>
           {copy.updated}{' '}

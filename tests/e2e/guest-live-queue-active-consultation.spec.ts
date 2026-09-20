@@ -89,9 +89,21 @@ test('renders the remaining consultation time as its own status, distinct from t
   // inside it.
   await expect(page.getByText('Temps d’attente estimé')).toBeVisible();
   // Both status regions independently surface the explainer link.
+  const explainers = page.getByRole('link', {
+    name: 'Pourquoi ces estimations changent',
+  });
+  await expect(explainers).toHaveCount(2);
+  for (const explainer of await explainers.all()) {
+    await expect(explainer).toHaveAttribute(
+      'href',
+      '/guest/eta-explained?lang=fr',
+    );
+    await expect(explainer).toHaveAttribute('target', '_blank');
+    await expect(explainer).toHaveAttribute('rel', 'noopener noreferrer');
+  }
   await expect(
-    page.getByRole('link', { name: 'Pourquoi ces estimations changent' }),
-  ).toHaveCount(2);
+    page.locator('#tabibi-consultation-eta-explainer-hint'),
+  ).toHaveText('(s’ouvre dans un nouvel onglet)');
 });
 
 test('uses singular wording for exactly one minute remaining', async ({
@@ -195,9 +207,22 @@ test('Arabic renders the active-consultation status with RTL parity', async ({
   await expect(
     page.getByText('الوقت المتبقي المقدر: حوالي 6 دقائق'),
   ).toBeVisible();
+  const explainer = page.getByRole('link', {
+    name: 'لماذا تتغير هذه التقديرات',
+  });
+  await expect(explainer).toHaveAttribute(
+    'href',
+    '/guest/eta-explained?lang=ar',
+  );
+  await expect(explainer).toHaveAttribute('target', '_blank');
+  await expect(explainer).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(explainer).toHaveAttribute(
+    'aria-describedby',
+    'tabibi-consultation-eta-explainer-hint',
+  );
   await expect(
-    page.getByRole('link', { name: 'لماذا تتغير هذه التقديرات' }),
-  ).toHaveAttribute('href', '/guest/eta-explained?lang=ar');
+    page.locator('#tabibi-consultation-eta-explainer-hint'),
+  ).toHaveText('(يُفتح في علامة تبويب جديدة)');
 });
 
 test('Arabic uses the dedicated singular and dual noun forms for 1 and 2 minutes', async ({
