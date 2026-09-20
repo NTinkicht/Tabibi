@@ -1,7 +1,8 @@
 name: WU97 temporary formatter diagnostic
 on:
-  push:
-    branches: [chatgpt/wu97-public-clinic-language-filter]
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
 permissions:
   contents: read
 jobs:
