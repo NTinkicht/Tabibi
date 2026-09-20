@@ -38,9 +38,11 @@ const named = (name: string) => {
 describe('Mistral scoped coding adapter is default-off and parent-controlled', () => {
   it('parses owner-only issue trigger and explicit activation guard', () => {
     expect(parsed.on.issue_comment.types).toEqual(['created']);
-    expect(parsed.jobs['mistral-code'].if).toContain("github.actor == 'NTinkicht'");
     expect(parsed.jobs['mistral-code'].if).toContain(
-      "github.event.issue.number == 11",
+      "github.actor == 'NTinkicht'",
+    );
+    expect(parsed.jobs['mistral-code'].if).toContain(
+      'github.event.issue.number == 11',
     );
     const gate = named('Validate owner lease and default-OFF guards');
     expect(gate.env?.ADAPTER_ENABLED).toContain(
@@ -57,11 +59,15 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     expect(parsed.permissions.contents).toBe('write');
     expect(parsed.permissions.issues).toBe('write');
     expect(parsed.permissions['pull-requests']).toBe('read');
-    const model = named('Request a bounded NON-mutating code proposal from Mistral');
+    const model = named(
+      'Request a bounded NON-mutating code proposal from Mistral',
+    );
     expect(model.env).not.toHaveProperty('GH_TOKEN');
     expect(model.env?.MISTRAL_API_KEY).toContain('secrets.MISTRAL_API_KEY');
     expect(model.run).toContain('--agent plan');
-    expect(model.run).toContain('--enabled-tools grep --enabled-tools read_file');
+    expect(model.run).toContain(
+      '--enabled-tools grep --enabled-tools read_file',
+    );
     expect(model.run).toContain('--max-turns 3');
     expect(model.run).not.toContain('--yolo');
     expect(model.run).not.toContain('--auto-approve');
@@ -102,9 +108,13 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
   });
 
   it('runs parent verifier synthetic attack and fail-closed selftests', () => {
-    const process = spawnSync('python3', ['scripts/mistral-code-adapter.py', 'selftest'], {
-      encoding: 'utf8',
-    });
+    const process = spawnSync(
+      'python3',
+      ['scripts/mistral-code-adapter.py', 'selftest'],
+      {
+        encoding: 'utf8',
+      },
+    );
     expect(process.status).toBe(0);
     expect(process.stdout).toContain('selftest passed');
     const parent = fs.readFileSync('scripts/mistral-code-adapter.py', 'utf8');
