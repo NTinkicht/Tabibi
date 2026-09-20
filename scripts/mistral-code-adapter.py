@@ -100,6 +100,57 @@ def pr_current(repo, number, sha):
     return branch
 
 
+LEASE_EVENTS = frozenset({
+    "ROLE_LEASE_ASSIGNED", "ROLE_LEASE_RELEASED", "ROLE_LEASE_REPLACED",
+    "ROLE_FAILOVER", "ROLE_LEASE_CANCELLED",
+})
+LEASE_EVENT_LINE = re.compile(r"(?m)^(ROLE_LEASE_[A-Z_]+|ROLE_FAILOVER)[ \\t]*$")
+
+
+def replay_owner_lease(comments, number, sha, stream):
+    """Replay only exact owner event lines; mentions in prose cannot grant a lease."""
+    active = None
+    for comment in sorted(comments, key=lambda c: c.get("id") or 0):
+        if comment.get("user", {}).get("login") != "NTinkicht":
+            continue
+        body = comment.get("body") or ""
+        markers = LEASE_EVENT_LINE.findall(body)
+        if not markers:
+            continue
+        if len(markers) != 1 or markers[0] not in LEASE_EVENTS:
+            raise ValueError("Mixed or unsupported owner lease event")
+        event = markers[0]
+        if event == "ROLE_LEASE_ASSIGNED":
+            if active is not None:
+                raise ValueError("Overlapping active implementation leases")
+            f = fields(body)
+            if (
+                f.get("actor") is None or f.get("capability") != "implementation"
+                or f.get("pr", "").removeprefix("#") != str(number)
+                or not SHA.fullmatch(f.get("exact_sha", ""))
+                or not re.fullmatch(r"WU[0-9]{1,5}", f.get("stream", ""))
+            ):
+                raise ValueError("Invalid sole-implementer assignment")
+            active = (comment.get("id"), f)
+        else:
+            if active is None:
+                raise ValueError("Lease released or replaced without active lease")
+            # A release is terminal for the current actor; replacement/failover
+            # also requires a later explicit new ROLE_LEASE_ASSIGNED event.
+            active = None
+    if active is None:
+        raise ValueError("No active owner implementation assignment")
+    lease_id, f = active
+    if (
+        f.get("actor") != "mistral-vibe"
+        or f.get("pr", "").removeprefix("#") != str(number)
+        or f.get("exact_sha") != sha
+        or f.get("stream") != stream
+    ):
+        raise ValueError("Active implementation lease is not for Mistral/current SHA")
+    return lease_id
+
+
 def active_owner_lease(repo, number, sha, stream):
     comments = []
     for page in range(1, 11):
@@ -111,32 +162,7 @@ def active_owner_lease(repo, number, sha, stream):
             break
     else:
         raise ValueError("Lease comment history exceeds safety bound")
-    # Only one active implementation actor on the canonical PR, and the
-    # latest owner lease must be an explicit Mistral assignment for this SHA.
-    owner = [c for c in comments if c.get("user", {}).get("login") == "NTinkicht"]
-    events = [
-        c for c in owner
-        if any(m in c.get("body", "") for m in (
-            "ROLE_LEASE_ASSIGNED", "ROLE_LEASE_RELEASED",
-            "ROLE_LEASE_REPLACED", "ROLE_FAILOVER",
-            "ROLE_LEASE_CANCELLED",
-        ))
-    ]
-    if not events:
-        raise ValueError("No owner-authorized implementation lease")
-    latest = max(events, key=lambda c: c.get("id") or 0)
-    body = latest.get("body", "")
-    if "ROLE_LEASE_ASSIGNED" not in body:
-        raise ValueError("Lease no longer active")
-    f = fields(body)
-    if (
-        f.get("actor") != "mistral-vibe" or f.get("capability") != "implementation"
-        or f.get("pr", "").removeprefix("#") != str(number)
-        or f.get("exact_sha") != sha
-        or f.get("stream") != stream
-    ):
-        raise ValueError("Lease belongs to another actor, SHA or work unit")
-    return latest.get("id")
+    return replay_owner_lease(comments, number, sha, stream)
 
 
 def parse_patch(text, allowed):
@@ -265,6 +291,31 @@ def main():
                 pass
             else:
                 raise AssertionError("Symlink attack accepted")
+        assigned = {
+            "id": 10, "user": {"login": "NTinkicht"},
+            "body": (f"ROLE_LEASE_ASSIGNED\\nactor: mistral-vibe\\n"
+                     f"capability: implementation\\npr: #2\\nexact_sha: {sha}\\n"
+                     "stream: WU101"),
+        }
+        assert replay_owner_lease([assigned], 2, sha, "WU101") == 10
+        release = {
+            "id": 11, "user": {"login": "NTinkicht"},
+            "body": ("ROLE_LEASE_RELEASED\\n"
+                     "reason: releasing prior ROLE_LEASE_ASSIGNED actor"),
+        }
+        for history in ([assigned, release], [assigned, dict(assigned, id=11)],
+                        [assigned, {"id": 11, "user": {"login": "NTinkicht"},
+                                    "body": "ROLE_LEASE_CANCELLED\\nROLE_LEASE_ASSIGNED"}]):
+            try:
+                replay_owner_lease(history, 2, sha, "WU101")
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("Inactive, duplicate or mixed lease accepted")
+        new_assignment = dict(assigned, id=12)
+        assert replay_owner_lease(
+            [assigned, release, new_assignment], 2, sha, "WU101"
+        ) == 12
         print("Mistral trusted implementation-adapter selftest passed")
         return
 
