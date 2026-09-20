@@ -774,8 +774,6 @@ function LiveQueueView({
 
     const scheduleNext = (delay: number) => {
       clearScheduled();
-      clearStreamRetry();
-      streamController?.abort();
       timeoutId = setTimeout(() => void poll(), delay);
     };
 
@@ -794,6 +792,8 @@ function LiveQueueView({
       currentBearer = null;
       initialBearerRef.current = undefined;
       clearScheduled();
+      clearStreamRetry();
+      streamController?.abort();
       if (!cancelled) setState({ kind: 'terminal', data });
     };
 
