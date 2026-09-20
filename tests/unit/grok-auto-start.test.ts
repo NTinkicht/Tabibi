@@ -82,15 +82,21 @@ describe('SaveGrok automatic owner-Codespace startup', () => {
       fs.readFileSync(path.resolve('.vscode/tasks.json'), 'utf8'),
     ) as {
       tasks: Array<{
-        command: string;
-        args: string[];
+        type: string;
+        script: string;
         runOptions: { runOn: string; instanceLimit: number };
         presentation: { reveal: string };
       }>;
     };
     expect(tasks.tasks).toHaveLength(1);
-    expect(tasks.tasks[0].command).toBe('node');
-    expect(tasks.tasks[0].args).toEqual(['scripts/grok-auto-start.mjs']);
+    expect(tasks.tasks[0].type).toBe('npm');
+    expect(tasks.tasks[0].script).toBe('grok:watch');
+    const manifest = JSON.parse(
+      fs.readFileSync(path.resolve('package.json'), 'utf8'),
+    ) as { scripts: Record<string, string> };
+    expect(manifest.scripts['grok:watch']).toBe(
+      'node scripts/grok-auto-start.mjs',
+    );
     expect(tasks.tasks[0].runOptions).toMatchObject({
       runOn: 'folderOpen',
       instanceLimit: 1,

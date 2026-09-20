@@ -19,6 +19,7 @@
     "test:api": "vitest run --project api",
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test",
+    "grok:watch": "node scripts/grok-auto-start.mjs",
     "db:migrate": "tsx scripts/db/migrate.ts",
     "db:seed": "tsx scripts/db/seed.ts",
     "db:reset:test": "tsx scripts/db/reset-test.ts",
