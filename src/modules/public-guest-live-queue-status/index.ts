@@ -27,6 +27,7 @@ export interface PublicGuestLiveQueueEta {
 export interface PublicGuestLiveQueueStatusResult {
   bookingState: string;
   queueState: string;
+  pauseStatus: 'paused' | null;
   activeConsultationRemainingMinutes: number | null;
   eta: PublicGuestLiveQueueEta | null;
 }
@@ -44,6 +45,7 @@ type StatusRow = {
   revoked_at: Date | null;
   appointment_status: string;
   queue_state: string;
+  session_status: string;
   in_consultation_started_at: Date | null;
   service_position: string | null;
   declared_delay_minutes: number | null;
@@ -143,6 +145,7 @@ export class PublicGuestLiveQueueStatusService {
               credential.revoked_at,
               appointment.status::text AS appointment_status,
               entry.state::text AS queue_state,
+              session.status::text AS session_status,
               entry.in_consultation_started_at,
               ordered.service_position::text AS service_position,
               session.declared_delay_minutes,
@@ -189,8 +192,11 @@ export class PublicGuestLiveQueueStatusService {
       row.duration_samples ?? [],
       row.historical_duration_samples ?? [],
     );
+    const isTerminal = TERMINAL_BOOKING_STATES.has(row.appointment_status);
+    const isPaused = !isTerminal && row.session_status === 'paused';
     const activeConsultationRemainingMinutes =
-      !TERMINAL_BOOKING_STATES.has(row.appointment_status) &&
+      !isTerminal &&
+      !isPaused &&
       row.queue_state === 'in_consultation' &&
       row.in_consultation_started_at
         ? computeActiveConsultationRemainingMinutes({
@@ -203,6 +209,7 @@ export class PublicGuestLiveQueueStatusService {
     return {
       bookingState: row.appointment_status,
       queueState: row.queue_state,
+      pauseStatus: isPaused ? 'paused' : null,
       activeConsultationRemainingMinutes,
       eta: this.computeEta(row, estimate),
     };
@@ -214,6 +221,7 @@ export class PublicGuestLiveQueueStatusService {
   ): PublicGuestLiveQueueEta | null {
     if (
       TERMINAL_BOOKING_STATES.has(row.appointment_status) ||
+      row.session_status === 'paused' ||
       !LIVE_QUEUE_STATES.has(row.queue_state) ||
       !row.service_position
     )

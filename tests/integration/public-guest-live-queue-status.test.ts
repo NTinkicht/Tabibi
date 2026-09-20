@@ -204,6 +204,7 @@ describe('WU63 public guest live queue status', () => {
     await expect(service.get(booking.bearer)).resolves.toEqual({
       bookingState: 'confirmed',
       queueState: 'waiting',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -216,6 +217,7 @@ describe('WU63 public guest live queue status', () => {
     await expect(service.get(booking.bearer)).resolves.toEqual({
       bookingState: 'checked_in',
       queueState: 'checked_in',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 0,
@@ -242,6 +244,7 @@ describe('WU63 public guest live queue status', () => {
     await expect(service.get(first.bearer)).resolves.toEqual({
       bookingState: 'checked_in',
       queueState: 'checked_in',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 0,
@@ -255,6 +258,7 @@ describe('WU63 public guest live queue status', () => {
     await expect(service.get(second.bearer)).resolves.toEqual({
       bookingState: 'confirmed',
       queueState: 'waiting',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -279,12 +283,14 @@ describe('WU63 public guest live queue status', () => {
     await expect(service.get(source.bearer)).resolves.toEqual({
       bookingState: 'confirmed',
       queueState: 'waiting',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
     await expect(service.get(target.bearer)).resolves.toEqual({
       bookingState: 'confirmed',
       queueState: 'waiting',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -351,12 +357,14 @@ describe('WU63 public guest live queue status', () => {
     await expect(service.get(cancelled.bearer)).resolves.toEqual({
       bookingState: 'cancelled',
       queueState: 'cancelled',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
     await expect(service.get(cancelled.bearer)).resolves.toEqual({
       bookingState: 'cancelled',
       queueState: 'cancelled',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -372,6 +380,7 @@ describe('WU63 public guest live queue status', () => {
     await expect(service.get(noShow.bearer)).resolves.toEqual({
       bookingState: 'no_show',
       queueState: 'no_show',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -391,6 +400,7 @@ describe('WU63 public guest live queue status', () => {
     await expect(service.get(completed.bearer)).resolves.toEqual({
       bookingState: 'completed',
       queueState: 'completed',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -453,18 +463,21 @@ describe('WU63 public guest live queue status', () => {
       {
         bookingState: 'confirmed',
         queueState: 'waiting',
+        pauseStatus: null,
         activeConsultationRemainingMinutes: null,
         eta: null,
       },
       {
         bookingState: 'confirmed',
         queueState: 'waiting',
+        pauseStatus: null,
         activeConsultationRemainingMinutes: null,
         eta: null,
       },
       {
         bookingState: 'confirmed',
         queueState: 'waiting',
+        pauseStatus: null,
         activeConsultationRemainingMinutes: null,
         eta: null,
       },
@@ -489,6 +502,7 @@ describe('WU63 public guest live queue status', () => {
     expect(body).toEqual({
       bookingState: 'confirmed',
       queueState: 'waiting',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: null,
     });
@@ -582,6 +596,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     await expect(service.get(booking.bearer)).resolves.toEqual({
       bookingState: 'checked_in',
       queueState: 'checked_in',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 0,
@@ -619,6 +634,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     await expect(service.get(booking.bearer)).resolves.toEqual({
       bookingState: 'checked_in',
       queueState: 'checked_in',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 1,
@@ -660,6 +676,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     await expect(service.get(booking.bearer)).resolves.toEqual({
       bookingState: 'checked_in',
       queueState: 'checked_in',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 1,
@@ -704,6 +721,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     await expect(service.get(booking.bearer)).resolves.toEqual({
       bookingState: 'checked_in',
       queueState: 'checked_in',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 1,
@@ -733,6 +751,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     await expect(service.get(booking.bearer)).resolves.toEqual({
       bookingState: 'checked_in',
       queueState: 'checked_in',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 2,
@@ -760,6 +779,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     await expect(service.get(booking.bearer)).resolves.toEqual({
       bookingState: 'checked_in',
       queueState: 'called',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 0,
@@ -789,6 +809,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     await expect(service.get(first.bearer)).resolves.toEqual({
       bookingState: 'checked_in',
       queueState: 'checked_in',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 0,
@@ -802,6 +823,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     await expect(service.get(second.bearer)).resolves.toEqual({
       bookingState: 'checked_in',
       queueState: 'checked_in',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 1,
@@ -831,6 +853,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     expect(body).toEqual({
       bookingState: 'checked_in',
       queueState: 'checked_in',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 0,
@@ -887,6 +910,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     const baseline = {
       bookingState: 'checked_in',
       queueState: 'checked_in',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 1,
@@ -972,6 +996,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     await expect(service.get(booking.bearer)).resolves.toEqual({
       bookingState: 'checked_in',
       queueState: 'checked_in',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
       eta: {
         patientsAhead: 2,
@@ -1000,6 +1025,7 @@ describe('WU88 guest active-consultation remaining time', () => {
     const service = new PublicGuestLiveQueueStatusService(pool, () => now);
     await expect(service.get(booking.bearer)).resolves.toMatchObject({
       queueState: 'called',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
     });
 
@@ -1012,6 +1038,7 @@ describe('WU88 guest active-consultation remaining time', () => {
     await expect(service.get(booking.bearer)).resolves.toMatchObject({
       bookingState: 'checked_in',
       queueState: 'in_consultation',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: 10,
     });
   });
@@ -1036,6 +1063,7 @@ describe('WU88 guest active-consultation remaining time', () => {
     const service = new PublicGuestLiveQueueStatusService(pool, () => now);
     await expect(service.get(booking.bearer)).resolves.toMatchObject({
       bookingState: 'completed',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
     });
   });
@@ -1065,6 +1093,7 @@ describe('WU88 guest active-consultation remaining time', () => {
     const service = new PublicGuestLiveQueueStatusService(pool, () => now);
     await expect(service.get(booking.bearer)).resolves.toMatchObject({
       queueState: 'in_consultation',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: null,
     });
   });
@@ -1089,6 +1118,7 @@ describe('WU88 guest active-consultation remaining time', () => {
     const service = new PublicGuestLiveQueueStatusService(pool, () => now);
     await expect(service.get(booking.bearer)).resolves.toMatchObject({
       queueState: 'in_consultation',
+      pauseStatus: null,
       activeConsultationRemainingMinutes: 0,
     });
   });
@@ -1116,5 +1146,96 @@ describe('WU88 guest active-consultation remaining time', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.activeConsultationRemainingMinutes).toBe(10);
+  });
+});
+
+describe('WU92 guest-safe session pause status', () => {
+  it('suppresses ETA while paused, restores it after resume, and isolates unrelated sessions', async () => {
+    const target = await createBooking('9201');
+    const unrelated = await createBooking('9202');
+    await openSession(target);
+    await openSession(unrelated);
+    await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
+      target.bearer,
+      'wu92-status-9201',
+    );
+    await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
+      unrelated.bearer,
+      'wu92-status-9202',
+    );
+    const service = new PublicGuestLiveQueueStatusService(pool, () => now);
+
+    await expect(service.get(target.bearer)).resolves.toMatchObject({
+      pauseStatus: null,
+      eta: { patientsAhead: 0 },
+    });
+
+    await pool.query(
+      `UPDATE consultation_sessions SET status='paused' WHERE id=$1 AND clinic_id=$2`,
+      [target.sessionId, target.clinicId],
+    );
+    await expect(service.get(target.bearer)).resolves.toMatchObject({
+      bookingState: 'checked_in',
+      queueState: 'checked_in',
+      pauseStatus: 'paused',
+      activeConsultationRemainingMinutes: null,
+      eta: null,
+    });
+    await expect(service.get(unrelated.bearer)).resolves.toMatchObject({
+      pauseStatus: null,
+      eta: { patientsAhead: 0 },
+    });
+
+    const pausedResponse = await GET(
+      new Request('http://localhost/api/public/bookings/live-queue-status', {
+        headers: { authorization: `Bearer ${target.bearer}` },
+      }),
+    );
+    expect(pausedResponse.status).toBe(200);
+    expect(pausedResponse.headers.get('cache-control')).toBe('no-store');
+    expect(pausedResponse.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(await pausedResponse.json()).toEqual({
+      bookingState: 'checked_in',
+      queueState: 'checked_in',
+      pauseStatus: 'paused',
+      activeConsultationRemainingMinutes: null,
+      eta: null,
+    });
+
+    await pool.query(
+      `UPDATE consultation_sessions SET status='open' WHERE id=$1 AND clinic_id=$2`,
+      [target.sessionId, target.clinicId],
+    );
+    await expect(service.get(target.bearer)).resolves.toMatchObject({
+      pauseStatus: null,
+      eta: { patientsAhead: 0 },
+    });
+  });
+
+  it('suppresses the pause projection for terminal bookings', async () => {
+    const booking = await createBooking('9203');
+    await openSession(booking);
+    await pool.query(
+      `UPDATE consultation_sessions SET status='paused' WHERE id=$1 AND clinic_id=$2`,
+      [booking.sessionId, booking.clinicId],
+    );
+    await pool.query(`UPDATE appointments SET status='cancelled' WHERE id=$1`, [
+      booking.appointmentId,
+    ]);
+    await pool.query(`UPDATE queue_entries SET state='cancelled' WHERE id=$1`, [
+      booking.queueEntryId,
+    ]);
+
+    await expect(
+      new PublicGuestLiveQueueStatusService(pool, () => now).get(
+        booking.bearer,
+      ),
+    ).resolves.toEqual({
+      bookingState: 'cancelled',
+      queueState: 'cancelled',
+      pauseStatus: null,
+      activeConsultationRemainingMinutes: null,
+      eta: null,
+    });
   });
 });

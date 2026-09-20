@@ -42,6 +42,7 @@ export async function GET(request: Request): Promise<Response> {
         body: {
           bookingState: result.bookingState,
           queueState: result.queueState,
+          pauseStatus: result.pauseStatus,
           activeConsultationRemainingMinutes:
             result.activeConsultationRemainingMinutes,
           eta: result.eta

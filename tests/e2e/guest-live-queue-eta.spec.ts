@@ -385,3 +385,95 @@ test('a stale in-flight poll response cannot regress a previously shown ETA', as
   ).toBeVisible();
   await expect(page.getByText(/en attente/)).toHaveCount(0);
 });
+
+test('French renders pause instead of ETA, preserves it across a stale regression, and restores ETA on resume', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let attempt = 0;
+  await page.route(STATUS_URL, async (route) => {
+    attempt += 1;
+    const body =
+      attempt === 1
+        ? {
+            bookingState: 'checked_in',
+            queueState: 'checked_in',
+            pauseStatus: 'paused',
+            activeConsultationRemainingMinutes: null,
+            eta: null,
+          }
+        : attempt === 2
+          ? {
+              bookingState: 'confirmed',
+              queueState: 'waiting',
+              pauseStatus: null,
+              activeConsultationRemainingMinutes: null,
+              eta: null,
+            }
+          : {
+              bookingState: 'checked_in',
+              queueState: 'checked_in',
+              pauseStatus: null,
+              activeConsultationRemainingMinutes: null,
+              eta: {
+                patientsAhead: 1,
+                minWaitMinutes: 5,
+                maxWaitMinutes: 10,
+                estimateSource: 'fallback',
+              },
+            };
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  await expect(page.getByText('File temporairement en pause')).toBeVisible();
+  await expect(page.getByText('Temps d’attente estimé')).toHaveCount(0);
+
+  await page.clock.fastForward(30_000);
+  await expect(page.getByText('File temporairement en pause')).toBeVisible();
+  await expect(page.getByText(/en attente/)).toHaveCount(0);
+
+  await page.clock.fastForward(30_000);
+  await expect(page.getByText('Environ 5–10 min')).toBeVisible();
+  await expect(page.getByText('File temporairement en pause')).toHaveCount(0);
+});
+
+test('Arabic renders an accessible RTL pause status without false precision', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'language', { get: () => 'ar-DZ' });
+  });
+  await mockBooking(page);
+  await page.route(STATUS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'checked_in',
+        queueState: 'in_consultation',
+        pauseStatus: 'paused',
+        activeConsultationRemainingMinutes: null,
+        eta: null,
+      }),
+    });
+  });
+
+  await submitBookingForm(page);
+  const shell = page.locator('section[lang="ar"][dir="rtl"]');
+  await expect(shell).toBeVisible();
+  await expect(
+    shell.getByRole('status').filter({
+      has: page.getByRole('heading', {
+        name: 'قائمة الانتظار متوقفة مؤقتًا',
+      }),
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('وقت الانتظار المقدر')).toHaveCount(0);
+  await expect(page.getByText('الاستشارة جارية الآن')).toHaveCount(0);
+});
