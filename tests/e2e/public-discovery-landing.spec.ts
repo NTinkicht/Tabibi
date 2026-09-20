@@ -253,6 +253,7 @@ test('filters public clinic and doctor names without leaking private IDs', async
   ).toBeVisible();
   await page.getByRole('button', { name: 'Effacer la recherche' }).click();
   await expect(search).toHaveValue('');
+  await expect(search).toBeFocused();
   await expect(page.locator('.publicClinic')).toHaveCount(2);
   const body = await page.locator('main').innerText();
   expect(body).not.toContain('private-clinic-id');
