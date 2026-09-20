@@ -35,7 +35,9 @@ describe('SaveGrok cloud lease bridge', () => {
     expect(workflow).toContain('ROLE_LEASE_RELEASED');
     expect(workflow).toContain('ROLE_FAILOVER');
     expect(workflow).toContain('ROLE_LEASE_ASSIGNED');
-    expect(workflow).toContain("source_id = int(os.environ['LEASE_COMMENT_ID'])");
+    expect(workflow).toContain(
+      "source_id = int(os.environ['LEASE_COMMENT_ID'])",
+    );
     expect(workflow).toContain('for page in range(1, 21)');
     expect(workflow).toContain("run.get('run_attempt')");
     expect(workflow).toContain("latest.get('status') != 'completed'");
