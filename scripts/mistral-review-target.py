@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import tempfile
 import subprocess
 import sys
 
@@ -84,23 +85,43 @@ def ci_green(repo, exact_sha):
     runs = github_json(
         f"repos/{repo}/actions/runs?head_sha={exact_sha}&event=pull_request&per_page=30"
     ).get("workflow_runs", [])
-    for run in runs:
-        if (
-            run.get("name") != "CI"
-            or run.get("head_sha") != exact_sha
-            or run.get("status") != "completed"
-            or run.get("conclusion") != "success"
-        ):
-            continue
-        jobs = github_json(
-            f"repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100"
-        ).get("jobs", [])
-        successful = {
-            job.get("name") for job in jobs if job.get("conclusion") == "success"
-        }
-        if REQUIRED_JOBS.issubset(successful):
-            return True
-    return False
+    # A newer attempt/failure must never be masked by an older successful
+    # run for the very same head (including explicit Actions reruns).
+    relevant = [
+        run for run in runs
+        if run.get("name") == "CI" and run.get("head_sha") == exact_sha
+        and run.get("event") == "pull_request"
+    ]
+    if not relevant:
+        return False
+    latest = max(
+        relevant,
+        key=lambda run: (
+            run.get("run_number") or 0,
+            run.get("run_attempt") or 0,
+            run.get("id") or 0,
+        ),
+    )
+    if latest.get("status") != "completed" or latest.get("conclusion") != "success":
+        return False
+    jobs = github_json(
+        f"repos/{repo}/actions/runs/{latest['id']}/jobs?filter=latest&per_page=100"
+    ).get("jobs", [])
+    successful = {
+        job.get("name") for job in jobs if job.get("conclusion") == "success"
+    }
+    return REQUIRED_JOBS.issubset(successful)
+
+
+def write_evidence(diff, filename=".tabibi_mistral_review.diff"):
+    # The checked-out PR controls all paths inside its worktree. Never follow
+    # an attacker-created symlink, or overwrite an already-existing file.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(filename, flags, 0o600)
+    with os.fdopen(descriptor, "wb") as stream:
+        stream.write(diff)
 
 
 def main():
@@ -123,7 +144,50 @@ def main():
                 pass
             else:
                 raise AssertionError("Untrusted review target accepted")
-        print("Mistral review-target parser selftest passed")
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "victim"
+            target.write_bytes(b"original")
+            link = Path(directory) / "evidence"
+            link.symlink_to(target)
+            try:
+                write_evidence(b"tamper", str(link))
+            except OSError:
+                pass
+            else:
+                raise AssertionError("Symlink evidence was overwritten")
+            assert target.read_bytes() == b"original"
+            link.unlink()
+            write_evidence(b"verified", str(link))
+            assert link.read_bytes() == b"verified"
+            try:
+                write_evidence(b"overwritten", str(link))
+            except FileExistsError:
+                pass
+            else:
+                raise AssertionError("Existing evidence was overwritten")
+        original_api = github_json
+        try:
+            def mock_api(route):
+                if "/actions/runs?" in route:
+                    return {"workflow_runs": [
+                        {"name": "CI", "head_sha": "a" * 40,
+                         "event": "pull_request", "run_number": 1,
+                         "run_attempt": 1, "id": 10, "status": "completed",
+                         "conclusion": "success"},
+                        {"name": "CI", "head_sha": "a" * 40,
+                         "event": "pull_request", "run_number": 2,
+                         "run_attempt": 1, "id": 11, "status": "completed",
+                         "conclusion": "failure"},
+                    ]}
+                return {"jobs": [{"name": name, "conclusion": "success"}
+                                 for name in REQUIRED_JOBS]}
+            globals()["github_json"] = mock_api
+            assert not ci_green("owner/repo", "a" * 40), (
+                "Older green CI masked latest failure"
+            )
+        finally:
+            globals()["github_json"] = original_api
+        print("Mistral review-target parser and security selftests passed")
         return
 
     repo = os.environ["GITHUB_REPOSITORY"]
@@ -183,12 +247,12 @@ def main():
             if not diff.startswith(b"diff --git ") or len(diff) > DIFF_LIMIT_BYTES:
                 blocked("REVIEW_DIFF_UNAVAILABLE_OR_TOO_LARGE")
                 return
-            Path(".tabibi_mistral_review.diff").write_bytes(diff)
+            write_evidence(diff)
         elif command != "recheck":
             blocked("REVIEW_TARGET_BLOCKED")
             return
         output(ready="true", status="OK", mode="review")
-    except (ValueError, subprocess.SubprocessError, json.JSONDecodeError):
+    except (ValueError, OSError, subprocess.SubprocessError, json.JSONDecodeError):
         blocked("STALE_SHA_OR_EVIDENCE_UNAVAILABLE")
 
 
