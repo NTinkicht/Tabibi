@@ -119,9 +119,7 @@ describe('GET public booking live queue stream', () => {
   });
 
   it('stops pending stream DB reads on reader cancellation', async () => {
-    const response = await GET(
-      request({ authorization: `Bearer ${bearer}` }),
-    );
+    const response = await GET(request({ authorization: `Bearer ${bearer}` }));
     const reader = response.body!.getReader();
     expect(get).toHaveBeenCalledTimes(1);
     await reader.cancel();
