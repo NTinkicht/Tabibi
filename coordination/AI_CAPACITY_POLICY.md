@@ -42,7 +42,7 @@ Gemini/Mistral/Grok credentials are runtime credentials, not repository assets.
 - `MISTRAL_API_KEY` is permitted only in `.github/workflows/mistral-vibe-wake.yml`, guarded by `TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED=true` and an owner-only Issue #11 event trigger.
 - `GOOGLE_API_KEY`, Vertex AI and other billable Gemini routes remain forbidden in active workflows.
 - `XAI_API_KEY`/metered xAI routes remain forbidden in workflows. Never copy `~/.grok/auth.json`, MCP credentials or OAuth tokens to hosted runners, GitHub Secrets, source, prompts or public issues.
-- The dedicated unattended wake workflows are read-only actor lanes: they may inspect repository evidence and return findings, but may not edit, commit, push, merge, label, create reviews or mutate GitHub state.
+- Gemini/Mistral model wake workflows are read-only actor lanes: they inspect evidence and post scrubbed findings but do not edit, commit, push, merge, label or create native reviews. The separately scoped **Grok metadata bridge** `.github/workflows/savegrok-cloud-slack-bridge.yml` is NOT a Grok model wake: it uses the already-approved Slack relay credential only to send public PR/lease/SHA metadata after verified owner-authored lease, newest 3/3 exact-head CI, and failover/supersession checks. `TABIBI_GROK_CLOUD_BRIDGE_ENABLED=true` is forbidden until owner has deliberately connected the included Grok Bot, GitHub and Slack and confirmed the narrow event routine. No Grok token, model access, code write or merge authority is granted. A real Codespace-off review must separately prove the Bot runtime.
 - Issue #162 is the scoped owner authorization for these two unattended wake paths only; it is not blanket authorization for provider-key automation elsewhere.
 - Do not paste credentials into issues, PRs, Team Room, Slack or model prompts.
 
@@ -78,7 +78,7 @@ Copilot context compression remains a finite included resource. Local budget sta
 
 Scheduled tasks consume capacity. Use event-driven state and shared cooldown/lease signals rather than multiple staggered polling tasks. Quiet Git history alone is not proof of idleness when CI/tests or an active lease exist.
 
-Gemini CLI and Mistral Vibe unattended wakes are deliberately event-driven only. Grok has no unattended wake, cron or subscriber OAuth token relay. They must not add polling or cron schedules without another explicit owner decision.
+Gemini CLI and Mistral Vibe unattended wakes are deliberately event-driven only. Grok Build has no unattended GitHub-hosted model wake, cron or OAuth token relay. The guarded metadata-only Slack bridge can dispatch to an owner-configured Grok Bot routine but must remain disabled until explicitly activated; it never runs Grok on Actions. No actor may add polling or cron schedules without another explicit owner decision.
 
 ## Data/security exclusions
 
