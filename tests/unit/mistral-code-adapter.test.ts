@@ -68,11 +68,11 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
   it('isolates the model and deterministic tests from ALL repository write tokens', () => {
     expect(parsed.permissions).toEqual({ contents: 'read' });
     for (const job of [propose, validate, test, publish, report]) {
-      expect(job.env).not.toHaveProperty('GH_TOKEN');
-      expect(job.env).not.toHaveProperty('MISTRAL_API_KEY');
+      expect(job.env ?? {}).not.toHaveProperty('GH_TOKEN');
+      expect(job.env ?? {}).not.toHaveProperty('MISTRAL_API_KEY');
     }
-    expect(parsed.env).not.toHaveProperty('GH_TOKEN');
-    expect(parsed.env).not.toHaveProperty('MISTRAL_API_KEY');
+    expect(parsed.env ?? {}).not.toHaveProperty('GH_TOKEN');
+    expect(parsed.env ?? {}).not.toHaveProperty('MISTRAL_API_KEY');
     expect(propose.permissions.contents).toBe('read');
     expect(validate.permissions.contents).toBe('read');
     expect(validate.permissions.issues).toBe('read');
