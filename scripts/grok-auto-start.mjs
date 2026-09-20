@@ -75,6 +75,13 @@ async function main() {
     safeCommand('git', ['diff', '--quiet']) !== null &&
     safeCommand('git', ['diff', '--cached', '--quiet']) !== null;
   const grokHome = env.GROK_HOME || path.join(os.homedir(), '.grok');
+  // VS Code process tasks may not source the owner's interactive shell PATH.
+  // The official installer places the CLI in ~/.grok/bin by default.
+  env.PATH = [
+    path.join(os.homedir(), '.grok', 'bin'),
+    path.join(grokHome, 'bin'),
+    env.PATH || '',
+  ].join(path.delimiter);
   const authAvailable = fs.existsSync(path.join(grokHome, 'auth.json'));
   const decision = startupDecision(env, {
     branch,
