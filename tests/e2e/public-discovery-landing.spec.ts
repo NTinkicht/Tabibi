@@ -205,7 +205,6 @@ test('initial HTML contains discoverable clinic names without client JavaScript'
   }
 });
 
-
 test('filters public clinic and doctor names without leaking private IDs', async ({
   page,
 }) => {
