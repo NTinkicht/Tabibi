@@ -8,6 +8,9 @@ type OutcomeCategory =
   | 'retry_timeout'
   | 'retries_exhausted'
   | 'provider_error'
+  | 'delivery_context_error'
+  | 'render_error'
+  | 'delivery_storage_error'
   | 'unspecified';
 type ExceptionView = {
   event: string;
@@ -28,6 +31,11 @@ function categorizeOutcome(code: unknown): OutcomeCategory {
   if (code === 'retry_exhausted') return 'retries_exhausted';
   if (code === 'provider_exception' || code === 'provider_indeterminate_result')
     return 'provider_error';
+  if (code === 'delivery_context_failure' || code === 'in_app_delivery_context_mismatch')
+    return 'delivery_context_error';
+  if (code === 'render_failure') return 'render_error';
+  if (code === 'in_app_persist_rejected' || code === 'in_app_persist_exception')
+    return 'delivery_storage_error';
   return 'unspecified';
 }
 type LoadState =
@@ -55,6 +63,9 @@ const copy = {
       retry_timeout: 'Délai de traitement dépassé',
       retries_exhausted: 'Nombre maximal de tentatives atteint',
       provider_error: 'Erreur du fournisseur de notification',
+      delivery_context_error: 'Contexte de livraison indisponible',
+      render_error: 'Préparation de la notification impossible',
+      delivery_storage_error: 'Enregistrement de la notification impossible',
       unspecified: 'Motif non précisé',
     },
     events: {
@@ -84,6 +95,9 @@ const copy = {
       retry_timeout: 'تجاوز مهلة المعالجة',
       retries_exhausted: 'بلغ الحد الأقصى لمحاولات الإرسال',
       provider_error: 'خطأ لدى مزوّد الإشعارات',
+      delivery_context_error: 'تعذّر تحديد سياق التسليم',
+      render_error: 'تعذّر إعداد الإشعار',
+      delivery_storage_error: 'تعذّر حفظ الإشعار',
       unspecified: 'سبب غير محدد',
     },
     events: {
@@ -129,7 +143,7 @@ function toExceptionViews(payload: unknown): ExceptionView[] {
   });
 }
 
-export function NotificationDeliveryExceptionsClient({
+function NotificationDeliveryExceptionsView({
   clinicId,
   initialLocale,
 }: {
@@ -176,14 +190,18 @@ export function NotificationDeliveryExceptionsClient({
   }, [clinicId, generation]);
 
   return (
-    <main lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
-      <header>
+    <main
+      className="desk notificationExceptions"
+      lang={locale}
+      dir={locale === 'ar' ? 'rtl' : 'ltr'}
+    >
+      <header className="notificationExceptionsHeader">
         <Link
           href={`/operations/${encodeURIComponent(clinicId)}?locale=${locale}`}
         >
           {t.back}
         </Link>
-        <div role="group" aria-label={t.language}>
+        <div className="notificationExceptionsLocales" role="group" aria-label={t.language}>
           <button
             type="button"
             lang="fr"
@@ -205,20 +223,21 @@ export function NotificationDeliveryExceptionsClient({
       <h1>{t.title}</h1>
       <p>{t.note}</p>
       <button
+        className="notificationExceptionsRefresh"
         type="button"
         onClick={refresh}
         disabled={state.kind === 'loading'}
       >
         {t.refresh}
       </button>
-      <section aria-busy={state.kind === 'loading'}>
+      <section className="notificationExceptionsState" aria-busy={state.kind === 'loading'}>
         {state.kind === 'loading' ? <p role="status">{t.loading}</p> : null}
         {state.kind === 'error' ? <p role="alert">{t.error}</p> : null}
         {state.kind === 'ready' && state.records.length === 0 ? (
           <p role="status">{t.empty}</p>
         ) : null}
         {state.kind === 'ready' && state.records.length > 0 ? (
-          <ul>
+          <ul className="notificationExceptionsList">
             {state.records.map((record, index) => {
               const eventLabel = Object.prototype.hasOwnProperty.call(
                 t.events,
@@ -253,4 +272,14 @@ export function NotificationDeliveryExceptionsClient({
       </section>
     </main>
   );
+}
+
+// The App Router can reuse a Client Component instance across clinic routes.
+// Keying the data-bearing child prevents any previous clinic's rows from being
+// rendered while the new clinic's no-store request is in flight.
+export function NotificationDeliveryExceptionsClient(props: {
+  clinicId: string;
+  initialLocale: Locale;
+}) {
+  return <NotificationDeliveryExceptionsView key={props.clinicId} {...props} />;
 }
