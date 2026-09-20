@@ -125,7 +125,7 @@ async function main() {
     )
   ) {
     process.stdout.write(
-      'SaveGrok: MAIN_NOT_EXACT_REMOTE_HEAD; no worker started.\\n',
+      'SaveGrok: MAIN_NOT_EXACT_REMOTE_HEAD; no worker started.\n',
     );
     return;
   }
