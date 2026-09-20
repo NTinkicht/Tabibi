@@ -385,7 +385,11 @@ function drainPending() {
 }
 // CI evidence is fetched by the trusted parent GitHub CLI, never by letting
 // the model read OAuth, shell credentials, raw workflow logs or provider secrets.
-const REQUIRED_CI = ['Quality and build', 'PostgreSQL integration', 'Browser smoke'];
+const REQUIRED_CI = [
+  'Quality and build',
+  'PostgreSQL integration',
+  'Browser smoke',
+];
 const CI_STEP_ALLOWLIST = new Set([
   'Initialize containers',
   'Set up job',
@@ -410,7 +414,9 @@ const CI_STEP_ALLOWLIST = new Set([
 ]);
 export function summarizeCiChecks(runs) {
   return REQUIRED_CI.map((name) => {
-    const run = Array.isArray(runs) ? runs.find((item) => item.name === name) : null;
+    const run = Array.isArray(runs)
+      ? runs.find((item) => item.name === name)
+      : null;
     const url =
       typeof run?.details_url === 'string' &&
       /^https:\/\/github\.com\/NTinkicht\/Tabibi\/actions\/runs\/[0-9]+\/job\/[0-9]+$/.test(
