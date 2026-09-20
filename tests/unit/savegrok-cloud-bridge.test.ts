@@ -16,6 +16,8 @@ describe('SaveGrok cloud lease bridge', () => {
     expect(workflow).toContain('capability: review');
     expect(workflow).toContain('source_lease_comment');
     expect(workflow).toContain('SLACK_CHATGPT_BOT_TOKEN');
+    expect(workflow).toContain('TABIBI_GROK_CLOUD_BRIDGE_ENABLED');
+    expect(workflow).toContain("GROK_CLOUD_BRIDGE_ENABLED') != 'true'");
     expect(workflow).not.toContain('XAI_API_KEY');
     expect(workflow).not.toContain('GROK_AUTH_JSON');
     expect(workflow).not.toContain('contents: write');
@@ -30,6 +32,14 @@ describe('SaveGrok cloud lease bridge', () => {
     expect(workflow).toContain("'Quality and build'");
     expect(workflow).toContain("'PostgreSQL integration'");
     expect(workflow).toContain("'Browser smoke'");
+    expect(workflow).toContain('ROLE_LEASE_RELEASED');
+    expect(workflow).toContain('ROLE_FAILOVER');
+    expect(workflow).toContain('ROLE_LEASE_ASSIGNED');
+    expect(workflow).toContain("source_id = int(os.environ['LEASE_COMMENT_ID'])");
+    expect(workflow).toContain('for page in range(1, 21)');
+    expect(workflow).toContain("run.get('run_attempt')");
+    expect(workflow).toContain("latest.get('status') != 'completed'");
+    expect(workflow).toContain('filter=latest&per_page=100');
     expect(workflow).toContain('CLOUD_SIGNAL_SENT');
     expect(workflow).toContain(
       'Grok Bot execution and review MUST be separately verified.',
