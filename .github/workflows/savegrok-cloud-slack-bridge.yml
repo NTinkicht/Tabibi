@@ -1,0 +1,163 @@
+name: SaveGrok Cloud Lease Bridge (included-capacity Bot)
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+  issues: read
+
+jobs:
+  notify-grok-cloud:
+    if: >-
+      github.actor == 'NTinkicht' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, 'ROLE_LEASE_ASSIGNED') &&
+      contains(github.event.comment.body, 'actor: grok') &&
+      contains(github.event.comment.body, 'capability: review')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: savegrok-cloud-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SLACK_CHATGPT_BOT_TOKEN: ${{ secrets.SLACK_CHATGPT_BOT_TOKEN }}
+      LEASE_BODY: ${{ github.event.comment.body }}
+      LEASE_COMMENT_ID: ${{ github.event.comment.id }}
+      LEASE_URL: ${{ github.event.comment.html_url }}
+      TARGET_PR: ${{ github.event.issue.number }}
+      TARGET_REPO: ${{ github.repository }}
+      SLACK_CHANNEL_ID: C0C0RV36QP2
+    steps:
+      - name: Validate owner lease and current SHA before sending metadata-only cloud signal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          import sys
+          import urllib.error
+          import urllib.request
+
+          body = os.environ['LEASE_BODY']
+          repo = os.environ['TARGET_REPO']
+          number = os.environ['TARGET_PR']
+          token = os.environ.get('SLACK_CHATGPT_BOT_TOKEN', '')
+          if not token:
+              raise SystemExit('CONFIG_BLOCKED: existing Slack relay token is absent')
+
+          def field(name):
+              values = re.findall(rf'(?m)^{re.escape(name)}:\\s*(.*?)\\s*$', body)
+              if len(values) != 1 or not values[0]:
+                  raise ValueError('Missing or duplicated trusted lease field')
+              return values[0].strip()
+
+          try:
+              if len(re.findall(r'(?m)^ROLE_LEASE_ASSIGNED\\s*$', body)) != 1:
+                  raise ValueError('Lease marker missing or repeated')
+              if field('actor') != 'grok' or field('capability') != 'review':
+                  raise ValueError('Wrong actor or capability')
+              pr_number = field('pr').removeprefix('#')
+              exact_sha = field('exact_sha')
+              stream = field('stream')
+              authors = [x.strip().lower() for x in field('material_authors').split(',')]
+              if (
+                  pr_number != number or
+                  not re.fullmatch(r'[0-9a-f]{40}', exact_sha) or
+                  not re.fullmatch(r'[A-Za-z0-9_-]{2,60}', stream) or
+                  not authors or
+                  any(not re.fullmatch(r'[a-z0-9_-]+', x) for x in authors) or
+                  'grok' in authors
+              ):
+                  raise ValueError('Invalid or Grok-self-authored review lease')
+              def api(route):
+                  data = subprocess.check_output(
+                      ['gh', 'api', route], stderr=subprocess.DEVNULL, timeout=20
+                  )
+                  return json.loads(data)
+              pr = api(f'repos/{repo}/pulls/{number}')
+              if (
+                  pr.get('state') != 'open' or
+                  pr.get('head', {}).get('sha') != exact_sha or
+                  pr.get('head', {}).get('repo', {}).get('full_name') != repo or
+                  pr.get('base', {}).get('repo', {}).get('full_name') != repo or
+                  pr.get('base', {}).get('ref') != 'main'
+              ):
+                  raise ValueError('Canonical PR is stale, forked or not open')
+              runs = api(
+                  f'repos/{repo}/actions/runs?head_sha={exact_sha}'
+                  '&event=pull_request&per_page=30'
+              ).get('workflow_runs', [])
+              required = {'Quality and build', 'PostgreSQL integration', 'Browser smoke'}
+              green = False
+              for run in runs:
+                  if (
+                      run.get('name') != 'CI' or
+                      run.get('head_sha') != exact_sha or
+                      run.get('conclusion') != 'success'
+                  ):
+                      continue
+                  jobs = api(
+                      f"repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100"
+                  ).get('jobs', [])
+                  passed = {
+                      job['name'] for job in jobs
+                      if job.get('conclusion') == 'success'
+                  }
+                  if required.issubset(passed):
+                      green = True
+                      break
+              if not green:
+                  raise ValueError('Exact-head required CI is not green')
+          except (ValueError, subprocess.SubprocessError, json.JSONDecodeError):
+              raise SystemExit('LEASE_BLOCKED: no cloud signal sent')
+
+          # Only public engineering metadata travels to Slack. It is a wake
+          # signal, NOT proof that the Bot actually executed or posted a review.
+          signal = (
+              'TABIBI_GROK_CLOUD_REVIEW_LEASE_V1\\n'
+              f'repo: {repo}\\n'
+              f'pr: {number}\\n'
+              f'exact_sha: {exact_sha}\\n'
+              f'stream: {stream}\\n'
+              f'source_lease_comment: {os.environ["LEASE_COMMENT_ID"]}\\n'
+              f'source: {os.environ["LEASE_URL"]}\\n'
+              'required: included SuperGrok Bot only; read-only; nonauthor; '
+              'reverify latest PR SHA + 3 CI jobs; post evidence on PR; '
+              'no paid API, no new branch, no self-gate.\\n'
+          )
+          payload = json.dumps({
+              'channel': os.environ['SLACK_CHANNEL_ID'],
+              'text': signal,
+              'unfurl_links': False,
+              'unfurl_media': False
+          }).encode('utf-8')
+          req = urllib.request.Request(
+              'https://slack.com/api/chat.postMessage',
+              data=payload,
+              headers={
+                  'Authorization': f'Bearer {token}',
+                  'Content-Type': 'application/json; charset=utf-8'
+              },
+              method='POST'
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=15) as response:
+                  result = json.load(response)
+          except (urllib.error.URLError, ValueError):
+              raise SystemExit('CLOUD_SIGNAL_DELIVERY_FAILED: Slack unavailable')
+          if not result.get('ok'):
+              raise SystemExit('CLOUD_SIGNAL_DELIVERY_FAILED: Slack declined message')
+          print(
+              'CLOUD_SIGNAL_SENT: trusted current-head lease metadata posted '
+              f"to existing Slack room; message timestamp {result['ts']}. "
+              'Grok Bot execution and review MUST be separately verified.'
+          )
+          PY
