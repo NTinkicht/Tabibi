@@ -63,11 +63,14 @@ def parse_owner_dispatch(body):
     sha = f.get("exact_sha", "")
     stream = f.get("stream", "")
     paths = f.get("allowed_paths", "").split(",")
+    objective = f.get("objective", "")
     if (
         not number.isascii() or not number.isdigit() or int(number) < 1
         or not SHA.fullmatch(sha)
         or not re.fullmatch(r"WU[0-9]{1,5}", stream)
         or not 2 <= len(paths) <= 4
+        or not 10 <= len(objective) <= 240
+        or not objective.isprintable() or REDACT.search(objective)
     ):
         raise ValueError("Invalid implementation lease")
     paths = [v.strip() for v in paths]
@@ -79,7 +82,7 @@ def parse_owner_dispatch(body):
         raise ValueError("A coding lease requires test changes")
     if any(".." in Path(v).parts for v in paths):
         raise ValueError("Path traversal")
-    return int(number), sha, stream, paths
+    return int(number), sha, stream, paths, objective
 
 
 def pr_current(repo, number, sha):
@@ -208,9 +211,11 @@ def main():
     if mode == "selftest":
         sha = "a" * 40
         body = (f"MISTRAL_LEASED_CODE_V1\npr: 2\nexact_sha: {sha}\n"
-                "stream: WU101\nallowed_paths: src/a.ts,tests/a.test.ts")
+                "stream: WU101\nallowed_paths: src/a.ts,tests/a.test.ts\n"
+                "objective: Change foo and test assertion from 1 to 2")
         assert parse_owner_dispatch(body) == (
-            2, sha, "WU101", ["src/a.ts", "tests/a.test.ts"]
+            2, sha, "WU101", ["src/a.ts", "tests/a.test.ts"],
+            "Change foo and test assertion from 1 to 2"
         )
         for bad in (
             body.replace("src/a.ts", "../.github/workflows/a.yml"),
@@ -270,14 +275,14 @@ def main():
             fail("CONFIG_BLOCKED")
             return
         try:
-            number, sha, stream, paths = parse_owner_dispatch(
+            number, sha, stream, paths, objective = parse_owner_dispatch(
                 os.environ.get("DISPATCH_BODY", "")
             )
             branch = pr_current(repo, number, sha)
             lease = active_owner_lease(repo, number, sha, stream)
             emit(ready="true", status="OK", pr=number, sha=sha,
                  stream=stream, branch=branch, lease=lease,
-                 paths=",".join(paths))
+                 paths=",".join(paths), objective=objective)
         except (ValueError, KeyError, subprocess.SubprocessError, json.JSONDecodeError):
             fail("LEASE_OR_TARGET_BLOCKED")
         return
@@ -301,9 +306,44 @@ def main():
             actual = run(["git", "diff", "--name-only"], capture=True).stdout.splitlines()
             if set(actual) != set(changed):
                 raise ValueError("Unexpected changed files")
+            # Seal only the schema-checked patch before any untrusted tests run.
+            # No raw model transcript, environment or other runner files travel
+            # from the proposal job into the fresh publish job.
+            parsed = parse_patch(content, paths)
+            Path("/tmp/tabibi-mistral-validated.json").write_text(
+                json.dumps({"edits": parsed}, ensure_ascii=False),
+                encoding="utf-8",
+            )
             emit(ready="true", status="PATCH_READY", changed=",".join(changed))
         except (ValueError, KeyError, OSError, subprocess.SubprocessError, json.JSONDecodeError):
             fail("PATCH_BLOCKED")
+        return
+    if mode == "applyartifact":
+        try:
+            number = int(os.environ["REVIEW_PR"])
+            sha = os.environ["REVIEW_SHA"]
+            stream = os.environ["REVIEW_STREAM"]
+            paths = os.environ["ALLOWED_PATHS"].split(",")
+            branch = pr_current(repo, number, sha)
+            if branch != os.environ["REVIEW_BRANCH"]:
+                raise ValueError("Canonical branch changed")
+            if str(active_owner_lease(repo, number, sha, stream)) != os.environ["LEASE_ID"]:
+                raise ValueError("Lease superseded")
+            if run(["git", "rev-parse", "HEAD"], capture=True).stdout.strip() != sha:
+                raise ValueError("Stale artifact checkout")
+            if run(["git", "status", "--porcelain"], capture=True).stdout:
+                raise ValueError("Artifact checkout not clean")
+            blob = Path("/tmp/tabibi-mistral-validated.json").read_text(encoding="utf-8")
+            if len(blob.encode("utf-8")) > MAX_PATCH_BYTES:
+                raise ValueError("Artifact too large")
+            changed = apply_patch(f"{BEGIN}\\n{blob}\\n{END}", paths, Path.cwd())
+            run(["git", "diff", "--check"])
+            actual = run(["git", "diff", "--name-only"], capture=True).stdout.splitlines()
+            if set(changed) != set(actual):
+                raise ValueError("Unexpected artifact changes")
+            emit(ready="true", status="ARTIFACT_VERIFIED")
+        except (ValueError, KeyError, OSError, subprocess.SubprocessError, json.JSONDecodeError):
+            fail("ARTIFACT_BLOCKED")
         return
     if mode == "publish":
         try:
