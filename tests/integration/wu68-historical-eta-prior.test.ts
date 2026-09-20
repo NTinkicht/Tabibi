@@ -251,6 +251,7 @@ describe('WU68 deterministic historical ETA prior', () => {
       minWaitMinutes: 23,
       maxWaitMinutes: 45,
       estimateSource: 'historical_median',
+      delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
     expect(staff).toEqual({
@@ -268,6 +269,7 @@ describe('WU68 deterministic historical ETA prior', () => {
         'minWaitMinutes',
         'maxWaitMinutes',
         'estimateSource',
+        'delayStatus',
         'revision',
       ].sort(),
     );
@@ -306,6 +308,7 @@ describe('WU68 deterministic historical ETA prior', () => {
       minWaitMinutes: 8,
       maxWaitMinutes: 15,
       estimateSource: 'observed_median',
+      delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
     expect(staff).toMatchObject({
@@ -398,6 +401,7 @@ describe('WU68 deterministic historical ETA prior', () => {
       minWaitMinutes: 11,
       maxWaitMinutes: 23,
       estimateSource: 'fallback',
+      delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
     expect(staff).toMatchObject({
@@ -439,6 +443,7 @@ describe('WU68 deterministic historical ETA prior', () => {
       minWaitMinutes: 11,
       maxWaitMinutes: 23,
       estimateSource: 'historical_median',
+      delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
     expect(staff).toMatchObject({

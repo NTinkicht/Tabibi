@@ -21,6 +21,7 @@ export interface PublicGuestLiveQueueEta {
   maxWaitMinutes: number;
   revision: string;
   estimateSource: QueueEtaEstimateSource;
+  delayStatus: 'declared' | null;
 }
 
 export interface PublicGuestLiveQueueStatusResult {
@@ -234,6 +235,7 @@ export class PublicGuestLiveQueueStatusService {
       maxWaitMinutes: range.maxWaitMinutes,
       revision: range.revision,
       estimateSource: estimate.estimateSource,
+      delayStatus: range.delayStatus,
     };
   }
 }

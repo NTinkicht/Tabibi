@@ -187,6 +187,7 @@ test('Arabic renders the ETA section with RTL parity', async ({ page }) => {
           minWaitMinutes: 15,
           maxWaitMinutes: 30,
           estimateSource: 'fallback',
+          delayStatus: 'declared',
           summary: {
             midpointMinutes: 22.5,
             uncertaintyWidthMinutes: 15,
@@ -206,6 +207,9 @@ test('Arabic renders the ETA section with RTL parity', async ({ page }) => {
   await expect(page.getByText('3 أشخاص أمامك')).toBeVisible();
   await expect(page.getByText('حوالي 15–30 دقيقة')).toBeVisible();
   await expect(page.getByText('ثقة التقدير: متوسطة')).toBeVisible();
+  await expect(
+    page.getByText('تشمل هذه المدة المقدرة تأخر الطبيب.'),
+  ).toBeVisible();
   const explainer = page.getByRole('link', {
     name: 'لماذا تتغير هذه التقديرات',
   });
@@ -222,6 +226,47 @@ test('Arabic renders the ETA section with RTL parity', async ({ page }) => {
   await expect(page.locator('#tabibi-wait-eta-explainer-hint')).toHaveText(
     '(يُفتح في علامة تبويب جديدة)',
   );
+});
+
+test('French delay notice follows declared, updated, and cleared snapshots', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  let attempt = 0;
+  await page.route(STATUS_URL, async (route) => {
+    attempt += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'checked_in',
+        queueState: 'checked_in',
+        eta: {
+          patientsAhead: 1,
+          minWaitMinutes: attempt === 1 ? 20 : attempt === 2 ? 35 : 10,
+          maxWaitMinutes: attempt === 1 ? 30 : attempt === 2 ? 45 : 20,
+          estimateSource: 'fallback',
+          delayStatus: attempt < 3 ? 'declared' : null,
+        },
+      }),
+    });
+  });
+
+  await page.clock.install();
+  await submitBookingForm(page);
+  const notice = page.getByText(
+    'Un retard du médecin est pris en compte dans cette estimation.',
+  );
+  await expect(notice).toBeVisible();
+  await expect(page.getByText('Environ 20–30 min')).toBeVisible();
+
+  await page.clock.fastForward(30_000);
+  await expect(page.getByText('Environ 35–45 min')).toBeVisible();
+  await expect(notice).toBeVisible();
+
+  await page.clock.fastForward(30_000);
+  await expect(page.getByText('Environ 10–20 min')).toBeVisible();
+  await expect(notice).toHaveCount(0);
 });
 
 test('Arabic uses singular wording for exactly one patient ahead', async ({
@@ -289,6 +334,7 @@ test('a stale in-flight poll response cannot regress a previously shown ETA', as
             minWaitMinutes: 5,
             maxWaitMinutes: 10,
             estimateSource: 'fallback',
+            delayStatus: 'declared',
           },
         }),
       });
@@ -316,6 +362,11 @@ test('a stale in-flight poll response cannot regress a previously shown ETA', as
   await expect(page.getByText(/enregistré/)).toBeVisible();
   await expect(page.getByText('1 personne devant vous')).toBeVisible();
   await expect(page.getByText('Environ 5–10 min')).toBeVisible();
+  await expect(
+    page.getByText(
+      'Un retard du médecin est pris en compte dans cette estimation.',
+    ),
+  ).toBeVisible();
 
   await page.clock.fastForward(30_000);
   await staleStatusStarted;
@@ -327,5 +378,10 @@ test('a stale in-flight poll response cannot regress a previously shown ETA', as
   await expect(page.getByText(/enregistré/)).toBeVisible();
   await expect(page.getByText('1 personne devant vous')).toBeVisible();
   await expect(page.getByText('Environ 5–10 min')).toBeVisible();
+  await expect(
+    page.getByText(
+      'Un retard du médecin est pris en compte dans cette estimation.',
+    ),
+  ).toBeVisible();
   await expect(page.getByText(/en attente/)).toHaveCount(0);
 });
