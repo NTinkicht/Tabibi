@@ -45,7 +45,11 @@ function bearerFrom(request: Request): string | null {
 async function consumeBucket(pool: Pool, key: string, limit: number) {
   const bucketKey = createHash('sha256').update(key).digest('hex');
   const result = await pool.query<{ allowed: boolean }>(
-    `WITH upserted AS (
+    `WITH cleanup AS (
+       DELETE FROM guest_status_rate_limit_buckets
+        WHERE bucket_key <> $1
+          AND window_started_at < now() - ($3::bigint * interval '1 millisecond')
+     ), upserted AS (
        INSERT INTO guest_status_rate_limit_buckets
          (bucket_key,window_started_at,request_count,updated_at)
        VALUES ($1,now(),1,now())
@@ -139,31 +143,48 @@ export async function GET(request: Request): Promise<Response> {
     );
   }
 
+  // Fetch streaming cancellation is not guaranteed to propagate through
+  // request.signal on every deployment. Reader cancellation must also
+  // promptly stop pending timers, DB queries and further enqueue attempts.
+  const streamAbort = new AbortController();
+  let readerCancelled = false;
+  const abortFromRequest = () => streamAbort.abort();
+  request.signal.addEventListener('abort', abortFromRequest, { once: true });
+  if (request.signal.aborted) streamAbort.abort();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const service = new PublicGuestLiveQueueStatusService(pool);
       let lastVersion = version(initial);
-      for (let tick = 1; tick < MAX_STREAM_TICKS; tick += 1) {
-        if (!(await wait(request.signal))) break;
-        try {
-          const next = await service.get(bearer, request.signal);
-          if (request.signal.aborted) break;
+      try {
+        for (let tick = 1; tick < MAX_STREAM_TICKS; tick += 1) {
+          if (!(await wait(streamAbort.signal))) break;
+          try {
+            const next = await service.get(bearer, streamAbort.signal);
+            if (streamAbort.signal.aborted) break;
           const nextVersion = version(next);
           if (nextVersion !== lastVersion) {
             controller.enqueue(encodeChangeHint());
             lastVersion = nextVersion;
           }
         } catch (error) {
-          if (
-            !request.signal.aborted &&
-            !(error instanceof PublicGuestLiveQueueStatusRejectedError)
-          ) {
-            getLogger().error('public guest live queue stream refresh failed');
+            if (
+              !streamAbort.signal.aborted &&
+              !(error instanceof PublicGuestLiveQueueStatusRejectedError)
+            ) {
+              getLogger().error('public guest live queue stream refresh failed');
+            }
+            break;
           }
-          break;
         }
+      } finally {
+        request.signal.removeEventListener('abort', abortFromRequest);
+        if (!readerCancelled) controller.close();
       }
-      controller.close();
+    },
+    cancel() {
+      readerCancelled = true;
+      streamAbort.abort();
+      request.signal.removeEventListener('abort', abortFromRequest);
     },
   });
   return new Response(stream, { status: 200, headers: STREAM_HEADERS });
