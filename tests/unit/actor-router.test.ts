@@ -213,6 +213,43 @@ describe('seven-actor capacity routing', () => {
     expect(workflow).not.toContain('pull-requests: write');
   });
 
+  it('pins Mistral binding review to a trusted current PR and green CI', () => {
+    const workflow = fs.readFileSync(
+      '.github/workflows/mistral-vibe-wake.yml',
+      'utf8',
+    );
+    const helper = fs.readFileSync('scripts/mistral-review-target.py', 'utf8');
+    expect(workflow).toContain(
+      'python3 /tmp/tabibi-mistral-review-target.py prepare',
+    );
+    expect(workflow).toContain('ref: ${{ steps.target.outputs.sha }}');
+    expect(workflow).toContain('persist-credentials: false');
+    expect(workflow).toContain(
+      'python3 /tmp/tabibi-mistral-review-target.py evidence',
+    );
+    expect(workflow).toContain(
+      'python3 /tmp/tabibi-mistral-review-target.py recheck',
+    );
+    expect(workflow).toContain('REVIEW_EVIDENCE_INCOMPLETE');
+    expect(workflow).not.toContain('contents: write');
+    expect(workflow).not.toContain('pull-requests: write');
+    expect(helper).toContain('REQUIRED_JOBS');
+    expect(helper).toContain('DIFF_LIMIT_BYTES');
+    expect(helper).toContain('"git", "diff"');
+    expect(helper).toContain('"git", "merge-base"');
+    expect(workflow).toContain('fetch-depth: 0');
+    expect(helper).not.toContain('"gh", "pr", "diff"');
+    expect(helper).toContain('mistral-vibe');
+    const check = spawnSync(
+      'python3',
+      ['scripts/mistral-review-target.py', 'selftest'],
+      {
+        encoding: 'utf8',
+      },
+    );
+    expect(check.status).toBe(0);
+  });
+
   it('relays Gemini CLI and Mistral Vibe in Slack without new credentials', () => {
     const workflowPath = path.join(
       process.cwd(),
