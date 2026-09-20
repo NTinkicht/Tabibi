@@ -122,6 +122,9 @@ describe('owner-private Grok dispatch lease parser', () => {
     expect(prompt).toContain('READ-ONLY');
     expect(prompt).toContain('never say MERGE_READY');
     expect(prompt).toContain('DO NOT EDIT, COMMIT, PUSH, MERGE');
+    expect(prompt).toContain('git diff origin/main...HEAD --stat');
+    expect(prompt).toContain('only when relevant');
+    expect(dispatcher.GROK_REVIEW_MAX_TURNS).toBe(28);
   });
 });
 
