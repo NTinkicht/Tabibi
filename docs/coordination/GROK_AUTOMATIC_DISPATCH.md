@@ -21,7 +21,7 @@ Substitute the live 40-character PR SHA and actual authors. Do not ask Nassim to
 
 ## GitHub-driven, no-routine-terminal mode (SaveGrok)
 
-The preferred owner experience is **no bash prompts to Grok**. GitHub Actions CI workflow-run handoffs and the orchestrator's exact-SHA ROLE_LEASE_ASSIGNED comments remain the durable work queue. The **already running** owner Codespace's Grok dispatcher polls GitHub PR conversations and fetches live GitHub check runs for each leased SHA; no one needs to paste a task or manually invoke --once for each PR. GitHub Actions sends signals and publishes CI evidence, but **does not receive owner Grok OAuth or invoke metered xAI API calls**.
+The preferred owner experience is **no bash prompts to Grok**. GitHub Actions CI workflow-run handoffs and the orchestrator's exact-SHA ROLE_LEASE_ASSIGNED comments remain the durable work queue. The **already running** owner Codespace's Grok dispatcher polls GitHub PR conversations and fetches live GitHub check runs for each leased SHA; no one needs to paste a task or manually invoke --once for each PR. GitHub Actions sends signals and publishes CI evidence, but **does not receive owner Grok OAuth or invoke metered xAI API calls**. The trusted parent fetches the exact SHA's three required GitHub Actions job statuses and validated GitHub action URLs, and for failed jobs only approved failed-step names (never raw CI logs, environment variables or secrets) are included in Grok's bounded review context.
 
 One-time, in the existing Codespace's **VS Code UI** after the startup-task PR merges:
 
