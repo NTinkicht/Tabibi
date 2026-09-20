@@ -199,10 +199,13 @@ describe('seven-actor capacity routing', () => {
   });
 
   it('bounds the owner-only Mistral wake and classifies token-budget failures', () => {
-    const workflow = fs.readFileSync(
-      path.join(process.cwd(), '.github', 'workflows', 'mistral-vibe-wake.yml'),
-      'utf8',
+    const workflowPath = path.join(
+      process.cwd(),
+      '.github',
+      'workflows',
+      'mistral-vibe-wake.yml',
     );
+    const workflow = fs.readFileSync(workflowPath, 'utf8');
     expect(workflow).toContain("github.event.issue.number == 11");
     expect(workflow).toContain("github.actor == 'NTinkicht'");
     expect(workflow).toContain('contents: read');
