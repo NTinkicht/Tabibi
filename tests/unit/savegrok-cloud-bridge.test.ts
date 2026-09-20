@@ -78,6 +78,8 @@ describe('SaveGrok cloud lease bridge', () => {
     );
     expect(workflow).toContain('for page in range(1, 21)');
     expect(workflow).toContain("run.get('run_attempt')");
+    expect(workflow).toContain("pr_ref.get('number') == int(number)");
+    expect(workflow).toContain("run.get('pull_requests') or []");
     expect(workflow).toContain("latest.get('status') != 'completed'");
     expect(workflow).toContain('filter=latest&per_page=100');
     expect(workflow).toContain('CLOUD_SIGNAL_SENT');
