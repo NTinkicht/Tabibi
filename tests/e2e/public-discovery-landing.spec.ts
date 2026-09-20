@@ -247,7 +247,9 @@ test('filters public clinic and doctor names without leaking private IDs', async
   ).toHaveCount(0);
   await search.fill('does-not-exist');
   await expect(
-    page.getByText('Aucune clinique ni aucun médecin ne correspond à votre recherche.'),
+    page.getByText(
+      'Aucune clinique ni aucun médecin ne correspond à votre recherche.',
+    ),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Effacer la recherche' }).click();
   await expect(search).toHaveValue('');
@@ -284,9 +286,9 @@ test('Arabic search matches without vowel marks and remains RTL', async ({
   await expect(
     page.getByRole('heading', { name: 'عِيَادَة الأمل' }),
   ).toBeVisible();
-  await expect(
-    page.getByRole('heading', { name: 'عيادة الورد' }),
-  ).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'عيادة الورد' })).toHaveCount(
+    0,
+  );
   await expect(page.getByText('نتائج البحث: 1 عيادة.')).toBeVisible();
 
   await page.getByRole('button', { name: 'تحديث' }).click();
