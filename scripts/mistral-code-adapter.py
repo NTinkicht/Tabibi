@@ -131,7 +131,8 @@ def active_owner_lease(repo, number, sha, stream):
     f = fields(body)
     if (
         f.get("actor") != "mistral-vibe" or f.get("capability") != "implementation"
-        or f.get("pr") != f"#{number}" or f.get("exact_sha") != sha
+        or f.get("pr", "").removeprefix("#") != str(number)
+        or f.get("exact_sha") != sha
         or f.get("stream") != stream
     ):
         raise ValueError("Lease belongs to another actor, SHA or work unit")
@@ -186,9 +187,13 @@ def apply_patch(text, allowed, root):
                 raise ValueError("Symlinked edit path")
         if path.resolve().is_relative_to(root.resolve()) is False:
             raise ValueError("Edit escapes repository")
-        mode = path.lstat().st_mode
-        if not stat.S_ISREG(mode) or path.stat().st_size > MAX_FILE_BYTES:
-            raise ValueError("Edit target not a bounded regular file")
+        metadata = path.lstat()
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or metadata.st_size > MAX_FILE_BYTES
+        ):
+            raise ValueError("Edit target not a bounded single-link regular file")
         source = path.read_text(encoding="utf-8")
         if source.count(edit["old"]) != 1:
             raise ValueError("Old text must match exactly once")
