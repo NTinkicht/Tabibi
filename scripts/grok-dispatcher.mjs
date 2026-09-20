@@ -9,6 +9,9 @@ import { fileURLToPath } from 'node:url';
 
 export const REPO = 'NTinkicht/Tabibi';
 export const MARKER = 'ROLE_LEASE_ASSIGNED';
+// Focused full PR reviews need more than 12 turns; a lease still runs once with
+// a strict finite turn budget and an independent 12-minute wall-clock timeout.
+export const GROK_REVIEW_MAX_TURNS = 28;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STATE = path.join(ROOT, '.tabibi', 'grok-dispatch');
 const SHA = /^[a-f0-9]{40}$/;
@@ -413,7 +416,10 @@ function recentComments(pr) {
 export function reviewPrompt(lease, checks) {
   return (
     `You are actor=grok reviewing NTinkicht/Tabibi PR #${lease.pr} in READ-ONLY mode.\n` +
-    'Read AGENTS.md, GROK.md, SECURITY.md, ARCHITECTURE.md, PRODUCT.md and relevant files.\n' +
+    'First read AGENTS.md, GROK.md and SECURITY.md for review guardrails. ' +
+    'Inspect git diff origin/main...HEAD --stat, then git diff origin/main...HEAD, ' +
+    'the touched source and tests. Consult ARCHITECTURE.md or PRODUCT.md ' +
+    'only when relevant; avoid rereading unrelated files.\\n' +
     `Exact head: ${lease.sha}. Material authors (as recorded by orchestrator): ${lease.authors.join(', ')}.\n` +
     `Exact-head CI observations: ${JSON.stringify(checks)}. Inspect git diff origin/main...HEAD in the checkout.\n` +
     'Review correctness, privacy, authorization, RTL/FR/AR, regressions and tests.\n' +
@@ -491,7 +497,7 @@ function runReview(lease, { dryRun = false } = {}) {
         '--allow',
         'Bash(git show *)',
         '--max-turns',
-        '12',
+        String(GROK_REVIEW_MAX_TURNS),
         '-p',
         prompt,
         '--output-format',
@@ -627,11 +633,13 @@ export function oneCycle({ dryRun = false } = {}) {
             deliver(
               lease,
               `<!-- tabibi-grok-dispatch:${lease.key} -->\n` +
-                `CAPACITY_DEGRADED actor: grok capability: review exact_sha: ${lease.sha}\n` +
+                `${failure === 'GROK_TURN_LIMIT' ? 'EXECUTION_INCOMPLETE' : 'CAPACITY_DEGRADED'} actor: grok capability: review exact_sha: ${lease.sha}\n` +
                 `source_lease_comment: ${lease.commentId}\n` +
                 `reason: ${failure}\n` +
                 'No GitHub-verifiable review verdict exists. Reconcile and fail over.',
-              'CAPACITY_DEGRADED',
+              failure === 'GROK_TURN_LIMIT'
+                ? 'EXECUTION_INCOMPLETE'
+                : 'CAPACITY_DEGRADED',
             );
           } catch {
             // Pending report is kept locally and retried before any new model call.
