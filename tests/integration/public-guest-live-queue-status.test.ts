@@ -1364,7 +1364,7 @@ describe('WU93 guest-safe session closure status', () => {
     );
   });
 
-  it('rejects expired closure snapshots and gives recent closure precedence over terminal booking state', async () => {
+  it('preserves terminal booking visibility after the closure notice expires', async () => {
     const expired = await createBooking('9303');
     const terminal = await createBooking('9304');
     await openSession(expired);
@@ -1376,15 +1376,31 @@ describe('WU93 guest-safe session closure status', () => {
     await closeSessionAfterGuestCancellation(terminal, now);
 
     const service = new PublicGuestLiveQueueStatusService(pool, () => now);
-    await expect(service.get(expired.bearer)).rejects.toBeInstanceOf(
-      PublicGuestLiveQueueStatusRejectedError,
-    );
+    await expect(service.get(expired.bearer)).resolves.toEqual({
+      bookingState: 'cancelled',
+      queueState: 'cancelled',
+      pauseStatus: null,
+      closureStatus: null,
+      activeConsultationRemainingMinutes: null,
+      eta: null,
+    });
     await expect(service.get(terminal.bearer)).resolves.toEqual({
       bookingState: 'cancelled',
       queueState: 'cancelled',
       pauseStatus: null,
       closureStatus: 'closed',
       activeConsultationRemainingMinutes: null,
+      eta: null,
+    });
+    // The same authorized terminal booking remains visible at the original
+    // guest credential TTL even after the brief closure notice disappears.
+    const afterGrace = new PublicGuestLiveQueueStatusService(
+      pool,
+      () => new Date(now.getTime() + 15 * 60 * 1000 + 1),
+    );
+    await expect(afterGrace.get(terminal.bearer)).resolves.toMatchObject({
+      bookingState: 'cancelled',
+      closureStatus: null,
       eta: null,
     });
   });
