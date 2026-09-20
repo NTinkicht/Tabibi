@@ -31,11 +31,15 @@ describe('SaveGrok cloud lease bridge', () => {
     expect(workflow).toContain("'PostgreSQL integration'");
     expect(workflow).toContain("'Browser smoke'");
     expect(workflow).toContain('CLOUD_SIGNAL_SENT');
-    expect(workflow).toContain('Grok Bot execution and review MUST be separately verified.');
+    expect(workflow).toContain(
+      'Grok Bot execution and review MUST be separately verified.',
+    );
   });
 
   it('parses the embedded lease validator without executing external actions', () => {
-    const body = workflow.split("python3 - <<'PY'\n")[1]?.split('\n          PY')[0];
+    const body = workflow
+      .split("python3 - <<'PY'\n")[1]
+      ?.split('\n          PY')[0];
     expect(body).toBeDefined();
     const script = body
       ?.split('\n')
