@@ -53,6 +53,21 @@ This wake may inspect repository evidence and report findings back to Issue #11.
 
 Interactive Codespace use remains available for explicitly leased implementation work.
 
+## Trusted exact-head review dispatch (after rollout and live proof)
+
+The GitHub-hosted Issue #11 wake remains read-only. A normal `@mistral-vibe` comment analyzes current `main` and is advisory; do not present that as a PR-head review. For a binding review, an owner-authored comment must contain `@mistral-vibe` plus one copy of the exact marker and fields:
+
+```text
+BINDING_EXACT_HEAD_REVIEW
+review_pr: <existing canonical PR number>
+review_sha: <40-character lowercase current head SHA>
+material_authors: chatgpt,codex
+```
+
+The example authors are placeholders: identify the actual material actors on the entire reviewed head, not just its GitHub committer. Never dispatch Mistral to gate a Mistral-authored head. The trusted parent validates an open same-repository PR to main, its exact head, the author declaration and ALL THREE green CI jobs, checks out that SHA without persisted credentials, supplies a bounded actual PR diff and rechecks the PR head after execution. Any stale head, absent evidence, missing verdict/SHA, self-authorship or quota/entitlement failure blocks the gate. The only GitHub writes are scrubbed response comments to Issue #11 and, for a valid anchored review, the target PR. The model still gets only `plan`, `grep` and `read_file`; it has no commit/push/merge permission. Mistral can produce a review report, not override deterministic CI.
+
+The separate coding/CI-repair adapter remains default OFF until a later reviewed WU implements scoped sole-implementer leases, restricted file ownership, parent-only commits/pushes, test/CI evidence and another actor's non-author gate. Do not represent this read-only review enhancement as the write adapter.
+
 ## Review boundary
 
 A Vibe review can gate only when `mistral-vibe` did not author/materially modify the exact reviewed SHA, required CI is green, original evidence is inspected, and the verdict explicitly names the exact SHA. Use Tabibi severities and `PASS`, `PASS_WITH_MINOR_FINDINGS`, or `CHANGES_REQUIRED`.
