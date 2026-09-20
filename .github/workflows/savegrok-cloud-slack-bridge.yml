@@ -32,6 +32,7 @@ jobs:
       TARGET_PR: ${{ github.event.issue.number }}
       TARGET_REPO: ${{ github.repository }}
       SLACK_CHANNEL_ID: C0C0RV36QP2
+      GROK_CLOUD_BRIDGE_ENABLED: ${{ vars.TABIBI_GROK_CLOUD_BRIDGE_ENABLED }}
     steps:
       - name: Validate owner lease and current SHA before sending metadata-only cloud signal
         shell: bash
@@ -50,6 +51,8 @@ jobs:
           repo = os.environ['TARGET_REPO']
           number = os.environ['TARGET_PR']
           token = os.environ.get('SLACK_CHATGPT_BOT_TOKEN', '')
+          if os.environ.get('GROK_CLOUD_BRIDGE_ENABLED') != 'true':
+              raise SystemExit('CONFIG_BLOCKED: cloud Bot owner setup not activated')
           if not token:
               raise SystemExit('CONFIG_BLOCKED: existing Slack relay token is absent')
 
@@ -91,31 +94,57 @@ jobs:
                   pr.get('base', {}).get('ref') != 'main'
               ):
                   raise ValueError('Canonical PR is stale, forked or not open')
+              # A released/failover lease must not be replayed after the
+              # canonical PR remains at the same SHA.
+              comments = api(
+                  f'repos/{repo}/issues/{number}/comments?per_page=100'
+              )
+              source_id = int(os.environ['LEASE_COMMENT_ID'])
+              if not any(c.get('id') == source_id for c in comments):
+                  raise ValueError('Original owner lease not found in current page')
+              invalidators = (
+                  'ROLE_LEASE_RELEASED', 'ROLE_FAILOVER',
+                  'ROLE_FAILOVER_REQUIRED', 'ROLE_LEASE_REPLACED',
+                  'ROLE_LEASE_CANCELLED',
+              )
+              if any(
+                  c.get('id', 0) > source_id and
+                  any(marker in c.get('body', '') for marker in invalidators)
+                  for c in comments
+              ):
+                  raise ValueError('Owner lease was superseded or released')
               runs = api(
                   f'repos/{repo}/actions/runs?head_sha={exact_sha}'
                   '&event=pull_request&per_page=30'
               ).get('workflow_runs', [])
               required = {'Quality and build', 'PostgreSQL integration', 'Browser smoke'}
-              green = False
-              for run in runs:
-                  if (
-                      run.get('name') != 'CI' or
-                      run.get('head_sha') != exact_sha or
-                      run.get('conclusion') != 'success'
-                  ):
-                      continue
-                  jobs = api(
-                      f"repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100"
-                  ).get('jobs', [])
-                  passed = {
-                      job['name'] for job in jobs
-                      if job.get('conclusion') == 'success'
-                  }
-                  if required.issubset(passed):
-                      green = True
-                      break
-              if not green:
-                  raise ValueError('Exact-head required CI is not green')
+              eligible = [
+                  run for run in runs
+                  if run.get('name') == 'CI' and
+                  run.get('head_sha') == exact_sha and
+                  run.get('event') == 'pull_request'
+              ]
+              if not eligible:
+                  raise ValueError('No exact-head CI run found')
+              latest = max(
+                  eligible,
+                  key=lambda run: (
+                      run.get('run_number') or 0,
+                      run.get('run_attempt') or 0,
+                      run.get('id') or 0,
+                  ),
+              )
+              if latest.get('status') != 'completed' or latest.get('conclusion') != 'success':
+                  raise ValueError('Latest exact-head CI run is not green')
+              jobs = api(
+                  f"repos/{repo}/actions/runs/{latest['id']}/jobs?filter=latest&per_page=100"
+              ).get('jobs', [])
+              passed = {
+                  job['name'] for job in jobs
+                  if job.get('conclusion') == 'success'
+              }
+              if not required.issubset(passed):
+                  raise ValueError('Latest exact-head required CI jobs are not green')
           except (ValueError, subprocess.SubprocessError, json.JSONDecodeError):
               raise SystemExit('LEASE_BLOCKED: no cloud signal sent')
 
