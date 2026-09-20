@@ -32,7 +32,7 @@ function fail(message, details = {}) {
 const [, , capability, ...flags] = process.argv;
 if (!capability) {
   fail(
-    'Usage: node scripts/actor-router.mjs <capability> [--authors=a,b] [--unavailable=a,b]',
+    'Usage: node scripts/actor-router.mjs <capability> [--authors=a,b] [--unavailable=a,b] [--verified=grok:review]',
   );
 }
 
@@ -44,6 +44,10 @@ if (!Array.isArray(route)) {
 
 const authors = parseCsvFlag(flags, '--authors');
 const unavailable = parseCsvFlag(flags, '--unavailable');
+// Runtime verification is capability-specific: proof that Grok can review
+// must never silently qualify it to implement, and a subscription alone
+// cannot prove an owner Codespace worker is currently running.
+const verified = parseCsvFlag(flags, '--verified');
 const actors = new Map(registry.actors.map((actor) => [actor.id, actor]));
 const considered = [];
 
@@ -57,6 +61,11 @@ for (const id of route) {
   else if (!actor.capabilities.includes(capability))
     reason = 'capability_not_declared';
   else if (unavailable.has(id)) reason = 'currently_unavailable';
+  else if (
+    actor.runtime_verification_required === true &&
+    !verified.has(`${id}:${capability}`)
+  )
+    reason = 'runtime_not_verified_for_capability';
   else if (capability === 'review' && authors.has(id))
     reason = 'material_author_cannot_self_gate';
 
