@@ -383,15 +383,77 @@ function drainPending() {
     }
   }
 }
-function ciStatus(sha) {
-  const runs =
-    gh(`repos/${REPO}/commits/${sha}/check-runs?per_page=100`).check_runs || [];
-  return ['Quality and build', 'PostgreSQL integration', 'Browser smoke'].map(
-    (name) => ({
+// CI evidence is fetched by the trusted parent GitHub CLI, never by letting
+// the model read OAuth, shell credentials, raw workflow logs or provider secrets.
+const REQUIRED_CI = [
+  'Quality and build',
+  'PostgreSQL integration',
+  'Browser smoke',
+];
+const CI_STEP_ALLOWLIST = new Set([
+  'Initialize containers',
+  'Set up job',
+  'Checkout',
+  'Set up Node.js',
+  'Install dependencies',
+  'Formatting',
+  'Lint',
+  'Typecheck',
+  'Unit and API tests',
+  'Production build',
+  'Dependency audit',
+  'Run PostgreSQL integration tests',
+  'Install PostgreSQL 16 client tools',
+  'Rehearse PostgreSQL backup and restore',
+  'Run bounded clinic-day load rehearsal',
+  'Apply migrations',
+  'Build application',
+  'Install Chromium',
+  'Run browser smoke tests',
+  'Stop containers',
+]);
+export function summarizeCiChecks(runs) {
+  return REQUIRED_CI.map((name) => {
+    const run = Array.isArray(runs)
+      ? runs.find((item) => item.name === name)
+      : null;
+    const url =
+      typeof run?.details_url === 'string' &&
+      /^https:\/\/github\.com\/NTinkicht\/Tabibi\/actions\/runs\/[0-9]+\/job\/[0-9]+$/.test(
+        run.details_url,
+      )
+        ? run.details_url
+        : undefined;
+    return {
       name,
-      conclusion: runs.find((r) => r.name === name)?.conclusion || 'not_run',
-    }),
-  );
+      status: run?.status || 'not_run',
+      conclusion: run?.conclusion || 'not_run',
+      ...(url ? { url } : {}),
+      ...(run?.app?.slug === 'github-actions' && Number.isSafeInteger(run.id)
+        ? { jobId: run.id }
+        : {}),
+    };
+  });
+}
+function ciStatus(sha) {
+  const raw = gh(`repos/${REPO}/commits/${sha}/check-runs?per_page=100`);
+  return summarizeCiChecks(raw.check_runs || []).map(({ jobId, ...check }) => {
+    if (check.conclusion !== 'failure' || !jobId) return check;
+    try {
+      const job = gh(`repos/${REPO}/actions/jobs/${jobId}`);
+      const failedSteps = (job.steps || [])
+        .filter((step) =>
+          ['failure', 'timed_out'].includes(String(step.conclusion)),
+        )
+        .map((step) => step.name)
+        .filter((name) => CI_STEP_ALLOWLIST.has(name))
+        .slice(0, 8);
+      return failedSteps.length ? { ...check, failedSteps } : check;
+    } catch {
+      // A failed CI job's summary must not become a Grok dispatch failure.
+      return check;
+    }
+  });
 }
 function materialGrokAuthorship(pr) {
   const commits = gh(`repos/${REPO}/pulls/${pr.number}/commits?per_page=100`);

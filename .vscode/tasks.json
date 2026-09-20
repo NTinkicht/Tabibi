@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "SaveGrok — automatic GitHub review failover (owner Codespace)",
+      "type": "process",
+      "command": "node",
+      "args": ["scripts/grok-auto-start.mjs"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "runOptions": {
+        "runOn": "folderOpen",
+        "instanceLimit": 1
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated",
+        "clear": false,
+        "echo": true
+      },
+      "detail": "Opt-in trusted-workspace startup. Watches GitHub CI/PR leases only in NTinkicht's active authenticated Codespace; no automatic Codespace wake or model invocation without a trusted exact-SHA review lease."
+    }
+  ]
+}
