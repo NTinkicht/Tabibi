@@ -1306,7 +1306,7 @@ test('Arabic mobile active filter summary is localized and remains RTL', async (
   );
 });
 
-test('filtered French directory displays visible clinics relative to the refreshed public total', async ({
+test('French filters show matching clinics relative to total', async ({
   page,
 }) => {
   const clinics = [
@@ -1348,7 +1348,7 @@ test('filtered French directory displays visible clinics relative to the refresh
   expect(body).not.toContain('private-visible-total-doctor');
 });
 
-test('Arabic mobile visible-total summary follows language filter and fresh directory data', async ({
+test('Arabic mobile visible total updates after refresh', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
