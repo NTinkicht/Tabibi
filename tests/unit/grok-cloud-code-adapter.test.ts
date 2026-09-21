@@ -21,13 +21,16 @@ type Step = {
 const parsed = yaml.load(source) as {
   on: { issue_comment: { types: string[] } };
   permissions: Record<string, string>;
-  jobs: Record<string, {
-    if?: string;
-    needs?: string | string[];
-    permissions: Record<string, string>;
-    concurrency?: Record<string, string | boolean>;
-    steps: Step[];
-  }>;
+  jobs: Record<
+    string,
+    {
+      if?: string;
+      needs?: string | string[];
+      permissions: Record<string, string>;
+      concurrency?: Record<string, string | boolean>;
+      steps: Step[];
+    }
+  >;
 };
 
 describe('Grok cloud proposal uses a separate trusted parent', () => {
