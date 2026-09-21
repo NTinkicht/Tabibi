@@ -1305,3 +1305,95 @@ test('Arabic mobile active filter summary is localized and remains RTL', async (
     'عوامل التصفية النشطة: اللغة: العربية · العيادات التي تعرض أطباء',
   );
 });
+
+test('French filters show matching clinics relative to total', async ({
+  page,
+}) => {
+  const clinics = [
+    {
+      name: 'Clinique Étoile',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr', 'ar'],
+      tenantKey: 'private-visible-total-tenant',
+      doctors: [
+        { displayName: 'Dr. Amine', id: 'private-visible-total-doctor' },
+      ],
+    },
+    {
+      name: 'Cabinet du Centre',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr'],
+      doctors: [],
+    },
+  ];
+  await mockDirectory(page, clinics);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  const summary = page.getByTestId('visible-clinic-total');
+  await expect(summary).toHaveCount(0);
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  await search.fill('amine');
+  await expect(summary).toHaveText(
+    'Affichage : 1 sur 2 cliniques du répertoire.',
+  );
+  await search.fill('introuvable');
+  await expect(summary).toHaveText(
+    'Affichage : 0 sur 2 cliniques du répertoire.',
+  );
+  await page.getByRole('button', { name: 'Effacer tous les filtres' }).click();
+  await expect(summary).toHaveCount(0);
+  await expect(page.locator('.publicClinic')).toHaveCount(2);
+  const body = await page.locator('main').innerText();
+  expect(body).not.toContain('private-visible-total-tenant');
+  expect(body).not.toContain('private-visible-total-doctor');
+});
+
+test('Arabic mobile visible total updates after refresh', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  let clinics = [
+    {
+      name: 'عيادة الأمل',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'د. مريم' }],
+    },
+    {
+      name: 'Clinique du Centre',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr'],
+      doctors: [],
+    },
+  ];
+  await page.route(DISCOVERY_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ clinics }),
+    });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  await page
+    .getByRole('combobox', { name: 'اللغة المتاحة في العيادة' })
+    .selectOption('ar');
+  const summary = page.getByTestId('visible-clinic-total');
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(summary).toHaveText('العيادات المعروضة: 1 من 2.');
+  clinics = [
+    ...clinics,
+    {
+      name: 'عيادة النور',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [],
+    },
+  ];
+  await page.getByRole('button', { name: 'تحديث' }).click();
+  await expect(summary).toHaveText('العيادات المعروضة: 2 من 3.');
+  await page.getByRole('button', { name: 'مسح جميع عوامل التصفية' }).click();
+  await expect(summary).toHaveCount(0);
+  await expect(page.locator('.publicClinic')).toHaveCount(3);
+});
