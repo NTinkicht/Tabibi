@@ -16,9 +16,21 @@ test('French ETA guidance distinguishes verified time from live freshness or a p
       /dernière vérification réussie jusqu’à une nouvelle actualisation confirmée/,
     ),
   ).toBeVisible();
-  await expect(page.getByText(/ne garantit pas/)).toBeVisible();
+  await expect(
+    page
+      .locator('section[aria-labelledby="verification-heading"]')
+      .getByText(/ne garantit pas/),
+  ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'Temps d’attente' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Si le statut n’est plus à jour' }),
+  ).toBeVisible();
+  await expect(page.getByText(/Actualiser mon statut/)).toBeVisible();
+  await expect(page.getByText(/Réessayer maintenant/)).toBeVisible();
+  await expect(
+    page.getByText(/Attendez une nouvelle vérification réussie/),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'Votre vie privée' }),
@@ -42,6 +54,14 @@ test('Arabic ETA guidance preserves RTL, translates timestamp caveat and changes
   ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'وقت الانتظار' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'إذا لم تعد الحالة محدّثة' }),
+  ).toBeVisible();
+  await expect(page.getByText(/تحديث حالتي/)).toBeVisible();
+  await expect(page.getByText(/إعادة المحاولة الآن/)).toBeVisible();
+  await expect(
+    page.getByText(/لا يضمن أن الحالة المعروضة هي الحالة الحالية/),
   ).toBeVisible();
   await expect(page.locator('main')).not.toContainText('never-expose-bearer');
   await page.getByRole('link', { name: 'Français' }).click();

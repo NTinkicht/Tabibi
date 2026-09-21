@@ -10,6 +10,8 @@ type Copy = {
   consultationBody: string;
   verificationHeading: string;
   verificationBody: string;
+  recoveryHeading: string;
+  recoveryBody: string;
   privacyHeading: string;
   privacyBody: string;
 };
@@ -29,6 +31,9 @@ const COPY: Record<Locale, Copy> = {
     verificationHeading: 'Dernière vérification du statut',
     verificationBody:
       'Cette heure indique la dernière fois où Tabibi a réussi à vérifier votre statut auprès de la file sécurisée. Elle ne garantit pas que le statut est encore à jour ni une heure précise de passage. Si un avertissement de connexion ou de statut potentiellement obsolète apparaît, l’heure reste celle de la dernière vérification réussie jusqu’à une nouvelle actualisation confirmée.',
+    recoveryHeading: 'Si le statut n’est plus à jour',
+    recoveryBody:
+      'Revenez à votre page sécurisée de suivi de file et utilisez « Actualiser mon statut » ou « Réessayer maintenant ». Attendez une nouvelle vérification réussie avant de vous fier à une estimation actualisée. L’heure de la dernière vérification ne garantit pas la situation présente.',
     privacyHeading: 'Votre vie privée',
     privacyBody:
       'Ces explications n’affichent ni identité d’un autre patient, ni motif de consultation, ni donnée clinique.',
@@ -47,6 +52,9 @@ const COPY: Record<Locale, Copy> = {
     verificationHeading: 'آخر تحقق من الحالة',
     verificationBody:
       'يشير هذا الوقت إلى آخر مرة نجح فيها طبيبي في التحقق من حالتك عبر الطابور الآمن. لا يضمن أن الحالة لا تزال محدّثة ولا يحدد موعدًا مضمونًا للدخول. عند ظهور تنبيه بانقطاع الاتصال أو احتمال قِدم الحالة، يبقى وقت آخر تحقق ناجح كما هو حتى يكتمل تحديث جديد مؤكّد.',
+    recoveryHeading: 'إذا لم تعد الحالة محدّثة',
+    recoveryBody:
+      'ارجع إلى صفحة متابعة الطابور الآمنة واستخدم « تحديث حالتي » أو « إعادة المحاولة الآن ». انتظر نجاح تحقق جديد قبل الاعتماد على تقدير محدّث. وقت آخر تحقق لا يضمن أن الحالة المعروضة هي الحالة الحالية.',
     privacyHeading: 'خصوصيتك',
     privacyBody:
       'لا تعرض هذه التوضيحات هوية أي مريض آخر أو سبب الاستشارة أو أي بيانات سريرية.',
@@ -81,6 +89,10 @@ export default async function GuestEtaExplainedPage({
       <section aria-labelledby="verification-heading">
         <h2 id="verification-heading">{copy.verificationHeading}</h2>
         <p>{copy.verificationBody}</p>
+      </section>
+      <section aria-labelledby="recovery-heading">
+        <h2 id="recovery-heading">{copy.recoveryHeading}</h2>
+        <p>{copy.recoveryBody}</p>
       </section>
       <section aria-labelledby="privacy-heading">
         <h2 id="privacy-heading">{copy.privacyHeading}</h2>
