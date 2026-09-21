@@ -13,6 +13,7 @@ export type PublicClinic = {
 };
 type LoadState = 'loading' | 'ready' | 'error';
 const REFRESH_TIMEOUT_MS = 5_000;
+const DIRECTORY_BATCH_SIZE = 6;
 
 const copy = {
   fr: {
@@ -46,6 +47,12 @@ const copy = {
       `${count} médecin${count === 1 ? '' : 's'} affiché${count === 1 ? '' : 's'} au total dans les résultats.`,
     visibleClinicTotal: (visible: number, total: number) =>
       `Affichage : ${visible} sur ${total} clinique${total === 1 ? '' : 's'} du répertoire.`,
+    resultRange: (shown: number, matching: number) =>
+      shown === 0
+        ? `Aucun résultat parmi ${matching} clinique${matching === 1 ? '' : 's'} correspondante${matching === 1 ? '' : 's'}.`
+        : `Résultats affichés : 1 à ${shown} sur ${matching} clinique${matching === 1 ? '' : 's'} correspondante${matching === 1 ? '' : 's'}.`,
+    showMore: (count: number) =>
+      `Afficher ${count} autre${count === 1 ? '' : 's'} clinique${count === 1 ? '' : 's'}`,
     noSearchMatches:
       'Aucune clinique ni aucun médecin ne correspond à votre recherche.',
     refresh: 'Actualiser',
@@ -90,6 +97,11 @@ const copy = {
       `إجمالي الأطباء المعروضين في النتائج: ${count}.`,
     visibleClinicTotal: (visible: number, total: number) =>
       `العيادات المعروضة: ${visible} من ${total}.`,
+    resultRange: (shown: number, matching: number) =>
+      shown === 0
+        ? `لا توجد نتائج معروضة من أصل ${matching} عيادة مطابقة.`
+        : `النتائج المعروضة: من 1 إلى ${shown} من أصل ${matching} عيادة مطابقة.`,
+    showMore: (count: number) => `عرض ${count} عيادة إضافية`,
     noSearchMatches: 'لا توجد عيادات أو أطباء يطابقون بحثك.',
     refresh: 'تحديث',
     refreshed: (count: number) => `تم تحديث الدليل: ${count} عيادة.`,
@@ -194,6 +206,7 @@ export default function PublicDiscoveryLandingClient({
     useState<ClinicLanguageFilter>('all');
   const [clinicSort, setClinicSort] = useState<ClinicSort>('original');
   const [onlyListedDoctors, setOnlyListedDoctors] = useState(false);
+  const [visibleLimit, setVisibleLimit] = useState(DIRECTORY_BATCH_SIZE);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [refreshCount, setRefreshCount] = useState<number | null>(null);
   const t = copy[locale];
@@ -221,13 +234,6 @@ export default function PublicDiscoveryLandingClient({
           normalizeSearch(doctor.displayName).includes(query),
         )),
   );
-  // Count exactly the doctors rendered inside the matching clinic cards:
-  // a clinic-name match exposes its full public list; a doctor-name-only
-  // match exposes only matching public names (WU103).
-  const visibleDoctorTotal = matchingClinics.reduce(
-    (total, clinic) => total + doctorsVisibleForQuery(clinic, query).length,
-    0,
-  );
   const collator = new Intl.Collator(locale, {
     sensitivity: 'base',
     numeric: true,
@@ -248,6 +254,14 @@ export default function PublicDiscoveryLandingClient({
             );
           })
           .map(({ clinic }) => clinic);
+  // Reveal public results in bounded batches without server pagination or
+  // changing the underlying filtered/sorted result set.
+  const displayedClinics = sortedClinics.slice(0, visibleLimit);
+  const remainingClinics = matchingClinics.length - displayedClinics.length;
+  const visibleDoctorTotal = displayedClinics.reduce(
+    (total, clinic) => total + doctorsVisibleForQuery(clinic, query).length,
+    0,
+  );
 
   useEffect(() => {
     if (retry === 0) return;
@@ -318,6 +332,7 @@ export default function PublicDiscoveryLandingClient({
   }, []);
 
   const beginRefresh = () => {
+    setVisibleLimit(DIRECTORY_BATCH_SIZE);
     setRefreshCount(null);
     setState('loading');
     setRetry((value) => value + 1);
@@ -388,11 +403,15 @@ export default function PublicDiscoveryLandingClient({
                 maxLength={120}
                 placeholder={t.searchPlaceholder}
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setVisibleLimit(DIRECTORY_BATCH_SIZE);
+                }}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape' && search.length > 0) {
                     event.preventDefault();
                     setSearch('');
+                    setVisibleLimit(DIRECTORY_BATCH_SIZE);
                   }
                 }}
               />
@@ -401,6 +420,7 @@ export default function PublicDiscoveryLandingClient({
                   type="button"
                   onClick={() => {
                     setSearch('');
+                    setVisibleLimit(DIRECTORY_BATCH_SIZE);
                     searchInputRef.current?.focus();
                   }}
                 >
@@ -414,9 +434,10 @@ export default function PublicDiscoveryLandingClient({
             <select
               id="publicClinicLanguage"
               value={clinicLanguage}
-              onChange={(event) =>
-                setClinicLanguage(event.target.value as ClinicLanguageFilter)
-              }
+              onChange={(event) => {
+                setClinicLanguage(event.target.value as ClinicLanguageFilter);
+                setVisibleLimit(DIRECTORY_BATCH_SIZE);
+              }}
             >
               <option value="all">{t.clinicLanguageAll}</option>
               <option value="fr">{t.clinicLanguageFrench}</option>
@@ -430,7 +451,10 @@ export default function PublicDiscoveryLandingClient({
                 id="publicClinicsWithDoctors"
                 type="checkbox"
                 checked={onlyListedDoctors}
-                onChange={(event) => setOnlyListedDoctors(event.target.checked)}
+                onChange={(event) => {
+                  setOnlyListedDoctors(event.target.checked);
+                  setVisibleLimit(DIRECTORY_BATCH_SIZE);
+                }}
               />
               <span>{t.onlyListedDoctors}</span>
             </label>
@@ -438,9 +462,10 @@ export default function PublicDiscoveryLandingClient({
             <select
               id="publicClinicSort"
               value={clinicSort}
-              onChange={(event) =>
-                setClinicSort(event.target.value as ClinicSort)
-              }
+              onChange={(event) => {
+                setClinicSort(event.target.value as ClinicSort);
+                setVisibleLimit(DIRECTORY_BATCH_SIZE);
+              }}
             >
               <option value="original">{t.clinicSortOriginal}</option>
               <option value="ascending">{t.clinicSortAscending}</option>
@@ -455,6 +480,7 @@ export default function PublicDiscoveryLandingClient({
                   setSearch('');
                   setClinicLanguage('all');
                   setOnlyListedDoctors(false);
+                  setVisibleLimit(DIRECTORY_BATCH_SIZE);
                   searchInputRef.current?.focus();
                 }}
               >
@@ -470,7 +496,7 @@ export default function PublicDiscoveryLandingClient({
               <div role="status" aria-live="polite" aria-atomic="true">
                 <p>{t.searchCount(matchingClinics.length)}</p>
                 <p data-testid="visible-clinic-total">
-                  {t.visibleClinicTotal(matchingClinics.length, clinics.length)}
+                  {t.visibleClinicTotal(displayedClinics.length, clinics.length)}
                 </p>
                 <p>{t.searchDoctorTotal(visibleDoctorTotal)}</p>
               </div>
@@ -502,9 +528,14 @@ export default function PublicDiscoveryLandingClient({
               {noMatchesCopy}
             </p>
           )}
-        {state === 'ready' && matchingClinics.length > 0 && (
+        {state === 'ready' && clinics.length > 0 && (
+          <p data-testid="clinic-result-range" aria-live="polite">
+            {t.resultRange(displayedClinics.length, matchingClinics.length)}
+          </p>
+        )}
+        {state === 'ready' && displayedClinics.length > 0 && (
           <div className="publicGrid">
-            {sortedClinics.map((clinic, index) => {
+            {displayedClinics.map((clinic, index) => {
               const visibleDoctors = doctorsVisibleForQuery(clinic, query);
               return (
                 <article className="publicClinic" key={index}>
@@ -534,6 +565,17 @@ export default function PublicDiscoveryLandingClient({
               );
             })}
           </div>
+        )}
+        {state === 'ready' && remainingClinics > 0 && (
+          <button
+            type="button"
+            data-testid="show-more-clinics"
+            onClick={() =>
+              setVisibleLimit((previous) => previous + DIRECTORY_BATCH_SIZE)
+            }
+          >
+            {t.showMore(Math.min(DIRECTORY_BATCH_SIZE, remainingClinics))}
+          </button>
         )}
       </section>
       <footer className="publicFootnote">{t.note}</footer>
