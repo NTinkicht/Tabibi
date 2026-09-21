@@ -188,6 +188,40 @@ describe('Mistral code adapter uses owner per-WU leases', () => {
     );
   });
 
+  it('fails closed at runtime when PAYG-off confirmation is absent', () => {
+    const dir = fs.mkdtempSync('/tmp/tabibi-mistral-payg-');
+    const output = `${dir}/result.txt`;
+    try {
+      fs.writeFileSync(output, '');
+      for (const confirmation of ['', 'false']) {
+        fs.writeFileSync(output, '');
+        const run = spawnSync(
+          'python3',
+          ['scripts/mistral-code-adapter.py', 'prepare'],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              GITHUB_REPOSITORY: 'NTinkicht/Tabibi',
+              GITHUB_OUTPUT: output,
+              DISPATCH_BODY: 'invalid dispatch must not be parsed',
+              PAYG_DISABLED_CONFIRMED: confirmation,
+            },
+          },
+        );
+        expect(run.status, run.stderr).toBe(0);
+        expect(fs.readFileSync(output, 'utf8')).toContain(
+          'status=CONFIG_BLOCKED',
+        );
+        expect(fs.readFileSync(output, 'utf8')).not.toContain(
+          'LEASE_OR_TARGET_BLOCKED',
+        );
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('runs parent synthetic attack and fail-closed security selftest', () => {
     const testRun = spawnSync(
       'python3',
