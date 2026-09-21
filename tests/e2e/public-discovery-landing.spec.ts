@@ -1392,7 +1392,7 @@ test('Arabic mobile visible-total summary follows language filter and fresh dire
     },
   ];
   await page.getByRole('button', { name: 'تحديث' }).click();
-  await expect(summary).toHaveText('المعروض: 2 من أصل 3 عيادة في الدليل.');
+  await expect(summary).toHaveText('العيادات المعروضة: 2 من 3.');
   await page.getByRole('button', { name: 'مسح جميع عوامل التصفية' }).click();
   await expect(summary).toHaveCount(0);
   await expect(page.locator('.publicClinic')).toHaveCount(3);
