@@ -1348,9 +1348,7 @@ test('French filters show matching clinics relative to total', async ({
   expect(body).not.toContain('private-visible-total-doctor');
 });
 
-test('Arabic mobile visible total updates after refresh', async ({
-  page,
-}) => {
+test('Arabic mobile visible total updates after refresh', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   let clinics = [
     {
