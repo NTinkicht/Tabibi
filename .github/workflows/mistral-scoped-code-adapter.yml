@@ -4,7 +4,7 @@ on:
   issue_comment:
     types: [created]
 
-# DEFAULT OFF. The Vibe child gets READ tools only. GitHub write token only
+# DEFAULT OFF unless an exact-head owner WU lease explicitly activates one run.\n# The Vibe child gets READ tools only. GitHub write token only
 # exists in the fresh publish job AFTER model and untrusted tests exit.
 permissions:
   contents: read
@@ -24,8 +24,8 @@ jobs:
       pull-requests: read
       actions: read
     concurrency:
-      group: mistral-code-${{ github.event.issue.number }}
-      cancel-in-progress: true
+      # Each authorized dispatch is isolated. The trusted parent checks the\n      # sole-implementer lease and expected SHA again before publishing.\n      group: mistral-code-${{ github.event.comment.id }}
+      cancel-in-progress: false
     outputs:
       ready: ${{ steps.model.outputs.exit_code == '0' }}
       status: ${{ steps.model.outputs.status }}
@@ -44,12 +44,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate owner lease and default-OFF guards
+      - name: Validate owner per-WU lease and PAYG-disabled guard
         id: lease
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DISPATCH_BODY: ${{ github.event.comment.body }}
-          ADAPTER_ENABLED: ${{ vars.TABIBI_MISTRAL_CODE_ADAPTER_ENABLED }}
           PAYG_DISABLED_CONFIRMED: ${{ vars.TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED }}
         shell: bash
         run: |
