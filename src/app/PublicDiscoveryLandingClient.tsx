@@ -36,6 +36,10 @@ const copy = {
     searchPlaceholder: 'Nom de la clinique ou du médecin',
     clearSearch: 'Effacer la recherche',
     clearAllFilters: 'Effacer tous les filtres',
+    activeFiltersLabel: 'Filtres actifs :',
+    activeLanguageFrench: 'langue : français',
+    activeLanguageArabic: 'langue : arabe',
+    activeListedDoctors: 'cliniques avec médecins affichés',
     searchCount: (count: number) =>
       `${count} clinique${count === 1 ? '' : 's'} trouvée${count === 1 ? '' : 's'}.`,
     searchDoctorTotal: (count: number) =>
@@ -75,6 +79,10 @@ const copy = {
     searchPlaceholder: 'اسم العيادة أو الطبيب',
     clearSearch: 'مسح البحث',
     clearAllFilters: 'مسح جميع عوامل التصفية',
+    activeFiltersLabel: 'عوامل التصفية النشطة:',
+    activeLanguageFrench: 'اللغة: الفرنسية',
+    activeLanguageArabic: 'اللغة: العربية',
+    activeListedDoctors: 'العيادات التي تعرض أطباء',
     searchCount: (count: number) => `نتائج البحث: ${count} عيادة.`,
     searchDoctorTotal: (count: number) =>
       `إجمالي الأطباء المعروضين في النتائج: ${count}.`,
@@ -190,6 +198,14 @@ export default function PublicDiscoveryLandingClient({
     clinicLanguage !== 'all' || onlyListedDoctors
       ? t.noFilteredMatches
       : t.noSearchMatches;
+  const activeFilterLabels = [
+    clinicLanguage === 'fr'
+      ? t.activeLanguageFrench
+      : clinicLanguage === 'ar'
+        ? t.activeLanguageArabic
+        : null,
+    onlyListedDoctors ? t.activeListedDoctors : null,
+  ].filter((value): value is string => value !== null);
   const matchingClinics = clinics.filter(
     (clinic) =>
       (clinicLanguage === 'all' ||
@@ -440,6 +456,11 @@ export default function PublicDiscoveryLandingClient({
               >
                 {t.clearAllFilters}
               </button>
+            )}
+            {activeFilterLabels.length > 0 && (
+              <p data-testid="active-filter-summary">
+                {t.activeFiltersLabel} {activeFilterLabels.join(' · ')}
+              </p>
             )}
             {(query || clinicLanguage !== 'all' || onlyListedDoctors) && (
               <div role="status" aria-live="polite" aria-atomic="true">
