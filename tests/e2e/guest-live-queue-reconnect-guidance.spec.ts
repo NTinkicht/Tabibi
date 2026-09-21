@@ -51,23 +51,20 @@ test('French connection loss gives bounded fallback announcement, reconnect prog
         const testWindow = window as Window & {
           __releaseGuestStream?: () => void;
         };
-        testWindow.__releaseGuestStream = () =>
+        testWindow.__releaseGuestStream = () => {
+          const stream = new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode(': ready\\n\\n'));
+              // Keep the stream open until the test finishes.
+            },
+          });
           resolve(
-              new Response(
-                new ReadableStream<Uint8Array>({
-                  start(controller) {
-                    controller.enqueue(
-                      new TextEncoder().encode(': ready\\n\\n'),
-                    );
-                    // Keep the stream open until the test finishes.
-                  },
-                }),
-                {
-                  status: 200,
-                  headers: { 'content-type': 'text/event-stream' },
-                },
-              ),
-            );
+            new Response(stream, {
+              status: 200,
+              headers: { 'content-type': 'text/event-stream' },
+            }),
+          );
+        };
       });
     };
   }, STREAM_URL);
@@ -91,9 +88,10 @@ test('French connection loss gives bounded fallback announcement, reconnect prog
   );
   await expect(announcement).toHaveCount(1);
   await page.evaluate(() => {
-    (
-      window as Window & { __releaseGuestStream?: () => void }
-    ).__releaseGuestStream?.();
+    const testWindow = window as Window & {
+      __releaseGuestStream?: () => void;
+    };
+    testWindow.__releaseGuestStream?.();
   });
   await expect(guidance).toContainText('Notifications en direct rétablies.');
   await expect(announcement).toHaveCount(1);
