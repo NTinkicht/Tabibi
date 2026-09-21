@@ -60,8 +60,12 @@ test('French result range reveals public clinics in bounded batches and resets o
   await expect(range).toHaveText(
     'Résultats affichés : 1 à 6 sur 8 cliniques correspondantes.',
   );
-  expect(await page.locator('main').innerText()).not.toContain('private-range-tenant');
-  expect(await page.locator('main').innerText()).not.toContain('private-range-clinic');
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-range-tenant',
+  );
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-range-clinic',
+  );
 });
 
 test('Arabic RTL mobile result range respects sorting, filters and public-data boundary', async ({
@@ -96,6 +100,8 @@ test('Arabic RTL mobile result range respects sorting, filters and public-data b
   await expect(range).toHaveText(
     'النتائج المعروضة: من 1 إلى 6 من أصل 7 عيادة مطابقة.',
   );
-  expect(await page.locator('main').innerText()).not.toContain('private-range-tenant');
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-range-tenant',
+  );
   expect(page.url()).not.toContain('private-range-clinic');
 });
