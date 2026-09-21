@@ -85,6 +85,8 @@ type Copy = {
   manualRetry: string;
   manualRefresh: string;
   manualRefreshPending: string;
+  manualRefreshVerified: string;
+  manualRefreshFailed: string;
   lastVerified: string;
   visitStatus: string;
   bookingStates: Record<string, string>;
@@ -154,6 +156,10 @@ const COPY: Record<SupportedLocale, Copy> = {
     manualRetry: 'Réessayer maintenant',
     manualRefresh: 'Actualiser mon statut',
     manualRefreshPending: 'Actualisation en cours…',
+    manualRefreshVerified:
+      'Nouvelle vérification réussie. Le statut peut avoir changé depuis cette vérification.',
+    manualRefreshFailed:
+      'La nouvelle vérification a échoué. La dernière heure vérifiée reste affichée.',
     lastVerified: 'Dernière vérification :',
     visitStatus: 'Statut de la visite',
     checkIn: 'Confirmer ma présence',
@@ -241,6 +247,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     manualRetry: 'إعادة المحاولة الآن',
     manualRefresh: 'تحديث حالتي',
     manualRefreshPending: 'جارٍ تحديث حالتك…',
+    manualRefreshVerified: 'نجح التحقق الجديد. قد تتغير الحالة بعد هذا التحقق.',
+    manualRefreshFailed: 'فشل التحقق الجديد. يبقى وقت آخر تحقق ناجح معروضًا.',
     lastVerified: 'آخر تحقق من الحالة:',
     visitStatus: 'حالة الزيارة',
     checkIn: 'تأكيد الحضور',
@@ -621,6 +629,9 @@ function LiveQueueView({
   const manualRetryRef = useRef<() => void>(() => undefined);
   const manualRefreshRef = useRef<() => void>(() => undefined);
   const [manualRefreshPending, setManualRefreshPending] = useState(false);
+  const [manualRefreshOutcome, setManualRefreshOutcome] = useState<
+    'idle' | 'pending' | 'verified' | 'failed'
+  >('idle');
   const [lastVerifiedAt, setLastVerifiedAt] = useState<Date | null>(null);
   // Captured once on mount; later re-renders may pass `undefined` once the
   // host clears its own copy, but this ref keeps the value this view needs.
@@ -911,15 +922,24 @@ function LiveQueueView({
         // Only a successfully parsed canonical snapshot establishes freshness.
         // Stream hints, failed requests, and retries never advance this clock.
         setLastVerifiedAt(new Date());
+        if (manualRequestPending) {
+          setManualRefreshOutcome('verified');
+        } else {
+          setManualRefreshOutcome((previous) =>
+            previous === 'failed' ? 'idle' : previous,
+          );
+        }
         setState({ kind: 'active', data });
         scheduleNext(POLL_INTERVAL_MS);
       } catch {
         if (cancelled || terminalReached) return;
         if (hideAbort) {
+          if (manualRequestPending) setManualRefreshOutcome('failed');
           hideAbort = false;
           resumeIfVisibleAfterHideAbort = true;
           return;
         }
+        if (manualRequestPending) setManualRefreshOutcome('failed');
         consecutiveFailures += 1;
         if (consecutiveFailures > MAX_TRANSIENT_FAILURES) {
           clearScheduled();
@@ -1048,6 +1068,7 @@ function LiveQueueView({
       if (now - lastManualRefreshAt < MANUAL_REFRESH_THROTTLE_MS) return;
       lastManualRefreshAt = now;
       manualRequestPending = true;
+      setManualRefreshOutcome('pending');
       setManualRefreshPending(true);
       clearScheduled();
       void poll();
@@ -1127,14 +1148,29 @@ function LiveQueueView({
   );
 
   const manualRefreshControl = (
-    <button
-      type="button"
-      onClick={() => manualRefreshRef.current()}
-      disabled={manualRefreshPending}
-      aria-busy={manualRefreshPending}
-    >
-      {manualRefreshPending ? copy.manualRefreshPending : copy.manualRefresh}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => manualRefreshRef.current()}
+        disabled={manualRefreshPending}
+        aria-busy={manualRefreshPending}
+      >
+        {manualRefreshPending ? copy.manualRefreshPending : copy.manualRefresh}
+      </button>
+      {manualRefreshOutcome !== 'idle' ? (
+        <p
+          role="status"
+          aria-atomic="true"
+          data-testid="manual-refresh-feedback"
+        >
+          {manualRefreshOutcome === 'pending'
+            ? copy.manualRefreshPending
+            : manualRefreshOutcome === 'verified'
+              ? copy.manualRefreshVerified
+              : copy.manualRefreshFailed}
+        </p>
+      ) : null}
+    </>
   );
 
   const lastVerifiedStatus = lastVerifiedAt ? (
