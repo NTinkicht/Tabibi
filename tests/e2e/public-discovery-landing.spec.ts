@@ -1315,7 +1315,9 @@ test('French filters show matching clinics relative to total', async ({
       defaultLocale: 'fr',
       enabledLocales: ['fr', 'ar'],
       tenantKey: 'private-visible-total-tenant',
-      doctors: [{ displayName: 'Dr. Amine', id: 'private-visible-total-doctor' }],
+      doctors: [
+        { displayName: 'Dr. Amine', id: 'private-visible-total-doctor' },
+      ],
     },
     {
       name: 'Cabinet du Centre',
