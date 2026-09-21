@@ -1054,9 +1054,7 @@ function LiveQueueView({
         // Only the canonical status request can terminate guest access.
         if (!response.ok || !response.body) throw new Error('stream rejected');
         if (cancelled || terminalReached) return;
-        setStreamConnection(
-          streamOutageAnnounced ? 'recovered' : 'connected',
-        );
+        setStreamConnection(streamOutageAnnounced ? 'recovered' : 'connected');
         if (streamOutageAnnounced) {
           setStreamAnnouncement('recovered');
           streamOutageAnnounced = false;
