@@ -11,6 +11,13 @@ const source = fs.readFileSync(
   '.github/workflows/grok-cloud-code-proposal.yml',
   'utf8',
 );
+type Step = {
+  name?: string;
+  id?: string;
+  run?: string;
+  env?: Record<string, string>;
+  uses?: string;
+};
 const parsed = yaml.load(source) as {
   on: { issue_comment: { types: string[] } };
   permissions: Record<string, string>;
@@ -19,12 +26,12 @@ const parsed = yaml.load(source) as {
     needs?: string | string[];
     permissions: Record<string, string>;
     concurrency?: Record<string, string | boolean>;
-    steps: { name?: string; id?: string; run?: string; env?: Record<string, string>; uses?: string }[];
+    steps: Step[];
   }>;
 };
 
 describe('Grok cloud proposal uses a separate trusted parent', () => {
-  it('accepts only owner-authored comments on existing PRs with code marker', () => {
+  it('only accepts owner comments on existing PRs with a code marker', () => {
     expect(parsed.on.issue_comment.types).toEqual(['created']);
     expect(parsed.permissions).toEqual({ contents: 'read' });
     const job = parsed.jobs.propose;
@@ -41,11 +48,15 @@ describe('Grok cloud proposal uses a separate trusted parent', () => {
     expect(stage?.run).toContain('write_text(raw');
   });
 
-  it('keeps untrusted Grok output and test runners read-only, and parent publishing isolated', () => {
+  it('separates untrusted tests from privileged parent publishing', () => {
     const { propose, validate, test, publish, report } = parsed.jobs;
     for (const job of [propose, validate, test]) {
       expect(job.permissions.contents).toBe('read');
-      expect(job.steps.some((step) => (step.run ?? '').includes('gh auth setup-git'))).toBe(false);
+      expect(
+        job.steps.some((step) =>
+          (step.run ?? '').includes('gh auth setup-git'),
+        ),
+      ).toBe(false);
     }
     expect(publish.permissions.contents).toBe('write');
     expect(report.permissions.contents).toBe('read');
@@ -65,7 +76,7 @@ describe('Grok cloud proposal uses a separate trusted parent', () => {
     expect(source).toContain('npm test');
   });
 
-  it('selftests exact old-text edits, symlink rejection and owner lease replay', () => {
+  it('selftests exact edits, symlinks and owner lease replay', () => {
     const output = spawnSync(
       'python3',
       ['scripts/grok-cloud-code-adapter.py', 'selftest'],
@@ -73,7 +84,10 @@ describe('Grok cloud proposal uses a separate trusted parent', () => {
     );
     expect(output.status, output.stderr).toBe(0);
     expect(output.stdout).toContain('selftest passed');
-    const adapter = fs.readFileSync('scripts/grok-cloud-code-adapter.py', 'utf8');
+    const adapter = fs.readFileSync(
+      'scripts/grok-cloud-code-adapter.py',
+      'utf8',
+    );
     for (const invariant of [
       'GROK_CLOUD_CODE_PROPOSAL_V1',
       'source_lease_id',
