@@ -205,7 +205,7 @@ export default function PublicDiscoveryLandingClient({
         ? t.activeLanguageArabic
         : null,
     onlyListedDoctors ? t.activeListedDoctors : null,
-  ].filter((value): value is string => value !== null);
+  ].filter((value) => value !== null);
   const matchingClinics = clinics.filter(
     (clinic) =>
       (clinicLanguage === 'all' ||
