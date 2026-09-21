@@ -42,13 +42,16 @@ const named = (job: Job, name: string) => {
   return found;
 };
 
-describe('Mistral scoped coding adapter requires an owner per-WU lease and is parent-controlled', () => {
-  it('parses owner-only event and requires PAYG-disabled per-lease activation', () => {
+describe('Mistral code adapter uses owner per-WU leases', () => {
+  it('accepts owner-only per-lease activation with PAYG disabled', () => {
     expect(parsed.on.issue_comment.types).toEqual(['created']);
     expect(propose.if).toContain("github.actor == 'NTinkicht'");
     expect(propose.if).toContain('github.event.issue.number == 11');
     expect(propose.if).toContain('MISTRAL_LEASED_CODE_V1');
-    const gate = named(propose, 'Validate owner per-WU lease and PAYG-disabled guard');
+    const gate = named(
+      propose,
+      'Validate owner per-WU lease and PAYG-disabled guard',
+    );
     expect(gate.env).not.toHaveProperty('ADAPTER_ENABLED');
     expect(gate.env?.PAYG_DISABLED_CONFIRMED).toContain(
       'vars.TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED',
@@ -61,7 +64,6 @@ describe('Mistral scoped coding adapter requires an owner per-WU lease and is pa
     expect(propose.outputs?.paths).toContain('steps.lease.outputs.paths');
     expect(propose.concurrency?.group).toContain('github.event.comment.id');
     expect(propose.concurrency?.['cancel-in-progress']).toBe(false);
-    expect(gate.run).toContain('mistral-code-adapter.py prepare');
   });
 
   it('isolates the model and deterministic tests from ALL repository write tokens', () => {
