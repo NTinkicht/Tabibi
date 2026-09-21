@@ -1,7 +1,7 @@
 name: WU109 disposable format diagnostic
 on:
-  push:
-    branches: [chatgpt/wu109-search-shortcut]
+  pull_request:
+    branches: [main]
 permissions:
   contents: read
 jobs:
