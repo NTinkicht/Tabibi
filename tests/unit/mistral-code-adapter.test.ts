@@ -42,16 +42,14 @@ const named = (job: Job, name: string) => {
   return found;
 };
 
-describe('Mistral scoped coding adapter is default-off and parent-controlled', () => {
-  it('parses owner-only event and explicit disabled-by-default lease guards', () => {
+describe('Mistral scoped coding adapter requires an owner per-WU lease and is parent-controlled', () => {
+  it('parses owner-only event and requires PAYG-disabled per-lease activation', () => {
     expect(parsed.on.issue_comment.types).toEqual(['created']);
     expect(propose.if).toContain("github.actor == 'NTinkicht'");
     expect(propose.if).toContain('github.event.issue.number == 11');
     expect(propose.if).toContain('MISTRAL_LEASED_CODE_V1');
-    const gate = named(propose, 'Validate owner lease and default-OFF guards');
-    expect(gate.env?.ADAPTER_ENABLED).toContain(
-      'vars.TABIBI_MISTRAL_CODE_ADAPTER_ENABLED',
-    );
+    const gate = named(propose, 'Validate owner per-WU lease and PAYG-disabled guard');
+    expect(gate.env).not.toHaveProperty('ADAPTER_ENABLED');
     expect(gate.env?.PAYG_DISABLED_CONFIRMED).toContain(
       'vars.TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED',
     );
@@ -61,8 +59,9 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     expect(validate.outputs?.ready).toContain('steps.patch.outputs.ready');
     expect(propose.outputs?.lease).toContain('steps.lease.outputs.lease');
     expect(propose.outputs?.paths).toContain('steps.lease.outputs.paths');
-    expect(propose.concurrency?.group).toContain('github.event.issue.number');
-    expect(propose.concurrency?.['cancel-in-progress']).toBe(true);
+    expect(propose.concurrency?.group).toContain('github.event.comment.id');
+    expect(propose.concurrency?.['cancel-in-progress']).toBe(false);
+    expect(gate.run).toContain('mistral-code-adapter.py prepare');
   });
 
   it('isolates the model and deterministic tests from ALL repository write tokens', () => {
@@ -217,5 +216,7 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
       expect(parent).toContain(evidence);
     }
     expect(parent).not.toContain('--force');
+    expect(parent).not.toContain('ADAPTER_ENABLED');
+    expect(parent).toContain('PAYG_DISABLED_CONFIRMED');
   });
 });
