@@ -1,0 +1,22 @@
+name: WU110 disposable format diagnostic
+on:
+  push:
+    branches: [codex/wu110-guest-refresh-status]
+permissions:
+  contents: read
+jobs:
+  formatter-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Show exact Prettier delta for synthetic work-unit file
+        shell: bash
+        run: |
+          npx prettier --write 'src/app/guest/live-queue/[selectionReference]/GuestLiveQueueHostClient.tsx'
+          git diff -- 'src/app/guest/live-queue/[selectionReference]/GuestLiveQueueHostClient.tsx'
