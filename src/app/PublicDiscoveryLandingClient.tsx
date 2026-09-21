@@ -89,7 +89,7 @@ const copy = {
     searchDoctorTotal: (count: number) =>
       `إجمالي الأطباء المعروضين في النتائج: ${count}.`,
     visibleClinicTotal: (visible: number, total: number) =>
-      `المعروض: ${visible} من أصل ${total} عيادة في الدليل.`,
+      `العيادات المعروضة: ${visible} من ${total}.`,
     noSearchMatches: 'لا توجد عيادات أو أطباء يطابقون بحثك.',
     refresh: 'تحديث',
     refreshed: (count: number) => `تم تحديث الدليل: ${count} عيادة.`,
