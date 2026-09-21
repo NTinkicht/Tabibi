@@ -1215,3 +1215,93 @@ test('slash focuses Arabic RTL public search from noneditable control on mobile'
   await expect(search).toHaveValue('مريم/');
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
 });
+
+test('active filter summary stays visible when search is cleared and disappears when filters reset', async ({
+  page,
+}) => {
+  await mockDirectory(page, [
+    {
+      name: 'Clinique Étoile',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr', 'ar'],
+      tenantKey: 'private-filter-summary-tenant',
+      doctors: [
+        { displayName: 'Dr. Salima', id: 'private-filter-summary-doctor' },
+      ],
+    },
+    {
+      name: 'Cabinet du Centre',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr'],
+      doctors: [{ displayName: 'Dr. Paul' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  await page
+    .getByRole('combobox', { name: 'Langue proposée par la clinique' })
+    .selectOption('ar');
+  await page
+    .getByRole('checkbox', {
+      name: 'Cliniques avec médecins affichés uniquement',
+    })
+    .check();
+  await search.fill('salima');
+
+  const summary = page.getByTestId('active-filter-summary');
+  await expect(summary).toHaveText(
+    'Filtres actifs : langue : arabe · cliniques avec médecins affichés',
+  );
+
+  await page.getByRole('button', { name: 'Effacer la recherche' }).click();
+  await expect(search).toHaveValue('');
+  await expect(search).toBeFocused();
+  await expect(summary).toHaveText(
+    'Filtres actifs : langue : arabe · cliniques avec médecins affichés',
+  );
+
+  await page.getByRole('button', { name: 'Effacer tous les filtres' }).click();
+  await expect(summary).toHaveCount(0);
+
+  const body = await page.locator('main').innerText();
+  expect(body).not.toContain('private-filter-summary-tenant');
+  expect(body).not.toContain('private-filter-summary-doctor');
+});
+
+test('Arabic mobile active filter summary is localized and remains RTL', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDirectory(page, [
+    {
+      name: 'عيادة الورد',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'د. مَرْيَم' }],
+    },
+    {
+      name: 'Clinique Étoile',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr', 'ar'],
+      doctors: [{ displayName: 'Dr. Salima' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  await page
+    .getByRole('combobox', { name: 'اللغة المتاحة في العيادة' })
+    .selectOption('ar');
+  await page
+    .getByRole('checkbox', { name: 'العيادات التي تعرض أطباء فقط' })
+    .check();
+
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.getByTestId('active-filter-summary')).toHaveText(
+    'عوامل التصفية النشطة: اللغة: العربية · العيادات التي تعرض أطباء',
+  );
+});
