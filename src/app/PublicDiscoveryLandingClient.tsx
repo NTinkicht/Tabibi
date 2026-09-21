@@ -333,6 +333,12 @@ export default function PublicDiscoveryLandingClient({
                 placeholder={t.searchPlaceholder}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape' && search.length > 0) {
+                    event.preventDefault();
+                    setSearch('');
+                  }
+                }}
               />
               {search.length > 0 && (
                 <button

@@ -1037,3 +1037,96 @@ test('Arabic RTL public result doctor total follows visible vowel-insensitive ma
     page.getByText(/إجمالي الأطباء المعروضين في النتائج:/),
   ).toHaveCount(0);
 });
+test('Escape clears only focused search and preserves language, listed-doctor and sort filters', async ({
+  page,
+}) => {
+  await mockDirectory(page, [
+    {
+      name: 'Clinique Étoile',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr', 'ar'],
+      tenantKey: 'private-escape-tenant',
+      doctors: [{ displayName: 'Dr. Salima', id: 'private-escape-doctor' }],
+    },
+    {
+      name: 'Cabinet du Centre',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr'],
+      doctors: [{ displayName: 'Dr. Paul' }],
+    },
+    {
+      name: 'عيادة الورد',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'د. مَرْيَم' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  const language = page.getByRole('combobox', {
+    name: 'Langue proposée par la clinique',
+  });
+  const listed = page.getByRole('checkbox', {
+    name: 'Cliniques avec médecins affichés uniquement',
+  });
+  const sort = page.getByRole('combobox', {
+    name: 'Trier les cliniques par nom',
+  });
+  await language.selectOption('ar');
+  await listed.check();
+  await sort.selectOption('ascending');
+  await search.fill('introuvable');
+  await expect(page.locator('.publicClinic')).toHaveCount(0);
+  await expect(page.getByText('0 cliniques trouvées.')).toBeVisible();
+
+  await search.press('Escape');
+  await expect(search).toHaveValue('');
+  await expect(search).toBeFocused();
+  await expect(language).toHaveValue('ar');
+  await expect(listed).toBeChecked();
+  await expect(sort).toHaveValue('ascending');
+  await expect(page.locator('.publicClinic h3')).toHaveText([
+    'Clinique Étoile',
+    'عيادة الورد',
+  ]);
+  await expect(page.getByText('2 cliniques trouvées.')).toBeVisible();
+  await search.press('Escape');
+  await expect(language).toHaveValue('ar');
+  await expect(listed).toBeChecked();
+  const body = await page.locator('main').innerText();
+  expect(body).not.toContain('private-escape-tenant');
+  expect(body).not.toContain('private-escape-doctor');
+});
+
+test('Arabic mobile Escape restores vowel-insensitive doctor results and keeps RTL', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDirectory(page, [
+    {
+      name: 'عيادة الورد',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'د. مَرْيَم' }, { displayName: 'د. سارة' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  const search = page.getByRole('searchbox', { name: 'ابحث عن عيادة أو طبيب' });
+  await search.fill('مريم');
+  await expect(page.locator('.publicClinic li')).toHaveCount(1);
+  await expect(
+    page.getByText('إجمالي الأطباء المعروضين في النتائج: 1.'),
+  ).toBeVisible();
+  await search.press('Escape');
+  await expect(search).toHaveValue('');
+  await expect(search).toBeFocused();
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.locator('.publicClinic li')).toHaveCount(2);
+  await expect(page.getByText('د. مَرْيَم')).toBeVisible();
+  await expect(page.getByText('د. سارة')).toBeVisible();
+});
