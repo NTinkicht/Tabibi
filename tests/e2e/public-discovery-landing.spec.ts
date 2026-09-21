@@ -1202,9 +1202,7 @@ test('slash focuses Arabic RTL public search from noneditable control on mobile'
   await page.goto('/');
   await page.getByRole('button', { name: 'Actualiser' }).click();
   await page.getByRole('button', { name: 'العربية' }).click();
-  await expect(
-    page.getByText('اضغط / للانتقال إلى البحث.'),
-  ).toBeVisible();
+  await expect(page.getByText('اضغط / للانتقال إلى البحث.')).toBeVisible();
   const search = page.getByRole('searchbox', { name: 'ابحث عن عيادة أو طبيب' });
   await page.getByRole('button', { name: 'العربية' }).focus();
   await page.keyboard.press('/');
