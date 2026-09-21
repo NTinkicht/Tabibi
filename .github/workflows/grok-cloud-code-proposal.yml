@@ -98,8 +98,8 @@ jobs:
           persist-credentials: false
       - name: Copy fresh trusted validator and execute security selftest
         run: |
-          cp scripts/grok-code-adapter.py /tmp/tabibi-grok-code-adapter.py
-          python3 /tmp/tabibi-grok-code-adapter.py selftest
+          cp scripts/grok-cloud-code-adapter.py /tmp/tabibi-grok-cloud-code-adapter.py
+          python3 /tmp/tabibi-grok-cloud-code-adapter.py selftest
       - name: Checkout pinned exact canonical PR head without stored token
         uses: actions/checkout@v6
         with:
@@ -120,7 +120,7 @@ jobs:
           REVIEW_BRANCH: ${{ needs.propose.outputs.branch }}
           ALLOWED_PATHS: ${{ needs.propose.outputs.paths }}
           LEASE_ID: ${{ needs.propose.outputs.lease }}
-        run: python3 /tmp/tabibi-grok-code-adapter.py apply
+        run: python3 /tmp/tabibi-grok-cloud-code-adapter.py apply
       - name: Seal validated immutable patch before untrusted tests
         if: steps.patch.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
@@ -149,7 +149,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Copy verifier outside PR worktree
-        run: cp scripts/grok-code-adapter.py /tmp/tabibi-grok-code-adapter.py
+        run: cp scripts/grok-cloud-code-adapter.py /tmp/tabibi-grok-cloud-code-adapter.py
       - name: Checkout exact PR parent
         uses: actions/checkout@v6
         with:
@@ -169,7 +169,7 @@ jobs:
           REVIEW_BRANCH: ${{ needs.propose.outputs.branch }}
           ALLOWED_PATHS: ${{ needs.propose.outputs.paths }}
           LEASE_ID: ${{ needs.propose.outputs.lease }}
-        run: python3 /tmp/tabibi-grok-code-adapter.py applyartifact
+        run: python3 /tmp/tabibi-grok-cloud-code-adapter.py applyartifact
       - uses: actions/setup-node@v4
         if: steps.applied.outputs.ready == 'true'
         with:
@@ -210,8 +210,8 @@ jobs:
           persist-credentials: false
       - name: Copy trusted parent and selftest before PR checkout
         run: |
-          cp scripts/grok-code-adapter.py /tmp/tabibi-grok-code-adapter.py
-          python3 /tmp/tabibi-grok-code-adapter.py selftest
+          cp scripts/grok-cloud-code-adapter.py /tmp/tabibi-grok-cloud-code-adapter.py
+          python3 /tmp/tabibi-grok-cloud-code-adapter.py selftest
       - name: Checkout exact PR parent (no credentials retained)
         uses: actions/checkout@v6
         with:
@@ -231,7 +231,7 @@ jobs:
           REVIEW_BRANCH: ${{ needs.propose.outputs.branch }}
           ALLOWED_PATHS: ${{ needs.propose.outputs.paths }}
           LEASE_ID: ${{ needs.propose.outputs.lease }}
-        run: python3 /tmp/tabibi-grok-code-adapter.py applyartifact
+        run: python3 /tmp/tabibi-grok-cloud-code-adapter.py applyartifact
       - name: Parent-only non-force canonical PR push AFTER isolated tests
         id: publish
         if: steps.verified.outputs.ready == 'true'
@@ -243,7 +243,7 @@ jobs:
           REVIEW_BRANCH: ${{ needs.propose.outputs.branch }}
           ALLOWED_PATHS: ${{ needs.propose.outputs.paths }}
           LEASE_ID: ${{ needs.propose.outputs.lease }}
-        run: python3 /tmp/tabibi-grok-code-adapter.py publish
+        run: python3 /tmp/tabibi-grok-cloud-code-adapter.py publish
 
   report:
     needs: [propose, validate, test, publish]
