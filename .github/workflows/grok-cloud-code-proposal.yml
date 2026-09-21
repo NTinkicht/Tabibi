@@ -1,0 +1,282 @@
+name: Grok Cloud Code Proposal Adapter
+
+on:
+  issue_comment:
+    types: [created]
+
+# The connected cloud Bot posts a proposal on an EXISTING canonical PR.
+# It never receives the GitHub Actions write token or a metered xAI key.
+permissions:
+  contents: read
+
+jobs:
+  propose:
+    if: >-
+      github.event.issue.pull_request != null &&
+      github.actor == 'NTinkicht' &&
+      contains(github.event.comment.body, 'GROK_CLOUD_CODE_PROPOSAL_V1')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    concurrency:
+      group: grok-cloud-proposal-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    outputs:
+      ready: ${{ steps.stage.outputs.ready }}
+      status: ${{ steps.stage.outputs.status }}
+      pr: ${{ steps.lease.outputs.pr }}
+      sha: ${{ steps.lease.outputs.sha }}
+      stream: ${{ steps.lease.outputs.stream }}
+      branch: ${{ steps.lease.outputs.branch }}
+      paths: ${{ steps.lease.outputs.paths }}
+      lease: ${{ steps.lease.outputs.lease }}
+      lease_status: ${{ steps.lease.outputs.status }}
+      model_status: ${{ steps.stage.outputs.status }}
+    steps:
+      - name: Checkout trusted adapter from main without credentials
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Verify exact owner lease and PR-comment source
+        id: lease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISPATCH_BODY: ${{ github.event.comment.body }}
+          EVENT_PR: ${{ github.event.issue.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp scripts/grok-cloud-code-adapter.py /tmp/tabibi-grok-cloud-code-adapter.py
+          python3 /tmp/tabibi-grok-cloud-code-adapter.py selftest
+          python3 /tmp/tabibi-grok-cloud-code-adapter.py prepare
+      - name: Stage bounded untrusted GitHub-comment patch as DATA only
+        id: stage
+        if: steps.lease.outputs.ready == 'true'
+        env:
+          UNTRUSTED_GROK_PROPOSAL: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          raw = os.environ['UNTRUSTED_GROK_PROPOSAL']
+          if not raw or len(raw.encode('utf-8')) > 56000:
+              raise SystemExit('UNTRUSTED_PROPOSAL_OVERSIZED')
+          Path('/tmp/tabibi-grok-code.txt').write_text(raw, encoding='utf-8')
+          PY
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+          echo 'status=PROPOSAL_READY' >> "$GITHUB_OUTPUT"
+      - name: Upload ONLY raw Grok comment for fresh isolated validation
+        if: steps.stage.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: grok-untrusted-proposal
+          path: /tmp/tabibi-grok-code.txt
+          if-no-files-found: error
+          retention-days: 1
+
+  validate:
+    needs: propose
+    if: needs.propose.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      ready: ${{ steps.patch.outputs.ready }}
+      status: ${{ steps.patch.outputs.status }}
+    steps:
+      - name: Fresh trusted read-only runner checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Copy fresh trusted validator and execute security selftest
+        run: |
+          cp scripts/grok-code-adapter.py /tmp/tabibi-grok-code-adapter.py
+          python3 /tmp/tabibi-grok-code-adapter.py selftest
+      - name: Checkout pinned exact canonical PR head without stored token
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.propose.outputs.sha }}
+          persist-credentials: false
+      - name: Download raw untrusted proposal without running it
+        uses: actions/download-artifact@v4
+        with:
+          name: grok-untrusted-proposal
+          path: /tmp
+      - name: Validate model exact edits in isolated trusted read-only parent
+        id: patch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_PR: ${{ needs.propose.outputs.pr }}
+          REVIEW_SHA: ${{ needs.propose.outputs.sha }}
+          REVIEW_STREAM: ${{ needs.propose.outputs.stream }}
+          REVIEW_BRANCH: ${{ needs.propose.outputs.branch }}
+          ALLOWED_PATHS: ${{ needs.propose.outputs.paths }}
+          LEASE_ID: ${{ needs.propose.outputs.lease }}
+        run: python3 /tmp/tabibi-grok-code-adapter.py apply
+      - name: Seal validated immutable patch before untrusted tests
+        if: steps.patch.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: grok-validated-patch
+          path: /tmp/tabibi-grok-validated.json
+          if-no-files-found: error
+          retention-days: 1
+
+  test:
+    needs: [propose, validate]
+    if: needs.validate.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    env:
+      DATABASE_URL: postgresql://tabibi:tabibi_test@127.0.0.1:5432/tabibi_test
+      GUEST_BEARER_SIGNING_SECRET: ci-only-guest-bearer-signing-secret-replace-in-production
+      PUBLIC_AVAILABILITY_SELECTION_SECRET: ci-only-public-availability-selection-secret-replace-in-production
+    steps:
+      - name: Checkout trusted verifier
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Copy verifier outside PR worktree
+        run: cp scripts/grok-code-adapter.py /tmp/tabibi-grok-code-adapter.py
+      - name: Checkout exact PR parent
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.propose.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: grok-validated-patch
+          path: /tmp
+      - name: Re-validate and apply sealed patch without write-capable token
+        id: applied
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_PR: ${{ needs.propose.outputs.pr }}
+          REVIEW_SHA: ${{ needs.propose.outputs.sha }}
+          REVIEW_STREAM: ${{ needs.propose.outputs.stream }}
+          REVIEW_BRANCH: ${{ needs.propose.outputs.branch }}
+          ALLOWED_PATHS: ${{ needs.propose.outputs.paths }}
+          LEASE_ID: ${{ needs.propose.outputs.lease }}
+        run: python3 /tmp/tabibi-grok-code-adapter.py applyartifact
+      - uses: actions/setup-node@v4
+        if: steps.applied.outputs.ready == 'true'
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Unprivileged deterministic format lint typecheck unit/API and build
+        if: steps.applied.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run format
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run build
+          git diff --check
+      - name: Reject unverified/no-test artifact
+        if: steps.applied.outputs.ready != 'true'
+        run: exit 1
+
+  publish:
+    needs: [propose, validate, test]
+    if: needs.validate.outputs.ready == 'true' && needs.test.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: read
+    outputs:
+      status: ${{ steps.publish.outputs.status }}
+      result_sha: ${{ steps.publish.outputs.result_sha }}
+    steps:
+      - name: Fresh privileged runner checkout of trusted default branch
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Copy trusted parent and selftest before PR checkout
+        run: |
+          cp scripts/grok-code-adapter.py /tmp/tabibi-grok-code-adapter.py
+          python3 /tmp/tabibi-grok-code-adapter.py selftest
+      - name: Checkout exact PR parent (no credentials retained)
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.propose.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: grok-validated-patch
+          path: /tmp
+      - name: Re-verify same owner lease, SHA, allowlist and sealed patch
+        id: verified
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_PR: ${{ needs.propose.outputs.pr }}
+          REVIEW_SHA: ${{ needs.propose.outputs.sha }}
+          REVIEW_STREAM: ${{ needs.propose.outputs.stream }}
+          REVIEW_BRANCH: ${{ needs.propose.outputs.branch }}
+          ALLOWED_PATHS: ${{ needs.propose.outputs.paths }}
+          LEASE_ID: ${{ needs.propose.outputs.lease }}
+        run: python3 /tmp/tabibi-grok-code-adapter.py applyartifact
+      - name: Parent-only non-force canonical PR push AFTER isolated tests
+        id: publish
+        if: steps.verified.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_PR: ${{ needs.propose.outputs.pr }}
+          REVIEW_SHA: ${{ needs.propose.outputs.sha }}
+          REVIEW_STREAM: ${{ needs.propose.outputs.stream }}
+          REVIEW_BRANCH: ${{ needs.propose.outputs.branch }}
+          ALLOWED_PATHS: ${{ needs.propose.outputs.paths }}
+          LEASE_ID: ${{ needs.propose.outputs.lease }}
+        run: python3 /tmp/tabibi-grok-code-adapter.py publish
+
+  report:
+    needs: [propose, validate, test, publish]
+    if: always() && github.event.issue.pull_request != null && github.actor == 'NTinkicht' && contains(github.event.comment.body, 'GROK_CLOUD_CODE_PROPOSAL_V1')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Publish only machine-verified status without model text
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LEASE_STATUS: ${{ needs.propose.outputs.lease_status }}
+          PREFLIGHT_STATUS: skipped_cloud_provider
+          MODEL_STATUS: ${{ needs.propose.outputs.model_status }}
+          PATCH_STATUS: ${{ needs.validate.outputs.status }}
+          TEST_STATUS: ${{ needs.test.result }}
+          PUBLISH_STATUS: ${{ needs.publish.outputs.status }}
+          RESULT_SHA: ${{ needs.publish.outputs.result_sha }}
+          TARGET_PR: ${{ needs.propose.outputs.pr }}
+          TARGET_SHA: ${{ needs.propose.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '**Grok default-off scoped code adapter**\n\n' > /tmp/tabibi-code-status.md
+          printf 'Parent gate: lease=%s; entitlement=%s; model=%s; patch=%s; isolated-tests=%s; publish=%s.\n' \
+            "${LEASE_STATUS:-BLOCKED}" "${PREFLIGHT_STATUS:-SKIPPED}" "${MODEL_STATUS:-SKIPPED}" \
+            "${PATCH_STATUS:-SKIPPED}" "${TEST_STATUS:-SKIPPED}" "${PUBLISH_STATUS:-SKIPPED}" >> /tmp/tabibi-code-status.md
+          if [[ "${PUBLISH_STATUS:-}" == 'PUSHED' ]]; then
+            printf '\nActual canonical PR #%s updated from %s to %s; fresh exact-head 3-job CI and NON-Grok review required.\n' \
+              "$TARGET_PR" "$TARGET_SHA" "$RESULT_SHA" >> /tmp/tabibi-code-status.md
+          else
+            printf '\nNo code delivery is claimed. No paid fallback was attempted.\n' >> /tmp/tabibi-code-status.md
+          fi
+          gh issue comment "$TARGET_PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-code-status.md
+
