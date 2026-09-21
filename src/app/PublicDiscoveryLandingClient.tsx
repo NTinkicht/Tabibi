@@ -21,6 +21,7 @@ const copy = {
       'Découvrez les cliniques et les médecins disponibles sur Tabibi.',
     directory: 'Cliniques',
     searchLabel: 'Rechercher une clinique ou un médecin',
+    searchShortcutHint: 'Appuyez sur / pour accéder à la recherche.',
     clinicLanguageLabel: 'Langue proposée par la clinique',
     clinicLanguageAll: 'Toutes les langues',
     clinicLanguageFrench: 'Français',
@@ -60,6 +61,7 @@ const copy = {
     description: 'تعرّف على العيادات والأطباء المعروضين على طبيبي.',
     directory: 'العيادات',
     searchLabel: 'ابحث عن عيادة أو طبيب',
+    searchShortcutHint: 'اضغط / للانتقال إلى البحث.',
     clinicLanguageLabel: 'اللغة المتاحة في العيادة',
     clinicLanguageAll: 'كل اللغات',
     clinicLanguageFrench: 'الفرنسية',
@@ -263,6 +265,38 @@ export default function PublicDiscoveryLandingClient({
     };
   }, [retry]);
 
+  // Focus the public directory search only from non-editable elements.
+  // Let form controls, contenteditable regions and modified shortcuts keep
+  // their native keyboard behavior; never change any filter or locale.
+  useEffect(() => {
+    function focusSearchOnSlash(event: KeyboardEvent) {
+      if (
+        event.key !== '/' ||
+        event.defaultPrevented ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        !searchInputRef.current
+      ) {
+        return;
+      }
+      const target = event.target;
+      if (
+        !(target instanceof HTMLElement) ||
+        target.isContentEditable ||
+        target.closest('input, textarea, select, [contenteditable]')
+      ) {
+        return;
+      }
+      event.preventDefault();
+      searchInputRef.current.focus();
+    }
+    window.addEventListener('keydown', focusSearchOnSlash);
+    return () => window.removeEventListener('keydown', focusSearchOnSlash);
+  }, []);
+
   const beginRefresh = () => {
     setRefreshCount(null);
     setState('loading');
@@ -323,9 +357,11 @@ export default function PublicDiscoveryLandingClient({
         {state === 'ready' && clinics.length > 0 && (
           <div className="publicSearch">
             <label htmlFor="publicClinicSearch">{t.searchLabel}</label>
+            <p id="publicClinicSearchShortcutHint">{t.searchShortcutHint}</p>
             <div className="publicSearchControls">
               <input
                 id="publicClinicSearch"
+                aria-describedby="publicClinicSearchShortcutHint"
                 ref={searchInputRef}
                 type="search"
                 autoComplete="off"

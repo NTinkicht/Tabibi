@@ -1130,3 +1130,88 @@ test('Arabic mobile Escape restores vowel-insensitive doctor results and keeps R
   await expect(page.getByText('د. مَرْيَم')).toBeVisible();
   await expect(page.getByText('د. سارة')).toBeVisible();
 });
+
+test('slash focuses French public search without changing selected filters or revealing private identifiers', async ({
+  page,
+}) => {
+  await mockDirectory(page, [
+    {
+      name: 'Clinique Étoile',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr', 'ar'],
+      tenantKey: 'private-shortcut-tenant',
+      doctors: [{ displayName: 'Dr. Salima', id: 'private-shortcut-doctor' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  await expect(search).toHaveAttribute(
+    'aria-describedby',
+    'publicClinicSearchShortcutHint',
+  );
+  await expect(
+    page.getByText('Appuyez sur / pour accéder à la recherche.'),
+  ).toBeVisible();
+  const language = page.getByRole('combobox', {
+    name: 'Langue proposée par la clinique',
+  });
+  const listed = page.getByRole('checkbox', {
+    name: 'Cliniques avec médecins affichés uniquement',
+  });
+  const sort = page.getByRole('combobox', {
+    name: 'Trier les cliniques par nom',
+  });
+  await language.selectOption('ar');
+  await listed.check();
+  await sort.selectOption('descending');
+  await page.getByRole('button', { name: 'Actualiser' }).focus();
+  await page.keyboard.press('/');
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue('');
+  await expect(language).toHaveValue('ar');
+  await expect(listed).toBeChecked();
+  await expect(sort).toHaveValue('descending');
+  await search.fill('Salima');
+  await search.press('/');
+  await expect(search).toHaveValue('Salima/');
+  await expect(search).toBeFocused();
+  await language.focus();
+  await page.keyboard.press('/');
+  await expect(language).toBeFocused();
+  await expect(language).toHaveValue('ar');
+  const body = await page.locator('main').innerText();
+  expect(body).not.toContain('private-shortcut-tenant');
+  expect(body).not.toContain('private-shortcut-doctor');
+});
+
+test('slash focuses Arabic RTL public search from noneditable control on mobile', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDirectory(page, [
+    {
+      name: 'عيادة الورد',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'د. مَرْيَم' }],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  await expect(page.getByText('اضغط / للانتقال إلى البحث.')).toBeVisible();
+  const search = page.getByRole('searchbox', { name: 'ابحث عن عيادة أو طبيب' });
+  await page.getByRole('button', { name: 'العربية' }).focus();
+  await page.keyboard.press('/');
+  await expect(search).toBeFocused();
+  await search.fill('مريم');
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.getByText('د. مَرْيَم')).toBeVisible();
+  await expect(page.locator('.publicClinic li')).toHaveCount(1);
+  await search.press('/');
+  await expect(search).toHaveValue('مريم/');
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+});
