@@ -69,8 +69,19 @@ describe('AI capacity policy', () => {
       .readdirSync(workflowDirectory)
       .filter((file) => /\.ya?ml$/i.test(file));
     expect(files.filter((file) => /grok/i.test(file))).toEqual([
+      'grok-cloud-code-proposal.yml',
       'savegrok-cloud-slack-bridge.yml',
     ]);
+    const grokCode = fs.readFileSync(
+      path.join(workflowDirectory, 'grok-cloud-code-proposal.yml'),
+      'utf8',
+    );
+    expect(grokCode).toContain('GROK_CLOUD_CODE_PROPOSAL_V1');
+    expect(grokCode).toContain('grok-cloud-code-adapter.py');
+    expect(grokCode).toContain('source');
+    expect(grokCode).not.toContain('XAI_API_KEY');
+    expect(grokCode).not.toContain('GROK_AUTH_JSON');
+    expect(grokCode).not.toContain('SLACK_CHATGPT_BOT_TOKEN');
     const bridge = fs.readFileSync(
       path.join(workflowDirectory, 'savegrok-cloud-slack-bridge.yml'),
       'utf8',
