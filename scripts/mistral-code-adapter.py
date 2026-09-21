@@ -324,7 +324,11 @@ def main():
         fail("REPOSITORY_BLOCKED")
         return
     if mode == "prepare":
-        # The owner-issued Issue #11 dispatch is the per-work-unit opt-in.\n        # Never infer permission to spend: the PAYG-disabled guard remains mandatory.\n        if os.environ.get("PAYG_DISABLED_CONFIRMED") != "true":\n            fail("CONFIG_BLOCKED")\n            return
+        # The owner-issued Issue #11 dispatch is the per-work-unit opt-in.
+        # Never infer permission to spend: the PAYG-disabled guard remains mandatory.
+        if os.environ.get("PAYG_DISABLED_CONFIRMED") != "true":
+            fail("CONFIG_BLOCKED")
+            return
         try:
             number, sha, stream, paths, objective = parse_owner_dispatch(
                 os.environ.get("DISPATCH_BODY", "")
