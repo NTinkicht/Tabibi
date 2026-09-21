@@ -247,7 +247,11 @@ jobs:
 
   report:
     needs: [propose, validate, test, publish]
-    if: always() && github.event.issue.pull_request != null && github.actor == 'NTinkicht' && contains(github.event.comment.body, 'GROK_CLOUD_CODE_PROPOSAL_V1')
+    if: >-
+      always() &&
+      github.event.issue.pull_request != null &&
+      github.actor == 'NTinkicht' &&
+      contains(github.event.comment.body, 'GROK_CLOUD_CODE_PROPOSAL_V1')
     runs-on: ubuntu-latest
     permissions:
       issues: write
