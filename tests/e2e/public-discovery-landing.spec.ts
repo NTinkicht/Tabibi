@@ -1381,7 +1381,7 @@ test('Arabic mobile visible-total summary follows language filter and fresh dire
     .selectOption('ar');
   const summary = page.getByTestId('visible-clinic-total');
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
-  await expect(summary).toHaveText('المعروض: 1 من أصل 2 عيادة في الدليل.');
+  await expect(summary).toHaveText('العيادات المعروضة: 1 من 2.');
   clinics = [
     ...clinics,
     {
