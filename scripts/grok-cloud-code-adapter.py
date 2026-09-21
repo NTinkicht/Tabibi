@@ -241,7 +241,7 @@ def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else ""
     if mode == "selftest":
         sha = "a" * 40
-        body = (f"GROK_LEASED_CODE_V1\npr: 2\nexact_sha: {sha}\n"
+        body = (f"GROK_CLOUD_CODE_PROPOSAL_V1\npr: 2\nexact_sha: {sha}\n"
                 "stream: WU101\nallowed_paths: src/a.ts,tests/a.test.ts\n"
                 "objective: Change foo and test assertion from 1 to 2")
         assert parse_owner_dispatch(body) == (
