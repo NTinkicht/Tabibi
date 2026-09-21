@@ -1225,7 +1225,9 @@ test('active filter summary stays visible when search is cleared and disappears 
       defaultLocale: 'fr',
       enabledLocales: ['fr', 'ar'],
       tenantKey: 'private-filter-summary-tenant',
-      doctors: [{ displayName: 'Dr. Salima', id: 'private-filter-summary-doctor' }],
+      doctors: [
+        { displayName: 'Dr. Salima', id: 'private-filter-summary-doctor' },
+      ],
     },
     {
       name: 'Cabinet du Centre',
