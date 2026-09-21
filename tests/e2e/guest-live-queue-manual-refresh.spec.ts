@@ -43,6 +43,10 @@ test('manual refresh uses the canonical bearer-header request without disclosure
   await expect(refresh).toBeVisible();
   await refresh.click();
   await expect.poll(() => authorizations.length).toBe(2);
+  await expect(page.getByTestId('manual-refresh-feedback')).toHaveText(
+    'Nouvelle vérification réussie. Le statut peut avoir changé depuis cette vérification.',
+  );
+  await expect(page.getByText('Dernière vérification :')).toBeVisible();
   expect(authorizations).toEqual([`Bearer ${BEARER}`, `Bearer ${BEARER}`]);
   expect(statusRequestUrls).toHaveLength(2);
   for (const requestUrl of statusRequestUrls)
@@ -89,10 +93,17 @@ test('manual refresh is disabled while pending and repeated clicks do not create
     name: 'Actualisation en cours…',
   });
   await expect(pending).toBeDisabled();
+  await expect(pending).toHaveAttribute('aria-busy', 'true');
+  await expect(page.getByTestId('manual-refresh-feedback')).toHaveText(
+    'Actualisation en cours…',
+  );
   await pending.evaluate((button: HTMLButtonElement) => button.click());
   await expect.poll(() => requests).toBe(2);
   releaseRefresh?.();
   await expect(refresh).toBeEnabled();
+  await expect(page.getByTestId('manual-refresh-feedback')).toHaveText(
+    'Nouvelle vérification réussie. Le statut peut avoir changé depuis cette vérification.',
+  );
   expect(requests).toBe(2);
 });
 
@@ -253,6 +264,9 @@ test('last verified time advances only after an authoritative successful refresh
     'datetime',
     '2026-09-20T12:00:00.000Z',
   );
+  await expect(page.getByTestId('manual-refresh-feedback')).toHaveText(
+    'La nouvelle vérification a échoué. La dernière heure vérifiée reste affichée.',
+  );
 
   await page.clock.setFixedTime(new Date('2026-09-20T12:03:00.000Z'));
   await page.getByRole('button', { name: 'Actualiser mon statut' }).click();
@@ -260,6 +274,9 @@ test('last verified time advances only after an authoritative successful refresh
   await expect(verified).toHaveAttribute(
     'datetime',
     '2026-09-20T12:03:00.000Z',
+  );
+  await expect(page.getByTestId('manual-refresh-feedback')).toHaveText(
+    'Nouvelle vérification réussie. Le statut peut avoir changé depuis cette vérification.',
   );
   await expect(
     page.getByRole('heading', { name: 'Statut potentiellement obsolète' }),
@@ -294,4 +311,52 @@ test('Arabic RTL guest view localizes the last authoritative verification', asyn
     'datetime',
     '2026-09-20T12:00:00.000Z',
   );
+});
+
+test('Arabic RTL manual refresh announces only a confirmed successful check', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.setFixedTime(new Date('2026-09-20T12:00:00.000Z'));
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'language', {
+      configurable: true,
+      value: 'ar-DZ',
+    });
+  });
+  let requests = 0;
+  await page.route(STREAM_URL, (route) =>
+    route.fulfill({ status: 503, body: 'optional stream unavailable' }),
+  );
+  await page.route(STATUS_URL, async (route) => {
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'confirmed',
+        queueState: 'waiting',
+      }),
+    });
+  });
+  await openLiveQueue(page);
+  const lastVerified = page.locator('time[datetime]');
+  await expect(lastVerified).toHaveAttribute(
+    'datetime',
+    '2026-09-20T12:00:00.000Z',
+  );
+  await page.clock.setFixedTime(new Date('2026-09-20T12:01:00.000Z'));
+  const refresh = page.getByRole('button', { name: 'تحديث حالتي' });
+  await refresh.click();
+  await expect(page.getByTestId('manual-refresh-feedback')).toHaveText(
+    'نجح التحقق الجديد. قد تتغير الحالة بعد هذا التحقق.',
+  );
+  await expect(lastVerified).toHaveAttribute(
+    'datetime',
+    '2026-09-20T12:01:00.000Z',
+  );
+  await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
+  expect(requests).toBe(2);
+  expect(page.url()).not.toContain(BEARER);
+  expect(await page.locator('body').innerText()).not.toContain(BEARER);
 });
