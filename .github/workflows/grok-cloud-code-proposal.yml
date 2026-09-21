@@ -283,4 +283,3 @@ jobs:
             printf '\nNo code delivery is claimed. No paid fallback was attempted.\n' >> /tmp/tabibi-code-status.md
           fi
           gh issue comment "$TARGET_PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-code-status.md
-
