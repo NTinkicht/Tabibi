@@ -28,7 +28,9 @@ async function openLiveQueue(page: Page) {
   await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel(/Votre nom|اسمك/).fill('Guest');
   await page.getByRole('button', { name: /Confirmer|تأكيد/ }).click();
-  await expect(page.getByText(/Dernière vérification :|آخر تحقق من الحالة:/)).toBeVisible();
+  await expect(
+    page.getByText(/Dernière vérification :|آخر تحقق من الحالة:/),
+  ).toBeVisible();
 }
 
 test('French connection loss gives bounded fallback announcement, reconnect progress and recovery', async ({
@@ -46,14 +48,18 @@ test('French connection loss gives bounded fallback announcement, reconnect prog
         return Promise.resolve(new Response(null, { status: 503 }));
       }
       return new Promise<Response>((resolve) => {
-        (window as Window & { __releaseGuestStream?: () => void }).__releaseGuestStream =
-          () =>
-            resolve(
+        const testWindow = window as Window & {
+          __releaseGuestStream?: () => void;
+        };
+        testWindow.__releaseGuestStream = () =>
+          resolve(
               new Response(
                 new ReadableStream<Uint8Array>({
                   start(controller) {
-                    controller.enqueue(new TextEncoder().encode(': ready\\n\\n'));
-                    // Remain connected until the component's AbortController closes the stream.
+                    controller.enqueue(
+                      new TextEncoder().encode(': ready\\n\\n'),
+                    );
+                    // Keep the stream open until the test finishes.
                   },
                 }),
                 {
@@ -73,17 +79,27 @@ test('French connection loss gives bounded fallback announcement, reconnect prog
     'Notifications en direct interrompues. La vérification automatique continue',
   );
   await expect(announcement).toHaveCount(1);
-  await expect(announcement).toContainText('Notifications en direct interrompues.');
-  await expect(page.getByRole('button', { name: 'Actualiser mon statut' })).toBeEnabled();
+  await expect(announcement).toContainText(
+    'Notifications en direct interrompues.',
+  );
+  await expect(
+    page.getByRole('button', { name: 'Actualiser mon statut' }),
+  ).toBeEnabled();
 
-  await expect(guidance).toContainText('Reconnexion aux notifications en direct en cours.');
+  await expect(guidance).toContainText(
+    'Reconnexion aux notifications en direct en cours.',
+  );
   await expect(announcement).toHaveCount(1);
   await page.evaluate(() => {
-    (window as Window & { __releaseGuestStream?: () => void }).__releaseGuestStream?.();
+    (
+      window as Window & { __releaseGuestStream?: () => void }
+    ).__releaseGuestStream?.();
   });
   await expect(guidance).toContainText('Notifications en direct rétablies.');
   await expect(announcement).toHaveCount(1);
-  await expect(announcement).toContainText('Notifications en direct rétablies.');
+  await expect(announcement).toContainText(
+    'Notifications en direct rétablies.',
+  );
   await page.getByRole('button', { name: 'Actualiser mon statut' }).click();
   await expect(page.getByTestId('manual-refresh-feedback')).toContainText(
     'Nouvelle vérification réussie.',
