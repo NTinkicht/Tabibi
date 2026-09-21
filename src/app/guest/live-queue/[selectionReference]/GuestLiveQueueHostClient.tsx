@@ -247,10 +247,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     manualRetry: 'إعادة المحاولة الآن',
     manualRefresh: 'تحديث حالتي',
     manualRefreshPending: 'جارٍ تحديث حالتك…',
-    manualRefreshVerified:
-      'نجح التحقق الجديد. قد تتغير الحالة بعد هذا التحقق.',
-    manualRefreshFailed:
-      'فشل التحقق الجديد. يبقى وقت آخر تحقق ناجح معروضًا.',
+    manualRefreshVerified: 'نجح التحقق الجديد. قد تتغير الحالة بعد هذا التحقق.',
+    manualRefreshFailed: 'فشل التحقق الجديد. يبقى وقت آخر تحقق ناجح معروضًا.',
     lastVerified: 'آخر تحقق من الحالة:',
     visitStatus: 'حالة الزيارة',
     checkIn: 'تأكيد الحضور',
@@ -1160,7 +1158,11 @@ function LiveQueueView({
         {manualRefreshPending ? copy.manualRefreshPending : copy.manualRefresh}
       </button>
       {manualRefreshOutcome !== 'idle' ? (
-        <p role="status" aria-atomic="true" data-testid="manual-refresh-feedback">
+        <p
+          role="status"
+          aria-atomic="true"
+          data-testid="manual-refresh-feedback"
+        >
           {manualRefreshOutcome === 'pending'
             ? copy.manualRefreshPending
             : manualRefreshOutcome === 'verified'
