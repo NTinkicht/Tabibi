@@ -1,7 +1,7 @@
 name: WU110 disposable format diagnostic
 on:
-  push:
-    branches: [codex/wu110-guest-refresh-status]
+  pull_request:
+    branches: [main]
 permissions:
   contents: read
 jobs:
