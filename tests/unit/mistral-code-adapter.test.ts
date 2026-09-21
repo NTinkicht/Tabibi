@@ -42,16 +42,17 @@ const named = (job: Job, name: string) => {
   return found;
 };
 
-describe('Mistral scoped coding adapter is default-off and parent-controlled', () => {
-  it('parses owner-only event and explicit disabled-by-default lease guards', () => {
+describe('Mistral code adapter uses owner per-WU leases', () => {
+  it('accepts owner-only per-lease activation with PAYG disabled', () => {
     expect(parsed.on.issue_comment.types).toEqual(['created']);
     expect(propose.if).toContain("github.actor == 'NTinkicht'");
     expect(propose.if).toContain('github.event.issue.number == 11');
     expect(propose.if).toContain('MISTRAL_LEASED_CODE_V1');
-    const gate = named(propose, 'Validate owner lease and default-OFF guards');
-    expect(gate.env?.ADAPTER_ENABLED).toContain(
-      'vars.TABIBI_MISTRAL_CODE_ADAPTER_ENABLED',
+    const gate = named(
+      propose,
+      'Validate owner per-WU lease and PAYG-disabled guard',
     );
+    expect(gate.env).not.toHaveProperty('ADAPTER_ENABLED');
     expect(gate.env?.PAYG_DISABLED_CONFIRMED).toContain(
       'vars.TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED',
     );
@@ -61,8 +62,8 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     expect(validate.outputs?.ready).toContain('steps.patch.outputs.ready');
     expect(propose.outputs?.lease).toContain('steps.lease.outputs.lease');
     expect(propose.outputs?.paths).toContain('steps.lease.outputs.paths');
-    expect(propose.concurrency?.group).toContain('github.event.issue.number');
-    expect(propose.concurrency?.['cancel-in-progress']).toBe(true);
+    expect(propose.concurrency?.group).toContain('github.event.comment.id');
+    expect(propose.concurrency?.['cancel-in-progress']).toBe(false);
   });
 
   it('isolates the model and deterministic tests from ALL repository write tokens', () => {
@@ -187,6 +188,40 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
     );
   });
 
+  it('fails closed at runtime when PAYG-off confirmation is absent', () => {
+    const dir = fs.mkdtempSync('/tmp/tabibi-mistral-payg-');
+    const output = `${dir}/result.txt`;
+    try {
+      fs.writeFileSync(output, '');
+      for (const confirmation of ['', 'false']) {
+        fs.writeFileSync(output, '');
+        const run = spawnSync(
+          'python3',
+          ['scripts/mistral-code-adapter.py', 'prepare'],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              GITHUB_REPOSITORY: 'NTinkicht/Tabibi',
+              GITHUB_OUTPUT: output,
+              DISPATCH_BODY: 'invalid dispatch must not be parsed',
+              PAYG_DISABLED_CONFIRMED: confirmation,
+            },
+          },
+        );
+        expect(run.status, run.stderr).toBe(0);
+        expect(fs.readFileSync(output, 'utf8')).toContain(
+          'status=CONFIG_BLOCKED',
+        );
+        expect(fs.readFileSync(output, 'utf8')).not.toContain(
+          'LEASE_OR_TARGET_BLOCKED',
+        );
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('runs parent synthetic attack and fail-closed security selftest', () => {
     const testRun = spawnSync(
       'python3',
@@ -217,5 +252,7 @@ describe('Mistral scoped coding adapter is default-off and parent-controlled', (
       expect(parent).toContain(evidence);
     }
     expect(parent).not.toContain('--force');
+    expect(parent).not.toContain('ADAPTER_ENABLED');
+    expect(parent).toContain('PAYG_DISABLED_CONFIRMED');
   });
 });

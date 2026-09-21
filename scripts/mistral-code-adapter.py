@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Trusted parent for DEFAULT-OFF Mistral proposal-to-code GitHub adapter.
+"""Trusted parent for per-lease-enabled Mistral proposal-to-code GitHub adapter.
 
 The Vibe child has ONLY read tools and prints bounded JSON edits. It never
 receives GitHub write credentials. This file is copied outside the reviewed
@@ -324,10 +324,9 @@ def main():
         fail("REPOSITORY_BLOCKED")
         return
     if mode == "prepare":
-        if (
-            os.environ.get("ADAPTER_ENABLED") != "true"
-            or os.environ.get("PAYG_DISABLED_CONFIRMED") != "true"
-        ):
+        # The owner-issued Issue #11 dispatch is the per-work-unit opt-in.
+        # Never infer permission to spend: the PAYG-disabled guard remains mandatory.
+        if os.environ.get("PAYG_DISABLED_CONFIRMED") != "true":
             fail("CONFIG_BLOCKED")
             return
         try:
