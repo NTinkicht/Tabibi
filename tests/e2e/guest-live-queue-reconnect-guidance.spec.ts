@@ -13,8 +13,11 @@ async function openLiveQueue(page: Page) {
       body: JSON.stringify({ queueLabel: 'G-123', guestBearer: BEARER }),
     }),
   );
-  await page.route(STATUS_URL, (route) =>
-    route.fulfill({
+  await page.route(STATUS_URL, (route) => {
+    const request = route.request();
+    expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
+    expect(request.url()).not.toContain(BEARER);
+    return route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
@@ -23,8 +26,8 @@ async function openLiveQueue(page: Page) {
         eta: null,
         activeConsultationRemainingMinutes: null,
       }),
-    }),
-  );
+    });
+  });
   await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel(/Votre nom|اسمك/).fill('Guest');
   await page.getByRole('button', { name: /Confirmer|تأكيد/ }).click();
@@ -36,38 +39,50 @@ async function openLiveQueue(page: Page) {
 test('French connection loss gives bounded fallback announcement, reconnect progress and recovery', async ({
   page,
 }) => {
-  await page.addInitScript((streamPath) => {
-    const originalFetch = window.fetch.bind(window);
-    let streamAttempts = 0;
-    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
-      if (typeof input !== 'string' || input !== streamPath) {
-        return originalFetch(input, init);
-      }
-      streamAttempts += 1;
-      if (streamAttempts === 1) {
-        return Promise.resolve(new Response(null, { status: 503 }));
-      }
-      return new Promise<Response>((resolve) => {
-        const testWindow = window as Window & {
-          __releaseGuestStream?: () => void;
-        };
-        testWindow.__releaseGuestStream = () => {
-          const stream = new ReadableStream<Uint8Array>({
-            start(controller) {
-              controller.enqueue(new TextEncoder().encode(': ready\\n\\n'));
-              // Keep the stream open until the test finishes.
-            },
-          });
-          resolve(
-            new Response(stream, {
-              status: 200,
-              headers: { 'content-type': 'text/event-stream' },
-            }),
-          );
-        };
-      });
-    };
-  }, STREAM_URL);
+  await page.addInitScript(
+    ({ streamPath, bearer }) => {
+      const originalFetch = window.fetch.bind(window);
+      let streamAttempts = 0;
+      window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+        const requestUrl =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (!requestUrl.endsWith(streamPath)) {
+          return originalFetch(input, init);
+        }
+        if (requestUrl.includes(bearer)) {
+          return Promise.reject(new Error('guest bearer leaked into stream URL'));
+        }
+        const headers = new Headers(init?.headers);
+        if (headers.get('authorization') !== `Bearer ${bearer}`) {
+          return Promise.reject(new Error('stream request missing bearer authorization'));
+        }
+        streamAttempts += 1;
+        if (streamAttempts === 1) {
+          return Promise.resolve(new Response(null, { status: 503 }));
+        }
+        return new Promise<Response>((resolve) => {
+          const testWindow = window as Window & {
+            __releaseGuestStream?: () => void;
+          };
+          testWindow.__releaseGuestStream = () => {
+            const stream = new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.enqueue(new TextEncoder().encode(': ready\\n\\n'));
+                // Keep the stream open until the test finishes.
+              },
+            });
+            resolve(
+              new Response(stream, {
+                status: 200,
+                headers: { 'content-type': 'text/event-stream' },
+              }),
+            );
+          };
+        });
+      };
+    },
+    { streamPath: STREAM_URL, bearer: BEARER },
+  );
   await openLiveQueue(page);
 
   const guidance = page.getByTestId('guest-stream-connection');
@@ -118,6 +133,9 @@ test('Arabic RTL fallback preserves canonical refresh and never exposes the bear
   });
   let streamAttempts = 0;
   await page.route(`**${STREAM_URL}`, (route) => {
+    const request = route.request();
+    expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
+    expect(request.url()).not.toContain(BEARER);
     streamAttempts += 1;
     return route.fulfill({ status: 503, body: 'stream unavailable' });
   });
