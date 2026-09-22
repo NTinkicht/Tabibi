@@ -152,7 +152,9 @@ test('Arabic RTL fallback preserves canonical refresh and never exposes the bear
   await expect(guidance).toContainText('انقطعت الإشعارات المباشرة.');
   await expect(guidance).toContainText('يستمر التحقق التلقائي');
   await expect(page.getByTestId('guest-stream-announcement')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'تحديث حالتي' })).toBeEnabled();
+  await expect(
+    page.getByRole('button', { name: 'تحديث حالتي' }),
+  ).toBeEnabled();
   await page.getByRole('button', { name: 'تحديث حالتي' }).click();
   await expect(page.getByTestId('manual-refresh-feedback')).toContainText(
     'نجح التحقق الجديد.',
