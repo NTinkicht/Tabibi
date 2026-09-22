@@ -496,10 +496,7 @@ export default function PublicDiscoveryLandingClient({
               <div role="status" aria-live="polite" aria-atomic="true">
                 <p>{t.searchCount(matchingClinics.length)}</p>
                 <p data-testid="visible-clinic-total">
-                  {t.visibleClinicTotal(
-                    displayedClinics.length,
-                    clinics.length,
-                  )}
+                  {t.visibleClinicTotal(matchingClinics.length, clinics.length)}
                 </p>
                 <p>{t.searchDoctorTotal(visibleDoctorTotal)}</p>
               </div>

@@ -20,6 +20,40 @@ async function mockDirectory(page: Page, locale: 'fr' | 'ar', count: number) {
   );
 }
 
+async function mockMixedDirectory(
+  page: Page,
+  frenchCount: number,
+  arabicOnlyCount: number,
+) {
+  const frenchClinics = Array.from({ length: frenchCount }, (_, index) => ({
+    name: `Clinique ${index + 1}`,
+    defaultLocale: 'fr',
+    enabledLocales: ['fr'],
+    doctors: [{ displayName: 'Dr. Public' }],
+    tenantKey: 'private-range-tenant',
+    id: 'private-range-clinic',
+  }));
+  const arabicOnlyClinics = Array.from(
+    { length: arabicOnlyCount },
+    (_, index) => ({
+      name: `عيادة ${index + 1}`,
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'د. عام' }],
+      tenantKey: 'private-range-tenant',
+      id: 'private-range-clinic',
+    }),
+  );
+  const clinics = [...frenchClinics, ...arabicOnlyClinics];
+  await page.route(DISCOVERY_URL, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ clinics }),
+    }),
+  );
+}
+
 test('French result range reveals public clinics in bounded batches and resets on search', async ({
   page,
 }) => {
@@ -104,4 +138,33 @@ test('Arabic RTL mobile result range respects sorting, filters and public-data b
     'private-range-tenant',
   );
   expect(page.url()).not.toContain('private-range-clinic');
+});
+
+test('visible clinic total reports the true match count, not the revealed batch, once a filter yields more matches than one batch', async ({
+  page,
+}) => {
+  await mockMixedDirectory(page, 7, 3);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+
+  await page.getByLabel('Langue proposée par la clinique').selectOption('fr');
+
+  const range = page.getByTestId('clinic-result-range');
+  const visibleTotal = page.getByTestId('visible-clinic-total');
+  await expect(page.locator('.publicClinic')).toHaveCount(6);
+  await expect(range).toHaveText(
+    'Résultats affichés : 1 à 6 sur 7 cliniques correspondantes.',
+  );
+  await expect(visibleTotal).toHaveText(
+    'Affichage : 7 sur 10 cliniques du répertoire.',
+  );
+
+  await page.getByTestId('show-more-clinics').click();
+  await expect(page.locator('.publicClinic')).toHaveCount(7);
+  await expect(range).toHaveText(
+    'Résultats affichés : 1 à 7 sur 7 cliniques correspondantes.',
+  );
+  await expect(visibleTotal).toHaveText(
+    'Affichage : 7 sur 10 cliniques du répertoire.',
+  );
 });
