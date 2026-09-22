@@ -1,8 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('regional Arabic ETA deep links render Arabic RTL guidance', async ({
-  page,
-}) => {
+test('Arabic regional ETA links render RTL', async ({ page }) => {
   for (const lang of ['ar', 'AR-DZ', 'ar_ae']) {
     await page.goto(`/guest/eta-explained?lang=${lang}`);
     await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
@@ -15,9 +13,7 @@ test('regional Arabic ETA deep links render Arabic RTL guidance', async ({
   }
 });
 
-test('unknown locale does not accidentally select Arabic', async ({
-  page,
-}) => {
+test('Unknown ETA locale falls back to French', async ({ page }) => {
   for (const lang of ['argentina', 'en-US', 'fr']) {
     await page.goto(`/guest/eta-explained?lang=${lang}`);
     await expect(page.locator('main[lang="fr"][dir="ltr"]')).toBeVisible();
@@ -30,13 +26,9 @@ test('unknown locale does not accidentally select Arabic', async ({
   }
 });
 
-test('ETA explainer never echoes unrelated private query parameters', async ({
-  page,
-}) => {
+test('ETA explainer does not echo private search params', async ({ page }) => {
   const sentinel = 'private-guest-bearer-sentinel';
-  await page.goto(
-    `/guest/eta-explained?lang=AR-DZ&unused=${sentinel}`,
-  );
+  await page.goto(`/guest/eta-explained?lang=AR-DZ&unused=${sentinel}`);
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
   expect(await page.locator('main').innerText()).not.toContain(sentinel);
   await page.getByRole('link', { name: 'Français' }).click();
