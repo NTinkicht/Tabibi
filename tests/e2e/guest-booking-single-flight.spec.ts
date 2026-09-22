@@ -60,8 +60,7 @@ async function mockControlledBooking(page: Page) {
   let requestCount = 0;
   await page.route(BOOKING_URL, async (route) => {
     requestCount += 1;
-    const idempotencyKey =
-      route.request().headers()['idempotency-key'] ?? null;
+    const idempotencyKey = route.request().headers()['idempotency-key'] ?? null;
     const fulfillment = await new Promise<BookingFulfillment>((resolve) => {
       pending.push({ idempotencyKey, resolve });
     });
@@ -183,9 +182,7 @@ test('Arabic RTL guest booking rejects duplicate submits, then a genuine retry a
   await expect(
     page.getByRole('heading', { name: 'الحجز غير متاح' }),
   ).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: 'تأكيد الحجز' }),
-  ).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'تأكيد الحجز' })).toBeEnabled();
 
   // Genuine retry after failure: also guarded against a duplicate submit,
   // and must carry the same idempotency key as the failed attempt.
