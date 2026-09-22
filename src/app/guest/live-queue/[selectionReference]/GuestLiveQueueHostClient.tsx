@@ -481,7 +481,9 @@ export function GuestLiveQueueHostClient({
   const [phase, setPhase] = useState<HostPhase>({ kind: 'form' });
   // Until a guest explicitly selects a language, follow the detected UI
   // locale (which may change from the SSR French fallback after hydration).
-  const [chosenLocale, setChosenLocale] = useState<SupportedLocale | null>(null);
+  const [chosenLocale, setChosenLocale] = useState<SupportedLocale | null>(
+    null,
+  );
   const preferredLocale = chosenLocale ?? locale;
   const [privateDisplayName, setPrivateDisplayName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
