@@ -48,7 +48,8 @@ for (const browserLanguage of ['ar-DZ', 'AR_ae']) {
         name: 'ابحث عن عيادة أو طبيب',
       });
       await search.fill('Clinique');
-      await page.getByLabel('ترتيب العيادات حسب الاسم').selectOption('ascending');
+      const sort = page.getByLabel('ترتيب العيادات حسب الاسم');
+      await sort.selectOption('ascending');
       await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
 
       // A deliberate switch remains authoritative through later interactions.
