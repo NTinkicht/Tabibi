@@ -18,9 +18,7 @@ async function mockDirectory(page: Page, locale: 'fr' | 'ar') {
   );
 }
 
-test('French filtered public directory jumps to first visible clinic without changing sort or reveal focus', async ({
-  page,
-}) => {
+test('French jump focuses the first filtered clinic', async ({ page }) => {
   await mockDirectory(page, 'fr');
   await page.goto('/');
   await page.getByRole('button', { name: 'Actualiser' }).click();
@@ -31,7 +29,8 @@ test('French filtered public directory jumps to first visible clinic without cha
     name: 'Rechercher une clinique ou un médecin',
   });
   await search.fill('Clinique');
-  await page.getByLabel('Trier les cliniques par nom').selectOption('descending');
+  const sort = page.getByLabel('Trier les cliniques par nom');
+  await sort.selectOption('descending');
   await expect(jump).toHaveText('Aller au premier résultat');
   await jump.focus();
   await jump.press('Enter');
@@ -61,9 +60,7 @@ test('French filtered public directory jumps to first visible clinic without cha
   );
 });
 
-test('Arabic RTL mobile public directory jumps to first filtered result by keyboard', async ({
-  page,
-}) => {
+test('Arabic RTL jump focuses first clinic', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockDirectory(page, 'ar');
   await page.goto('/');
