@@ -53,8 +53,7 @@ for (const locale of ['fr', 'ar'] as const) {
     const bookingAttempts = await mockRetryableBooking(page);
     await page.goto('/guest/live-queue/test-selection-ref');
     const name = locale === 'fr' ? 'Votre nom' : 'اسمك';
-    const submit =
-      locale === 'fr' ? 'Confirmer la réservation' : 'تأكيد الحجز';
+    const submit = locale === 'fr' ? 'Confirmer la réservation' : 'تأكيد الحجز';
     const error =
       locale === 'fr' ? 'Réservation indisponible' : 'الحجز غير متاح';
     if (locale === 'ar') {
