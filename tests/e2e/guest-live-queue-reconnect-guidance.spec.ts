@@ -212,6 +212,9 @@ for (const language of ['fr-FR', 'ar-DZ'] as const) {
     }
 
     await expect(page.getByTestId('guest-stream-connection')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText(
+      /vérification automatique continue|يستمر التحقق التلقائي/,
+    );
     await expect(
       page.getByRole('button', {
         name: /Réessayer maintenant|إعادة المحاولة الآن/,
