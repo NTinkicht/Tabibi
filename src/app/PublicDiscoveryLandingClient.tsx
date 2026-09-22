@@ -68,6 +68,7 @@ const copy = {
         : `Résultats affichés : 1 à ${shown} sur ${matching} clinique${matching === 1 ? '' : 's'} correspondante${matching === 1 ? '' : 's'}.`,
     showMore: (count: number) =>
       `Afficher ${count} autre${count === 1 ? '' : 's'} clinique${count === 1 ? '' : 's'}`,
+    showFewer: 'Afficher les 6 premières cliniques',
     noSearchMatches:
       'Aucune clinique ni aucun médecin ne correspond à votre recherche.',
     refresh: 'Actualiser',
@@ -123,6 +124,7 @@ const copy = {
         ? `لا توجد نتائج معروضة من أصل ${matching} عيادة مطابقة.`
         : `النتائج المعروضة: من 1 إلى ${shown} من أصل ${matching} عيادة مطابقة.`,
     showMore: (count: number) => `عرض ${count} عيادة إضافية`,
+    showFewer: 'عرض أول 6 عيادات',
     noSearchMatches: 'لا توجد عيادات أو أطباء يطابقون بحثك.',
     refresh: 'تحديث',
     refreshed: (count: number) => `تم تحديث الدليل: ${count} عيادة.`,
@@ -239,6 +241,8 @@ export default function PublicDiscoveryLandingClient({
   const firstClinicHeadingRef = useRef<HTMLHeadingElement>(null);
   const [revealFocusIndex, setRevealFocusIndex] = useState<number | null>(null);
   const revealedClinicHeadingRef = useRef<HTMLHeadingElement>(null);
+  const showMoreButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreShowMoreFocusRef = useRef(false);
   const [refreshCount, setRefreshCount] = useState<number | null>(null);
   const t = copy[locale];
   const query = normalizeSearch(search.trim());
@@ -289,6 +293,7 @@ export default function PublicDiscoveryLandingClient({
   // changing the underlying filtered/sorted result set.
   const displayedClinics = sortedClinics.slice(0, visibleLimit);
   const remainingClinics = matchingClinics.length - displayedClinics.length;
+  const canCollapse = displayedClinics.length > DIRECTORY_BATCH_SIZE;
   const visibleDoctorTotal = displayedClinics.reduce(
     (total, clinic) => total + doctorsVisibleForQuery(clinic, query).length,
     0,
@@ -373,6 +378,14 @@ export default function PublicDiscoveryLandingClient({
     }
     revealedClinicHeadingRef.current?.focus();
   }, [visibleLimit, revealFocusIndex, displayedClinics.length]);
+
+  // A collapse removes its own button. Restore focus to the surviving Show
+  // more control only for an intentional collapse, never for filter resets.
+  useEffect(() => {
+    if (!restoreShowMoreFocusRef.current) return;
+    restoreShowMoreFocusRef.current = false;
+    showMoreButtonRef.current?.focus();
+  }, [visibleLimit]);
 
   const beginRefresh = () => {
     setVisibleLimit(DIRECTORY_BATCH_SIZE);
@@ -687,12 +700,26 @@ export default function PublicDiscoveryLandingClient({
           <button
             type="button"
             data-testid="show-more-clinics"
+            ref={showMoreButtonRef}
             onClick={() => {
               setRevealFocusIndex(displayedClinics.length);
               setVisibleLimit((previous) => previous + DIRECTORY_BATCH_SIZE);
             }}
           >
             {t.showMore(Math.min(DIRECTORY_BATCH_SIZE, remainingClinics))}
+          </button>
+        )}
+        {state === 'ready' && canCollapse && (
+          <button
+            type="button"
+            data-testid="show-fewer-clinics"
+            onClick={() => {
+              restoreShowMoreFocusRef.current = true;
+              setRevealFocusIndex(null);
+              setVisibleLimit(DIRECTORY_BATCH_SIZE);
+            }}
+          >
+            {t.showFewer}
           </button>
         )}
       </section>
