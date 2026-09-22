@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 type Locale = 'ar' | 'fr';
 type ClinicLanguageFilter = Locale | 'all';
@@ -12,6 +12,15 @@ export type PublicClinic = {
   doctors: { displayName: string }[];
 };
 type LoadState = 'loading' | 'ready' | 'error';
+
+function subscribeToBrowserLocale(onChange: () => void) {
+  window.addEventListener('languagechange', onChange);
+  return () => window.removeEventListener('languagechange', onChange);
+}
+
+function getBrowserLocale(): Locale {
+  return /^ar(?:[-_]|$)/i.test(navigator.language.trim()) ? 'ar' : 'fr';
+}
 const REFRESH_TIMEOUT_MS = 5_000;
 const DIRECTORY_BATCH_SIZE = 6;
 
@@ -207,7 +216,13 @@ export default function PublicDiscoveryLandingClient({
 }: {
   initialClinics: PublicClinic[] | null;
 }) {
-  const [locale, setLocale] = useState<Locale>('fr');
+  const browserLocale = useSyncExternalStore<Locale>(
+    subscribeToBrowserLocale,
+    getBrowserLocale,
+    () => 'fr',
+  );
+  const [chosenLocale, setChosenLocale] = useState<Locale | null>(null);
+  const locale = chosenLocale ?? browserLocale;
   const [state, setState] = useState<LoadState>(
     initialClinics === null ? 'error' : 'ready',
   );
@@ -384,7 +399,9 @@ export default function PublicDiscoveryLandingClient({
             type="button"
             lang="fr"
             aria-pressed={locale === 'fr'}
-            onClick={() => setLocale('fr')}
+            onClick={() => {
+              setChosenLocale('fr');
+            }}
           >
             Français
           </button>
@@ -392,7 +409,9 @@ export default function PublicDiscoveryLandingClient({
             type="button"
             lang="ar"
             aria-pressed={locale === 'ar'}
-            onClick={() => setLocale('ar')}
+            onClick={() => {
+              setChosenLocale('ar');
+            }}
           >
             العربية
           </button>
