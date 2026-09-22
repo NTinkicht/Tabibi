@@ -1331,7 +1331,7 @@ function LiveQueueView({
           ) : null}
         </div>
         {state.data ? lastVerifiedStatus : null}
-        {state.data ? streamGuidance : null}
+        {state.data && !state.exhausted ? streamGuidance : null}
         {state.data ? manualRefreshControl : null}
       </>,
     );
