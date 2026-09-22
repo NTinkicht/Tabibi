@@ -34,6 +34,7 @@ const copy = {
     clinicSortDescending: 'Nom : Z à A',
     sortedResultsAscending: 'Cliniques classées par nom : A à Z.',
     sortedResultsDescending: 'Cliniques classées par nom : Z à A.',
+    resetClinicSort: 'Réinitialiser le tri',
     noFilteredMatches:
       'Aucune clinique ne correspond aux filtres sélectionnés.',
     searchPlaceholder: 'Nom de la clinique ou du médecin',
@@ -91,6 +92,7 @@ const copy = {
     clinicSortDescending: 'الاسم: تنازليًا',
     sortedResultsAscending: 'العيادات مرتبة حسب الاسم: تصاعديًا.',
     sortedResultsDescending: 'العيادات مرتبة حسب الاسم: تنازليًا.',
+    resetClinicSort: 'استعادة الترتيب الأصلي',
     noFilteredMatches: 'لا توجد عيادات تطابق عوامل التصفية المحددة.',
     searchPlaceholder: 'اسم العيادة أو الطبيب',
     clearSearch: 'مسح البحث',
@@ -218,6 +220,7 @@ export default function PublicDiscoveryLandingClient({
   const [onlyListedDoctors, setOnlyListedDoctors] = useState(false);
   const [visibleLimit, setVisibleLimit] = useState(DIRECTORY_BATCH_SIZE);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const sortSelectRef = useRef<HTMLSelectElement>(null);
   const firstClinicHeadingRef = useRef<HTMLHeadingElement>(null);
   const [revealFocusIndex, setRevealFocusIndex] = useState<number | null>(null);
   const revealedClinicHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -486,6 +489,7 @@ export default function PublicDiscoveryLandingClient({
             <label htmlFor="publicClinicSort">{t.clinicSortLabel}</label>
             <select
               id="publicClinicSort"
+              ref={sortSelectRef}
               value={clinicSort}
               onChange={(event) => {
                 setClinicSort(event.target.value as ClinicSort);
@@ -598,6 +602,21 @@ export default function PublicDiscoveryLandingClient({
                 ? t.sortedResultsAscending
                 : t.sortedResultsDescending}
             </p>
+          )}
+        {state === 'ready' &&
+          displayedClinics.length > 0 &&
+          clinicSort !== 'original' && (
+            <button
+              type="button"
+              data-testid="reset-clinic-sort"
+              onClick={() => {
+                setClinicSort('original');
+                setVisibleLimit(DIRECTORY_BATCH_SIZE);
+                sortSelectRef.current?.focus();
+              }}
+            >
+              {t.resetClinicSort}
+            </button>
           )}
         {state === 'ready' && displayedClinics.length > 0 && (
           <div className="publicGrid">
