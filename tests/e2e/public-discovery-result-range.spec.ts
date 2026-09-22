@@ -249,7 +249,7 @@ test('French empty-results recovery clears only search first, then filters, pres
   await clinicLanguage.selectOption('fr');
   await search.fill('aucune-correspondance');
   const recovery = page.getByTestId('empty-results-recovery');
-  await expect(recovery).toHaveText('Effacer la recherche');
+  await expect(recovery).toHaveText('Afficher sans cette recherche');
   await recovery.click();
   await expect(search).toBeFocused();
   await expect(search).toHaveValue('');
@@ -259,7 +259,7 @@ test('French empty-results recovery clears only search first, then filters, pres
 
   await clinicLanguage.selectOption('ar');
   await expect(page.locator('.publicClinic')).toHaveCount(0);
-  await expect(recovery).toHaveText('Effacer tous les filtres');
+  await expect(recovery).toHaveText('Voir toutes les cliniques');
   await recovery.click();
   await expect(search).toBeFocused();
   await expect(clinicLanguage).toHaveValue('all');
@@ -288,12 +288,12 @@ test('Arabic RTL empty-results recovery preserves locale and public-only data', 
   const clinicLanguage = page.getByLabel('اللغة المتاحة في العيادة');
   const recovery = page.getByTestId('empty-results-recovery');
   await search.fill('غير موجود');
-  await expect(recovery).toHaveText('مسح البحث');
+  await expect(recovery).toHaveText('عرض النتائج بدون البحث');
   await recovery.click();
   await expect(search).toBeFocused();
   await expect(page.locator('.publicClinic')).toHaveCount(6);
   await clinicLanguage.selectOption('fr');
-  await expect(recovery).toHaveText('مسح جميع عوامل التصفية');
+  await expect(recovery).toHaveText('عرض جميع العيادات');
   await recovery.click();
   await expect(clinicLanguage).toHaveValue('all');
   await expect(search).toBeFocused();
