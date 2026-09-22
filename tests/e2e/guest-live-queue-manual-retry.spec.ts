@@ -91,7 +91,9 @@ test('manual retry shows accessible pending feedback, stays bound to one in-flig
 
   releaseRetry?.();
   await expect(page.getByText(/en attente/)).toBeVisible();
-  await expect(page.getByTestId('manual-retry-feedback')).toHaveCount(0);
+  await expect(page.getByTestId('manual-retry-feedback')).toHaveText(
+    'Nouvelle tentative réussie. Le statut a été vérifié.',
+  );
   expect(requests).toBe(6);
 });
 
@@ -209,7 +211,9 @@ test('Arabic RTL manual retry announces pending status and recovers to the live 
 
   releaseRetry?.();
   await expect(page.getByText(/في الانتظار/)).toBeVisible();
-  await expect(page.getByTestId('manual-retry-feedback')).toHaveCount(0);
+  await expect(page.getByTestId('manual-retry-feedback')).toHaveText(
+    'نجحت إعادة المحاولة. تم التحقق من حالتك.',
+  );
   expect(requests).toBe(6);
   expect(page.url()).not.toContain(BEARER);
 });

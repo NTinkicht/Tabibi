@@ -1251,6 +1251,17 @@ function LiveQueueView({
     </>
   );
 
+  const manualRetryFeedback =
+    manualRetryOutcome !== 'idle' ? (
+      <p role="status" aria-atomic="true" data-testid="manual-retry-feedback">
+        {manualRetryOutcome === 'pending'
+          ? copy.manualRetryPending
+          : manualRetryOutcome === 'verified'
+            ? copy.manualRetryVerified
+            : copy.manualRetryFailed}
+      </p>
+    ) : null;
+
   const streamGuidance = (
     <div data-testid="guest-stream-connection" aria-live="off">
       {streamConnection === 'connected'
@@ -1365,19 +1376,7 @@ function LiveQueueView({
               {manualRetryPending ? copy.manualRetryPending : copy.manualRetry}
             </button>
           ) : null}
-          {manualRetryOutcome !== 'idle' ? (
-            <p
-              role="status"
-              aria-atomic="true"
-              data-testid="manual-retry-feedback"
-            >
-              {manualRetryOutcome === 'pending'
-                ? copy.manualRetryPending
-                : manualRetryOutcome === 'verified'
-                  ? copy.manualRetryVerified
-                  : copy.manualRetryFailed}
-            </p>
-          ) : null}
+          {manualRetryFeedback}
         </div>
         {state.data ? lastVerifiedStatus : null}
         {state.data && !state.exhausted ? streamGuidance : null}
@@ -1409,6 +1408,7 @@ function LiveQueueView({
       {lastVerifiedStatus}
       {streamGuidance}
       {manualRefreshControl}
+      {manualRetryFeedback}
       {state.data.queueState === 'waiting' || checkInState.kind !== 'idle' ? (
         <div role="status">
           {checkInState.kind === 'done' ? (
