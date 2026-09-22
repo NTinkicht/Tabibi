@@ -45,6 +45,9 @@ test('manual retry shows accessible pending feedback, stays bound to one in-flig
   let requests = 0;
   let releaseRetry: (() => void) | undefined;
   await page.route(STATUS_URL, async (route) => {
+    const request = route.request();
+    expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
+    expect(request.url()).not.toContain(BEARER);
     requests += 1;
     if (requests <= 5) {
       await route.fulfill({ status: 503, body: '' });
@@ -104,6 +107,9 @@ test('manual retry failure preserves the last verified timestamp and reports tru
   await mockBooking(page);
   let requests = 0;
   await page.route(STATUS_URL, async (route) => {
+    const request = route.request();
+    expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
+    expect(request.url()).not.toContain(BEARER);
     requests += 1;
     if (requests === 1) {
       await route.fulfill({
@@ -171,6 +177,9 @@ test('Arabic RTL manual retry announces pending status and recovers to the live 
   let requests = 0;
   let releaseRetry: (() => void) | undefined;
   await page.route(STATUS_URL, async (route) => {
+    const request = route.request();
+    expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
+    expect(request.url()).not.toContain(BEARER);
     requests += 1;
     if (requests <= 5) {
       await route.fulfill({ status: 503, body: '' });
