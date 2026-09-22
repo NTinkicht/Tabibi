@@ -208,6 +208,8 @@ export default function PublicDiscoveryLandingClient({
   const [onlyListedDoctors, setOnlyListedDoctors] = useState(false);
   const [visibleLimit, setVisibleLimit] = useState(DIRECTORY_BATCH_SIZE);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const pendingRevealFocusIndexRef = useRef<number | null>(null);
+  const revealedClinicHeadingRef = useRef<HTMLHeadingElement>(null);
   const [refreshCount, setRefreshCount] = useState<number | null>(null);
   const t = copy[locale];
   const query = normalizeSearch(search.trim());
@@ -330,6 +332,14 @@ export default function PublicDiscoveryLandingClient({
     window.addEventListener('keydown', focusSearchOnSlash);
     return () => window.removeEventListener('keydown', focusSearchOnSlash);
   }, []);
+
+  // Move focus only after an intentional reveal, never on initial load or
+  // when a search, filter, sort or refresh resets the first batch.
+  useEffect(() => {
+    if (pendingRevealFocusIndexRef.current === null) return;
+    revealedClinicHeadingRef.current?.focus();
+    pendingRevealFocusIndexRef.current = null;
+  }, [visibleLimit]);
 
   const beginRefresh = () => {
     setVisibleLimit(DIRECTORY_BATCH_SIZE);
@@ -542,7 +552,20 @@ export default function PublicDiscoveryLandingClient({
               const visibleDoctors = doctorsVisibleForQuery(clinic, query);
               return (
                 <article className="publicClinic" key={index}>
-                  <h3>{clinic.name}</h3>
+                  <h3
+                    ref={
+                      index === pendingRevealFocusIndexRef.current
+                        ? revealedClinicHeadingRef
+                        : undefined
+                    }
+                    tabIndex={
+                      index === pendingRevealFocusIndexRef.current
+                        ? -1
+                        : undefined
+                    }
+                  >
+                    {clinic.name}
+                  </h3>
                   <p className="publicLanguages">
                     {t.languages}:{' '}
                     {clinic.enabledLocales
@@ -573,9 +596,10 @@ export default function PublicDiscoveryLandingClient({
           <button
             type="button"
             data-testid="show-more-clinics"
-            onClick={() =>
-              setVisibleLimit((previous) => previous + DIRECTORY_BATCH_SIZE)
-            }
+            onClick={() => {
+              pendingRevealFocusIndexRef.current = displayedClinics.length;
+              setVisibleLimit((previous) => previous + DIRECTORY_BATCH_SIZE);
+            }}
           >
             {t.showMore(Math.min(DIRECTORY_BATCH_SIZE, remainingClinics))}
           </button>
