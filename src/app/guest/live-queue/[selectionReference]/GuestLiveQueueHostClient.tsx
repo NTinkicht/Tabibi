@@ -491,9 +491,18 @@ export function GuestLiveQueueHostClient({
   const [contactPreference, setContactPreference] =
     useState<ContactPreference>('none');
   const idempotencyKeyRef = useRef<string | null>(null);
+  // React disables the form via `phase.kind === 'booking'` only after this
+  // handler returns and a re-render commits, so a rapid double click/Enter
+  // (or a synthesised double submit) can re-enter this handler before that
+  // happens. This ref is set synchronously, before any `await`, so the
+  // second re-entrant call is rejected immediately instead of racing a
+  // second POST.
+  const bookingInFlightRef = useRef(false);
 
   const submitBooking = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (bookingInFlightRef.current) return;
+    bookingInFlightRef.current = true;
     setPhase({ kind: 'booking' });
     idempotencyKeyRef.current ??= crypto.randomUUID();
     try {
@@ -526,6 +535,8 @@ export function GuestLiveQueueHostClient({
       });
     } catch {
       setPhase({ kind: 'booking_failed' });
+    } finally {
+      bookingInFlightRef.current = false;
     }
   };
 
