@@ -208,7 +208,7 @@ export default function PublicDiscoveryLandingClient({
   const [onlyListedDoctors, setOnlyListedDoctors] = useState(false);
   const [visibleLimit, setVisibleLimit] = useState(DIRECTORY_BATCH_SIZE);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const pendingRevealFocusIndexRef = useRef<number | null>(null);
+  const [revealFocusIndex, setRevealFocusIndex] = useState<number | null>(null);
   const revealedClinicHeadingRef = useRef<HTMLHeadingElement>(null);
   const [refreshCount, setRefreshCount] = useState<number | null>(null);
   const t = copy[locale];
@@ -336,10 +336,11 @@ export default function PublicDiscoveryLandingClient({
   // Move focus only after an intentional reveal, never on initial load or
   // when a search, filter, sort or refresh resets the first batch.
   useEffect(() => {
-    if (pendingRevealFocusIndexRef.current === null) return;
+    if (revealFocusIndex === null || displayedClinics.length <= revealFocusIndex) {
+      return;
+    }
     revealedClinicHeadingRef.current?.focus();
-    pendingRevealFocusIndexRef.current = null;
-  }, [visibleLimit]);
+  }, [visibleLimit, revealFocusIndex, displayedClinics.length]);
 
   const beginRefresh = () => {
     setVisibleLimit(DIRECTORY_BATCH_SIZE);
@@ -554,12 +555,12 @@ export default function PublicDiscoveryLandingClient({
                 <article className="publicClinic" key={index}>
                   <h3
                     ref={
-                      index === pendingRevealFocusIndexRef.current
+                      index === revealFocusIndex
                         ? revealedClinicHeadingRef
                         : undefined
                     }
                     tabIndex={
-                      index === pendingRevealFocusIndexRef.current
+                      index === revealFocusIndex
                         ? -1
                         : undefined
                     }
@@ -597,7 +598,7 @@ export default function PublicDiscoveryLandingClient({
             type="button"
             data-testid="show-more-clinics"
             onClick={() => {
-              pendingRevealFocusIndexRef.current = displayedClinics.length;
+              setRevealFocusIndex(displayedClinics.length);
               setVisibleLimit((previous) => previous + DIRECTORY_BATCH_SIZE);
             }}
           >
