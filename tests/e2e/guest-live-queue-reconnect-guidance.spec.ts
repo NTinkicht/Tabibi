@@ -201,11 +201,17 @@ for (const language of ['fr-FR', 'ar-DZ'] as const) {
         failedStatusRequests += 1;
         return route.fulfill({ status: 503, body: 'status unavailable' });
       });
-      for (const [index, delay] of [31_000, 6_000, 16_000, 31_000, 61_000].entries()) {
+      const retryDelays = [31_000, 6_000, 16_000, 31_000, 61_000];
+      for (const [index, delay] of retryDelays.entries()) {
         await page.clock.runFor(delay);
         await expect.poll(() => failedStatusRequests).toBe(index + 1);
         await expect(
-          page.getByRole('heading', { name: /état.*ancien|الحالة قديمة|قد تكون الحالة قديمة|Connexion interrompue|انقطع الاتصال/ }),
+          page.getByRole('heading', {
+            name:
+              index === retryDelays.length - 1
+                ? /Connexion interrompue|انقطع الاتصال/
+                : /Statut potentiellement obsolète|قد تكون الحالة قديمة/,
+          }),
         ).toBeVisible();
       }
 
