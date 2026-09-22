@@ -87,7 +87,8 @@ test('French sort reset keeps search and focus', async ({ page }) => {
     name: 'Rechercher une clinique ou un médecin',
   });
   await search.fill('Clinique');
-  await page.getByLabel('Langue proposée par la clinique').selectOption('fr');
+  const filter = page.getByLabel('Langue proposée par la clinique');
+  await filter.selectOption('fr');
   const sort = page.getByLabel('Trier les cliniques par nom');
   await sort.selectOption('descending');
   await expect(page.locator('.publicClinic h3').first()).toHaveText(
@@ -100,9 +101,7 @@ test('French sort reset keeps search and focus', async ({ page }) => {
   await expect(sort).toHaveValue('original');
   await expect(sort).toBeFocused();
   await expect(search).toHaveValue('Clinique');
-  await expect(
-    page.getByLabel('Langue proposée par la clinique'),
-  ).toHaveValue('fr');
+  await expect(filter).toHaveValue('fr');
   await expect(page.locator('.publicClinic h3').first()).toHaveText(
     'Clinique 1',
   );
