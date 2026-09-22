@@ -4,6 +4,7 @@ type Copy = {
   dir: 'ltr' | 'rtl';
   title: string;
   intro: string;
+  onThisPage: string;
   queueHeading: string;
   queueBody: string;
   consultationHeading: string;
@@ -22,6 +23,7 @@ const COPY: Record<Locale, Copy> = {
     title: 'Comprendre vos estimations Tabibi',
     intro:
       'Les temps affichés sont des estimations qui évoluent avec la file réelle. Ils ne constituent pas une heure de passage garantie.',
+    onThisPage: 'Sur cette page',
     queueHeading: 'Temps d’attente',
     queueBody:
       'La fourchette d’attente est recalculée à partir de l’état validé de la file (ordre et durées observées disponibles) au moment du calcul. Une urgence, une pause ou une consultation plus longue peut la faire évoluer.',
@@ -43,6 +45,7 @@ const COPY: Record<Locale, Copy> = {
     title: 'فهم تقديرات طبيبي',
     intro:
       'الأوقات المعروضة تقديرات تتغير مع حالة الطابور الفعلية، وليست موعدًا مضمونًا للدخول.',
+    onThisPage: 'في هذه الصفحة',
     queueHeading: 'وقت الانتظار',
     queueBody:
       'يُعاد حساب نطاق الانتظار اعتمادًا على الحالة المعتمدة للطابور (الترتيب والمدد المرصودة المتاحة) وقت الحساب. قد يتغير بسبب حالة طارئة أو توقف مؤقت أو استشارة أطول من المتوقع.',
@@ -79,6 +82,27 @@ export default async function GuestEtaExplainedPage({
     <main lang={locale} dir={copy.dir}>
       <h1>{copy.title}</h1>
       <p>{copy.intro}</p>
+      <nav aria-label={copy.onThisPage}>
+        <ul>
+          <li>
+            <a href="#queue-estimate-heading">{copy.queueHeading}</a>
+          </li>
+          <li>
+            <a href="#consultation-estimate-heading">
+              {copy.consultationHeading}
+            </a>
+          </li>
+          <li>
+            <a href="#verification-heading">{copy.verificationHeading}</a>
+          </li>
+          <li>
+            <a href="#recovery-heading">{copy.recoveryHeading}</a>
+          </li>
+          <li>
+            <a href="#privacy-heading">{copy.privacyHeading}</a>
+          </li>
+        </ul>
+      </nav>
       <section aria-labelledby="queue-estimate-heading">
         <h2 id="queue-estimate-heading">{copy.queueHeading}</h2>
         <p>{copy.queueBody}</p>
