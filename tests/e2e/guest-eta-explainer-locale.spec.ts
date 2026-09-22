@@ -35,3 +35,34 @@ test('ETA explainer does not echo private search params', async ({ page }) => {
   await expect(page.locator('main[lang="fr"][dir="ltr"]')).toBeVisible();
   expect(page.url()).not.toContain(sentinel);
 });
+
+test('ETA explainer marks only selected language as current', async ({
+  page,
+}) => {
+  const french = page.getByRole('link', { name: 'Français' });
+  const arabic = page.getByRole('link', { name: 'العربية' });
+  await page.goto('/guest/eta-explained?lang=fr');
+  await expect(french).toHaveAttribute('aria-current', 'page');
+  await expect(arabic).not.toHaveAttribute('aria-current');
+
+  await arabic.click();
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(arabic).toHaveAttribute('aria-current', 'page');
+  await expect(french).not.toHaveAttribute('aria-current');
+
+  await french.click();
+  await expect(page.locator('main[lang="fr"][dir="ltr"]')).toBeVisible();
+  await expect(french).toHaveAttribute('aria-current', 'page');
+  await expect(arabic).not.toHaveAttribute('aria-current');
+});
+
+test('Regional Arabic deep links mark Arabic as current', async ({ page }) => {
+  await page.goto('/guest/eta-explained?lang=AR-DZ');
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'العربية' }),
+  ).toHaveAttribute('aria-current', 'page');
+  await expect(
+    page.getByRole('link', { name: 'Français' }),
+  ).not.toHaveAttribute('aria-current');
+});
