@@ -226,7 +226,7 @@ test('Arabic RTL keyboard reveal focuses the first newly shown clinic on mobile'
   ).toBeFocused();
   await expect(showMore).toHaveCount(0);
   await expect(page.getByTestId('clinic-result-range')).toHaveText(
-    'النتائج المعروضة: من 1 إلى 8 من أصل 8 عيادات مطابقة.',
+    'النتائج المعروضة: من 1 إلى 8 من أصل 8 عيادة مطابقة.',
   );
   expect(await page.locator('main').innerText()).not.toContain(
     'private-range-clinic',
