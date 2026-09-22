@@ -164,3 +164,44 @@ test('Arabic RTL fallback preserves canonical refresh and never exposes the bear
   expect(page.url()).not.toContain(BEARER);
   expect(await page.locator('body').innerText()).not.toContain(BEARER);
 });
+
+for (const language of ['fr-FR', 'ar-DZ'] as const) {
+  test(`Exhausted polling ${language} asks for manual retry`, async ({ page }) => {
+    await page.clock.install();
+    await page.addInitScript((locale) => {
+      Object.defineProperty(navigator, 'language', {
+        configurable: true,
+        value: locale,
+      });
+    }, language);
+    await page.route(`**${STREAM_URL}`, (route) => {
+      const request = route.request();
+      expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
+      expect(request.url()).not.toContain(BEARER);
+      return route.fulfill({ status: 503, body: 'stream unavailable' });
+    });
+    await openLiveQueue(page);
+    await expect(page.getByTestId('guest-stream-connection')).toContainText(
+      /vérification automatique continue|يستمر التحقق التلقائي/,
+    );
+
+    // Override the initial successful canonical route, then exhaust all
+    // bounded retries with a virtual clock rather than wall-clock sleeps.
+    await page.route(STATUS_URL, (route) => {
+      const request = route.request();
+      expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
+      expect(request.url()).not.toContain(BEARER);
+      return route.fulfill({ status: 503, body: 'status unavailable' });
+    });
+    await page.clock.runFor(150_000);
+
+    await expect(page.getByTestId('guest-stream-connection')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', {
+        name: /Réessayer maintenant|إعادة المحاولة الآن/,
+      }),
+    ).toBeVisible();
+    expect(page.url()).not.toContain(BEARER);
+    expect(await page.locator('body').innerText()).not.toContain(BEARER);
+  });
+}
