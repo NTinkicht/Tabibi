@@ -173,56 +173,55 @@ for (const language of ['fr-FR', 'ar-DZ'] as const) {
   test(`Exhausted polling ${language} asks for manual retry`, async ({
     page,
   }) => {
-      await page.clock.install();
-      await page.addInitScript((locale) => {
-        Object.defineProperty(navigator, 'language', {
-          configurable: true,
-          value: locale,
-        });
-      }, language);
-      await page.route(`**${STREAM_URL}`, (route) => {
-        const request = route.request();
-        expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
-        expect(request.url()).not.toContain(BEARER);
-        return route.fulfill({ status: 503, body: 'stream unavailable' });
+    await page.clock.install();
+    await page.addInitScript((locale) => {
+      Object.defineProperty(navigator, 'language', {
+        configurable: true,
+        value: locale,
       });
-      await openLiveQueue(page);
-      await expect(page.getByTestId('guest-stream-connection')).toContainText(
-        /vérification automatique continue|يستمر التحقق التلقائي/,
-      );
+    }, language);
+    await page.route(`**${STREAM_URL}`, (route) => {
+      const request = route.request();
+      expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
+      expect(request.url()).not.toContain(BEARER);
+      return route.fulfill({ status: 503, body: 'stream unavailable' });
+    });
+    await openLiveQueue(page);
+    await expect(page.getByTestId('guest-stream-connection')).toContainText(
+      /vérification automatique continue|يستمر التحقق التلقائي/,
+    );
 
-      // Advance one polling boundary at a time. A single large virtual-clock
-      // jump can outrun asynchronous fetch/React settling between retries.
-      let failedStatusRequests = 0;
-      await page.route(STATUS_URL, (route) => {
-        const request = route.request();
-        expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
-        expect(request.url()).not.toContain(BEARER);
-        failedStatusRequests += 1;
-        return route.fulfill({ status: 503, body: 'status unavailable' });
-      });
-      const retryDelays = [31_000, 6_000, 16_000, 31_000, 61_000];
-      for (const [index, delay] of retryDelays.entries()) {
-        await page.clock.runFor(delay);
-        await expect.poll(() => failedStatusRequests).toBe(index + 1);
-        await expect(
-          page.getByRole('heading', {
-            name:
-              index === retryDelays.length - 1
-                ? /Connexion interrompue|انقطع الاتصال/
-                : /Statut potentiellement obsolète|قد تكون الحالة قديمة/,
-          }),
-        ).toBeVisible();
-      }
-
-      await expect(page.getByTestId('guest-stream-connection')).toHaveCount(0);
+    // Advance one polling boundary at a time. A single large virtual-clock
+    // jump can outrun asynchronous fetch/React settling between retries.
+    let failedStatusRequests = 0;
+    await page.route(STATUS_URL, (route) => {
+      const request = route.request();
+      expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
+      expect(request.url()).not.toContain(BEARER);
+      failedStatusRequests += 1;
+      return route.fulfill({ status: 503, body: 'status unavailable' });
+    });
+    const retryDelays = [31_000, 6_000, 16_000, 31_000, 61_000];
+    for (const [index, delay] of retryDelays.entries()) {
+      await page.clock.runFor(delay);
+      await expect.poll(() => failedStatusRequests).toBe(index + 1);
       await expect(
-        page.getByRole('button', {
-          name: /Réessayer maintenant|إعادة المحاولة الآن/,
+        page.getByRole('heading', {
+          name:
+            index === retryDelays.length - 1
+              ? /Connexion interrompue|انقطع الاتصال/
+              : /Statut potentiellement obsolète|قد تكون الحالة قديمة/,
         }),
       ).toBeVisible();
-      expect(page.url()).not.toContain(BEARER);
-      expect(await page.locator('body').innerText()).not.toContain(BEARER);
-    },
-  );
+    }
+
+    await expect(page.getByTestId('guest-stream-connection')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', {
+        name: /Réessayer maintenant|إعادة المحاولة الآن/,
+      }),
+    ).toBeVisible();
+    expect(page.url()).not.toContain(BEARER);
+    expect(await page.locator('body').innerText()).not.toContain(BEARER);
+  });
 }
