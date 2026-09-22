@@ -479,8 +479,10 @@ export function GuestLiveQueueHostClient({
   );
   const copy = COPY[locale];
   const [phase, setPhase] = useState<HostPhase>({ kind: 'form' });
-  const [preferredLocale, setPreferredLocale] =
-    useState<SupportedLocale>(locale);
+  // Until a guest explicitly selects a language, follow the detected UI
+  // locale (which may change from the SSR French fallback after hydration).
+  const [chosenLocale, setChosenLocale] = useState<SupportedLocale | null>(null);
+  const preferredLocale = chosenLocale ?? locale;
   const [privateDisplayName, setPrivateDisplayName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
@@ -612,7 +614,7 @@ export function GuestLiveQueueHostClient({
                 name="preferredLocale"
                 value={value}
                 checked={preferredLocale === value}
-                onChange={() => setPreferredLocale(value)}
+                onChange={() => setChosenLocale(value)}
               />
               {value === 'fr' ? 'Français' : 'العربية'}
             </label>
