@@ -42,6 +42,7 @@ const copy = {
     emptyRecoverySearch: 'Afficher sans cette recherche',
     emptyRecoveryFilters: 'Voir toutes les cliniques',
     activeFiltersLabel: 'Filtres actifs :',
+    jumpToFirstClinic: 'Aller au premier résultat',
     activeLanguageFrench: 'langue : français',
     activeLanguageArabic: 'langue : arabe',
     activeListedDoctors: 'cliniques avec médecins affichés',
@@ -97,6 +98,7 @@ const copy = {
     emptyRecoverySearch: 'عرض النتائج بدون البحث',
     emptyRecoveryFilters: 'عرض جميع العيادات',
     activeFiltersLabel: 'عوامل التصفية النشطة:',
+    jumpToFirstClinic: 'الانتقال إلى أول نتيجة',
     activeLanguageFrench: 'اللغة: الفرنسية',
     activeLanguageArabic: 'اللغة: العربية',
     activeListedDoctors: 'العيادات التي تعرض أطباء',
@@ -216,6 +218,7 @@ export default function PublicDiscoveryLandingClient({
   const [onlyListedDoctors, setOnlyListedDoctors] = useState(false);
   const [visibleLimit, setVisibleLimit] = useState(DIRECTORY_BATCH_SIZE);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const firstClinicHeadingRef = useRef<HTMLHeadingElement>(null);
   const [revealFocusIndex, setRevealFocusIndex] = useState<number | null>(null);
   const revealedClinicHeadingRef = useRef<HTMLHeadingElement>(null);
   const [refreshCount, setRefreshCount] = useState<number | null>(null);
@@ -571,6 +574,17 @@ export default function PublicDiscoveryLandingClient({
               </button>
             </div>
           )}
+        {state === 'ready' &&
+          displayedClinics.length > 0 &&
+          (query || clinicLanguage !== 'all' || onlyListedDoctors) && (
+            <button
+              type="button"
+              data-testid="jump-to-first-clinic"
+              onClick={() => firstClinicHeadingRef.current?.focus()}
+            >
+              {t.jumpToFirstClinic}
+            </button>
+          )}
         {state === 'ready' && clinics.length > 0 && (
           <p data-testid="clinic-result-range" aria-live="polite">
             {t.resultRange(displayedClinics.length, matchingClinics.length)}
@@ -593,11 +607,15 @@ export default function PublicDiscoveryLandingClient({
                 <article className="publicClinic" key={index}>
                   <h3
                     ref={
-                      index === revealFocusIndex
-                        ? revealedClinicHeadingRef
-                        : undefined
+                      index === 0
+                        ? firstClinicHeadingRef
+                        : index === revealFocusIndex
+                          ? revealedClinicHeadingRef
+                          : undefined
                     }
-                    tabIndex={index === revealFocusIndex ? -1 : undefined}
+                    tabIndex={
+                      index === 0 || index === revealFocusIndex ? -1 : undefined
+                    }
                   >
                     {clinic.name}
                   </h3>
