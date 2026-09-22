@@ -41,9 +41,7 @@ async function mockRetryableBooking(page: Page) {
 }
 
 for (const locale of ['fr', 'ar'] as const) {
-  test(`Booking failure focuses retryable error heading in ${locale}`, async ({
-    page,
-  }) => {
+  test(`Guest booking error focus and retry in ${locale}`, async ({ page }) => {
     if (locale === 'ar') {
       await page.addInitScript(() => {
         Object.defineProperty(navigator, 'language', {
@@ -57,9 +55,11 @@ for (const locale of ['fr', 'ar'] as const) {
     const name = locale === 'fr' ? 'Votre nom' : 'اسمك';
     const submit =
       locale === 'fr' ? 'Confirmer la réservation' : 'تأكيد الحجز';
-    const error = locale === 'fr' ? 'Réservation indisponible' : 'الحجز غير متاح';
+    const error =
+      locale === 'fr' ? 'Réservation indisponible' : 'الحجز غير متاح';
     if (locale === 'ar') {
-      await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
+      const rtlForm = page.locator('section[lang="ar"][dir="rtl"]');
+      await expect(rtlForm).toBeVisible();
     }
     await page.getByLabel(name).fill('Guest');
     await page.getByRole('button', { name: submit }).click();
