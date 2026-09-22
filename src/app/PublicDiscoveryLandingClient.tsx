@@ -208,6 +208,7 @@ export default function PublicDiscoveryLandingClient({
   initialClinics: PublicClinic[] | null;
 }) {
   const [locale, setLocale] = useState<Locale>('fr');
+  const manualLocaleChoiceRef = useRef(false);
   const [state, setState] = useState<LoadState>(
     initialClinics === null ? 'error' : 'ready',
   );
@@ -315,6 +316,15 @@ export default function PublicDiscoveryLandingClient({
     };
   }, [retry]);
 
+  // Keep the SSR/hydration default deterministic, then honor Arabic browser
+  // preference without overriding an explicit in-page language choice.
+  useEffect(() => {
+    if (manualLocaleChoiceRef.current) return;
+    if (/^ar(?:[-_]|$)/i.test(navigator.language.trim())) {
+      setLocale('ar');
+    }
+  }, []);
+
   // Focus the public directory search only from non-editable elements.
   // Let form controls, contenteditable regions and modified shortcuts keep
   // their native keyboard behavior; never change any filter or locale.
@@ -384,7 +394,10 @@ export default function PublicDiscoveryLandingClient({
             type="button"
             lang="fr"
             aria-pressed={locale === 'fr'}
-            onClick={() => setLocale('fr')}
+            onClick={() => {
+              manualLocaleChoiceRef.current = true;
+              setLocale('fr');
+            }}
           >
             Français
           </button>
@@ -392,7 +405,10 @@ export default function PublicDiscoveryLandingClient({
             type="button"
             lang="ar"
             aria-pressed={locale === 'ar'}
-            onClick={() => setLocale('ar')}
+            onClick={() => {
+              manualLocaleChoiceRef.current = true;
+              setLocale('ar');
+            }}
           >
             العربية
           </button>
