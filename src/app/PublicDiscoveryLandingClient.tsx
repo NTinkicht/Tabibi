@@ -710,17 +710,17 @@ export default function PublicDiscoveryLandingClient({
         )}
         {state === 'ready' &&
           displayedClinics.length > DIRECTORY_BATCH_SIZE && (
-          <button
-            type="button"
-            data-testid="show-fewer-clinics"
-            onClick={() => {
-              restoreShowMoreFocusRef.current = true;
-              setRevealFocusIndex(null);
-              setVisibleLimit(DIRECTORY_BATCH_SIZE);
-            }}
-          >
-            {t.showFewer}
-          </button>
+            <button
+              type="button"
+              data-testid="show-fewer-clinics"
+              onClick={() => {
+                restoreShowMoreFocusRef.current = true;
+                setRevealFocusIndex(null);
+                setVisibleLimit(DIRECTORY_BATCH_SIZE);
+              }}
+            >
+              {t.showFewer}
+            </button>
         )}
       </section>
       <footer className="publicFootnote">{t.note}</footer>
