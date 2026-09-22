@@ -130,7 +130,9 @@ test('French connection loss gives bounded fallback announcement, reconnect prog
   expect(await page.locator('body').innerText()).not.toContain(BEARER);
 });
 
-test('Arabic RTL fallback preserves canonical refresh and never exposes the bearer', async ({ page }) => {
+test('Arabic RTL fallback preserves canonical refresh and never exposes the bearer', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'language', {
