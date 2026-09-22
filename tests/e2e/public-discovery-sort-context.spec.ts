@@ -61,12 +61,8 @@ test('Arabic RTL public directory keeps sort context truthful through zero match
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
 
   await sort.selectOption('descending');
-  await expect(summary).toHaveText(
-    'العيادات مرتبة حسب الاسم: تنازليًا.',
-  );
-  await expect(page.locator('.publicClinic h3').first()).toHaveText(
-    'عيادة 8',
-  );
+  await expect(summary).toHaveText('العيادات مرتبة حسب الاسم: تنازليًا.');
+  await expect(page.locator('.publicClinic h3').first()).toHaveText('عيادة 8');
   const search = page.getByRole('searchbox', {
     name: 'ابحث عن عيادة أو طبيب',
   });
@@ -74,9 +70,7 @@ test('Arabic RTL public directory keeps sort context truthful through zero match
   await expect(page.locator('.publicClinic')).toHaveCount(0);
   await expect(summary).toHaveCount(0);
   await search.press('Escape');
-  await expect(summary).toHaveText(
-    'العيادات مرتبة حسب الاسم: تنازليًا.',
-  );
+  await expect(summary).toHaveText('العيادات مرتبة حسب الاسم: تنازليًا.');
   await sort.selectOption('original');
   await expect(summary).toHaveCount(0);
   expect(await page.locator('main').innerText()).not.toContain(
