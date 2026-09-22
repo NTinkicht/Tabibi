@@ -541,9 +541,25 @@ export default function PublicDiscoveryLandingClient({
           clinics.length > 0 &&
           (query || clinicLanguage !== 'all' || onlyListedDoctors) &&
           matchingClinics.length === 0 && (
-            <p className="publicNotice" role="status">
-              {noMatchesCopy}
-            </p>
+            <div className="publicNotice" role="status">
+              <p>{noMatchesCopy}</p>
+              <button
+                type="button"
+                data-testid="empty-results-recovery"
+                onClick={() => {
+                  if (search.length > 0) {
+                    setSearch('');
+                  } else {
+                    setClinicLanguage('all');
+                    setOnlyListedDoctors(false);
+                  }
+                  setVisibleLimit(DIRECTORY_BATCH_SIZE);
+                  searchInputRef.current?.focus();
+                }}
+              >
+                {search.length > 0 ? t.clearSearch : t.clearAllFilters}
+              </button>
+            </div>
           )}
         {state === 'ready' && clinics.length > 0 && (
           <p data-testid="clinic-result-range" aria-live="polite">
