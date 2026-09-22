@@ -77,3 +77,63 @@ test('Arabic RTL public directory keeps sort context truthful through zero match
     'private-sort-clinic-id',
   );
 });
+
+test('French sort reset keeps search and focus', async ({ page }) => {
+  await mockClinics(page, 'fr');
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  await search.fill('Clinique');
+  const filter = page.getByLabel('Langue proposée par la clinique');
+  await filter.selectOption('fr');
+  const sort = page.getByLabel('Trier les cliniques par nom');
+  await sort.selectOption('descending');
+  await expect(page.locator('.publicClinic h3').first()).toHaveText(
+    'Clinique 8',
+  );
+  const reset = page.getByTestId('reset-clinic-sort');
+  await expect(reset).toHaveText('Réinitialiser le tri');
+  await reset.click();
+
+  await expect(sort).toHaveValue('original');
+  await expect(sort).toBeFocused();
+  await expect(search).toHaveValue('Clinique');
+  await expect(filter).toHaveValue('fr');
+  await expect(page.locator('.publicClinic h3').first()).toHaveText(
+    'Clinique 1',
+  );
+  await expect(page.locator('.publicClinic')).toHaveCount(6);
+  await expect(reset).toHaveCount(0);
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-sort-tenant',
+  );
+});
+
+test('Arabic RTL sort reset keeps filters and focus', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockClinics(page, 'ar');
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  const filter = page.getByLabel('اللغة المتاحة في العيادة');
+  await filter.selectOption('ar');
+  const sort = page.getByLabel('ترتيب العيادات حسب الاسم');
+  await sort.selectOption('descending');
+  const reset = page.getByTestId('reset-clinic-sort');
+  await expect(reset).toHaveText('استعادة الترتيب الأصلي');
+  await reset.click();
+
+  await expect(sort).toHaveValue('original');
+  await expect(sort).toBeFocused();
+  await expect(filter).toHaveValue('ar');
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.locator('.publicClinic h3').first()).toHaveText('عيادة 1');
+  await expect(page.locator('.publicClinic')).toHaveCount(6);
+  await expect(reset).toHaveCount(0);
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-sort-clinic-id',
+  );
+});
