@@ -86,3 +86,44 @@ test('Arabic RTL guest booking labels language independently from contact and su
   await expect.poll(getSelectedLocale).toBe('fr');
   expect(page.url()).not.toContain(PRIVATE_BEARER);
 });
+
+test('French browser defaults the booking preference to French without manual selection', async ({
+  page,
+}) => {
+  const getSelectedLocale = await captureBookingLocale(page);
+  await page.goto('/guest/live-queue/test-selection-ref');
+  const preferredLanguage = page.getByRole('group', {
+    name: 'Langue préférée',
+  });
+  await expect(
+    preferredLanguage.getByRole('radio', { name: 'Français' }),
+  ).toBeChecked();
+  await page.getByLabel('Votre nom').fill('Guest');
+  await page.getByRole('button', { name: 'Confirmer la réservation' }).click();
+  await expect.poll(getSelectedLocale).toBe('fr');
+  expect(page.url()).not.toContain(PRIVATE_BEARER);
+});
+
+test('Arabic browser defaults preferred booking language to Arabic after hydration', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'language', {
+      configurable: true,
+      value: 'ar-DZ',
+    });
+  });
+  const getSelectedLocale = await captureBookingLocale(page);
+  await page.goto('/guest/live-queue/test-selection-ref');
+  await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
+  const preferredLanguage = page.getByRole('group', {
+    name: 'اللغة المفضلة',
+  });
+  await expect(
+    preferredLanguage.getByRole('radio', { name: 'العربية' }),
+  ).toBeChecked();
+  await page.getByLabel('اسمك').fill('Guest');
+  await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
+  await expect.poll(getSelectedLocale).toBe('ar');
+  expect(page.url()).not.toContain(PRIVATE_BEARER);
+});
