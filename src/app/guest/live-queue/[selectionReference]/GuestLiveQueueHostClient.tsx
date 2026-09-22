@@ -64,6 +64,7 @@ type Copy = {
   contactPhone: string;
   contactEmail: string;
   contactPreferenceLabel: string;
+  preferredLocaleLabel: string;
   contactPreferenceNone: string;
   contactPreferencePhone: string;
   contactPreferenceEmail: string;
@@ -138,6 +139,7 @@ const COPY: Record<SupportedLocale, Copy> = {
     contactPhone: 'Téléphone (optionnel)',
     contactEmail: 'Email (optionnel)',
     contactPreferenceLabel: 'Préférence de contact',
+    preferredLocaleLabel: 'Langue préférée',
     contactPreferenceNone: 'Aucune',
     contactPreferencePhone: 'Téléphone',
     contactPreferenceEmail: 'Email',
@@ -243,6 +245,7 @@ const COPY: Record<SupportedLocale, Copy> = {
     contactPhone: 'الهاتف (اختياري)',
     contactEmail: 'البريد الإلكتروني (اختياري)',
     contactPreferenceLabel: 'تفضيل الاتصال',
+    preferredLocaleLabel: 'اللغة المفضلة',
     contactPreferenceNone: 'بدون',
     contactPreferencePhone: 'الهاتف',
     contactPreferenceEmail: 'البريد الإلكتروني',
@@ -601,7 +604,7 @@ export function GuestLiveQueueHostClient({
           ))}
         </fieldset>
         <fieldset disabled={phase.kind === 'booking'}>
-          <legend>{copy.title}</legend>
+          <legend>{copy.preferredLocaleLabel}</legend>
           {(['fr', 'ar'] as const).map((value) => (
             <label key={value}>
               <input
