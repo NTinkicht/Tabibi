@@ -50,11 +50,12 @@ test('French connection loss gives bounded fallback announcement, reconnect prog
             : input instanceof URL
               ? input.href
               : input.url;
-        if (!requestUrl.endsWith(streamPath)) {
-          return originalFetch(input, init);
-        }
         if (requestUrl.includes(bearer)) {
           return Promise.reject(new Error('guest bearer leaked into stream URL'));
+        }
+        const parsedUrl = new URL(requestUrl, window.location.origin);
+        if (parsedUrl.pathname !== streamPath) {
+          return originalFetch(input, init);
         }
         const headers = new Headers(init?.headers);
         if (headers.get('authorization') !== `Bearer ${bearer}`) {
@@ -73,7 +74,7 @@ test('French connection loss gives bounded fallback announcement, reconnect prog
           testWindow.__releaseGuestStream = () => {
             const stream = new ReadableStream<Uint8Array>({
               start(controller) {
-                controller.enqueue(new TextEncoder().encode(': ready\\n\\n'));
+                controller.enqueue(new TextEncoder().encode(': ready\n\n'));
                 // Keep the stream open until the test finishes.
               },
             });
