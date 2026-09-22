@@ -336,7 +336,10 @@ export default function PublicDiscoveryLandingClient({
   // Move focus only after an intentional reveal, never on initial load or
   // when a search, filter, sort or refresh resets the first batch.
   useEffect(() => {
-    if (revealFocusIndex === null || displayedClinics.length <= revealFocusIndex) {
+    if (
+      revealFocusIndex === null ||
+      displayedClinics.length <= revealFocusIndex
+    ) {
       return;
     }
     revealedClinicHeadingRef.current?.focus();
@@ -559,11 +562,7 @@ export default function PublicDiscoveryLandingClient({
                         ? revealedClinicHeadingRef
                         : undefined
                     }
-                    tabIndex={
-                      index === revealFocusIndex
-                        ? -1
-                        : undefined
-                    }
+                    tabIndex={index === revealFocusIndex ? -1 : undefined}
                   >
                     {clinic.name}
                   </h3>
