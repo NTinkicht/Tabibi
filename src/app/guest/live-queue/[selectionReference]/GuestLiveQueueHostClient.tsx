@@ -83,6 +83,9 @@ type Copy = {
   offline: string;
   offlineBody: string;
   manualRetry: string;
+  manualRetryPending: string;
+  manualRetryVerified: string;
+  manualRetryFailed: string;
   manualRefresh: string;
   manualRefreshPending: string;
   manualRefreshVerified: string;
@@ -158,6 +161,10 @@ const COPY: Record<SupportedLocale, Copy> = {
     offlineBody:
       'Nous n’avons pas pu actualiser votre statut. Réessayez manuellement.',
     manualRetry: 'Réessayer maintenant',
+    manualRetryPending: 'Nouvelle tentative en cours…',
+    manualRetryVerified: 'Nouvelle tentative réussie. Le statut a été vérifié.',
+    manualRetryFailed:
+      'La nouvelle tentative a échoué. La dernière heure vérifiée reste affichée.',
     manualRefresh: 'Actualiser mon statut',
     manualRefreshPending: 'Actualisation en cours…',
     manualRefreshVerified:
@@ -257,6 +264,9 @@ const COPY: Record<SupportedLocale, Copy> = {
     offline: 'انقطع الاتصال',
     offlineBody: 'تعذر تحديث حالتك. أعد المحاولة يدويًا.',
     manualRetry: 'إعادة المحاولة الآن',
+    manualRetryPending: 'إعادة المحاولة جارية…',
+    manualRetryVerified: 'نجحت إعادة المحاولة. تم التحقق من حالتك.',
+    manualRetryFailed: 'فشلت إعادة المحاولة. يبقى وقت آخر تحقق ناجح معروضًا.',
     manualRefresh: 'تحديث حالتي',
     manualRefreshPending: 'جارٍ تحديث حالتك…',
     manualRefreshVerified: 'نجح التحقق الجديد. قد تتغير الحالة بعد هذا التحقق.',
@@ -659,6 +669,10 @@ function LiveQueueView({
   const [manualRefreshOutcome, setManualRefreshOutcome] = useState<
     'idle' | 'pending' | 'verified' | 'failed'
   >('idle');
+  const [manualRetryPending, setManualRetryPending] = useState(false);
+  const [manualRetryOutcome, setManualRetryOutcome] = useState<
+    'idle' | 'pending' | 'verified' | 'failed'
+  >('idle');
   const [lastVerifiedAt, setLastVerifiedAt] = useState<Date | null>(null);
   const [streamConnection, setStreamConnection] =
     useState<StreamConnectionState>('connecting');
@@ -820,6 +834,7 @@ function LiveQueueView({
     let streamOutageAnnounced = false;
     let hintPending = false;
     let manualRequestPending = false;
+    let manualRetryRequestPending = false;
     let lastManualRefreshAt = Number.NEGATIVE_INFINITY;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -964,17 +979,26 @@ function LiveQueueView({
             previous === 'failed' ? 'idle' : previous,
           );
         }
+        if (manualRetryRequestPending) {
+          setManualRetryOutcome('verified');
+        } else {
+          setManualRetryOutcome((previous) =>
+            previous === 'failed' ? 'idle' : previous,
+          );
+        }
         setState({ kind: 'active', data });
         scheduleNext(POLL_INTERVAL_MS);
       } catch {
         if (cancelled || terminalReached) return;
         if (hideAbort) {
           if (manualRequestPending) setManualRefreshOutcome('failed');
+          if (manualRetryRequestPending) setManualRetryOutcome('failed');
           hideAbort = false;
           resumeIfVisibleAfterHideAbort = true;
           return;
         }
         if (manualRequestPending) setManualRefreshOutcome('failed');
+        if (manualRetryRequestPending) setManualRetryOutcome('failed');
         consecutiveFailures += 1;
         if (consecutiveFailures > MAX_TRANSIENT_FAILURES) {
           clearScheduled();
@@ -1003,6 +1027,10 @@ function LiveQueueView({
         if (manualRequestPending) {
           manualRequestPending = false;
           if (!cancelled) setManualRefreshPending(false);
+        }
+        if (manualRetryRequestPending) {
+          manualRetryRequestPending = false;
+          if (!cancelled) setManualRetryPending(false);
         }
         if (hintPending && !cancelled && !terminalReached) {
           hintPending = false;
@@ -1105,6 +1133,9 @@ function LiveQueueView({
     manualRetryRef.current = () => {
       if (cancelled || terminalReached || inFlight) return;
       consecutiveFailures = 0;
+      manualRetryRequestPending = true;
+      setManualRetryOutcome('pending');
+      setManualRetryPending(true);
       clearScheduled();
       void poll();
     };
@@ -1325,9 +1356,27 @@ function LiveQueueView({
                 : copy.staleBody}
           </p>
           {state.exhausted ? (
-            <button type="button" onClick={() => manualRetryRef.current()}>
-              {copy.manualRetry}
+            <button
+              type="button"
+              onClick={() => manualRetryRef.current()}
+              disabled={manualRetryPending}
+              aria-busy={manualRetryPending}
+            >
+              {manualRetryPending ? copy.manualRetryPending : copy.manualRetry}
             </button>
+          ) : null}
+          {manualRetryOutcome !== 'idle' ? (
+            <p
+              role="status"
+              aria-atomic="true"
+              data-testid="manual-retry-feedback"
+            >
+              {manualRetryOutcome === 'pending'
+                ? copy.manualRetryPending
+                : manualRetryOutcome === 'verified'
+                  ? copy.manualRetryVerified
+                  : copy.manualRetryFailed}
+            </p>
           ) : null}
         </div>
         {state.data ? lastVerifiedStatus : null}
