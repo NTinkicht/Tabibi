@@ -498,6 +498,14 @@ export function GuestLiveQueueHostClient({
   // second re-entrant call is rejected immediately instead of racing a
   // second POST.
   const bookingInFlightRef = useRef(false);
+  const bookingFailureHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  // Announce booking failure at the retryable form, not on initial load.
+  useEffect(() => {
+    if (phase.kind === 'booking_failed') {
+      bookingFailureHeadingRef.current?.focus();
+    }
+  }, [phase.kind]);
 
   const submitBooking = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -564,7 +572,9 @@ export function GuestLiveQueueHostClient({
       <p>{copy.subtitle}</p>
       {phase.kind === 'booking_failed' ? (
         <div role="alert">
-          <h2>{copy.bookingFailed}</h2>
+          <h2 ref={bookingFailureHeadingRef} tabIndex={-1}>
+            {copy.bookingFailed}
+          </h2>
           <p>{copy.bookingFailedBody}</p>
         </div>
       ) : null}
