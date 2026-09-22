@@ -58,7 +58,9 @@ test('French connection loss gives bounded fallback announcement, reconnect prog
         }
         const headers = new Headers(init?.headers);
         if (headers.get('authorization') !== `Bearer ${bearer}`) {
-          return Promise.reject(new Error('stream request missing bearer authorization'));
+          return Promise.reject(
+            new Error('stream request missing bearer authorization'),
+          );
         }
         streamAttempts += 1;
         if (streamAttempts === 1) {
