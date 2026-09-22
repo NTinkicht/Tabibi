@@ -168,3 +168,67 @@ test('visible clinic total reports the true match count, not the revealed batch,
     'Affichage : 7 sur 10 cliniques du répertoire.',
   );
 });
+
+test('French keyboard reveal focuses first newly shown clinic and never steals search focus', async ({
+  page,
+}) => {
+  await mockDirectory(page, 'fr', 8);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+
+  const showMore = page.getByTestId('show-more-clinics');
+  await showMore.focus();
+  await showMore.press('Enter');
+
+  const newlyRevealedHeading = page
+    .locator('.publicClinic')
+    .nth(6)
+    .getByRole('heading', { level: 3, name: 'Clinique 7' });
+  await expect(newlyRevealedHeading).toBeFocused();
+  await expect(page.locator('.publicClinic')).toHaveCount(8);
+  await expect(showMore).toHaveCount(0);
+  await expect(page.getByTestId('clinic-result-range')).toHaveText(
+    'Résultats affichés : 1 à 8 sur 8 cliniques correspondantes.',
+  );
+
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  await search.fill('Clinique 7');
+  await expect(page.locator('.publicClinic')).toHaveCount(1);
+  await expect(search).toBeFocused();
+  await search.press('Escape');
+  await expect(page.locator('.publicClinic')).toHaveCount(6);
+  await expect(search).toBeFocused();
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-range-tenant',
+  );
+});
+
+test('Arabic RTL keyboard reveal focuses the first newly shown clinic on mobile', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDirectory(page, 'ar', 8);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+
+  const showMore = page.getByTestId('show-more-clinics');
+  await showMore.focus();
+  await showMore.press('Enter');
+  await expect(
+    page
+      .locator('.publicClinic')
+      .nth(6)
+      .getByRole('heading', { level: 3, name: 'عيادة 7' }),
+  ).toBeFocused();
+  await expect(showMore).toHaveCount(0);
+  await expect(page.getByTestId('clinic-result-range')).toHaveText(
+    'النتائج المعروضة: من 1 إلى 8 من أصل 8 عيادات مطابقة.',
+  );
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-range-clinic',
+  );
+});
