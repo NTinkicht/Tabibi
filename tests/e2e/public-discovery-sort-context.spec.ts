@@ -78,9 +78,7 @@ test('Arabic RTL public directory keeps sort context truthful through zero match
   );
 });
 
-test('French sort reset restores original order without losing search', async ({
-  page,
-}) => {
+test('French sort reset keeps search and focus', async ({ page }) => {
   await mockClinics(page, 'fr');
   await page.goto('/');
   await page.getByRole('button', { name: 'Actualiser' }).click();
@@ -115,9 +113,7 @@ test('French sort reset restores original order without losing search', async ({
   );
 });
 
-test('Arabic RTL reset sort retains filters and returns focus', async ({
-  page,
-}) => {
+test('Arabic RTL sort reset keeps filters and focus', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockClinics(page, 'ar');
   await page.goto('/');
@@ -135,9 +131,7 @@ test('Arabic RTL reset sort retains filters and returns focus', async ({
   await expect(sort).toBeFocused();
   await expect(filter).toHaveValue('ar');
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
-  await expect(page.locator('.publicClinic h3').first()).toHaveText(
-    'عيادة 1',
-  );
+  await expect(page.locator('.publicClinic h3').first()).toHaveText('عيادة 1');
   await expect(page.locator('.publicClinic')).toHaveCount(6);
   await expect(reset).toHaveCount(0);
   expect(await page.locator('main').innerText()).not.toContain(
