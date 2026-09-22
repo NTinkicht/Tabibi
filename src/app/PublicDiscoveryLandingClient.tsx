@@ -37,6 +37,8 @@ const copy = {
     searchPlaceholder: 'Nom de la clinique ou du médecin',
     clearSearch: 'Effacer la recherche',
     clearAllFilters: 'Effacer tous les filtres',
+    emptyRecoverySearch: 'Afficher sans cette recherche',
+    emptyRecoveryFilters: 'Voir toutes les cliniques',
     activeFiltersLabel: 'Filtres actifs :',
     activeLanguageFrench: 'langue : français',
     activeLanguageArabic: 'langue : arabe',
@@ -88,6 +90,8 @@ const copy = {
     searchPlaceholder: 'اسم العيادة أو الطبيب',
     clearSearch: 'مسح البحث',
     clearAllFilters: 'مسح جميع عوامل التصفية',
+    emptyRecoverySearch: 'عرض النتائج بدون البحث',
+    emptyRecoveryFilters: 'عرض جميع العيادات',
     activeFiltersLabel: 'عوامل التصفية النشطة:',
     activeLanguageFrench: 'اللغة: الفرنسية',
     activeLanguageArabic: 'اللغة: العربية',
@@ -557,7 +561,9 @@ export default function PublicDiscoveryLandingClient({
                   searchInputRef.current?.focus();
                 }}
               >
-                {search.length > 0 ? t.clearSearch : t.clearAllFilters}
+                {search.length > 0
+                  ? t.emptyRecoverySearch
+                  : t.emptyRecoveryFilters}
               </button>
             </div>
           )}
