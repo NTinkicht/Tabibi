@@ -708,7 +708,8 @@ export default function PublicDiscoveryLandingClient({
             {t.showMore(Math.min(DIRECTORY_BATCH_SIZE, remainingClinics))}
           </button>
         )}
-        {state === 'ready' && displayedClinics.length > DIRECTORY_BATCH_SIZE && (
+        {state === 'ready' &&
+          displayedClinics.length > DIRECTORY_BATCH_SIZE && (
           <button
             type="button"
             data-testid="show-fewer-clinics"
