@@ -87,6 +87,10 @@ type Copy = {
   manualRefreshPending: string;
   manualRefreshVerified: string;
   manualRefreshFailed: string;
+  streamConnected: string;
+  streamReconnecting: string;
+  streamFallback: string;
+  streamRecovered: string;
   lastVerified: string;
   visitStatus: string;
   bookingStates: Record<string, string>;
@@ -160,6 +164,14 @@ const COPY: Record<SupportedLocale, Copy> = {
       'Nouvelle vérification réussie. Le statut peut avoir changé depuis cette vérification.',
     manualRefreshFailed:
       'La nouvelle vérification a échoué. La dernière heure vérifiée reste affichée.',
+    streamConnected:
+      'Notifications en direct disponibles. Seule une vérification réussie confirme votre statut.',
+    streamReconnecting:
+      'Reconnexion aux notifications en direct en cours. La vérification automatique continue.',
+    streamFallback:
+      'Notifications en direct interrompues. La vérification automatique continue ; vous pouvez aussi utiliser « Actualiser mon statut ».',
+    streamRecovered:
+      'Notifications en direct rétablies. La dernière vérification affichée reste la référence.',
     lastVerified: 'Dernière vérification :',
     visitStatus: 'Statut de la visite',
     checkIn: 'Confirmer ma présence',
@@ -249,6 +261,14 @@ const COPY: Record<SupportedLocale, Copy> = {
     manualRefreshPending: 'جارٍ تحديث حالتك…',
     manualRefreshVerified: 'نجح التحقق الجديد. قد تتغير الحالة بعد هذا التحقق.',
     manualRefreshFailed: 'فشل التحقق الجديد. يبقى وقت آخر تحقق ناجح معروضًا.',
+    streamConnected:
+      'الإشعارات المباشرة متاحة. لا تُؤكَّد حالتك إلا بعد تحقق ناجح.',
+    streamReconnecting:
+      'تجري إعادة الاتصال بالإشعارات المباشرة. يستمر التحقق التلقائي من الحالة.',
+    streamFallback:
+      'انقطعت الإشعارات المباشرة. يستمر التحقق التلقائي ويمكنك أيضًا استخدام « تحديث حالتي ».',
+    streamRecovered:
+      'عادت الإشعارات المباشرة. يظل وقت آخر تحقق معروض هو المرجع.',
     lastVerified: 'آخر تحقق من الحالة:',
     visitStatus: 'حالة الزيارة',
     checkIn: 'تأكيد الحضور',
@@ -605,6 +625,13 @@ type ViewState =
   | { kind: 'unavailable' }
   | { kind: 'terminal'; data: LiveQueueData };
 
+type StreamConnectionState =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'fallback'
+  | 'recovered';
+
 type CheckInState =
   | { kind: 'idle' }
   | { kind: 'pending' }
@@ -633,6 +660,13 @@ function LiveQueueView({
     'idle' | 'pending' | 'verified' | 'failed'
   >('idle');
   const [lastVerifiedAt, setLastVerifiedAt] = useState<Date | null>(null);
+  const [streamConnection, setStreamConnection] =
+    useState<StreamConnectionState>('connecting');
+  // Announce one outage and one recovery, not every exponentially backed-off
+  // reconnect attempt; stream hints never count as authoritative freshness.
+  const [streamAnnouncement, setStreamAnnouncement] = useState<
+    'none' | 'fallback' | 'recovered'
+  >('none');
   // Captured once on mount; later re-renders may pass `undefined` once the
   // host clears its own copy, but this ref keeps the value this view needs.
   const initialBearerRef = useRef(bearer);
@@ -783,6 +817,7 @@ function LiveQueueView({
     let streamController: AbortController | null = null;
     let streamRetryId: ReturnType<typeof setTimeout> | null = null;
     let streamFailures = 0;
+    let streamOutageAnnounced = false;
     let hintPending = false;
     let manualRequestPending = false;
     let lastManualRefreshAt = Number.NEGATIVE_INFINITY;
@@ -1000,6 +1035,7 @@ function LiveQueueView({
       )
         return;
       clearStreamRetry();
+      if (streamFailures > 0) setStreamConnection('reconnecting');
       const controller = new AbortController();
       streamController = controller;
       try {
@@ -1017,6 +1053,12 @@ function LiveQueueView({
         // endpoint might be disabled or an old test/deployment may lack it).
         // Only the canonical status request can terminate guest access.
         if (!response.ok || !response.body) throw new Error('stream rejected');
+        if (cancelled || terminalReached) return;
+        setStreamConnection(streamOutageAnnounced ? 'recovered' : 'connected');
+        if (streamOutageAnnounced) {
+          setStreamAnnouncement('recovered');
+          streamOutageAnnounced = false;
+        }
         streamFailures = 0;
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -1049,6 +1091,11 @@ function LiveQueueView({
           document.visibilityState === 'visible'
         ) {
           streamFailures += 1;
+          setStreamConnection('fallback');
+          if (!streamOutageAnnounced) {
+            setStreamAnnouncement('fallback');
+            streamOutageAnnounced = true;
+          }
           const delay = Math.min(2 ** (streamFailures - 1) * 1_000, 30_000);
           streamRetryId = setTimeout(() => void startStream(), delay);
         }
@@ -1173,6 +1220,27 @@ function LiveQueueView({
     </>
   );
 
+  const streamGuidance = (
+    <div data-testid="guest-stream-connection" aria-live="off">
+      {streamConnection === 'connected'
+        ? copy.streamConnected
+        : streamConnection === 'reconnecting'
+          ? copy.streamReconnecting
+          : streamConnection === 'fallback'
+            ? copy.streamFallback
+            : streamConnection === 'recovered'
+              ? copy.streamRecovered
+              : null}
+      {streamAnnouncement !== 'none' ? (
+        <p role="status" data-testid="guest-stream-announcement">
+          {streamAnnouncement === 'fallback'
+            ? copy.streamFallback
+            : copy.streamRecovered}
+        </p>
+      ) : null}
+    </div>
+  );
+
   const lastVerifiedStatus = lastVerifiedAt ? (
     <p>
       <strong>{copy.lastVerified}</strong>{' '}
@@ -1263,6 +1331,7 @@ function LiveQueueView({
           ) : null}
         </div>
         {state.data ? lastVerifiedStatus : null}
+        {state.data && !state.exhausted ? streamGuidance : null}
         {state.data ? manualRefreshControl : null}
       </>,
     );
@@ -1289,6 +1358,7 @@ function LiveQueueView({
         />
       ) : null}
       {lastVerifiedStatus}
+      {streamGuidance}
       {manualRefreshControl}
       {state.data.queueState === 'waiting' || checkInState.kind !== 'idle' ? (
         <div role="status">
