@@ -63,18 +63,17 @@ test('Regional Arabic deep links mark Arabic as current', async ({ page }) => {
   await expect(french).not.toHaveAttribute('aria-current');
 });
 
-test('French ETA explainer jump links navigate to the recovery guidance without a bearer', async ({
-  page,
-}) => {
+test('French ETA quick nav jumps to recovery', async ({ page }) => {
   const secret = 'private-guest-token-never-in-explainer';
   await page.goto('/guest/eta-explained?lang=fr');
   const quickNav = page.getByRole('navigation', { name: 'Sur cette page' });
   await expect(quickNav.getByRole('link')).toHaveCount(5);
-  await quickNav.getByRole('link', { name: 'Si le statut n’est plus à jour' }).click();
+  const recoveryLink = quickNav.getByRole('link', {
+    name: 'Si le statut n’est plus à jour',
+  });
+  await recoveryLink.click();
   await expect(
-    page.getByRole('heading', {
-      name: 'Si le statut n’est plus à jour',
-    }),
+    page.getByRole('heading', { name: 'Si le statut n’est plus à jour' }),
   ).toHaveAttribute('id', 'recovery-heading');
   await expect(page).toHaveURL(/#recovery-heading$/);
   expect(page.url()).not.toContain(secret);
