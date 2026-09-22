@@ -93,8 +93,9 @@ test('Arabic RTL ETA explainer jumps to last verified explanation', async ({
     page.getByRole('heading', { name: 'آخر تحقق من الحالة' }),
   ).toHaveAttribute('id', 'verification-heading');
   await expect(page).toHaveURL(/#verification-heading$/);
-  await expect(
-    page.getByRole('link', { name: 'العربية' }),
-  ).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('link', { name: 'العربية' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
   expect(page.url()).not.toContain('private-guest-token');
 });
