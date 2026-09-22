@@ -32,6 +32,8 @@ const copy = {
     clinicSortOriginal: 'Ordre initial',
     clinicSortAscending: 'Nom : A à Z',
     clinicSortDescending: 'Nom : Z à A',
+    sortedResultsAscending: 'Cliniques classées par nom : A à Z.',
+    sortedResultsDescending: 'Cliniques classées par nom : Z à A.',
     noFilteredMatches:
       'Aucune clinique ne correspond aux filtres sélectionnés.',
     searchPlaceholder: 'Nom de la clinique ou du médecin',
@@ -86,6 +88,8 @@ const copy = {
     clinicSortOriginal: 'الترتيب الأصلي',
     clinicSortAscending: 'الاسم: تصاعديًا',
     clinicSortDescending: 'الاسم: تنازليًا',
+    sortedResultsAscending: 'العيادات مرتبة حسب الاسم: تصاعديًا.',
+    sortedResultsDescending: 'العيادات مرتبة حسب الاسم: تنازليًا.',
     noFilteredMatches: 'لا توجد عيادات تطابق عوامل التصفية المحددة.',
     searchPlaceholder: 'اسم العيادة أو الطبيب',
     clearSearch: 'مسح البحث',
@@ -572,6 +576,15 @@ export default function PublicDiscoveryLandingClient({
             {t.resultRange(displayedClinics.length, matchingClinics.length)}
           </p>
         )}
+        {state === 'ready' &&
+          displayedClinics.length > 0 &&
+          clinicSort !== 'original' && (
+            <p data-testid="clinic-sort-context" role="status">
+              {clinicSort === 'ascending'
+                ? t.sortedResultsAscending
+                : t.sortedResultsDescending}
+            </p>
+          )}
         {state === 'ready' && displayedClinics.length > 0 && (
           <div className="publicGrid">
             {displayedClinics.map((clinic, index) => {
