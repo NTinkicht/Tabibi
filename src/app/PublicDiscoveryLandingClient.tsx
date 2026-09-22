@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 type Locale = 'ar' | 'fr';
 type ClinicLanguageFilter = Locale | 'all';
@@ -12,6 +12,15 @@ export type PublicClinic = {
   doctors: { displayName: string }[];
 };
 type LoadState = 'loading' | 'ready' | 'error';
+
+function subscribeToBrowserLocale(onChange: () => void) {
+  window.addEventListener('languagechange', onChange);
+  return () => window.removeEventListener('languagechange', onChange);
+}
+
+function getBrowserLocale(): Locale {
+  return /^ar(?:[-_]|$)/i.test(navigator.language.trim()) ? 'ar' : 'fr';
+}
 const REFRESH_TIMEOUT_MS = 5_000;
 const DIRECTORY_BATCH_SIZE = 6;
 
@@ -207,8 +216,13 @@ export default function PublicDiscoveryLandingClient({
 }: {
   initialClinics: PublicClinic[] | null;
 }) {
-  const [locale, setLocale] = useState<Locale>('fr');
-  const manualLocaleChoiceRef = useRef(false);
+  const browserLocale = useSyncExternalStore<Locale>(
+    subscribeToBrowserLocale,
+    getBrowserLocale,
+    () => 'fr',
+  );
+  const [chosenLocale, setChosenLocale] = useState<Locale | null>(null);
+  const locale = chosenLocale ?? browserLocale;
   const [state, setState] = useState<LoadState>(
     initialClinics === null ? 'error' : 'ready',
   );
@@ -316,15 +330,6 @@ export default function PublicDiscoveryLandingClient({
     };
   }, [retry]);
 
-  // Keep the SSR/hydration default deterministic, then honor Arabic browser
-  // preference without overriding an explicit in-page language choice.
-  useEffect(() => {
-    if (manualLocaleChoiceRef.current) return;
-    if (/^ar(?:[-_]|$)/i.test(navigator.language.trim())) {
-      setLocale('ar');
-    }
-  }, []);
-
   // Focus the public directory search only from non-editable elements.
   // Let form controls, contenteditable regions and modified shortcuts keep
   // their native keyboard behavior; never change any filter or locale.
@@ -395,8 +400,7 @@ export default function PublicDiscoveryLandingClient({
             lang="fr"
             aria-pressed={locale === 'fr'}
             onClick={() => {
-              manualLocaleChoiceRef.current = true;
-              setLocale('fr');
+              setChosenLocale('fr');
             }}
           >
             Français
@@ -406,8 +410,7 @@ export default function PublicDiscoveryLandingClient({
             lang="ar"
             aria-pressed={locale === 'ar'}
             onClick={() => {
-              manualLocaleChoiceRef.current = true;
-              setLocale('ar');
+              setChosenLocale('ar');
             }}
           >
             العربية
