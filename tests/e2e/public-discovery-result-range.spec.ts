@@ -232,3 +232,76 @@ test('Arabic RTL keyboard reveal focuses the first newly shown clinic on mobile'
     'private-range-clinic',
   );
 });
+
+test('French empty-results recovery clears only search first, then filters, preserving sort', async ({
+  page,
+}) => {
+  await mockDirectory(page, 'fr', 8);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  const clinicLanguage = page.getByLabel('Langue proposée par la clinique');
+  const sort = page.getByLabel('Trier les cliniques par nom');
+  await sort.selectOption('descending');
+  await clinicLanguage.selectOption('fr');
+  await search.fill('aucune-correspondance');
+  const recovery = page.getByTestId('empty-results-recovery');
+  await expect(recovery).toHaveText('Afficher sans cette recherche');
+  await recovery.click();
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue('');
+  await expect(clinicLanguage).toHaveValue('fr');
+  await expect(sort).toHaveValue('descending');
+  await expect(page.locator('.publicClinic')).toHaveCount(6);
+
+  await clinicLanguage.selectOption('ar');
+  await expect(page.locator('.publicClinic')).toHaveCount(0);
+  await expect(recovery).toHaveText('Voir toutes les cliniques');
+  await recovery.click();
+  await expect(search).toBeFocused();
+  await expect(clinicLanguage).toHaveValue('all');
+  await expect(sort).toHaveValue('descending');
+  await expect(page.locator('.publicClinic')).toHaveCount(6);
+  await expect(page.getByTestId('clinic-result-range')).toHaveText(
+    'Résultats affichés : 1 à 6 sur 8 cliniques correspondantes.',
+  );
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-range-tenant',
+  );
+});
+
+test('Arabic RTL empty-results recovery preserves locale and public-only data', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDirectory(page, 'ar', 8);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+
+  const search = page.getByRole('searchbox', {
+    name: 'ابحث عن عيادة أو طبيب',
+  });
+  const clinicLanguage = page.getByLabel('اللغة المتاحة في العيادة');
+  const recovery = page.getByTestId('empty-results-recovery');
+  await search.fill('غير موجود');
+  await expect(recovery).toHaveText('عرض النتائج بدون البحث');
+  await recovery.click();
+  await expect(search).toBeFocused();
+  await expect(page.locator('.publicClinic')).toHaveCount(6);
+  await clinicLanguage.selectOption('fr');
+  await expect(recovery).toHaveText('عرض جميع العيادات');
+  await recovery.click();
+  await expect(clinicLanguage).toHaveValue('all');
+  await expect(search).toBeFocused();
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.getByTestId('clinic-result-range')).toHaveText(
+    'النتائج المعروضة: من 1 إلى 6 من أصل 8 عيادة مطابقة.',
+  );
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-range-clinic',
+  );
+});

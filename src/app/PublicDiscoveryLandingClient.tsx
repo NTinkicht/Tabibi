@@ -37,6 +37,8 @@ const copy = {
     searchPlaceholder: 'Nom de la clinique ou du médecin',
     clearSearch: 'Effacer la recherche',
     clearAllFilters: 'Effacer tous les filtres',
+    emptyRecoverySearch: 'Afficher sans cette recherche',
+    emptyRecoveryFilters: 'Voir toutes les cliniques',
     activeFiltersLabel: 'Filtres actifs :',
     activeLanguageFrench: 'langue : français',
     activeLanguageArabic: 'langue : arabe',
@@ -88,6 +90,8 @@ const copy = {
     searchPlaceholder: 'اسم العيادة أو الطبيب',
     clearSearch: 'مسح البحث',
     clearAllFilters: 'مسح جميع عوامل التصفية',
+    emptyRecoverySearch: 'عرض النتائج بدون البحث',
+    emptyRecoveryFilters: 'عرض جميع العيادات',
     activeFiltersLabel: 'عوامل التصفية النشطة:',
     activeLanguageFrench: 'اللغة: الفرنسية',
     activeLanguageArabic: 'اللغة: العربية',
@@ -541,9 +545,27 @@ export default function PublicDiscoveryLandingClient({
           clinics.length > 0 &&
           (query || clinicLanguage !== 'all' || onlyListedDoctors) &&
           matchingClinics.length === 0 && (
-            <p className="publicNotice" role="status">
-              {noMatchesCopy}
-            </p>
+            <div className="publicNotice" role="status">
+              <p>{noMatchesCopy}</p>
+              <button
+                type="button"
+                data-testid="empty-results-recovery"
+                onClick={() => {
+                  if (search.length > 0) {
+                    setSearch('');
+                  } else {
+                    setClinicLanguage('all');
+                    setOnlyListedDoctors(false);
+                  }
+                  setVisibleLimit(DIRECTORY_BATCH_SIZE);
+                  searchInputRef.current?.focus();
+                }}
+              >
+                {search.length > 0
+                  ? t.emptyRecoverySearch
+                  : t.emptyRecoveryFilters}
+              </button>
+            </div>
           )}
         {state === 'ready' && clinics.length > 0 && (
           <p data-testid="clinic-result-range" aria-live="polite">
