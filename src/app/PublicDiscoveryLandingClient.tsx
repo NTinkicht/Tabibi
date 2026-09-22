@@ -293,6 +293,7 @@ export default function PublicDiscoveryLandingClient({
   // changing the underlying filtered/sorted result set.
   const displayedClinics = sortedClinics.slice(0, visibleLimit);
   const remainingClinics = matchingClinics.length - displayedClinics.length;
+  const canCollapse = displayedClinics.length > DIRECTORY_BATCH_SIZE;
   const visibleDoctorTotal = displayedClinics.reduce(
     (total, clinic) => total + doctorsVisibleForQuery(clinic, query).length,
     0,
@@ -708,19 +709,18 @@ export default function PublicDiscoveryLandingClient({
             {t.showMore(Math.min(DIRECTORY_BATCH_SIZE, remainingClinics))}
           </button>
         )}
-        {state === 'ready' &&
-          displayedClinics.length > DIRECTORY_BATCH_SIZE && (
-            <button
-              type="button"
-              data-testid="show-fewer-clinics"
-              onClick={() => {
-                restoreShowMoreFocusRef.current = true;
-                setRevealFocusIndex(null);
-                setVisibleLimit(DIRECTORY_BATCH_SIZE);
-              }}
-            >
-              {t.showFewer}
-            </button>
+        {state === 'ready' && canCollapse && (
+          <button
+            type="button"
+            data-testid="show-fewer-clinics"
+            onClick={() => {
+              restoreShowMoreFocusRef.current = true;
+              setRevealFocusIndex(null);
+              setVisibleLimit(DIRECTORY_BATCH_SIZE);
+            }}
+          >
+            {t.showFewer}
+          </button>
         )}
       </section>
       <footer className="publicFootnote">{t.note}</footer>
