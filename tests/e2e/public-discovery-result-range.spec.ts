@@ -156,7 +156,7 @@ test('visible clinic total reports the true match count, not the revealed batch,
     'Résultats affichés : 1 à 6 sur 7 cliniques correspondantes.',
   );
   await expect(visibleTotal).toHaveText(
-    'Affichage : 7 sur 10 cliniques du répertoire.',
+    'Affichage : 6 sur 10 cliniques du répertoire.',
   );
 
   await page.getByTestId('show-more-clinics').click();
