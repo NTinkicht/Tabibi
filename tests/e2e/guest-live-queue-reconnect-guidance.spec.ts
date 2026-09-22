@@ -51,7 +51,9 @@ test('French connection loss gives bounded fallback announcement, reconnect prog
               ? input.href
               : input.url;
         if (requestUrl.includes(bearer)) {
-          return Promise.reject(new Error('guest bearer leaked into stream URL'));
+          return Promise.reject(
+            new Error('guest bearer leaked into stream URL'),
+          );
         }
         const parsedUrl = new URL(requestUrl, window.location.origin);
         if (parsedUrl.pathname !== streamPath) {
@@ -128,40 +130,35 @@ test('French connection loss gives bounded fallback announcement, reconnect prog
   expect(await page.locator('body').innerText()).not.toContain(BEARER);
 });
 
-test(
-  'Arabic RTL fallback preserves canonical refresh and never exposes the bearer',
-  async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, 'language', {
-        configurable: true,
-        value: 'ar-DZ',
-      });
+test('Arabic RTL fallback preserves canonical refresh and never exposes the bearer', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'language', {
+      configurable: true,
+      value: 'ar-DZ',
     });
-    let streamAttempts = 0;
-    await page.route(`**${STREAM_URL}`, (route) => {
-      const request = route.request();
-      expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
-      expect(request.url()).not.toContain(BEARER);
-      streamAttempts += 1;
-      return route.fulfill({ status: 503, body: 'stream unavailable' });
-    });
-    await openLiveQueue(page);
+  });
+  let streamAttempts = 0;
+  await page.route(`**${STREAM_URL}`, (route) => {
+    const request = route.request();
+    expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
+    expect(request.url()).not.toContain(BEARER);
+    streamAttempts += 1;
+    return route.fulfill({ status: 503, body: 'stream unavailable' });
+  });
+  await openLiveQueue(page);
 
-    await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
-    const guidance = page.getByTestId('guest-stream-connection');
-    await expect(guidance).toContainText('انقطعت الإشعارات المباشرة.');
-    await expect(guidance).toContainText('يستمر التحقق التلقائي');
-    await expect(page.getByTestId('guest-stream-announcement')).toHaveCount(1);
-    await expect(
-      page.getByRole('button', { name: 'تحديث حالتي' }),
-    ).toBeEnabled();
-    await page.getByRole('button', { name: 'تحديث حالتي' }).click();
-    await expect(page.getByTestId('manual-refresh-feedback')).toContainText(
-      'نجح التحقق الجديد.',
-    );
-    expect(streamAttempts).toBeGreaterThanOrEqual(1);
-    expect(page.url()).not.toContain(BEARER);
-    expect(await page.locator('body').innerText()).not.toContain(BEARER);
-  },
-);
+  await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
+  const guidance = page.getByTestId('guest-stream-connection');
+  await expect(guidance).toContainText('انقطعت الإشعارات المباشرة.');
+  await expect(guidance).toContainText('يستمر التحقق التلقائي');
+  await expect(page.getByTestId('guest-stream-announcement')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'تحديث حالتي' })).toBeEnabled();
+  await page.getByRole('button', { name: 'تحديث حالتي' }).click();
+  await expect(page.getByTestId('manual-refresh-feedback')).toContainText(
+    'نجح التحقق الجديد.',
+  );
+  expect(streamAttempts).toBeGreaterThanOrEqual(1);
+  expect(page.url()).not.toContain(BEARER);
+  expect(await page.locator('body').innerText()).not.toContain(BEARER);
+});
