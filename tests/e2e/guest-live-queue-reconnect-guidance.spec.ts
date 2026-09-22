@@ -45,7 +45,11 @@ test('French connection loss gives bounded fallback announcement, reconnect prog
       let streamAttempts = 0;
       window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
         const requestUrl =
-          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
         if (!requestUrl.endsWith(streamPath)) {
           return originalFetch(input, init);
         }
