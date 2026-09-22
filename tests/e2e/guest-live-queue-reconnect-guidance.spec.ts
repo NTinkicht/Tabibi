@@ -170,9 +170,9 @@ test('Arabic RTL fallback preserves canonical refresh and never exposes the bear
 });
 
 for (const language of ['fr-FR', 'ar-DZ'] as const) {
-  test(
-    `Exhausted polling ${language} asks for manual retry`,
-    async ({ page }) => {
+  test(`Exhausted polling ${language} asks for manual retry`, async ({
+    page,
+  }) => {
       await page.clock.install();
       await page.addInitScript((locale) => {
         Object.defineProperty(navigator, 'language', {
@@ -191,15 +191,23 @@ for (const language of ['fr-FR', 'ar-DZ'] as const) {
         /vérification automatique continue|يستمر التحقق التلقائي/,
       );
 
-      // Override the initial successful canonical route, then exhaust all
-      // bounded retries with a virtual clock rather than wall-clock sleeps.
+      // Advance one polling boundary at a time. A single large virtual-clock
+      // jump can outrun asynchronous fetch/React settling between retries.
+      let failedStatusRequests = 0;
       await page.route(STATUS_URL, (route) => {
         const request = route.request();
         expect(request.headers()['authorization']).toBe(`Bearer ${BEARER}`);
         expect(request.url()).not.toContain(BEARER);
+        failedStatusRequests += 1;
         return route.fulfill({ status: 503, body: 'status unavailable' });
       });
-      await page.clock.runFor(150_000);
+      for (const [index, delay] of [31_000, 6_000, 16_000, 31_000, 61_000].entries()) {
+        await page.clock.runFor(delay);
+        await expect.poll(() => failedStatusRequests).toBe(index + 1);
+        await expect(
+          page.getByRole('heading', { name: /état.*ancien|الحالة قديمة|قد تكون الحالة قديمة|Connexion interrompue|انقطع الاتصال/ }),
+        ).toBeVisible();
+      }
 
       await expect(page.getByTestId('guest-stream-connection')).toHaveCount(0);
       await expect(
