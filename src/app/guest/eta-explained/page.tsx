@@ -71,11 +71,8 @@ export default async function GuestEtaExplainedPage({
   searchParams: Promise<{ lang?: string }>;
 }) {
   const params = await searchParams;
-  const locale: Locale =
-    typeof params.lang === 'string' &&
-    /^ar(?:[-_]|$)/i.test(params.lang.trim())
-      ? 'ar'
-      : 'fr';
+  const lang = typeof params.lang === 'string' ? params.lang.trim() : '';
+  const locale: Locale = /^ar(?:[-_]|$)/i.test(lang) ? 'ar' : 'fr';
   const copy = COPY[locale];
 
   return (
