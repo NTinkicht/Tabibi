@@ -551,7 +551,7 @@ export default function PublicDiscoveryLandingClient({
                 type="button"
                 data-testid="empty-results-recovery"
                 onClick={() => {
-                  if (search.length > 0) {
+                  if (query.length > 0) {
                     setSearch('');
                   } else {
                     setClinicLanguage('all');
@@ -561,7 +561,7 @@ export default function PublicDiscoveryLandingClient({
                   searchInputRef.current?.focus();
                 }}
               >
-                {search.length > 0
+                {query.length > 0
                   ? t.emptyRecoverySearch
                   : t.emptyRecoveryFilters}
               </button>

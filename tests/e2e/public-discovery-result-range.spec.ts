@@ -305,3 +305,69 @@ test('Arabic RTL empty-results recovery preserves locale and public-only data', 
     'private-range-clinic',
   );
 });
+
+test('French whitespace-only search clears the actual zero-result filter on first recovery', async ({
+  page,
+}) => {
+  await mockDirectory(page, 'fr', 8);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  const filter = page.getByLabel('Langue proposée par la clinique');
+  const sort = page.getByLabel('Trier les cliniques par nom');
+  await sort.selectOption('descending');
+  await search.fill('   ');
+  await filter.selectOption('ar');
+
+  await expect(page.locator('.publicClinic')).toHaveCount(0);
+  const recovery = page.getByTestId('empty-results-recovery');
+  await expect(recovery).toHaveText('Voir toutes les cliniques');
+  await recovery.click();
+
+  await expect(filter).toHaveValue('all');
+  await expect(sort).toHaveValue('descending');
+  await expect(search).toBeFocused();
+  await expect(page.locator('.publicClinic')).toHaveCount(6);
+  await expect(recovery).toHaveCount(0);
+  await expect(page.getByTestId('clinic-result-range')).toHaveText(
+    'Résultats affichés : 1 à 6 sur 8 cliniques correspondantes.',
+  );
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-range-tenant',
+  );
+});
+
+test('Arabic RTL whitespace-only search recovers filtered clinics in one action', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDirectory(page, 'ar', 8);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+
+  const search = page.getByRole('searchbox', {
+    name: 'ابحث عن عيادة أو طبيب',
+  });
+  const filter = page.getByLabel('اللغة المتاحة في العيادة');
+  await search.fill('   ');
+  await filter.selectOption('fr');
+  await expect(page.locator('.publicClinic')).toHaveCount(0);
+  const recovery = page.getByTestId('empty-results-recovery');
+  await expect(recovery).toHaveText('عرض جميع العيادات');
+  await recovery.click();
+
+  await expect(filter).toHaveValue('all');
+  await expect(search).toBeFocused();
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.locator('.publicClinic')).toHaveCount(6);
+  await expect(recovery).toHaveCount(0);
+  await expect(page.getByTestId('clinic-result-range')).toHaveText(
+    'النتائج المعروضة: من 1 إلى 6 من أصل 8 عيادة مطابقة.',
+  );
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-range-clinic',
+  );
+});
