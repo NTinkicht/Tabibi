@@ -509,12 +509,9 @@ export function GuestLiveQueueHostClient({
   useEffect(() => {
     const phoneInput = contactPhoneInputRef.current;
     if (!phoneInput) return;
-    const phoneIsRelevant =
-      contactPreference === 'phone' || contactEmail.trim().length === 0;
+    const trimmedPhoneLength = contactPhone.trim().length;
     phoneInput.setCustomValidity(
-      phoneIsRelevant &&
-        contactPhone.length > 0 &&
-        contactPhone.trim().length < 3
+      trimmedPhoneLength > 0 && trimmedPhoneLength < 3
         ? copy.contactRequirement
         : '',
     );
