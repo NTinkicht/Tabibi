@@ -25,28 +25,25 @@ test('guest booking next steps are clear in French without private data', async 
   expect(await page.locator('body').innerText()).not.toContain(PRIVATE_SENTINEL);
 });
 
-test(
-  'guest booking next steps are equivalent in Arabic RTL',
-  async ({ page }) => {
-    await page.goto('/guest/booking-next-steps');
+test('guest booking next steps are equivalent in Arabic RTL', async ({
+  page,
+}) => {
+  await page.goto('/guest/booking-next-steps');
 
-    const arabic = page.locator('section[lang="ar"][dir="rtl"]');
-    await expect(
-      arabic.getByRole('heading', { name: 'تابع حجز موعدك' }),
-    ).toBeVisible();
-    await expect(arabic.getByRole('listitem')).toHaveCount(4);
-    await expect(arabic.getByRole('listitem').nth(0)).toHaveText(
-      'ارجع إلى مسار حجز الموعد للزائر.',
-    );
-    await expect(arabic.getByRole('listitem').nth(3)).toHaveText(
-      'راجع معلوماتك ثم أرسل الطلب مرة واحدة فقط.',
-    );
-    await expect(arabic.locator('p').last()).toContainText(
-      'لا يطلب أي دفع أو كلمة مرور أو مستند طبي أو رمز دخول للزائر',
-    );
-    expect(page.url()).not.toContain(PRIVATE_SENTINEL);
-    expect(await page.locator('body').innerText()).not.toContain(
-      PRIVATE_SENTINEL,
-    );
-  },
-);
+  const arabic = page.locator('section[lang="ar"][dir="rtl"]');
+  await expect(
+    arabic.getByRole('heading', { name: 'تابع حجز موعدك' }),
+  ).toBeVisible();
+  await expect(arabic.getByRole('listitem')).toHaveCount(4);
+  await expect(arabic.getByRole('listitem').nth(0)).toHaveText(
+    'ارجع إلى مسار حجز الموعد للزائر.',
+  );
+  await expect(arabic.getByRole('listitem').nth(3)).toHaveText(
+    'راجع معلوماتك ثم أرسل الطلب مرة واحدة فقط.',
+  );
+  await expect(arabic.locator('p').last()).toContainText(
+    'لا يطلب أي دفع أو كلمة مرور أو مستند طبي أو رمز دخول للزائر',
+  );
+  expect(page.url()).not.toContain(PRIVATE_SENTINEL);
+  expect(await page.locator('body').innerText()).not.toContain(PRIVATE_SENTINEL);
+});
