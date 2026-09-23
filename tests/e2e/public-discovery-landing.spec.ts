@@ -1412,3 +1412,115 @@ test('Arabic mobile visible total updates after refresh', async ({ page }) => {
   await expect(summary).toHaveCount(0);
   await expect(page.locator('.publicClinic')).toHaveCount(3);
 });
+
+test('French active filter controls remove only the selected filter and restore focus', async ({
+  page,
+}) => {
+  await mockDirectory(page, [
+    {
+      name: 'Clinique Soleil',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr', 'ar'],
+      doctors: [{ displayName: 'Dr. Public' }],
+      tenantKey: 'private-filter-remove-tenant',
+    },
+    {
+      name: 'Clinique Nord',
+      defaultLocale: 'fr',
+      enabledLocales: ['fr'],
+      doctors: [],
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  const language = page.getByRole('combobox', {
+    name: 'Langue proposée par la clinique',
+  });
+  const listed = page.getByRole('checkbox', {
+    name: 'Cliniques avec médecins affichés uniquement',
+  });
+  const search = page.getByRole('searchbox', {
+    name: 'Rechercher une clinique ou un médecin',
+  });
+  const sort = page.getByRole('combobox', {
+    name: 'Trier les cliniques par nom',
+  });
+  await search.fill('Clinique');
+  await sort.selectOption('descending');
+  await language.selectOption('ar');
+  await listed.check();
+  await expect(page.getByTestId('active-filter-summary')).toContainText(
+    'langue : arabe · cliniques avec médecins affichés',
+  );
+
+  const removeLanguage = page.getByTestId('remove-language-filter');
+  await expect(removeLanguage).toHaveText('Retirer le filtre de langue');
+  await removeLanguage.click();
+  await expect(language).toHaveValue('all');
+  await expect(language).toBeFocused();
+  await expect(listed).toBeChecked();
+  await expect(search).toHaveValue('Clinique');
+  await expect(sort).toHaveValue('descending');
+  await expect(page.getByTestId('active-filter-summary')).toContainText(
+    'cliniques avec médecins affichés',
+  );
+  await expect(removeLanguage).toHaveCount(0);
+
+  await language.selectOption('ar');
+  const removeDoctors = page.getByTestId('remove-doctors-filter');
+  await expect(removeDoctors).toHaveText('Retirer le filtre des médecins');
+  await removeDoctors.click();
+  await expect(listed).not.toBeChecked();
+  await expect(listed).toBeFocused();
+  await expect(language).toHaveValue('ar');
+  await expect(search).toHaveValue('Clinique');
+  await expect(sort).toHaveValue('descending');
+  await expect(removeDoctors).toHaveCount(0);
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-filter-remove-tenant',
+  );
+});
+
+test('Arabic RTL mobile can remove one filter without clearing the other', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDirectory(page, [
+    {
+      name: 'عيادة الورد',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar'],
+      doctors: [{ displayName: 'د. مريم' }],
+      id: 'private-filter-remove-clinic',
+    },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page.getByRole('button', { name: 'العربية' }).click();
+  const language = page.getByRole('combobox', {
+    name: 'اللغة المتاحة في العيادة',
+  });
+  const listed = page.getByRole('checkbox', {
+    name: 'العيادات التي تعرض أطباء فقط',
+  });
+  await language.selectOption('ar');
+  await listed.check();
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page.getByTestId('remove-language-filter')).toHaveText(
+    'إزالة فلتر اللغة',
+  );
+  await page.getByTestId('remove-doctors-filter').click();
+  await expect(listed).not.toBeChecked();
+  await expect(listed).toBeFocused();
+  await expect(language).toHaveValue('ar');
+  await expect(page.getByTestId('active-filter-summary')).toContainText(
+    'اللغة: العربية',
+  );
+  await page.getByTestId('remove-language-filter').click();
+  await expect(language).toBeFocused();
+  await expect(language).toHaveValue('all');
+  await expect(page.getByTestId('active-filter-summary')).toHaveCount(0);
+  expect(await page.locator('main').innerText()).not.toContain(
+    'private-filter-remove-clinic',
+  );
+});
