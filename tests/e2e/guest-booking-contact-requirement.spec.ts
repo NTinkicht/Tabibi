@@ -103,7 +103,9 @@ test(
     });
     const captured = await captureBooking(page);
     await page.goto('/guest/live-queue/test-selection-ref');
-    await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
+    await expect(
+      page.locator('section[lang="ar"][dir="rtl"]'),
+    ).toBeVisible();
     await expect(
       page.getByText(/أدخل وسيلة اتصال واحدة على الأقل/),
     ).toBeVisible();
