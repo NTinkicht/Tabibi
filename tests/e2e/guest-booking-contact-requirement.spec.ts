@@ -92,39 +92,40 @@ test(
   },
 );
 
-test('Arabic RTL guest form requires a phone when phone is preferred', async ({
-  page,
-}) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'language', {
-      configurable: true,
-      value: 'ar-DZ',
+test(
+  'Arabic RTL guest form requires a phone when phone is preferred',
+  async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'language', {
+        configurable: true,
+        value: 'ar-DZ',
+      });
     });
-  });
-  const captured = await captureBooking(page);
-  await page.goto('/guest/live-queue/test-selection-ref');
-  await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
-  await expect(
-    page.getByText(/أدخل وسيلة اتصال واحدة على الأقل/),
-  ).toBeVisible();
-  await page.getByLabel('اسمك').fill('Guest');
-  await page.getByRole('radio', { name: 'الهاتف' }).check();
-  const phone = page.locator('input[type="tel"]');
-  const email = page.locator('input[type="email"]');
-  await email.fill('guest@example.test');
-  const submit = page.getByRole('button', { name: 'تأكيد الحجز' });
-  await submit.click();
-  expect(captured.count()).toBe(0);
+    const captured = await captureBooking(page);
+    await page.goto('/guest/live-queue/test-selection-ref');
+    await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
+    await expect(
+      page.getByText(/أدخل وسيلة اتصال واحدة على الأقل/),
+    ).toBeVisible();
+    await page.getByLabel('اسمك').fill('Guest');
+    await page.getByRole('radio', { name: 'الهاتف' }).check();
+    const phone = page.locator('input[type="tel"]');
+    const email = page.locator('input[type="email"]');
+    await email.fill('guest@example.test');
+    const submit = page.getByRole('button', { name: 'تأكيد الحجز' });
+    await submit.click();
+    expect(captured.count()).toBe(0);
 
-  await phone.fill('   ');
-  await expect(phone).not.toHaveJSProperty('validationMessage', '');
-  await submit.click();
-  expect(captured.count()).toBe(0);
+    await phone.fill('   ');
+    await expect(phone).not.toHaveJSProperty('validationMessage', '');
+    await submit.click();
+    expect(captured.count()).toBe(0);
 
-  await phone.fill('0555555555');
-  await submit.click();
-  await expect.poll(captured.count).toBe(1);
-  expect(captured.preference()).toBe('phone');
-  expect(page.url()).not.toContain(PRIVATE_BEARER);
-  expect(await page.locator('body').innerText()).not.toContain(PRIVATE_BEARER);
-});
+    await phone.fill('0555555555');
+    await submit.click();
+    await expect.poll(captured.count).toBe(1);
+    expect(captured.preference()).toBe('phone');
+    expect(page.url()).not.toContain(PRIVATE_BEARER);
+    expect(await page.locator('body').innerText()).not.toContain(PRIVATE_BEARER);
+  },
+);
