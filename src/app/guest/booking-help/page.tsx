@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function GuestBookingHelpPage() {
   return (
     <main className="pageShell" data-testid="guest-booking-help">
@@ -20,6 +22,9 @@ export default function GuestBookingHelpPage() {
           Cette page d’aide ne demande aucun paiement, mot de passe ou document
           médical.
         </p>
+        <Link href="/guest/booking-next-steps">
+          Passer aux étapes de réservation
+        </Link>
       </section>
 
       <section lang="ar" dir="rtl" aria-labelledby="booking-help-ar">
@@ -35,6 +40,7 @@ export default function GuestBookingHelpPage() {
           </li>
         </ul>
         <p>صفحة المساعدة هذه لا تطلب أي دفع أو كلمة مرور أو مستند طبي.</p>
+        <Link href="/guest/booking-next-steps">الانتقال إلى خطوات الحجز</Link>
       </section>
     </main>
   );

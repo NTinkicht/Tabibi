@@ -25,6 +25,10 @@ test('guest booking help exposes French preparation guidance without private dat
     'Cette page d’aide ne demande aucun paiement, mot de passe ou document médical.',
   );
 
+  await expect(
+    french.getByRole('link', { name: 'Passer aux étapes de réservation' }),
+  ).toHaveAttribute('href', '/guest/booking-next-steps');
+
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   expect(await page.locator('body').innerText()).not.toContain(
     PRIVATE_SENTINEL,
@@ -53,6 +57,9 @@ test('guest booking help exposes equivalent Arabic RTL preparation guidance', as
   await expect(arabic.locator('p').last()).toHaveText(
     'صفحة المساعدة هذه لا تطلب أي دفع أو كلمة مرور أو مستند طبي.',
   );
+  await expect(
+    arabic.getByRole('link', { name: 'الانتقال إلى خطوات الحجز' }),
+  ).toHaveAttribute('href', '/guest/booking-next-steps');
 
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   expect(await page.locator('body').innerText()).not.toContain(
