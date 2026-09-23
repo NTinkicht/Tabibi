@@ -53,8 +53,8 @@ test('French guest form avoids a futile POST when the chosen email contact is mi
 }) => {
   const captured = await captureBooking(page);
   await page.goto('/guest/live-queue/test-selection-ref');
-  const phone = page.getByLabel('Téléphone', { exact: true });
-  const email = page.getByLabel('Email', { exact: true });
+  const phone = page.locator('input[type="tel"]');
+  const email = page.locator('input[type="email"]');
   await expect(phone).toHaveAttribute(
     'aria-describedby',
     'guest-contact-requirement',
@@ -100,8 +100,8 @@ test('Arabic RTL guest form requires a phone when phone is preferred', async ({
   ).toBeVisible();
   await page.getByLabel('اسمك').fill('Guest');
   await page.getByRole('radio', { name: 'الهاتف' }).check();
-  const phone = page.getByLabel('الهاتف', { exact: true });
-  const email = page.getByLabel('البريد الإلكتروني', { exact: true });
+  const phone = page.locator('input[type="tel"]');
+  const email = page.locator('input[type="email"]');
   await email.fill('guest@example.test');
   await expect(phone).toHaveAttribute('required', '');
   const submit = page.getByRole('button', { name: 'تأكيد الحجز' });
