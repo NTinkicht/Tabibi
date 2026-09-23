@@ -175,8 +175,14 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 export function resolveNotificationTemplateLocale(
   requested?: string | null,
 ): NotificationTemplateLocale {
-  const normalized = requested?.trim().toLowerCase().replace('_', '-');
-  if (normalized === 'ar' || normalized?.startsWith('ar-')) return 'ar';
+  const normalized = requested?.trim().toLowerCase().replaceAll('_', '-');
+  if (
+    normalized === 'ar' ||
+    normalized?.startsWith('ar-') ||
+    normalized === 'ara' ||
+    normalized?.startsWith('ara-')
+  )
+    return 'ar';
   return 'fr';
 }
 
