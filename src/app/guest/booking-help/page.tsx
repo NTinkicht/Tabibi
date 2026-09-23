@@ -24,9 +24,7 @@ export default function GuestBookingHelpPage() {
 
       <section lang="ar" dir="rtl" aria-labelledby="booking-help-ar">
         <h1 id="booking-help-ar">استعد لحجز موعدك</h1>
-        <p>
-          قبل البدء، جهّز المعلومات اللازمة لتفادي انقطاع خطوات الحجز.
-        </p>
+        <p>قبل البدء، جهّز المعلومات اللازمة لتفادي انقطاع خطوات الحجز.</p>
         <h2>ما الذي تحتاج إلى تجهيزه؟</h2>
         <ul>
           <li>العيادة والطبيب اللذان ترغب في اختيارهما.</li>
@@ -36,9 +34,7 @@ export default function GuestBookingHelpPage() {
             الإلكتروني المطابق لها.
           </li>
         </ul>
-        <p>
-          صفحة المساعدة هذه لا تطلب أي دفع أو كلمة مرور أو مستند طبي.
-        </p>
+        <p>صفحة المساعدة هذه لا تطلب أي دفع أو كلمة مرور أو مستند طبي.</p>
       </section>
     </main>
   );
