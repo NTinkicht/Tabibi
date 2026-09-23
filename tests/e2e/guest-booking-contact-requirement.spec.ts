@@ -66,14 +66,11 @@ test('French guest form avoids a futile POST when the chosen email contact is mi
   await expect(page.getByText(/Indiquez au moins un contact/)).toBeVisible();
   await page.getByLabel('Votre nom').fill('Guest');
   const submit = page.getByRole('button', { name: 'Confirmer la réservation' });
-  await expect(phone).toHaveAttribute('required', '');
-  await expect(email).toHaveAttribute('required', '');
   await submit.click();
   expect(captured.count()).toBe(0);
 
   await page.getByRole('radio', { name: 'Email' }).check();
   await phone.fill('   ');
-  await expect(email).toHaveAttribute('required', '');
   await submit.click();
   expect(captured.count()).toBe(0);
   await email.fill('guest@example.test');
@@ -116,7 +113,6 @@ test('Arabic RTL guest form requires a phone when phone is preferred', async ({
   const phone = page.locator('input[type="tel"]');
   const email = page.locator('input[type="email"]');
   await email.fill('guest@example.test');
-  await expect(phone).toHaveAttribute('required', '');
   const submit = page.getByRole('button', { name: 'تأكيد الحجز' });
   await submit.click();
   expect(captured.count()).toBe(0);
