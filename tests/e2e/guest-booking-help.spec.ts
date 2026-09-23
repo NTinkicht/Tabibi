@@ -56,6 +56,8 @@ test(
     );
 
     expect(page.url()).not.toContain(PRIVATE_SENTINEL);
-    expect(await page.locator('body').innerText()).not.toContain(PRIVATE_SENTINEL);
+    expect(await page.locator('body').innerText()).not.toContain(
+      PRIVATE_SENTINEL,
+    );
   },
 );
