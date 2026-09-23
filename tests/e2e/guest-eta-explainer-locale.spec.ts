@@ -152,7 +152,9 @@ test('French to Arabic switch retains current ETA recovery section without priva
   await arabic.click();
 
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
-  await expect(page).toHaveURL(/\/guest\/eta-explained\?lang=ar#recovery-heading$/);
+  await expect(page).toHaveURL(
+    /\/guest\/eta-explained\?lang=ar#recovery-heading$/,
+  );
   await expect(page.locator('h2#recovery-heading')).toHaveAttribute(
     'tabindex',
     '-1',
