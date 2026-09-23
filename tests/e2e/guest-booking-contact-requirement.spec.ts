@@ -48,21 +48,13 @@ async function captureBooking(page: Page) {
   };
 }
 
-test('French guest form avoids a futile POST when the chosen email contact is missing', async ({
-  page,
-}) => {
+test('French guest form avoids a futile POST when the chosen email contact is missing', async ({ page }) => {
   const captured = await captureBooking(page);
   await page.goto('/guest/live-queue/test-selection-ref');
   const phone = page.locator('input[type="tel"]');
   const email = page.locator('input[type="email"]');
-  await expect(phone).toHaveAttribute(
-    'aria-describedby',
-    'guest-contact-requirement',
-  );
-  await expect(email).toHaveAttribute(
-    'aria-describedby',
-    'guest-contact-requirement',
-  );
+  await expect(phone).toHaveAttribute('aria-describedby', 'guest-contact-requirement');
+  await expect(email).toHaveAttribute('aria-describedby', 'guest-contact-requirement');
   await expect(page.getByText(/Indiquez au moins un contact/)).toBeVisible();
   await page.getByLabel('Votre nom').fill('Guest');
   const submit = page.getByRole('button', { name: 'Confirmer la réservation' });
@@ -74,12 +66,8 @@ test('French guest form avoids a futile POST when the chosen email contact is mi
   await submit.click();
   expect(captured.count()).toBe(0);
   await email.fill('guest@example.test');
-  // Whitespace-only phone is omitted by the booking payload and must not
-  // retain a stale custom error after the valid preferred email is supplied.
   await expect(phone).toHaveJSProperty('validationMessage', '');
 
-  // Any non-empty phone that the payload would send is validated using the
-  // server's trimmed length, even when email is the preferred contact.
   await phone.fill(' 1 ');
   await expect(phone).not.toHaveJSProperty('validationMessage', '');
   await submit.click();
@@ -93,9 +81,7 @@ test('French guest form avoids a futile POST when the chosen email contact is mi
   expect(page.url()).not.toContain(PRIVATE_BEARER);
 });
 
-test('Arabic RTL guest form requires a phone when phone is preferred', async ({
-  page,
-}) => {
+test('Arabic RTL guest form requires a phone when phone is preferred', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'language', {
       configurable: true,
@@ -115,8 +101,6 @@ test('Arabic RTL guest form requires a phone when phone is preferred', async ({
   await submit.click();
   expect(captured.count()).toBe(0);
 
-  // Raw input length is misleading: the server trims a phone before checking
-  // whether it contains at least three actual characters.
   await phone.fill('   ');
   await expect(phone).not.toHaveJSProperty('validationMessage', '');
   await submit.click();
@@ -127,7 +111,5 @@ test('Arabic RTL guest form requires a phone when phone is preferred', async ({
   await expect.poll(captured.count).toBe(1);
   expect(captured.preference()).toBe('phone');
   expect(page.url()).not.toContain(PRIVATE_BEARER);
-  expect(await page.locator('body').innerText()).not.toContain(
-    PRIVATE_BEARER,
-  );
+  expect(await page.locator('body').innerText()).not.toContain(PRIVATE_BEARER);
 });
