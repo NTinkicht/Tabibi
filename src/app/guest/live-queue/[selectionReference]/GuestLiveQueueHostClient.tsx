@@ -505,17 +505,39 @@ export function GuestLiveQueueHostClient({
   const bookingInFlightRef = useRef(false);
   const bookingFailureHeadingRef = useRef<HTMLHeadingElement>(null);
   const contactPhoneInputRef = useRef<HTMLInputElement>(null);
+  const contactEmailInputRef = useRef<HTMLInputElement>(null);
+  const [contactValidationAttempted, setContactValidationAttempted] =
+    useState(false);
 
   useEffect(() => {
     const phoneInput = contactPhoneInputRef.current;
     if (!phoneInput) return;
+    const emailInput = contactEmailInputRef.current;
     const trimmedPhoneLength = contactPhone.trim().length;
+    const trimmedEmailLength = contactEmail.trim().length;
+    const noContact = trimmedPhoneLength === 0 && trimmedEmailLength === 0;
     phoneInput.setCustomValidity(
-      trimmedPhoneLength > 0 && trimmedPhoneLength < 3
+      (trimmedPhoneLength > 0 && trimmedPhoneLength < 3) ||
+        (contactValidationAttempted &&
+          noContact &&
+          contactPreference !== 'email')
         ? copy.contactRequirement
         : '',
     );
-  }, [contactEmail, contactPhone, contactPreference, copy.contactRequirement]);
+    emailInput?.setCustomValidity(
+      contactValidationAttempted &&
+        noContact &&
+        contactPreference === 'email'
+        ? copy.contactRequirement
+        : '',
+    );
+  }, [
+    contactEmail,
+    contactPhone,
+    contactPreference,
+    contactValidationAttempted,
+    copy.contactRequirement,
+  ]);
 
   // Announce booking failure at the retryable form, not on initial load.
   useEffect(() => {
@@ -595,7 +617,26 @@ export function GuestLiveQueueHostClient({
           <p>{copy.bookingFailedBody}</p>
         </div>
       ) : null}
-      <form onSubmit={submitBooking}>
+      <form
+        onSubmit={(event) => {
+          setContactValidationAttempted(true);
+          const phone = contactPhoneInputRef.current;
+          const email = contactEmailInputRef.current;
+          const noContact =
+            contactPhone.trim().length === 0 && contactEmail.trim().length === 0;
+          if (noContact) {
+            if (contactPreference === 'email') {
+              email?.setCustomValidity(copy.contactRequirement);
+            } else {
+              phone?.setCustomValidity(copy.contactRequirement);
+            }
+            event.preventDefault();
+            (contactPreference === 'email' ? email : phone)?.reportValidity();
+            return;
+          }
+          void submitBooking(event);
+        }}
+      >
         <label>
           {copy.privateDisplayName}
           <input
@@ -611,11 +652,7 @@ export function GuestLiveQueueHostClient({
           <input
             ref={contactPhoneInputRef}
             type="tel"
-            required={
-              contactPreference === 'phone' || contactEmail.trim().length === 0
-            }
             minLength={3}
-            maxLength={32}
             aria-describedby="guest-contact-requirement"
             value={contactPhone}
             onChange={(event) => setContactPhone(event.target.value)}
@@ -625,10 +662,8 @@ export function GuestLiveQueueHostClient({
         <label>
           {copy.contactEmail}
           <input
+            ref={contactEmailInputRef}
             type="email"
-            required={
-              contactPreference === 'email' || contactPhone.trim().length === 0
-            }
             minLength={3}
             maxLength={254}
             aria-describedby="guest-contact-requirement"
