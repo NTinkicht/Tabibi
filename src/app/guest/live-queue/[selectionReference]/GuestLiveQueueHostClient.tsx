@@ -525,9 +525,7 @@ export function GuestLiveQueueHostClient({
         : '',
     );
     emailInput?.setCustomValidity(
-      contactValidationAttempted &&
-        noContact &&
-        contactPreference === 'email'
+      contactValidationAttempted && noContact && contactPreference === 'email'
         ? copy.contactRequirement
         : '',
     );
@@ -623,8 +621,9 @@ export function GuestLiveQueueHostClient({
           const phone = contactPhoneInputRef.current;
           const email = contactEmailInputRef.current;
           const noContact =
-            contactPhone.trim().length === 0 && contactEmail.trim().length === 0;
-          if (noContact) {
+            contactPhone.trim().length === 0 &&
+            contactEmail.trim().length === 0;
+          if (contactValidationAttempted && noContact) {
             if (contactPreference === 'email') {
               email?.setCustomValidity(copy.contactRequirement);
             } else {
