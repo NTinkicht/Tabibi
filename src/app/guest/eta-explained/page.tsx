@@ -108,11 +108,15 @@ export default async function GuestEtaExplainedPage({
         <p>{copy.queueBody}</p>
       </section>
       <section aria-labelledby="consultation-estimate-heading">
-        <h2 id="consultation-estimate-heading" tabIndex={-1}>{copy.consultationHeading}</h2>
+        <h2 id="consultation-estimate-heading" tabIndex={-1}>
+          {copy.consultationHeading}
+        </h2>
         <p>{copy.consultationBody}</p>
       </section>
       <section aria-labelledby="verification-heading">
-        <h2 id="verification-heading" tabIndex={-1}>{copy.verificationHeading}</h2>
+        <h2 id="verification-heading" tabIndex={-1}>
+          {copy.verificationHeading}
+        </h2>
         <p>{copy.verificationBody}</p>
       </section>
       <section aria-labelledby="recovery-heading">
