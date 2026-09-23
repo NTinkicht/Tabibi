@@ -12,8 +12,18 @@ test(
       french.getByRole('heading', { name: 'Préparer votre réservation' }),
     ).toBeVisible();
     await expect(french.getByRole('listitem')).toHaveCount(3);
-    await expect(french).toContainText('Au moins un moyen de contact');
-    await expect(french).toContainText('ne demande aucun paiement');
+    await expect(french.getByRole('listitem').nth(0)).toHaveText(
+      'La clinique et le médecin que vous souhaitez consulter.',
+    );
+    await expect(french.getByRole('listitem').nth(1)).toHaveText(
+      'Au moins un moyen de contact : téléphone ou e-mail.',
+    );
+    await expect(french.getByRole('listitem').nth(2)).toHaveText(
+      'Si vous choisissez un contact préféré, renseignez bien ce téléphone ou cet e-mail.',
+    );
+    await expect(french.locator('p').last()).toHaveText(
+      'Cette page d’aide ne demande aucun paiement, mot de passe ou document médical.',
+    );
 
     expect(page.url()).not.toContain(PRIVATE_SENTINEL);
     expect(await page.locator('body').innerText()).not.toContain(
@@ -32,8 +42,18 @@ test(
       arabic.getByRole('heading', { name: 'استعد لحجز موعدك' }),
     ).toBeVisible();
     await expect(arabic.getByRole('listitem')).toHaveCount(3);
-    await expect(arabic).toContainText('وسيلة تواصل واحدة على الأقل');
-    await expect(arabic).toContainText('لا تطلب أي دفع');
+    await expect(arabic.getByRole('listitem').nth(0)).toHaveText(
+      'العيادة والطبيب اللذان ترغب في اختيارهما.',
+    );
+    await expect(arabic.getByRole('listitem').nth(1)).toHaveText(
+      'وسيلة تواصل واحدة على الأقل: رقم هاتف أو بريد إلكتروني.',
+    );
+    await expect(arabic.getByRole('listitem').nth(2)).toHaveText(
+      'إذا اخترت وسيلة تواصل مفضلة، فتأكد من إدخال رقم الهاتف أو البريد الإلكتروني المطابق لها.',
+    );
+    await expect(arabic.locator('p').last()).toHaveText(
+      'صفحة المساعدة هذه لا تطلب أي دفع أو كلمة مرور أو مستند طبي.',
+    );
 
     expect(page.url()).not.toContain(PRIVATE_SENTINEL);
     expect(await page.locator('body').innerText()).not.toContain(PRIVATE_SENTINEL);
