@@ -22,7 +22,9 @@ test('guest booking next steps are clear in French without private data', async 
     'aucun paiement, mot de passe, document médical ou code d’accès invité',
   );
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
-  expect(await page.locator('body').innerText()).not.toContain(PRIVATE_SENTINEL);
+  expect(await page.locator('body').innerText()).not.toContain(
+    PRIVATE_SENTINEL,
+  );
 });
 
 test('guest booking next steps are equivalent in Arabic RTL', async ({
@@ -45,5 +47,7 @@ test('guest booking next steps are equivalent in Arabic RTL', async ({
     'لا يطلب أي دفع أو كلمة مرور أو مستند طبي أو رمز دخول للزائر',
   );
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
-  expect(await page.locator('body').innerText()).not.toContain(PRIVATE_SENTINEL);
+  expect(await page.locator('body').innerText()).not.toContain(
+    PRIVATE_SENTINEL,
+  );
 });
