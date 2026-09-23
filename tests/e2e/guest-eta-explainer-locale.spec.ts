@@ -71,10 +71,14 @@ test('French ETA quick nav jumps to recovery', async ({ page }) => {
   const recoveryLink = quickNav.getByRole('link', {
     name: 'Si le statut n’est plus à jour',
   });
-  await recoveryLink.click();
-  await expect(
-    page.getByRole('heading', { name: 'Si le statut n’est plus à jour' }),
-  ).toHaveAttribute('id', 'recovery-heading');
+  await recoveryLink.focus();
+  await recoveryLink.press('Enter');
+  const recoveryHeading = page.getByRole('heading', {
+    name: 'Si le statut n’est plus à jour',
+  });
+  await expect(recoveryHeading).toHaveAttribute('id', 'recovery-heading');
+  await expect(recoveryHeading).toHaveAttribute('tabindex', '-1');
+  await expect(recoveryHeading).toBeFocused();
   await expect(page).toHaveURL(/#recovery-heading$/);
   expect(page.url()).not.toContain(secret);
   expect(await page.locator('main').innerText()).not.toContain(secret);
@@ -88,10 +92,20 @@ test('Arabic RTL ETA explainer jumps to last verified explanation', async ({
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
   const quickNav = page.getByRole('navigation', { name: 'في هذه الصفحة' });
   await expect(quickNav.getByRole('link')).toHaveCount(5);
-  await quickNav.getByRole('link', { name: 'آخر تحقق من الحالة' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'آخر تحقق من الحالة' }),
-  ).toHaveAttribute('id', 'verification-heading');
+  const verificationLink = quickNav.getByRole('link', {
+    name: 'آخر تحقق من الحالة',
+  });
+  await verificationLink.focus();
+  await verificationLink.press('Enter');
+  const verificationHeading = page.getByRole('heading', {
+    name: 'آخر تحقق من الحالة',
+  });
+  await expect(verificationHeading).toHaveAttribute(
+    'id',
+    'verification-heading',
+  );
+  await expect(verificationHeading).toHaveAttribute('tabindex', '-1');
+  await expect(verificationHeading).toBeFocused();
   await expect(page).toHaveURL(/#verification-heading$/);
   await expect(page.getByRole('link', { name: 'العربية' })).toHaveAttribute(
     'aria-current',
