@@ -52,6 +52,8 @@ const copy = {
     emptyRecoverySearch: 'Afficher sans cette recherche',
     emptyRecoveryFilters: 'Voir toutes les cliniques',
     activeFiltersLabel: 'Filtres actifs :',
+    removeLanguageFilter: 'Retirer le filtre de langue',
+    removeDoctorsFilter: 'Retirer le filtre des médecins',
     jumpToFirstClinic: 'Aller au premier résultat',
     activeLanguageFrench: 'langue : français',
     activeLanguageArabic: 'langue : arabe',
@@ -110,6 +112,8 @@ const copy = {
     emptyRecoverySearch: 'عرض النتائج بدون البحث',
     emptyRecoveryFilters: 'عرض جميع العيادات',
     activeFiltersLabel: 'عوامل التصفية النشطة:',
+    removeLanguageFilter: 'إزالة فلتر اللغة',
+    removeDoctorsFilter: 'إزالة فلتر الأطباء',
     jumpToFirstClinic: 'الانتقال إلى أول نتيجة',
     activeLanguageFrench: 'اللغة: الفرنسية',
     activeLanguageArabic: 'اللغة: العربية',
@@ -237,6 +241,8 @@ export default function PublicDiscoveryLandingClient({
   const [onlyListedDoctors, setOnlyListedDoctors] = useState(false);
   const [visibleLimit, setVisibleLimit] = useState(DIRECTORY_BATCH_SIZE);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const languageSelectRef = useRef<HTMLSelectElement>(null);
+  const listedDoctorsRef = useRef<HTMLInputElement>(null);
   const sortSelectRef = useRef<HTMLSelectElement>(null);
   const firstClinicHeadingRef = useRef<HTMLHeadingElement>(null);
   const [revealFocusIndex, setRevealFocusIndex] = useState<number | null>(null);
@@ -493,6 +499,7 @@ export default function PublicDiscoveryLandingClient({
             </label>
             <select
               id="publicClinicLanguage"
+              ref={languageSelectRef}
               value={clinicLanguage}
               onChange={(event) => {
                 setClinicLanguage(event.target.value as ClinicLanguageFilter);
@@ -509,6 +516,7 @@ export default function PublicDiscoveryLandingClient({
             >
               <input
                 id="publicClinicsWithDoctors"
+                ref={listedDoctorsRef}
                 type="checkbox"
                 checked={onlyListedDoctors}
                 onChange={(event) => {
@@ -557,6 +565,32 @@ export default function PublicDiscoveryLandingClient({
                 <p data-testid="active-filter-summary">
                   {t.activeFiltersLabel} {activeFilterLabels.join(' · ')}
                 </p>
+              )}
+              {clinicLanguage !== 'all' && (
+                <button
+                  type="button"
+                  data-testid="remove-language-filter"
+                  onClick={() => {
+                    setClinicLanguage('all');
+                    setVisibleLimit(DIRECTORY_BATCH_SIZE);
+                    languageSelectRef.current?.focus();
+                  }}
+                >
+                  {t.removeLanguageFilter}
+                </button>
+              )}
+              {onlyListedDoctors && (
+                <button
+                  type="button"
+                  data-testid="remove-doctors-filter"
+                  onClick={() => {
+                    setOnlyListedDoctors(false);
+                    setVisibleLimit(DIRECTORY_BATCH_SIZE);
+                    listedDoctorsRef.current?.focus();
+                  }}
+                >
+                  {t.removeDoctorsFilter}
+                </button>
               )}
             </div>
             {(query || clinicLanguage !== 'all' || onlyListedDoctors) && (
