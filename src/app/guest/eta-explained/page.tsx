@@ -104,23 +104,33 @@ export default async function GuestEtaExplainedPage({
         </ul>
       </nav>
       <section aria-labelledby="queue-estimate-heading">
-        <h2 id="queue-estimate-heading">{copy.queueHeading}</h2>
+        <h2 id="queue-estimate-heading" tabIndex={-1}>
+          {copy.queueHeading}
+        </h2>
         <p>{copy.queueBody}</p>
       </section>
       <section aria-labelledby="consultation-estimate-heading">
-        <h2 id="consultation-estimate-heading">{copy.consultationHeading}</h2>
+        <h2 id="consultation-estimate-heading" tabIndex={-1}>
+          {copy.consultationHeading}
+        </h2>
         <p>{copy.consultationBody}</p>
       </section>
       <section aria-labelledby="verification-heading">
-        <h2 id="verification-heading">{copy.verificationHeading}</h2>
+        <h2 id="verification-heading" tabIndex={-1}>
+          {copy.verificationHeading}
+        </h2>
         <p>{copy.verificationBody}</p>
       </section>
       <section aria-labelledby="recovery-heading">
-        <h2 id="recovery-heading">{copy.recoveryHeading}</h2>
+        <h2 id="recovery-heading" tabIndex={-1}>
+          {copy.recoveryHeading}
+        </h2>
         <p>{copy.recoveryBody}</p>
       </section>
       <section aria-labelledby="privacy-heading">
-        <h2 id="privacy-heading">{copy.privacyHeading}</h2>
+        <h2 id="privacy-heading" tabIndex={-1}>
+          {copy.privacyHeading}
+        </h2>
         <p>{copy.privacyBody}</p>
       </section>
       <nav aria-label={locale === 'ar' ? 'اللغة' : 'Langue'}>
