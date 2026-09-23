@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function GuestBookingNextStepsPage() {
   return (
     <main className="pageShell" data-testid="guest-booking-next-steps">
@@ -16,6 +18,7 @@ export default function GuestBookingNextStepsPage() {
           Ce guide ne demande aucun paiement, mot de passe, document médical ou
           code d’accès invité.
         </p>
+        <Link href="/guest/booking-help">Revoir la préparation</Link>
       </section>
 
       <section lang="ar" dir="rtl" aria-labelledby="booking-next-ar">
@@ -33,6 +36,7 @@ export default function GuestBookingNextStepsPage() {
           هذا الدليل لا يطلب أي دفع أو كلمة مرور أو مستند طبي أو رمز دخول
           للزائر.
         </p>
+        <Link href="/guest/booking-help">مراجعة التحضير</Link>
       </section>
     </main>
   );
