@@ -605,7 +605,16 @@ export function GuestLiveQueueHostClient({
             maxLength={32}
             aria-describedby="guest-contact-requirement"
             value={contactPhone}
-            onChange={(event) => setContactPhone(event.target.value)}
+            onChange={(event) => {
+              setContactPhone(event.target.value);
+              // The backend validates the trimmed phone, not raw length.
+              event.target.setCustomValidity(
+                event.target.value.length > 0 &&
+                  event.target.value.trim().length < 3
+                  ? copy.contactRequirement
+                  : '',
+              );
+            }}
             disabled={phase.kind === 'booking'}
           />
         </label>
