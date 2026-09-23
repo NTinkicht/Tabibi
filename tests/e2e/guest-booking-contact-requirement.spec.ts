@@ -72,11 +72,14 @@ test('French guest form avoids a futile POST when the chosen email contact is mi
   expect(captured.count()).toBe(0);
 
   await page.getByRole('radio', { name: 'Email' }).check();
-  await phone.fill('0555555555');
+  await phone.fill('   ');
   await expect(email).toHaveAttribute('required', '');
   await submit.click();
   expect(captured.count()).toBe(0);
   await email.fill('guest@example.test');
+  // The now-irrelevant whitespace phone must not retain a stale custom error
+  // after the guest supplies the currently preferred email channel.
+  await expect(phone).toHaveJSProperty('validationMessage', '');
   await submit.click();
   await expect.poll(captured.count).toBe(1);
   expect(captured.preference()).toBe('email');
