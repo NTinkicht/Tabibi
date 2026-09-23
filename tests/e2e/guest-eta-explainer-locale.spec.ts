@@ -139,9 +139,7 @@ test('French to Arabic switch retains current ETA recovery section without priva
   page,
 }) => {
   const privateValue = 'private-section-bearer-do-not-forward';
-  await page.goto(
-    `/guest/eta-explained?lang=fr&opaque=${privateValue}`,
-  );
+  await page.goto(`/guest/eta-explained?lang=fr&opaque=${privateValue}`);
   const quickNav = page.getByRole('navigation', { name: 'Sur cette page' });
   const recoveryLink = quickNav.getByRole('link', {
     name: 'Si le statut n’est plus à jour',
@@ -150,19 +148,15 @@ test('French to Arabic switch retains current ETA recovery section without priva
   await recoveryLink.press('Enter');
   await expect(page).toHaveURL(/#recovery-heading$/);
   const arabic = page.getByRole('link', { name: 'العربية' });
-  await expect(arabic).toHaveAttribute(
-    'href',
-    '?lang=ar#recovery-heading',
-  );
+  await expect(arabic).toHaveAttribute('href', '?lang=ar#recovery-heading');
   await arabic.click();
 
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
-  await expect(page).toHaveURL(
-    /\/guest\/eta-explained\?lang=ar#recovery-heading$/,
+  await expect(page).toHaveURL(/\/guest\/eta-explained\?lang=ar#recovery-heading$/);
+  await expect(page.locator('h2#recovery-heading')).toHaveAttribute(
+    'tabindex',
+    '-1',
   );
-  await expect(
-    page.locator('h2#recovery-heading'),
-  ).toHaveAttribute('tabindex', '-1');
   await expect(arabic).toHaveAttribute('aria-current', 'page');
   expect(page.url()).not.toContain(privateValue);
   expect(await page.locator('main').innerText()).not.toContain(privateValue);
