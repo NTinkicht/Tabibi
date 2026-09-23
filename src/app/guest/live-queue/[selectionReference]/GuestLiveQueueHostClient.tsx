@@ -64,6 +64,7 @@ type Copy = {
   contactPhone: string;
   contactEmail: string;
   contactPreferenceLabel: string;
+  contactRequirement: string;
   preferredLocaleLabel: string;
   contactPreferenceNone: string;
   contactPreferencePhone: string;
@@ -139,6 +140,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     contactPhone: 'Téléphone (optionnel)',
     contactEmail: 'Email (optionnel)',
     contactPreferenceLabel: 'Préférence de contact',
+    contactRequirement:
+      'Indiquez au moins un contact : téléphone ou e-mail. Renseignez le moyen de contact choisi.',
     preferredLocaleLabel: 'Langue préférée',
     contactPreferenceNone: 'Aucune',
     contactPreferencePhone: 'Téléphone',
@@ -245,6 +248,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     contactPhone: 'الهاتف (اختياري)',
     contactEmail: 'البريد الإلكتروني (اختياري)',
     contactPreferenceLabel: 'تفضيل الاتصال',
+    contactRequirement:
+      'أدخل وسيلة اتصال واحدة على الأقل: الهاتف أو البريد الإلكتروني. أكمل وسيلة الاتصال المفضلة.',
     preferredLocaleLabel: 'اللغة المفضلة',
     contactPreferenceNone: 'بدون',
     contactPreferencePhone: 'الهاتف',
@@ -593,6 +598,12 @@ export function GuestLiveQueueHostClient({
           {copy.contactPhone}
           <input
             type="tel"
+            required={
+              contactPreference === 'phone' || contactEmail.trim().length === 0
+            }
+            minLength={3}
+            maxLength={32}
+            aria-describedby="guest-contact-requirement"
             value={contactPhone}
             onChange={(event) => setContactPhone(event.target.value)}
             disabled={phase.kind === 'booking'}
@@ -602,11 +613,18 @@ export function GuestLiveQueueHostClient({
           {copy.contactEmail}
           <input
             type="email"
+            required={
+              contactPreference === 'email' || contactPhone.trim().length === 0
+            }
+            minLength={3}
+            maxLength={254}
+            aria-describedby="guest-contact-requirement"
             value={contactEmail}
             onChange={(event) => setContactEmail(event.target.value)}
             disabled={phase.kind === 'booking'}
           />
         </label>
+        <p id="guest-contact-requirement">{copy.contactRequirement}</p>
         <fieldset disabled={phase.kind === 'booking'}>
           <legend>{copy.contactPreferenceLabel}</legend>
           {(
