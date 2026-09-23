@@ -16,7 +16,9 @@ test(
     await expect(french).toContainText('ne demande aucun paiement');
 
     expect(page.url()).not.toContain(PRIVATE_SENTINEL);
-    expect(await page.locator('body').innerText()).not.toContain(PRIVATE_SENTINEL);
+    expect(await page.locator('body').innerText()).not.toContain(
+      PRIVATE_SENTINEL,
+    );
   },
 );
 
