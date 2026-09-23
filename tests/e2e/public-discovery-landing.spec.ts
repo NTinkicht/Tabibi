@@ -1252,7 +1252,10 @@ test('active filter summary stays visible when search is cleared and disappears 
     .check();
   await search.fill('salima');
 
-  const summary = page.getByTestId('active-filter-summary');
+  const liveRegion = page.getByTestId('active-filter-live-region');
+  await expect(liveRegion).toHaveAttribute('aria-live', 'polite');
+  await expect(liveRegion).toHaveAttribute('aria-atomic', 'true');
+  const summary = liveRegion.getByTestId('active-filter-summary');
   await expect(summary).toHaveText(
     'Filtres actifs : langue : arabe · cliniques avec médecins affichés',
   );
@@ -1266,6 +1269,9 @@ test('active filter summary stays visible when search is cleared and disappears 
 
   await page.getByRole('button', { name: 'Effacer tous les filtres' }).click();
   await expect(summary).toHaveCount(0);
+  // The live region remains mounted so the disappearance is announced too.
+  await expect(liveRegion).toHaveAttribute('aria-live', 'polite');
+  await expect(liveRegion).toHaveText('');
 
   const body = await page.locator('main').innerText();
   expect(body).not.toContain('private-filter-summary-tenant');
@@ -1301,8 +1307,17 @@ test('Arabic mobile active filter summary is localized and remains RTL', async (
     .check();
 
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
-  await expect(page.getByTestId('active-filter-summary')).toHaveText(
+  const liveRegion = page.getByTestId('active-filter-live-region');
+  await expect(liveRegion).toHaveAttribute('aria-live', 'polite');
+  await expect(liveRegion).toHaveAttribute('aria-atomic', 'true');
+  await expect(liveRegion.getByTestId('active-filter-summary')).toHaveText(
     'عوامل التصفية النشطة: اللغة: العربية · العيادات التي تعرض أطباء',
+  );
+  await page
+    .getByRole('checkbox', { name: 'العيادات التي تعرض أطباء فقط' })
+    .uncheck();
+  await expect(liveRegion.getByTestId('active-filter-summary')).toHaveText(
+    'عوامل التصفية النشطة: اللغة: العربية',
   );
 });
 
