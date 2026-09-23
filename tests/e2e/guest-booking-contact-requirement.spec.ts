@@ -105,9 +105,7 @@ test('Arabic RTL guest form requires a phone when phone is preferred', async ({
   const captured = await captureBooking(page);
   await page.goto('/guest/live-queue/test-selection-ref');
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
-  await expect(
-    page.getByText(/أدخل وسيلة اتصال واحدة على الأقل/),
-  ).toBeVisible();
+  await expect(page.getByText(/أدخل وسيلة اتصال واحدة على الأقل/)).toBeVisible();
   await page.getByLabel('اسمك').fill('Guest');
   await page.getByRole('radio', { name: 'الهاتف' }).check();
   const phone = page.locator('input[type="tel"]');
