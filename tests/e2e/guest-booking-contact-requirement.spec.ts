@@ -77,8 +77,18 @@ test('French guest form avoids a futile POST when the chosen email contact is mi
   await submit.click();
   expect(captured.count()).toBe(0);
   await email.fill('guest@example.test');
-  // The now-irrelevant whitespace phone must not retain a stale custom error
-  // after the guest supplies the currently preferred email channel.
+  // Whitespace-only phone is omitted by the booking payload and must not
+  // retain a stale custom error after the valid preferred email is supplied.
+  await expect(phone).toHaveJSProperty('validationMessage', '');
+
+  // Any non-empty phone that the payload would send is validated using the
+  // server's trimmed length, even when email is the preferred contact.
+  await phone.fill(' 1 ');
+  await expect(phone).not.toHaveJSProperty('validationMessage', '');
+  await submit.click();
+  expect(captured.count()).toBe(0);
+
+  await phone.fill('   ');
   await expect(phone).toHaveJSProperty('validationMessage', '');
   await submit.click();
   await expect.poll(captured.count).toBe(1);
