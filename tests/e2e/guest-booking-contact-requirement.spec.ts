@@ -48,13 +48,21 @@ async function captureBooking(page: Page) {
   };
 }
 
-test('French guest form avoids a futile POST when the chosen email contact is missing', async ({ page }) => {
+test('French guest form avoids a futile POST when the chosen email contact is missing', async ({
+  page,
+}) => {
   const captured = await captureBooking(page);
   await page.goto('/guest/live-queue/test-selection-ref');
   const phone = page.locator('input[type="tel"]');
   const email = page.locator('input[type="email"]');
-  await expect(phone).toHaveAttribute('aria-describedby', 'guest-contact-requirement');
-  await expect(email).toHaveAttribute('aria-describedby', 'guest-contact-requirement');
+  await expect(phone).toHaveAttribute(
+    'aria-describedby',
+    'guest-contact-requirement',
+  );
+  await expect(email).toHaveAttribute(
+    'aria-describedby',
+    'guest-contact-requirement',
+  );
   await expect(page.getByText(/Indiquez au moins un contact/)).toBeVisible();
   await page.getByLabel('Votre nom').fill('Guest');
   const submit = page.getByRole('button', { name: 'Confirmer la réservation' });
@@ -81,7 +89,9 @@ test('French guest form avoids a futile POST when the chosen email contact is mi
   expect(page.url()).not.toContain(PRIVATE_BEARER);
 });
 
-test('Arabic RTL guest form requires a phone when phone is preferred', async ({ page }) => {
+test('Arabic RTL guest form requires a phone when phone is preferred', async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'language', {
       configurable: true,
@@ -91,7 +101,9 @@ test('Arabic RTL guest form requires a phone when phone is preferred', async ({ 
   const captured = await captureBooking(page);
   await page.goto('/guest/live-queue/test-selection-ref');
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
-  await expect(page.getByText(/أدخل وسيلة اتصال واحدة على الأقل/)).toBeVisible();
+  await expect(
+    page.getByText(/أدخل وسيلة اتصال واحدة على الأقل/),
+  ).toBeVisible();
   await page.getByLabel('اسمك').fill('Guest');
   await page.getByRole('radio', { name: 'الهاتف' }).check();
   const phone = page.locator('input[type="tel"]');
@@ -111,5 +123,7 @@ test('Arabic RTL guest form requires a phone when phone is preferred', async ({ 
   await expect.poll(captured.count).toBe(1);
   expect(captured.preference()).toBe('phone');
   expect(page.url()).not.toContain(PRIVATE_BEARER);
-  expect(await page.locator('body').innerText()).not.toContain(PRIVATE_BEARER);
+  expect(await page.locator('body').innerText()).not.toContain(
+    PRIVATE_BEARER,
+  );
 });
