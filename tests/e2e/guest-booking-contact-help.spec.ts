@@ -1,8 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('booking contact help explains the French contact contract', async ({
-  page,
-}) => {
+test('booking contact help explains the French contact contract', async ({ page }) => {
   await page.goto('/guest/booking-contact-help');
 
   const section = page.locator('section[lang="fr"][dir="ltr"]');
