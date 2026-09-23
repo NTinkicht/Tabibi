@@ -22,7 +22,9 @@ export default function GuestBookingHelpPage() {
           Cette page d’aide ne demande aucun paiement, mot de passe ou document
           médical.
         </p>
-        <Link href="/guest/booking-next-steps">Passer aux étapes de réservation</Link>
+        <Link href="/guest/booking-next-steps">
+          Passer aux étapes de réservation
+        </Link>
       </section>
 
       <section lang="ar" dir="rtl" aria-labelledby="booking-help-ar">
