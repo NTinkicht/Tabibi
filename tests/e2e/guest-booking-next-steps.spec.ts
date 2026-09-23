@@ -25,7 +25,9 @@ test('guest booking next steps are clear in French without private data', async 
   expect(await page.locator('body').innerText()).not.toContain(PRIVATE_SENTINEL);
 });
 
-test('guest booking next steps are equivalent in Arabic RTL', async ({ page }) => {
+test('guest booking next steps are equivalent in Arabic RTL', async ({
+  page,
+}) => {
   await page.goto('/guest/booking-next-steps');
 
   const arabic = page.locator('section[lang="ar"][dir="rtl"]');
