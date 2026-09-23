@@ -548,11 +548,17 @@ export default function PublicDiscoveryLandingClient({
                 {t.clearAllFilters}
               </button>
             )}
-            {activeFilterLabels.length > 0 && (
-              <p data-testid="active-filter-summary">
-                {t.activeFiltersLabel} {activeFilterLabels.join(' · ')}
-              </p>
-            )}
+            <div
+              data-testid="active-filter-live-region"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {activeFilterLabels.length > 0 && (
+                <p data-testid="active-filter-summary">
+                  {t.activeFiltersLabel} {activeFilterLabels.join(' · ')}
+                </p>
+              )}
+            </div>
             {(query || clinicLanguage !== 'all' || onlyListedDoctors) && (
               <div role="status" aria-live="polite" aria-atomic="true">
                 <p>{t.searchCount(matchingClinics.length)}</p>
