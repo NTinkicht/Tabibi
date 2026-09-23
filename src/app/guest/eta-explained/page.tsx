@@ -104,7 +104,9 @@ export default async function GuestEtaExplainedPage({
         </ul>
       </nav>
       <section aria-labelledby="queue-estimate-heading">
-        <h2 id="queue-estimate-heading" tabIndex={-1}>{copy.queueHeading}</h2>
+        <h2 id="queue-estimate-heading" tabIndex={-1}>
+          {copy.queueHeading}
+        </h2>
         <p>{copy.queueBody}</p>
       </section>
       <section aria-labelledby="consultation-estimate-heading">
@@ -120,11 +122,15 @@ export default async function GuestEtaExplainedPage({
         <p>{copy.verificationBody}</p>
       </section>
       <section aria-labelledby="recovery-heading">
-        <h2 id="recovery-heading" tabIndex={-1}>{copy.recoveryHeading}</h2>
+        <h2 id="recovery-heading" tabIndex={-1}>
+          {copy.recoveryHeading}
+        </h2>
         <p>{copy.recoveryBody}</p>
       </section>
       <section aria-labelledby="privacy-heading">
-        <h2 id="privacy-heading" tabIndex={-1}>{copy.privacyHeading}</h2>
+        <h2 id="privacy-heading" tabIndex={-1}>
+          {copy.privacyHeading}
+        </h2>
         <p>{copy.privacyBody}</p>
       </section>
       <nav aria-label={locale === 'ar' ? 'اللغة' : 'Langue'}>
