@@ -108,6 +108,13 @@ test('Arabic RTL guest form requires a phone when phone is preferred', async ({
   await submit.click();
   expect(captured.count()).toBe(0);
 
+  // Raw input length is misleading: the server trims a phone before checking
+  // whether it contains at least three actual characters.
+  await phone.fill('   ');
+  await expect(phone).not.toHaveJSProperty('validationMessage', '');
+  await submit.click();
+  expect(captured.count()).toBe(0);
+
   await phone.fill('0555555555');
   await submit.click();
   await expect.poll(captured.count).toBe(1);
