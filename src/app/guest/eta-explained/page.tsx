@@ -1,3 +1,5 @@
+import EtaExplanationLanguageLinks from './EtaExplanationLanguageLinks';
+
 type Locale = 'fr' | 'ar';
 
 type Copy = {
@@ -133,22 +135,7 @@ export default async function GuestEtaExplainedPage({
         </h2>
         <p>{copy.privacyBody}</p>
       </section>
-      <nav aria-label={locale === 'ar' ? 'اللغة' : 'Langue'}>
-        <a
-          href="?lang=fr"
-          lang="fr"
-          aria-current={locale === 'fr' ? 'page' : undefined}
-        >
-          Français
-        </a>{' '}
-        <a
-          href="?lang=ar"
-          lang="ar"
-          aria-current={locale === 'ar' ? 'page' : undefined}
-        >
-          العربية
-        </a>
-      </nav>
+      <EtaExplanationLanguageLinks locale={locale} />
     </main>
   );
 }

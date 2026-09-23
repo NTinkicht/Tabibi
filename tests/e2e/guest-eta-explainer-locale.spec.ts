@@ -134,3 +134,57 @@ test('All five bilingual ETA anchor targets support programmatic focus without n
     expect(page.url()).not.toContain('private-guest-bearer');
   }
 });
+
+test('French to Arabic switch retains current ETA recovery section without private params', async ({
+  page,
+}) => {
+  const privateValue = 'private-section-bearer-do-not-forward';
+  await page.goto(`/guest/eta-explained?lang=fr&opaque=${privateValue}`);
+  const quickNav = page.getByRole('navigation', { name: 'Sur cette page' });
+  const recoveryLink = quickNav.getByRole('link', {
+    name: 'Si le statut n’est plus à jour',
+  });
+  await recoveryLink.focus();
+  await recoveryLink.press('Enter');
+  await expect(page).toHaveURL(/#recovery-heading$/);
+  const arabic = page.getByRole('link', { name: 'العربية' });
+  await expect(arabic).toHaveAttribute('href', '?lang=ar#recovery-heading');
+  await arabic.click();
+
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(page).toHaveURL(
+    /\/guest\/eta-explained\?lang=ar#recovery-heading$/,
+  );
+  await expect(page.locator('h2#recovery-heading')).toHaveAttribute(
+    'tabindex',
+    '-1',
+  );
+  await expect(arabic).toHaveAttribute('aria-current', 'page');
+  expect(page.url()).not.toContain(privateValue);
+  expect(await page.locator('main').innerText()).not.toContain(privateValue);
+});
+
+test('Arabic regional ETA language switch discards unknown and private fragments', async ({
+  page,
+}) => {
+  const privateValue = 'private-guest-fragment-never-forward';
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(
+    `/guest/eta-explained?lang=AR-DZ&unused=${privateValue}#${privateValue}`,
+  );
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  const french = page.getByRole('link', { name: 'Français' });
+  await expect(french).toHaveAttribute('href', '?lang=fr');
+  await french.click();
+  await expect(page.locator('main[lang="fr"][dir="ltr"]')).toBeVisible();
+  await expect(page).toHaveURL(/\/guest\/eta-explained\?lang=fr$/);
+  expect(page.url()).not.toContain(privateValue);
+  await page
+    .getByRole('navigation', { name: 'Sur cette page' })
+    .getByRole('link', { name: 'Dernière vérification du statut' })
+    .click();
+  await expect(page.getByRole('link', { name: 'العربية' })).toHaveAttribute(
+    'href',
+    '?lang=ar#verification-heading',
+  );
+});
