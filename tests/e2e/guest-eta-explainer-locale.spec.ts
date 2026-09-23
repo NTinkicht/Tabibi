@@ -113,3 +113,24 @@ test('Arabic RTL ETA explainer jumps to last verified explanation', async ({
   );
   expect(page.url()).not.toContain('private-guest-token');
 });
+
+test('All five bilingual ETA anchor targets support programmatic focus without new tab stops', async ({
+  page,
+}) => {
+  for (const lang of ['fr', 'AR-DZ']) {
+    await page.goto(`/guest/eta-explained?lang=${lang}`);
+    for (const id of [
+      'queue-estimate-heading',
+      'consultation-estimate-heading',
+      'verification-heading',
+      'recovery-heading',
+      'privacy-heading',
+    ]) {
+      const heading = page.locator(`h2#${id}`);
+      await expect(heading).toHaveAttribute('tabindex', '-1');
+      await heading.focus();
+      await expect(heading).toBeFocused();
+    }
+    expect(page.url()).not.toContain('private-guest-bearer');
+  }
+});
