@@ -127,5 +127,7 @@ test('Arabic RTL guest form requires a phone when phone is preferred', async ({
   await expect.poll(captured.count).toBe(1);
   expect(captured.preference()).toBe('phone');
   expect(page.url()).not.toContain(PRIVATE_BEARER);
-  expect(await page.locator('body').innerText()).not.toContain(PRIVATE_BEARER);
+  expect(await page.locator('body').innerText()).not.toContain(
+    PRIVATE_BEARER,
+  );
 });
