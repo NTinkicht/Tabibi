@@ -504,6 +504,21 @@ export function GuestLiveQueueHostClient({
   // second POST.
   const bookingInFlightRef = useRef(false);
   const bookingFailureHeadingRef = useRef<HTMLHeadingElement>(null);
+  const contactPhoneInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const phoneInput = contactPhoneInputRef.current;
+    if (!phoneInput) return;
+    const phoneIsRelevant =
+      contactPreference === 'phone' || contactEmail.trim().length === 0;
+    phoneInput.setCustomValidity(
+      phoneIsRelevant &&
+        contactPhone.length > 0 &&
+        contactPhone.trim().length < 3
+        ? copy.contactRequirement
+        : '',
+    );
+  }, [contactEmail, contactPhone, contactPreference, copy.contactRequirement]);
 
   // Announce booking failure at the retryable form, not on initial load.
   useEffect(() => {
@@ -597,6 +612,7 @@ export function GuestLiveQueueHostClient({
         <label>
           {copy.contactPhone}
           <input
+            ref={contactPhoneInputRef}
             type="tel"
             required={
               contactPreference === 'phone' || contactEmail.trim().length === 0
@@ -605,16 +621,7 @@ export function GuestLiveQueueHostClient({
             maxLength={32}
             aria-describedby="guest-contact-requirement"
             value={contactPhone}
-            onChange={(event) => {
-              setContactPhone(event.target.value);
-              // The backend validates the trimmed phone, not raw length.
-              event.target.setCustomValidity(
-                event.target.value.length > 0 &&
-                  event.target.value.trim().length < 3
-                  ? copy.contactRequirement
-                  : '',
-              );
-            }}
+            onChange={(event) => setContactPhone(event.target.value)}
             disabled={phase.kind === 'booking'}
           />
         </label>
