@@ -20,6 +20,11 @@ export default function GuestBookingNextStepsPage() {
         </p>
         <Link href="/guest/booking-help">Revoir la préparation</Link>
         <div>
+          <Link href="/guest/notification-help">
+            Comprendre les notifications de réservation
+          </Link>
+        </div>
+        <div>
           <Link href="/guest/queue-arrival-help">
             Préparer votre arrivée à la clinique
           </Link>
@@ -42,6 +47,9 @@ export default function GuestBookingNextStepsPage() {
           للزائر.
         </p>
         <Link href="/guest/booking-help">مراجعة التحضير</Link>
+        <div>
+          <Link href="/guest/notification-help">فهم إشعارات الحجز</Link>
+        </div>
         <div>
           <Link href="/guest/queue-arrival-help">استعد للوصول إلى العيادة</Link>
         </div>
