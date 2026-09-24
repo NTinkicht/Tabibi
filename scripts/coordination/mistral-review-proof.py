@@ -46,12 +46,12 @@ def redact_public_text(text, *, provider_key=""):
     if re.search(r"-----BEGIN [A-Z ]*PRIVATE KEY-----", text, re.I):
         return "[REDACTED SECURITY-SENSITIVE OUTPUT]"
     text = re.sub(
-        r"(?i)(authorization\\s*:\\s*bearer\\s+)\\S+",
-        r"\\1[REDACTED]", text,
+        r"(?i)(authorization\s*:\s*bearer\s+)\S+",
+        r"\1[REDACTED]", text,
     )
     text = re.sub(
-        r"(?i)(\\b(?:MISTRAL_API_KEY|GITHUB_TOKEN|GH_TOKEN)\\s*[=:]\\s*)\\S+",
-        r"\\1[REDACTED]", text,
+        r"(?i)(\b(?:MISTRAL_API_KEY|GITHUB_TOKEN|GH_TOKEN)\s*[=:]\s*)\S+",
+        r"\1[REDACTED]", text,
     )
     return SENSITIVE.sub("[REDACTED]", text)
 
