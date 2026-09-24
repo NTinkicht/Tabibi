@@ -24,6 +24,9 @@ test('guest booking next steps are clear in French without private data', async 
   await expect(
     french.getByRole('link', { name: 'Revoir la préparation' }),
   ).toHaveAttribute('href', '/guest/booking-help');
+  await expect(
+    french.getByRole('link', { name: 'Préparer votre arrivée à la clinique' }),
+  ).toHaveAttribute('href', '/guest/queue-arrival-help');
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   expect(await page.locator('body').innerText()).not.toContain(
     PRIVATE_SENTINEL,
@@ -52,6 +55,9 @@ test('guest booking next steps are equivalent in Arabic RTL', async ({
   await expect(
     arabic.getByRole('link', { name: 'مراجعة التحضير' }),
   ).toHaveAttribute('href', '/guest/booking-help');
+  await expect(
+    arabic.getByRole('link', { name: 'استعد للوصول إلى العيادة' }),
+  ).toHaveAttribute('href', '/guest/queue-arrival-help');
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   expect(await page.locator('body').innerText()).not.toContain(
     PRIVATE_SENTINEL,
