@@ -323,7 +323,7 @@ def selftest():
     sealed = proof_reader()
     saved_api = globals()["api"]
     try:
-        def exercise(verdicts):
+        def exercise(verdicts, spoof_bot=False):
             dispatches = {}
             runs = {}
             comments = []
@@ -350,6 +350,13 @@ def selftest():
                     .replace("dispatch-comment:44", f"dispatch-comment:{identifier}"),
                 ))
 
+            if spoof_bot:
+                comments.append(dict(
+                    comment, id=99_999,
+                    body=comment["body"].replace(
+                        "dispatch-comment:44", "dispatch-comment:999999999"
+                    ),
+                ))
             def mocked_api(route):
                 if route.endswith("/pulls/7"):
                     return {
@@ -403,6 +410,7 @@ def selftest():
 
         assert exercise(["PASS"]) == sha
         assert exercise(["PASS", "PASS"]) == sha
+        assert exercise(["PASS"], spoof_bot=True) == sha
         assert exercise(["PASS", "CHANGES_REQUIRED"]) is None
         assert exercise(["PASS", "PASS_WITH_MINOR_FINDINGS"]) is None
         assert exercise(["CHANGES_REQUIRED"]) is None
