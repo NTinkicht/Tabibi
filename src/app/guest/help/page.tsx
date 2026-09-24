@@ -5,6 +5,11 @@ export default function GuestHelpHubPage() {
     <main className="pageShell" data-testid="guest-help-hub">
       <section lang="fr" dir="ltr" aria-labelledby="guest-help-fr">
         <h1 id="guest-help-fr">Aide pour votre parcours invité</h1>
+        <p role="note" data-testid="guest-help-safety-fr">
+          Cette aide concerne le parcours de réservation et de file d’attente.
+          En cas d’urgence médicale, contactez immédiatement les services
+          d’urgence locaux ; n’attendez pas une mise à jour de la file.
+        </p>
         <h2>Avant la réservation</h2>
         <ul>
           <li>
@@ -46,6 +51,11 @@ export default function GuestHelpHubPage() {
 
       <section lang="ar" dir="rtl" aria-labelledby="guest-help-ar">
         <h1 id="guest-help-ar">مساعدة خلال رحلة الحجز كضيف</h1>
+        <p role="note" data-testid="guest-help-safety-ar">
+          هذه المساعدة مخصصة لمسار الحجز وقائمة الانتظار. في حالة الطوارئ
+          الطبية، اتصل بخدمات الطوارئ المحلية فورًا ولا تنتظر تحديث قائمة
+          الانتظار.
+        </p>
         <h2>قبل الحجز</h2>
         <ul>
           <li>

@@ -43,6 +43,24 @@ test('guest help hub groups French and Arabic guidance by journey phase', async 
   await expect(
     arabic.locator('a[href="/guest/eta-explained?lang=ar"]'),
   ).toHaveCount(1);
+  await expect(page.getByTestId('guest-help-safety-fr')).toContainText(
+    'urgence médicale',
+  );
+  await expect(page.getByTestId('guest-help-safety-fr')).toContainText(
+    'services d’urgence locaux',
+  );
+  await expect(page.getByTestId('guest-help-safety-fr')).toContainText(
+    'n’attendez pas une mise à jour de la file',
+  );
+  await expect(page.getByTestId('guest-help-safety-ar')).toContainText(
+    'الطوارئ الطبية',
+  );
+  await expect(page.getByTestId('guest-help-safety-ar')).toContainText(
+    'خدمات الطوارئ المحلية',
+  );
+  await expect(page.getByTestId('guest-help-safety-ar')).toContainText(
+    'لا تنتظر تحديث قائمة الانتظار',
+  );
   expect(page.url()).not.toContain('private-guest-bearer-secret');
   await expect(page.locator('body')).not.toContainText(
     'private-guest-bearer-secret',
