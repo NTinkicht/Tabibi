@@ -51,6 +51,10 @@ describe('Mistral review publisher isolation', () => {
     const out = workflow.jobs['publish-review'];
     const report = model.steps.find((s) => s.name === 'Post Mistral result');
     expect(report?.run).toContain('gh issue comment 11');
+    expect(report?.run).toContain('source_report_id=');
+    expect(out.steps[1]?.env?.SOURCE_REPORT_ID).toContain(
+      'needs.mistral-vibe.outputs.source_report_id',
+    );
     expect(report?.run).not.toContain('gh issue comment "$REVIEW_PR"');
     expect(out.steps).toHaveLength(2);
     const checkout = out.steps[0];
@@ -67,4 +71,23 @@ describe('Mistral review publisher isolation', () => {
     expect(commands).not.toContain('npm ');
     expect(commands).not.toContain('gh pr merge');
   });
+  it('never loads PR-controlled hooks or agent instructions with model credentials', () => {
+    const model = workflow.jobs['mistral-vibe'];
+    const stage = model.steps.find(
+      (s) => s.name === 'Stage only verified diff as data outside PR checkout',
+    );
+    const execute = model.steps.find(
+      (s) => s.name === 'Run Mistral Vibe in bounded read-only programmatic mode',
+    );
+    expect(stage?.run).toContain('/tmp/tabibi-mistral-clean-review');
+    expect(stage?.run).toContain('stat.S_ISREG');
+    expect(stage?.run).toContain('os.chmod');
+    expect(execute?.run).toContain('--workdir "$VIBE_SAFE_WORKDIR"');
+    expect(execute?.run).not.toContain('              --trust');
+    expect(execute?.run).not.toContain('Consult VIBE.md');
+    expect(execute?.run).toContain('Inspect ONLY staged .tabibi_mistral_review.diff');
+    expect(execute?.run).not.toContain('--enabled-tools bash');
+    expect(execute?.run).not.toContain('--enabled-tools write_file');
+  });
+
 });
