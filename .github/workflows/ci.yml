@@ -41,7 +41,12 @@ jobs:
         run: npm ci
 
       - name: Formatting
-        run: npm run format
+        run: |
+          npm run format || {
+            npx prettier --write src/app/guest/notification-help/page.tsx tests/e2e/guest-notification-help.spec.ts
+            git diff -- src/app/guest/notification-help/page.tsx tests/e2e/guest-notification-help.spec.ts
+            exit 1
+          }
 
       - name: Lint
         run: npm run lint
