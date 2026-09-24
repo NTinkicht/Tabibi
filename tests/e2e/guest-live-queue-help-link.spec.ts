@@ -51,7 +51,7 @@ test('guest live queue displays FR help hub link without bearer token', async ({
 
   const helpLink = page.getByTestId('guest-live-queue-help-link');
   await expect(helpLink).toBeVisible();
-  await expect(helpLink).toHaveText('Voir toutes les rubriques d\'aide');
+  await expect(helpLink).toHaveText("Voir toutes les rubriques d'aide");
   await expect(helpLink).toHaveAttribute('href', '/guest/help');
 
   expect(await page.locator('body').innerText()).not.toContain(BEARER);

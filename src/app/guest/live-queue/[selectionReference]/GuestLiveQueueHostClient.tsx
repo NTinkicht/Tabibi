@@ -224,7 +224,7 @@ const COPY: Record<SupportedLocale, Copy> = {
         : `Temps restant estimé : environ ${minutes} min`,
     estimateExplainerLink: 'Pourquoi ces estimations changent',
     estimateExplainerNewTab: 's’ouvre dans un nouvel onglet',
-    helpHubLink: 'Voir toutes les rubriques d'aide',
+    helpHubLink: `Voir toutes les rubriques d'aide`,
     bookingStates: {
       confirmed: 'confirmée',
       checked_in: 'enregistré',
@@ -324,7 +324,7 @@ const COPY: Record<SupportedLocale, Copy> = {
       `الوقت المتبقي المقدر: حوالي ${arabicMinuteCount(minutes)}`,
     estimateExplainerLink: 'لماذا تتغير هذه التقديرات',
     estimateExplainerNewTab: 'يُفتح في علامة تبويب جديدة',
-    helpHubLink: 'عرض جميع مواضيع المساعدة',
+    helpHubLink: `عرض جميع مواضيع المساعدة`,
     bookingStates: {
       confirmed: 'مؤكدة',
       checked_in: 'تم تسجيل الوصول',
