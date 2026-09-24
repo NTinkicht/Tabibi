@@ -40,9 +40,9 @@ test('root discovery displays public clinic and doctor names only', async ({
   await expect(
     page.getByRole('heading', { name: 'Clinique Étoile' }),
   ).toBeVisible();
-  await expect(page.getByRole('status')).toContainText(
-    'Répertoire actualisé : 1 clinique.',
-  );
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Répertoire actualisé' }),
+  ).toContainText('Répertoire actualisé : 1 clinique.');
   await expect(page.getByText('Dr. Amine')).toBeVisible();
   await expect(page.getByText('Français · العربية')).toBeVisible();
   const body = await page.locator('main').innerText();
@@ -173,9 +173,9 @@ test('Arabic directory uses RTL on a mobile viewport', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: 'عيادة الأمل' }),
   ).toBeVisible();
-  await expect(page.getByRole('status')).toContainText(
-    'تم تحديث الدليل: 1 عيادة.',
-  );
+  await expect(
+    page.getByRole('status').filter({ hasText: 'تم تحديث الدليل' }),
+  ).toContainText('تم تحديث الدليل: 1 عيادة.');
   await expect(page.getByText('د. مريم')).toBeVisible();
   await expect(
     page.getByRole('link', { name: 'عرض مساعدة الضيوف' }),
