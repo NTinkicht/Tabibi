@@ -7,10 +7,12 @@ export default function GuestNotificationHelpPage() {
         <h1 id="notification-help-fr">Comprendre les notifications Tabibi</h1>
         <ul>
           <li>
-            Les horaires et temps d’attente restent estimatifs et peuvent changer.
+            Les horaires et temps d’attente restent estimatifs et peuvent
+            changer.
           </li>
           <li>
-            Une notification de tour vous invite à suivre les instructions de la clinique.
+            Une notification de tour vous invite à suivre les instructions de
+            la clinique.
           </li>
           <li>
             En cas de doute, vérifiez votre statut dans Tabibi plutôt que de
