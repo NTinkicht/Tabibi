@@ -30,7 +30,7 @@ const workflow = yaml.load(
   };
 };
 
-describe('Mistral review report publication uses a separate privilege boundary', () => {
+describe('Mistral PR publisher privilege isolation', () => {
   it('keeps PR-write permission out of the model invocation', () => {
     const model = workflow.jobs['mistral-vibe'];
     const publisher = workflow.jobs['publish-review'];
@@ -44,7 +44,7 @@ describe('Mistral review report publication uses a separate privilege boundary',
     expect(publisher.if).toContain('BINDING_EXACT_HEAD_REVIEW');
   });
 
-  it('publishes only from trusted main without model keys or PR checkout', () => {
+  it('uses trusted main without model keys or PR checkout', () => {
     const model = workflow.jobs['mistral-vibe'];
     const publisher = workflow.jobs['publish-review'];
     const report = model.steps.find(
@@ -61,7 +61,9 @@ describe('Mistral review report publication uses a separate privilege boundary',
       step.run?.includes('publish-mistral-review.py'),
     );
     expect(publish?.env?.GH_TOKEN).toContain('secrets.GITHUB_TOKEN');
-    expect(publisher.steps.some((step) => step.env?.MISTRAL_API_KEY)).toBe(false);
+    expect(
+      publisher.steps.some((step) => step.env?.MISTRAL_API_KEY),
+    ).toBe(false);
     expect(
       publisher.steps.some(
         (step) =>
