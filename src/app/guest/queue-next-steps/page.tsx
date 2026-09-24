@@ -22,6 +22,10 @@ export default function GuestQueueNextStepsPage() {
             de créer une nouvelle réservation.
           </li>
         </ol>
+        <div role="note" data-testid="waiting-emergency-fr">
+          En cas d’urgence médicale, contactez immédiatement les services
+          d’urgence locaux ; n’attendez pas une mise à jour de la file.
+        </div>
         <Link href="/guest/queue-arrival-help">
           Voir les consignes d’arrivée
         </Link>
@@ -47,6 +51,10 @@ export default function GuestQueueNextStepsPage() {
           <li>عندما يقترب دورك، اتبع تعليمات العيادة.</li>
           <li>إذا انقطع اتصالك، حدّث حالة الحجز بدلاً من إنشاء حجز جديد.</li>
         </ol>
+        <div role="note" data-testid="waiting-emergency-ar">
+          في حالة الطوارئ الطبية، اتصل بخدمات الطوارئ المحلية فورًا ولا تنتظر
+          تحديث قائمة الانتظار.
+        </div>
         <Link href="/guest/queue-arrival-help">عرض تعليمات الوصول</Link>
         <div>
           <Link href="/guest/eta-explained?lang=ar">
