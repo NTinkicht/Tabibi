@@ -26,6 +26,11 @@ export default function GuestQueueNextStepsPage() {
             Comprendre l’estimation du temps d’attente
           </Link>
         </div>
+        <div>
+          <Link href="/guest/notification-help">
+            Comprendre les notifications de tour
+          </Link>
+        </div>
       </section>
       <section lang="ar" dir="rtl" aria-labelledby="queue-next-ar">
         <h1 id="queue-next-ar">ماذا تفعل أثناء الانتظار</h1>
@@ -39,6 +44,9 @@ export default function GuestQueueNextStepsPage() {
           <Link href="/guest/eta-explained?lang=ar">
             فهم تقدير وقت الانتظار
           </Link>
+        </div>
+        <div>
+          <Link href="/guest/notification-help">فهم إشعارات حلول الدور</Link>
         </div>
       </section>
     </main>

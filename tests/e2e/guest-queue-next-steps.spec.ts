@@ -31,6 +31,12 @@ test('queue next steps are bilingual, RTL-aware and link to safe guidance', asyn
   await expect(
     arabic.getByRole('link', { name: 'فهم تقدير وقت الانتظار' }),
   ).toHaveAttribute('href', '/guest/eta-explained?lang=ar');
+  await expect(
+    french.getByRole('link', { name: 'Comprendre les notifications de tour' }),
+  ).toHaveAttribute('href', '/guest/notification-help');
+  await expect(
+    arabic.getByRole('link', { name: 'فهم إشعارات حلول الدور' }),
+  ).toHaveAttribute('href', '/guest/notification-help');
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   expect(await page.locator('body').innerText()).not.toContain(
     PRIVATE_SENTINEL,
