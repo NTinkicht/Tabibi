@@ -157,7 +157,8 @@ describe('AI capacity policy', () => {
           'https://console.mistral.ai/api/vibe/whoami',
           'VIBE_HOME: /tmp/tabibi-vibe-home',
           'enable_telemetry = false',
-          "text.replace(secret, '[REDACTED]')",
+          "['redact_public_text']",
+          'env -u GITHUB_TOKEN -u GH_TOKEN',
         ],
       },
     ];
@@ -209,7 +210,8 @@ describe('AI capacity policy', () => {
     expect(content).not.toContain('--auto-approve');
     expect(content).not.toContain('--yolo');
     expect(content).toContain('--workdir "$VIBE_SAFE_WORKDIR"');
-    expect(content).toContain("text.replace(secret, '[REDACTED]')");
+    expect(content).toContain("['redact_public_text']");
+    expect(content).toContain('env -u GITHUB_TOKEN -u GH_TOKEN');
     expect(content).toContain(
       'PAYG remains disabled and no paid fallback was attempted',
     );
