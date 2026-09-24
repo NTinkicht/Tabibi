@@ -258,13 +258,13 @@ def main():
                 if route.endswith("/commits?per_page=100&page=1"):
                     return [{
                         "sha": f"{index + 1:040x}",
-                        "commit": {"message": "feat: demo\\n\\nMaterial-Author: chatgpt"},
+                        "commit": {"message": "feat: demo\n\nMaterial-Author: chatgpt"},
                         "author": {"login": "NTinkicht"},
                     } for index in range(100)]
                 if route.endswith("/commits?per_page=100&page=2"):
                     return [{
                         "sha": "a" * 40,
-                        "commit": {"message": "feat: final\\n\\nMaterial-Author: chatgpt"},
+                        "commit": {"message": "feat: final\n\nMaterial-Author: chatgpt"},
                         "author": {"login": "NTinkicht"},
                     }]
                 raise ValueError("Unexpected page")
