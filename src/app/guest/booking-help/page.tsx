@@ -47,7 +47,9 @@ export default function GuestBookingHelpPage() {
         <p>صفحة المساعدة هذه لا تطلب أي دفع أو كلمة مرور أو مستند طبي.</p>
         <Link href="/guest/booking-next-steps">الانتقال إلى خطوات الحجز</Link>
         <div>
-          <Link href="/guest/booking-contact-help">فهم بيانات التواصل المطلوبة</Link>
+          <Link href="/guest/booking-contact-help">
+            فهم بيانات التواصل المطلوبة
+          </Link>
         </div>
       </section>
     </main>
