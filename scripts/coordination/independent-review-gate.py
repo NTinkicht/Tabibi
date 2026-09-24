@@ -261,9 +261,33 @@ def selftest():
             "<!-- tabibi-mistral-review-run:18 dispatch-comment:44 -->"
         ),
     }
-    proof = proof_reader().proof_for(
+    sealed = proof_reader()
+    saved_reader = globals()["proof_reader"]
+    original_api_raw = sealed.api_raw
+    # The sealed document is the Issue #11 report (id 900+); the PR-side copy
+    # is a DIFFERENT comment (id 123+) with an identical body. A genuine
+    # provider-run PASS must stay eligible although the ids never match.
+    sealed_reports = {}
+    def sealed_api_raw(route):
+        prefix = f"repos/{REPO}/issues/comments/"
+        if route.startswith(prefix):
+            key = route[len(prefix):]
+            if key in sealed_reports:
+                return json.dumps(sealed_reports[key]).encode()
+        raise ValueError("Sealed Issue #11 report unavailable")
+
+    sealed.api_raw = sealed_api_raw
+    globals()["proof_reader"] = lambda: sealed
+    sealed_reports["900"] = {
+        "id": 900, "user": {"login": "github-actions[bot]"},
+        "issue_url": f"https://api.github.com/repos/{REPO}/issues/11",
+        "created_at": "2026-09-24T10:02:00Z",
+        "updated_at": "2026-09-24T10:02:00Z",
+        "body": comment["body"],
+    }
+    proof = sealed.proof_for(
         comment["body"], run_id=18, dispatch_id=44, pr=7, sha=sha,
-        report_id=123,
+        report_id=900,
     )
     comment["id"] = 123
     assert verified_bot_review(comment, 7, sha, {"chatgpt"}, dispatch, run, proof) == "PASS"
@@ -320,7 +344,6 @@ def selftest():
                              lambda _: jobs, sha)
     # Whole-gate regression: a red review must block even after a PASS;
     # repeated PASS reviews must not accidentally block clean current head.
-    sealed = proof_reader()
     saved_api = globals()["api"]
     try:
         def exercise(verdicts, spoof_bot=False):
@@ -349,6 +372,16 @@ def selftest():
                     .replace("review-run:18", f"review-run:{run_id}")
                     .replace("dispatch-comment:44", f"dispatch-comment:{identifier}"),
                 ))
+                # Sealed Issue #11 report id (900+) differs from the PR copy
+                # id (123+); only the body is shared.
+                sealed_reports[str(900 + index)] = {
+                    "id": 900 + index,
+                    "user": {"login": "github-actions[bot]"},
+                    "issue_url": f"https://api.github.com/repos/{REPO}/issues/11",
+                    "created_at": f"2026-09-24T{hour:02d}:02:00Z",
+                    "updated_at": f"2026-09-24T{hour:02d}:02:00Z",
+                    "body": comments[-1]["body"],
+                }
 
             if spoof_bot:
                 comments.append(dict(
@@ -398,7 +431,7 @@ def selftest():
                     return sealed.proof_for(
                         comments[index]["body"], run_id=run_id,
                         dispatch_id=44 + index, pr=7, sha=sha,
-                        report_id=123 + index,
+                        report_id=900 + index,
                     )
             globals()["proof_reader"] = lambda: FakeProof
             try:
@@ -416,6 +449,8 @@ def selftest():
         assert exercise(["CHANGES_REQUIRED"]) is None
     finally:
         globals()["api"] = saved_api
+        globals()["proof_reader"] = saved_reader
+        sealed.api_raw = original_api_raw
     print("Independent review gate pilot selftest passed")
 
 

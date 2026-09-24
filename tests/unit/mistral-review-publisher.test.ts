@@ -85,6 +85,7 @@ describe('Mistral review publisher isolation', () => {
     expect(stage?.run).toContain('stat.S_ISREG');
     expect(stage?.run).toContain('os.chmod');
     expect(execute?.run).toContain('--workdir "$VIBE_SAFE_WORKDIR"');
+    expect(execute?.run).toContain('cd "$VIBE_SAFE_WORKDIR"');
     expect(execute?.run).not.toContain('              --trust');
     expect(execute?.run).not.toContain('Consult VIBE.md');
     expect(execute?.run).toContain(

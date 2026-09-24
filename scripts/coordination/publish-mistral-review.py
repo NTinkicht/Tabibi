@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 
 REPO = "NTinkicht/Tabibi"
 MARKER = re.compile(
@@ -164,6 +165,150 @@ def publish():
     print(f"CURRENT_RUN_REVIEW_PUBLISHED PR #{number} SHA {sha}")
 
 
+def publish_copy_path_selftest():
+    """publish() must copy the sealed Issue #11 report byte-identically.
+
+    The sealed document is the Issue #11 comment the run artifact points at
+    (id 777). The PR-side copy gets a NEW comment id (888); publication stays
+    valid only while the posted body is identical to the sealed document.
+    """
+    sha = "a" * 40
+    dispatch_body = (
+        "@mistral-vibe\nBINDING_EXACT_HEAD_REVIEW\n"
+        f"review_pr: 487\nreview_sha: {sha}\nmaterial_authors: chatgpt"
+    )
+    review_body = (
+        "**mistral-vibe unattended wake**\n\n"
+        f"Target PR #487 exact_sha={sha}; parent verified 3/3 CI green.\n"
+        f"sha {sha}\nVERDICT: PASS\n"
+        "<!-- tabibi-mistral-review-run:123 dispatch-comment:456 -->"
+    )
+    sealed_source = {
+        "id": 777,
+        "user": {"login": "github-actions[bot]"},
+        "issue_url": f"https://api.github.com/repos/{REPO}/issues/11",
+        "created_at": "2026-09-24T10:02:00Z",
+        "updated_at": "2026-09-24T10:02:00Z",
+        "body": review_body,
+    }
+    pr_comments = []
+    real_target = parent()
+    proof_mod = proof_reader()
+    proof = proof_mod.proof_for(
+        review_body, run_id=123, dispatch_id=456, pr=487, sha=sha,
+        report_id=777,
+    )
+
+    class FakeTarget:
+        @staticmethod
+        def parse(body):
+            return real_target.parse(body)
+
+        @staticmethod
+        def read_current_pr(repo, number, exact_sha):
+            return {
+                "state": "open",
+                "head": {"sha": exact_sha, "repo": {"full_name": repo}},
+                "base": {"ref": "main", "repo": {"full_name": repo}},
+            }
+
+        @staticmethod
+        def verify_provenance(repo, number, exact_sha, actors):
+            return True
+
+        @staticmethod
+        def ci_green(repo, exact_sha):
+            return True
+
+    class FakeProof:
+        @staticmethod
+        def read_run_proof(run_id):
+            return proof
+
+        @staticmethod
+        def matches(p, c, *, run_id, dispatch_id, pr, sha):
+            return proof_mod.matches(p, c, run_id=run_id,
+                                     dispatch_id=dispatch_id, pr=pr, sha=sha)
+
+    def fake_api(route, *, body=None):
+        if route == f"repos/{REPO}/issues/comments/777":
+            return sealed_source
+        if route == f"repos/{REPO}/issues/487/comments?per_page=100&page=1":
+            return pr_comments
+        if route == f"repos/{REPO}/issues/487/comments":
+            assert body is not None and body.get("body") == review_body
+            copy = {"id": 888, "user": {"login": "github-actions[bot]"},
+                    "body": body["body"]}
+            pr_comments.append(copy)
+            return copy
+        raise ValueError("Unexpected publisher API route")
+
+    event = {
+        "action": "created",
+        "issue": {"number": 11},
+        "comment": {
+            "id": 456, "user": {"login": "NTinkicht"},
+            "created_at": "2026-09-24T10:00:00Z",
+            "updated_at": "2026-09-24T10:00:00Z",
+            "body": dispatch_body,
+        },
+    }
+    saved_globals = {name: globals()[name] for name in ("api", "parent", "proof_reader")}
+    saved_api_raw = proof_mod.api_raw
+    saved_env = {key: os.environ.get(key) for key in (
+        "GITHUB_REPOSITORY", "GITHUB_RUN_ID", "SOURCE_REPORT_ID", "GITHUB_EVENT_PATH",
+    )}
+    event_path = None
+    try:
+        def proof_api_raw(route):
+            if route == f"repos/{REPO}/issues/comments/777":
+                return json.dumps(sealed_source).encode()
+            raise ValueError("Sealed report unavailable")
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as stream:
+            json.dump(event, stream)
+            event_path = stream.name
+        proof_mod.api_raw = proof_api_raw
+        os.environ.update({
+            "GITHUB_REPOSITORY": REPO,
+            "GITHUB_RUN_ID": "123",
+            "SOURCE_REPORT_ID": "777",
+            "GITHUB_EVENT_PATH": event_path,
+        })
+        globals()["api"] = fake_api
+        globals()["parent"] = lambda: FakeTarget
+        globals()["proof_reader"] = lambda: FakeProof
+
+        publish()
+        assert pr_comments == [{
+            "id": 888, "user": {"login": "github-actions[bot]"}, "body": review_body,
+        }], pr_comments
+        # The identical bot copy is already on the PR: no second post.
+        publish()
+        assert pr_comments == [{
+            "id": 888, "user": {"login": "github-actions[bot]"}, "body": review_body,
+        }], pr_comments
+        # An edited sealed report must fail closed before any copy is posted.
+        sealed_source["updated_at"] = "2026-09-24T10:30:00Z"
+        try:
+            publish()
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Edited sealed report was published")
+        sealed_source["updated_at"] = "2026-09-24T10:02:00Z"
+    finally:
+        globals().update(saved_globals)
+        proof_mod.api_raw = saved_api_raw
+        for key, value in saved_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        if event_path is not None:
+            os.unlink(event_path)
+
+
 def selftest():
     sha = "a" * 40
     result = {
@@ -186,6 +331,7 @@ def selftest():
         dict(result, body=result["body"] + "\nghp_" + "a" * 18),
     ):
         assert not trusted_report(broken, **args)
+    publish_copy_path_selftest()
     print("Separated Mistral PR publisher negative-path selftest passed")
 
 

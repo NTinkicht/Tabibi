@@ -130,21 +130,52 @@ def read_run_proof(run_id):
     return proof
 
 
+def sealed_report(proof):
+    """Authenticate the sealed Issue #11 report this run's artifact points at.
+
+    The artifact's report_id is the only pointer to the sealed document. The
+    PR-side copy published later is a DIFFERENT comment whose id can never
+    equal the sealed Issue #11 report id, so the copy itself is never the
+    sealed document.
+    """
+    report_id = str((proof or {}).get("report_id") or "")
+    if not report_id.isascii() or not report_id.isdigit():
+        raise ValueError("Sealed report identity missing")
+    source = json.loads(api_raw(f"repos/{REPO}/issues/comments/{report_id}"))
+    if (
+        not isinstance(source, dict)
+        or str(source.get("id") or "") != report_id
+        or not (source.get("issue_url") or "").endswith("/issues/11")
+        or source.get("updated_at", source.get("created_at")) != source.get("created_at")
+        or source.get("user", {}).get("login") != "github-actions[bot]"
+        or digest(source.get("body") or "") != str((proof or {}).get("body_sha256") or "")
+    ):
+        raise ValueError("Sealed report does not authenticate against run proof")
+    return source
+
+
 def matches(proof, comment, *, run_id, dispatch_id, pr, sha):
+    """Accept a PR comment only as an identical-body copy of the sealed report.
+
+    The sealed document is always the Issue #11 comment authenticated via the
+    run-scoped artifact. A PR copy with a different comment id stays eligible
+    only while its body is byte-identical to that sealed document.
+    """
     if not isinstance(proof, dict):
         return False
     try:
+        source = sealed_report(proof)
         expected = proof_for(
-            comment.get("body") or "",
+            source.get("body") or "",
             run_id=run_id,
             dispatch_id=dispatch_id,
             pr=pr,
             sha=sha,
-            report_id=comment.get("id"),
+            report_id=source.get("id"),
         )
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, KeyError, OSError, subprocess.SubprocessError):
         return False
-    return expected == proof
+    return expected == proof and (comment.get("body") or "") == source.get("body")
 
 
 def selftest():
@@ -155,21 +186,19 @@ def selftest():
         f"sha {sha}\nVERDICT: PASS\n"
         "<!-- tabibi-mistral-review-run:18 dispatch-comment:44 -->"
     )
+    # The sealed document is the Issue #11 report; the PR-side copy is a
+    # different comment whose id can never equal the sealed report id.
+    sealed_source = {
+        "id": 900,
+        "user": {"login": "github-actions[bot]"},
+        "issue_url": f"https://api.github.com/repos/{REPO}/issues/11",
+        "created_at": "2026-09-24T10:02:00Z",
+        "updated_at": "2026-09-24T10:02:00Z",
+        "body": body,
+    }
+    pr_copy = {"id": 123, "body": body}
     proof = proof_for(body, run_id=18, dispatch_id=44, pr=7,
-                      sha=sha, report_id=123)
-    comment = {"id": 123, "body": body}
-    assert matches(proof, comment, run_id=18, dispatch_id=44, pr=7, sha=sha)
-    assert not matches(proof, dict(comment, body=body + "edited"), run_id=18,
-                       dispatch_id=44, pr=7, sha=sha)
-    assert not matches(proof, dict(comment, id=124), run_id=18,
-                       dispatch_id=44, pr=7, sha=sha)
-    assert not matches(proof, comment, run_id=19, dispatch_id=44, pr=7, sha=sha)
-    assert not matches(proof, comment, run_id=18, dispatch_id=45, pr=7, sha=sha)
-    assert not matches(proof, comment, run_id=18, dispatch_id=44, pr=8, sha=sha)
-    assert not matches(proof, comment, run_id=18, dispatch_id=44, pr=7, sha="b"*40)
-    assert not matches(proof, dict(comment, body=body.replace(
-        "VERDICT: PASS", "VERDICT: CHANGES_REQUIRED"
-    )), run_id=18, dispatch_id=44, pr=7, sha=sha)
+                      sha=sha, report_id=900)
     # API and ZIP boundary: a user-authored bot comment must not stand in
     # for a GitHub artifact uploaded by this exact reviewer run.
     archive_stream = io.BytesIO()
@@ -179,6 +208,8 @@ def selftest():
     original_api = globals()["api_raw"]
     try:
         def synthetic_api(route):
+            if route == f"repos/{REPO}/issues/comments/900":
+                return json.dumps(sealed_source).encode()
             if "/artifacts?name=" in route:
                 return json.dumps({
                     "artifacts": [{
@@ -190,22 +221,59 @@ def selftest():
                 return archive_bytes
             raise ValueError("Unknown synthetic API path")
         globals()["api_raw"] = synthetic_api
+        assert matches(proof, pr_copy, run_id=18, dispatch_id=44, pr=7, sha=sha)
+        # Any other PR copy id is still eligible: only the body must be an
+        # identical copy of the sealed Issue #11 document.
+        assert matches(proof, dict(pr_copy, id=124), run_id=18,
+                       dispatch_id=44, pr=7, sha=sha)
+        assert not matches(proof, dict(pr_copy, body=body + "edited"),
+                           run_id=18, dispatch_id=44, pr=7, sha=sha)
+        assert not matches(proof, dict(pr_copy, body=body.replace(
+            "VERDICT: PASS", "VERDICT: CHANGES_REQUIRED"
+        )), run_id=18, dispatch_id=44, pr=7, sha=sha)
+        assert not matches(proof, pr_copy, run_id=19, dispatch_id=44, pr=7, sha=sha)
+        assert not matches(proof, pr_copy, run_id=18, dispatch_id=45, pr=7, sha=sha)
+        assert not matches(proof, pr_copy, run_id=18, dispatch_id=44, pr=8, sha=sha)
+        assert not matches(proof, pr_copy, run_id=18, dispatch_id=44, pr=7,
+                           sha="b" * 40)
+        assert not matches(dict(proof, body_sha256="0" * 64), pr_copy,
+                           run_id=18, dispatch_id=44, pr=7, sha=sha)
+        # The sealed Issue #11 document itself must stay authentic.
+        for forged in (
+            dict(sealed_source, updated_at="2026-09-24T10:30:00Z"),
+            dict(sealed_source, issue_url=f"https://api.github.com/repos/{REPO}/issues/99"),
+            dict(sealed_source, id=901),
+            dict(sealed_source, user={"login": "NTinkicht"}),
+            dict(sealed_source, body=body + "edited"),
+        ):
+            def forged_api(route, forged=forged):
+                if route == f"repos/{REPO}/issues/comments/900":
+                    return json.dumps(forged).encode()
+                raise ValueError("Unknown synthetic API path")
+            globals()["api_raw"] = forged_api
+            assert not matches(proof, pr_copy, run_id=18, dispatch_id=44,
+                               pr=7, sha=sha), forged
+        def absent_api(route):
+            raise ValueError("Sealed report unavailable")
+        globals()["api_raw"] = absent_api
+        assert not matches(proof, pr_copy, run_id=18, dispatch_id=44, pr=7, sha=sha)
+        globals()["api_raw"] = synthetic_api
         assert read_run_proof(18) == proof
-        assert matches(read_run_proof(18), comment,
+        assert matches(read_run_proof(18), pr_copy,
                        run_id=18, dispatch_id=44, pr=7, sha=sha)
-        assert not matches(dict(read_run_proof(18), body_sha256="0"*64),
-                           comment, run_id=18, dispatch_id=44, pr=7, sha=sha)
         try:
             read_run_proof(19)
         except ValueError:
             pass
         else:
             raise AssertionError("Wrong run accepted an unrelated artifact")
-        def absent_api(route):
+        def missing_artifact_api(route):
+            if route == f"repos/{REPO}/issues/comments/900":
+                return json.dumps(sealed_source).encode()
             if "/artifacts?name=" in route:
                 return b'{"artifacts":[]}'
             raise ValueError("Artifact unavailable")
-        globals()["api_raw"] = absent_api
+        globals()["api_raw"] = missing_artifact_api
         try:
             read_run_proof(18)
         except ValueError:

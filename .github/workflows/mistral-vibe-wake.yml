@@ -217,6 +217,10 @@ jobs:
           # Vibe must not load PR-controlled .vibe/hooks.toml, project skills,
           # AGENTS.md or nested agents into an environment with provider auth.
           # Reviewer gets only the checked, staged diff and read-only tools.
+          # The plan agent auto-approves reads inside the process CWD, so the
+          # process must LEAVE the untrusted PR checkout: CWD and --workdir
+          # are BOTH the staged-diff directory before vibe starts.
+          cd "$VIBE_SAFE_WORKDIR"
           set +e
           timeout --signal=TERM --kill-after=15s 600s \
             vibe \
