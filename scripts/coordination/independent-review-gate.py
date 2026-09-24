@@ -260,10 +260,10 @@ def selftest():
         dict(comment, user={"login": "NTinkicht"}), 7, sha,
         {"chatgpt"}, dispatch, run, proof
     )
-    assert verified_bot_review(
+    assert not verified_bot_review(
         dict(comment, body=comment["body"].replace("VERDICT: PASS", "VERDICT: CHANGES_REQUIRED")),
-        7, sha, {"chatgpt"}, dispatch, run, proof
-    ) == "CHANGES_REQUIRED"
+        7, sha, {"chatgpt"}, dispatch, run, proof,
+    )  # An unsealed edit to a PASS must fail even if syntactically valid.
     assert not verified_bot_review(comment, 7, sha, {"chatgpt"},
                                    dispatch, dict(run, conclusion="failure"), proof)
     assert not verified_bot_review(comment, 7, sha, {"mistral-vibe"},
