@@ -16,6 +16,10 @@ export default function GuestQueueArrivalHelpPage() {
             Revenez depuis votre lien de réservation si votre accès a expiré.
           </li>
         </ul>
+        <div role="note" data-testid="arrival-emergency-fr">
+          En cas d’urgence médicale, contactez immédiatement les services
+          d’urgence locaux ; n’attendez pas votre tour dans la file.
+        </div>
         <Link href="/guest/eta-explained?lang=fr">
           Comprendre le temps d’attente
         </Link>
@@ -34,6 +38,10 @@ export default function GuestQueueArrivalHelpPage() {
           <li>حدّث الحالة إذا انقطع اتصالك.</li>
           <li>عد من رابط الحجز الخاص بك إذا انتهت صلاحية الوصول.</li>
         </ul>
+        <div role="note" data-testid="arrival-emergency-ar">
+          في حالة الطوارئ الطبية، اتصل بخدمات الطوارئ المحلية فورًا ولا تنتظر
+          دورك في قائمة الانتظار.
+        </div>
         <Link href="/guest/eta-explained?lang=ar">فهم وقت الانتظار</Link>
         <div>
           <Link href="/guest/queue-next-steps">مراجعة خطوات الانتظار</Link>
