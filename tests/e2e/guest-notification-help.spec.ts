@@ -7,7 +7,9 @@ test('guest notification help is bilingual and privacy-minimal', async ({
   const french = page.locator('section[lang="fr"]');
   const arabic = page.locator('section[lang="ar"]');
   await expect(
-    french.getByRole('heading', { name: 'Comprendre les notifications Tabibi' }),
+    french.getByRole('heading', {
+      name: 'Comprendre les notifications Tabibi',
+    }),
   ).toBeVisible();
   await expect(arabic).toHaveAttribute('dir', 'rtl');
   await expect(
