@@ -21,6 +21,12 @@ test('guest notification help is bilingual and privacy-minimal', async ({
   await expect(
     arabic.getByRole('link', { name: 'العودة إلى الحالة' }),
   ).toHaveAttribute('href', '/guest/status');
+  await expect(
+    french.getByRole('link', { name: 'Consulter les étapes pendant l’attente' }),
+  ).toHaveAttribute('href', '/guest/queue-next-steps');
+  await expect(
+    arabic.getByRole('link', { name: 'مراجعة خطوات الانتظار' }),
+  ).toHaveAttribute('href', '/guest/queue-next-steps');
   const text = await page.locator('body').innerText();
   expect(text.toLowerCase()).not.toContain('bearer');
   expect(text.toLowerCase()).not.toContain('token');
