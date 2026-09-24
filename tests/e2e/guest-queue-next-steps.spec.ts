@@ -15,8 +15,14 @@ test('queue next steps are bilingual, RTL-aware and link to safe guidance', asyn
   await expect(
     arabic.getByRole('heading', { name: 'ماذا تفعل أثناء الانتظار' }),
   ).toBeVisible();
-  await expect(french.getByRole('listitem')).toHaveCount(3);
-  await expect(arabic.getByRole('listitem')).toHaveCount(3);
+  await expect(french.getByRole('listitem')).toHaveCount(4);
+  await expect(french.getByRole('listitem').nth(3)).toHaveText(
+    'Si la connexion est interrompue, actualisez votre statut plutôt que de créer une nouvelle réservation.',
+  );
+  await expect(arabic.getByRole('listitem')).toHaveCount(4);
+  await expect(arabic.getByRole('listitem').nth(3)).toHaveText(
+    'إذا انقطع اتصالك، حدّث حالة الحجز بدلاً من إنشاء حجز جديد.',
+  );
   await expect(
     french.getByRole('link', { name: 'Voir les consignes d’arrivée' }),
   ).toHaveAttribute('href', '/guest/queue-arrival-help');
