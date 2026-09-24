@@ -65,7 +65,9 @@ def verified_bot_review(comment, number, sha, actors, dispatch, run):
         comment.get("user", {}).get("login") != "github-actions[bot]"
         or len(marker) != 1
         or len(verdict) != 1
-        or verdict[0] != "PASS"
+        or comment.get("updated_at", comment.get("created_at")) != comment.get("created_at")
+        or dispatch.get("updated_at", dispatch.get("created_at")) != dispatch.get("created_at")
+        or not (dispatch.get("issue_url") or "").endswith("/issues/11")
         or body.count("**mistral-vibe unattended wake**") != 1
         or f"Target PR #{number} exact_sha={sha};" not in body
         or body.count(sha) < 2
@@ -86,7 +88,8 @@ def verified_bot_review(comment, number, sha, actors, dispatch, run):
         opened = after(run["created_at"])
         completed = after(run["updated_at"])
         dispatched = after(dispatch["created_at"])
-        return dispatched <= opened <= created <= completed + dt.timedelta(minutes=3)
+        return (dispatched <= opened <= dispatched + dt.timedelta(minutes=2)
+                and opened <= created <= completed + dt.timedelta(minutes=3))
     except (KeyError, ValueError, TypeError):
         return False
 
@@ -152,41 +155,39 @@ def evaluate(number):
         sha,
     ):
         raise ValueError("Current exact-head 3/3 CI not green")
-    comments = api(f"repos/{REPO}/issues/{number}/comments?per_page=100")
-    # A single page limit is fail closed, never silently ignore older findings.
-    if len(comments) >= 100:
-        raise ValueError("PR comments require pagination/reconciliation")
-    dispatches = []
-    for page in range(1, 12):
-        page_comments = api(
-            f"repos/{REPO}/issues/11/comments?per_page=100&page={page}"
-        )
-        if not isinstance(page_comments, list):
-            raise ValueError("Missing trusted dispatch history")
-        dispatches.extend(page_comments)
-        if len(page_comments) < 100:
+    comments = []
+    for page in range(1, 101):
+        batch = api(f"repos/{REPO}/issues/{number}/comments?per_page=100&page={page}")
+        if not isinstance(batch, list):
+            raise ValueError("PR comment history unavailable")
+        comments.extend(batch)
+        if len(batch) < 100:
             break
     else:
-        raise ValueError("Trusted dispatch history exceeds checked bound")
-    eligible_dispatch = {
-        str(d.get("id")): d for d in dispatches
-        if d.get("user", {}).get("login") == "NTinkicht"
-        and single_owner_dispatch(d.get("body") or "", number, sha, actors)
-    }
+        raise ValueError("PR comment history exceeds checked bound")
     eligible = []
     for comment in comments:
-        match = MARKER.findall(comment.get("body") or "")
-        if len(match) != 1 or match[0][1] not in eligible_dispatch:
+        # Public-PR adversaries can write arbitrary markers. Only an actual
+        # github-actions bot comment may trigger a dispatch/run lookup.
+        if comment.get("user", {}).get("login") != "github-actions[bot]":
             continue
-        run = api(f"repos/{REPO}/actions/runs/{match[0][0]}")
-        if verified_bot_review(
-            comment, number, sha, actors, eligible_dispatch[match[0][1]], run
-        ):
-            eligible.append(comment)
-    if len(eligible) != 1:
-        raise ValueError("No unique current-head independently executed PASS")
-    # Red reviewer verdicts and unresolved material findings need reconciliation
-    # beyond this initial pilot; never say this alone enables automatic merging.
+        match = MARKER.findall(comment.get("body") or "")
+        if len(match) != 1:
+            continue
+        run_id, dispatch_id = match[0]
+        dispatch = api(f"repos/{REPO}/issues/comments/{dispatch_id}")
+        if dispatch.get("user", {}).get("login") != "NTinkicht":
+            continue
+        if not single_owner_dispatch(dispatch.get("body") or "", number, sha, actors):
+            continue
+        run = api(f"repos/{REPO}/actions/runs/{run_id}")
+        verdict = verified_bot_review(comment, number, sha, actors, dispatch, run)
+        if verdict is not None:
+            eligible.append(verdict)
+    if "PASS" not in eligible or any(v != "PASS" for v in eligible):
+        raise ValueError("No clean current-head independent PASS or adverse verdict")
+    # Inline reviewer findings require separate reconciliation; even this
+    # verified proof is advisory until the complete merge gate is implemented.
     return sha
 
 
@@ -194,6 +195,7 @@ def selftest():
     sha = "a" * 40
     dispatch = {
         "id": 44, "user": {"login": "NTinkicht"},
+        "issue_url": "https://api.github.com/repos/NTinkicht/Tabibi/issues/11",
         "created_at": "2026-09-24T10:00:00Z",
         "body": ("@mistral-vibe\nBINDING_EXACT_HEAD_REVIEW\n"
                  "review_pr: 7\nreview_sha: " + sha +
