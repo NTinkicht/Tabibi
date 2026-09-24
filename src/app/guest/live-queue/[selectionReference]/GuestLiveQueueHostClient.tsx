@@ -516,18 +516,21 @@ export function GuestLiveQueueHostClient({
     const trimmedPhoneLength = contactPhone.trim().length;
     const trimmedEmailLength = contactEmail.trim().length;
     const noContact = trimmedPhoneLength === 0 && trimmedEmailLength === 0;
+    const phoneRequired =
+      contactValidationAttempted &&
+      (noContact || contactPreference === 'phone') &&
+      trimmedPhoneLength === 0;
+    const emailRequired =
+      contactValidationAttempted &&
+      (noContact || contactPreference === 'email') &&
+      trimmedEmailLength === 0;
     phoneInput.setCustomValidity(
-      (trimmedPhoneLength > 0 && trimmedPhoneLength < 3) ||
-        (contactValidationAttempted &&
-          noContact &&
-          contactPreference !== 'email')
+      (trimmedPhoneLength > 0 && trimmedPhoneLength < 3) || phoneRequired
         ? copy.contactRequirement
         : '',
     );
     emailInput?.setCustomValidity(
-      contactValidationAttempted && noContact && contactPreference === 'email'
-        ? copy.contactRequirement
-        : '',
+      emailRequired ? copy.contactRequirement : '',
     );
   }, [
     contactEmail,
@@ -620,17 +623,23 @@ export function GuestLiveQueueHostClient({
           setContactValidationAttempted(true);
           const phone = contactPhoneInputRef.current;
           const email = contactEmailInputRef.current;
+          const trimmedPhoneLength = contactPhone.trim().length;
+          const trimmedEmailLength = contactEmail.trim().length;
           const noContact =
-            contactPhone.trim().length === 0 &&
-            contactEmail.trim().length === 0;
-          if (contactValidationAttempted && noContact) {
-            if (contactPreference === 'email') {
-              email?.setCustomValidity(copy.contactRequirement);
-            } else {
-              phone?.setCustomValidity(copy.contactRequirement);
-            }
+            trimmedPhoneLength === 0 && trimmedEmailLength === 0;
+          const missingPreferredPhone =
+            contactPreference === 'phone' && trimmedPhoneLength === 0;
+          const missingPreferredEmail =
+            contactPreference === 'email' && trimmedEmailLength === 0;
+          if (noContact || missingPreferredPhone || missingPreferredEmail) {
+            const invalidInput =
+              missingPreferredEmail ||
+              (noContact && contactPreference === 'email')
+                ? email
+                : phone;
+            invalidInput?.setCustomValidity(copy.contactRequirement);
             event.preventDefault();
-            (contactPreference === 'email' ? email : phone)?.reportValidity();
+            invalidInput?.reportValidity();
             return;
           }
           void submitBooking(event);
