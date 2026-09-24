@@ -1325,6 +1325,11 @@ function LiveQueueView({
         <strong>{copy.yourLabel}</strong> {queueLabel}
       </p>
       {content}
+      <p>
+        <a href="/guest/help" data-testid="guest-live-queue-help-link">
+          {copy.helpHubLink}
+        </a>
+      </p>
     </section>
   );
 
@@ -1543,11 +1548,6 @@ function LiveQueueView({
           )}
         </div>
       ) : null}
-      <p>
-        <a href="/guest/help" data-testid="guest-live-queue-help-link">
-          {copy.helpHubLink}
-        </a>
-      </p>
     </>,
   );
 }
