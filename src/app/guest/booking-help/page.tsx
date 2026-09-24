@@ -30,6 +30,9 @@ export default function GuestBookingHelpPage() {
             Comprendre les coordonnées requises
           </Link>
         </div>
+        <div>
+          <Link href="/guest/help">Voir toutes les rubriques d’aide</Link>
+        </div>
       </section>
 
       <section lang="ar" dir="rtl" aria-labelledby="booking-help-ar">
@@ -50,6 +53,9 @@ export default function GuestBookingHelpPage() {
           <Link href="/guest/booking-contact-help">
             فهم بيانات التواصل المطلوبة
           </Link>
+        </div>
+        <div>
+          <Link href="/guest/help">عرض جميع مواضيع المساعدة</Link>
         </div>
       </section>
     </main>
