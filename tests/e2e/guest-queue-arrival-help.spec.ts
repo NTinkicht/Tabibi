@@ -23,6 +23,12 @@ test('queue arrival help gives French clinic-day guidance', async ({
   await expect(
     section.getByRole('link', { name: 'Revoir les étapes pendant l’attente' }),
   ).toHaveAttribute('href', '/guest/queue-next-steps');
+  await expect(page.getByTestId('arrival-emergency-fr')).toContainText(
+    'n’attendez pas votre tour dans la file',
+  );
+  await expect(page.getByTestId('arrival-emergency-ar')).toContainText(
+    'ولا تنتظر دورك في قائمة الانتظار',
+  );
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   await expect(page.locator('body')).not.toContainText(PRIVATE_SENTINEL);
 });
