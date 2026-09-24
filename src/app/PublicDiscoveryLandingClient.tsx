@@ -29,6 +29,7 @@ const copy = {
     intro: 'Trouvez votre clinique',
     description:
       'Découvrez les cliniques et les médecins disponibles sur Tabibi.',
+    guestHelp: 'Consulter l’aide pour les invités',
     directory: 'Cliniques',
     searchLabel: 'Rechercher une clinique ou un médecin',
     searchShortcutHint: 'Appuyez sur / pour accéder à la recherche.',
@@ -90,6 +91,7 @@ const copy = {
   ar: {
     intro: 'ابحث عن عيادتك',
     description: 'تعرّف على العيادات والأطباء المعروضين على طبيبي.',
+    guestHelp: 'عرض مساعدة الضيوف',
     directory: 'العيادات',
     searchLabel: 'ابحث عن عيادة أو طبيب',
     searchShortcutHint: 'اضغط / للانتقال إلى البحث.',
@@ -441,6 +443,9 @@ export default function PublicDiscoveryLandingClient({
         <p className="publicEyebrow">TABIBI</p>
         <h2>{t.intro}</h2>
         <p>{t.description}</p>
+        <p>
+          <a href="/guest/help">{t.guestHelp}</a>
+        </p>
       </section>
 
       <section aria-labelledby="publicDirectoryTitle">
