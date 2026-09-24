@@ -37,6 +37,7 @@ describe('Mistral PR publisher privilege isolation', () => {
     expect(workflow.permissions['pull-requests']).toBe('read');
     expect(model.permissions?.['pull-requests']).toBeUndefined();
     expect(publisher.permissions?.['pull-requests']).toBe('write');
+    expect(publisher.permissions?.issues).toBe('write');
     expect(publisher.permissions?.contents).toBe('read');
     expect(publisher.needs).toBe('mistral-vibe');
     expect(publisher.if).toContain("needs.mistral-vibe.result == 'success'");
