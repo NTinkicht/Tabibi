@@ -119,6 +119,7 @@ type Copy = {
   activeConsultationRemaining: (minutes: number) => string;
   estimateExplainerLink: string;
   estimateExplainerNewTab: string;
+  helpHubLink: string;
 };
 
 // Arabic noun-number agreement for دقيقة (minute): 1/2 take dedicated
@@ -223,6 +224,7 @@ const COPY: Record<SupportedLocale, Copy> = {
         : `Temps restant estimé : environ ${minutes} min`,
     estimateExplainerLink: 'Pourquoi ces estimations changent',
     estimateExplainerNewTab: 's’ouvre dans un nouvel onglet',
+    helpHubLink: `Voir toutes les rubriques d'aide`,
     bookingStates: {
       confirmed: 'confirmée',
       checked_in: 'enregistré',
@@ -322,6 +324,7 @@ const COPY: Record<SupportedLocale, Copy> = {
       `الوقت المتبقي المقدر: حوالي ${arabicMinuteCount(minutes)}`,
     estimateExplainerLink: 'لماذا تتغير هذه التقديرات',
     estimateExplainerNewTab: 'يُفتح في علامة تبويب جديدة',
+    helpHubLink: `عرض جميع مواضيع المساعدة`,
     bookingStates: {
       confirmed: 'مؤكدة',
       checked_in: 'تم تسجيل الوصول',
@@ -1322,6 +1325,20 @@ function LiveQueueView({
         <strong>{copy.yourLabel}</strong> {queueLabel}
       </p>
       {content}
+      <p>
+        <a
+          href="/guest/help"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-describedby="tabibi-guest-help-new-tab-hint"
+          data-testid="guest-live-queue-help-link"
+        >
+          {copy.helpHubLink}
+        </a>{' '}
+        <small id="tabibi-guest-help-new-tab-hint">
+          ({copy.estimateExplainerNewTab})
+        </small>
+      </p>
     </section>
   );
 
