@@ -65,8 +65,6 @@ const copy = {
       `${count} médecin${count === 1 ? '' : 's'} affiché${count === 1 ? '' : 's'} au total dans les résultats.`,
     visibleClinicTotal: (visible: number, total: number) =>
       `Cliniques correspondantes : ${visible} sur ${total} clinique${total === 1 ? '' : 's'} du répertoire.`,
-    spokenResultSummary: (shown: number, matching: number) =>
-      `Cliniques correspondantes : ${matching}. Cliniques actuellement affichées : ${shown}.`,
     resultRange: (shown: number, matching: number) =>
       shown === 0
         ? `Aucun résultat parmi ${matching} clinique${matching === 1 ? '' : 's'} correspondante${matching === 1 ? '' : 's'}.`
@@ -127,8 +125,6 @@ const copy = {
       `إجمالي الأطباء المعروضين في النتائج: ${count}.`,
     visibleClinicTotal: (visible: number, total: number) =>
       `العيادات المطابقة: ${visible} من ${total}.`,
-    spokenResultSummary: (shown: number, matching: number) =>
-      `العيادات المطابقة: ${matching}. العيادات المعروضة حاليًا: ${shown}.`,
     resultRange: (shown: number, matching: number) =>
       shown === 0
         ? `لا توجد نتائج معروضة من أصل ${matching} عيادة مطابقة.`
@@ -673,10 +669,6 @@ export default function PublicDiscoveryLandingClient({
             role="status"
             aria-live="polite"
             aria-atomic="true"
-            aria-label={t.spokenResultSummary(
-              displayedClinics.length,
-              matchingClinics.length,
-            )}
           >
             {t.resultRange(displayedClinics.length, matchingClinics.length)}
           </p>
