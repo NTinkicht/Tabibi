@@ -19,6 +19,11 @@ export default function GuestQueueArrivalHelpPage() {
         <Link href="/guest/eta-explained?lang=fr">
           Comprendre le temps d’attente
         </Link>
+        <div>
+          <Link href="/guest/queue-next-steps">
+            Revoir les étapes pendant l’attente
+          </Link>
+        </div>
       </section>
 
       <section lang="ar" dir="rtl" aria-labelledby="queue-arrival-ar">
@@ -30,6 +35,9 @@ export default function GuestQueueArrivalHelpPage() {
           <li>عد من رابط الحجز الخاص بك إذا انتهت صلاحية الوصول.</li>
         </ul>
         <Link href="/guest/eta-explained?lang=ar">فهم وقت الانتظار</Link>
+        <div>
+          <Link href="/guest/queue-next-steps">مراجعة خطوات الانتظار</Link>
+        </div>
       </section>
     </main>
   );
