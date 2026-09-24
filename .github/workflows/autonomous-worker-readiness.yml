@@ -16,6 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
+      - name: Checkout trusted default branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify existing provider adapters offline
+        run: python3 scripts/autonomous-worker-readiness.py
       - name: Check policy flags without reading credentials
         env:
           MISTRAL_GUARD: ${{ vars.TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED }}
@@ -37,5 +43,5 @@ jobs:
           echo "::notice::Grok included-subscription headless GitHub-hosted authentication remains unverified. Never export owner OAuth or enable xAI API fallback."
       - name: Publish next gate
         run: |
-          echo 'Implementation workers remain DISABLED until provider-specific included-capacity authentication and bounded write-mode isolation are proven.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Existing bounded code-proposal adapters pass offline checks; actual provider execution and issue-to-PR autonomy remain UNVERIFIED until Codespace-off evidence is recorded.' >> "$GITHUB_STEP_SUMMARY"
           echo 'See docs/coordination/GITHUB_NATIVE_IMPLEMENTATION_WORKERS.md and issue #481.' >> "$GITHUB_STEP_SUMMARY"
