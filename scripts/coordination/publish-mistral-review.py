@@ -112,20 +112,28 @@ def publish():
     if not trusted.ci_green(REPO, sha):
         raise ValueError("Latest exact-head CI is not green")
 
-    # The model never gets PR-write access; the issue #11 source must have
-    # been published first by the trusted predecessor's own current run.
-    matches = [
-        comment for comment in comments(11)
-        if trusted_report(
-            comment, run_id=run_id, dispatch_id=dispatch_id,
-            number=number, sha=sha,
-        )
-    ]
-    if len(matches) != 1:
-        raise ValueError("Unique trusted model result not available")
-    body = matches[0]["body"]
-    if any(MARKER.search(c.get("body") or "") and c.get("body") == body
-           for c in comments(number)):
+    # No finite scan of the permanent Issue #11 bus: its comment ID comes
+    # directly from the preceding trusted job output, never model text.
+    source_report_id = os.environ.get("SOURCE_REPORT_ID", "")
+    if not source_report_id.isascii() or not source_report_id.isdigit():
+        raise ValueError("Trusted predecessor report ID not supplied")
+    source = api(f"repos/{REPO}/issues/comments/{source_report_id}")
+    if not (source.get("issue_url") or "").endswith("/issues/11"):
+        raise ValueError("Model report does not belong to permanent wake bus")
+    if source.get("updated_at", source.get("created_at")) != source.get("created_at"):
+        raise ValueError("Model result was edited after first publication")
+    if not trusted_report(
+        source, run_id=run_id, dispatch_id=dispatch_id,
+        number=number, sha=sha,
+    ):
+        raise ValueError("Predecessor's provider-run report not verified")
+    body = source["body"]
+    if any(
+        c.get("user", {}).get("login") == "github-actions[bot]"
+        and MARKER.search(c.get("body") or "")
+        and c.get("body") == body
+        for c in comments(number)
+    ):
         print("CURRENT_RUN_REVIEW_ALREADY_PUBLISHED")
         return
 
