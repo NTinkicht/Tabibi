@@ -27,6 +27,35 @@ VERDICT = re.compile(
 )
 
 
+# The trusted parent and its diagnostic lane use the SAME conservative redactor
+# before untrusted model text can reach Actions logs or public Issue #11.
+# The model may read /proc/self/environ despite a read-only tool allowlist;
+# never rely on the prompt to keep environment credentials out of its output.
+SENSITIVE = re.compile(
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----|"
+    r"(?<![A-Za-z0-9])(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{16,}|"
+    r"(?<![A-Za-z0-9])(?:sk|xai|mistral)-[A-Za-z0-9_-]{20,}",
+    re.I,
+)
+
+
+def redact_public_text(text, *, provider_key=""):
+    if provider_key:
+        text = text.replace(provider_key, "[REDACTED]")
+    # A PEM body must never survive after only its header was replaced.
+    if re.search(r"-----BEGIN [A-Z ]*PRIVATE KEY-----", text, re.I):
+        return "[REDACTED SECURITY-SENSITIVE OUTPUT]"
+    text = re.sub(
+        r"(?i)(authorization\\s*:\\s*bearer\\s+)\\S+",
+        r"\\1[REDACTED]", text,
+    )
+    text = re.sub(
+        r"(?i)(\\b(?:MISTRAL_API_KEY|GITHUB_TOKEN|GH_TOKEN)\\s*[=:]\\s*)\\S+",
+        r"\\1[REDACTED]", text,
+    )
+    return SENSITIVE.sub("[REDACTED]", text)
+
+
 def digest(body):
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
@@ -179,6 +208,23 @@ def matches(proof, comment, *, run_id, dispatch_id, pr, sha):
 
 
 def selftest():
+    secret = "provider-test-secret-never-log"
+    github = "ghs_" + "Z" * 32
+    for sample in (
+        secret, github, "ghp_" + "Y" * 32,
+        "Authorization: Bearer " + github,
+        "GH_TOKEN=" + github, "GITHUB_TOKEN: " + github,
+        "MISTRAL_API_KEY=" + secret,
+        "mistral-" + "Q" * 24,
+    ):
+        public = redact_public_text("before " + sample + " after", provider_key=secret)
+        assert secret not in public and github not in public
+        assert sample not in public
+        assert "[REDACTED]" in public
+    assert redact_public_text("safe SHA " + "a" * 40) == "safe SHA " + "a" * 40
+    assert redact_public_text("-----BEGIN RSA PRIVATE KEY-----\\nFAKE_PRIVATE_MATERIAL").startswith(
+        "[REDACTED SECURITY-SENSITIVE OUTPUT]"
+    )
     sha = "a" * 40
     body = (
         "**mistral-vibe unattended wake**\n"
