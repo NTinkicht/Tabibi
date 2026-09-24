@@ -430,10 +430,10 @@ jobs:
       pull-requests: write
       actions: read
     steps:
-      - name: Checkout trusted publisher from main with no stored credentials
+      - name: Checkout trusted publisher from event-pinned main commit
         uses: actions/checkout@v6
         with:
-          ref: main
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Publish provider-run-bound review to the unchanged PR
         env:
