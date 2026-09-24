@@ -40,6 +40,9 @@ jobs:
       - name: Offline isolated Mistral PR publisher negative tests
         run: python3 scripts/coordination/publish-mistral-review.py selftest
 
+      - name: Offline immutable provider-run reviewer-proof negative tests
+        run: python3 scripts/coordination/mistral-review-proof.py selftest
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
