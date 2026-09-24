@@ -370,6 +370,32 @@ jobs:
             fi
           fi
           gh issue comment 11 --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-mistral-comment.md
-          if [[ "${TARGET_MODE:-main}" == "review" && "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" && "${RECHECK_READY:-false}" == "true" && "$verdict_ready" == "true" ]]; then
-            gh issue comment "$REVIEW_PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-mistral-comment.md
-          fi
+          # PR comments need PR-write permission on GitHub App installation tokens.
+          # Never give the model/inference job that permission. A fresh job
+          # validates this trusted issue-11 report and publishes the PR copy.
+
+  publish-review:
+    needs: mistral-vibe
+    if: >-
+      needs.mistral-vibe.result == 'success' &&
+      github.event.issue.number == 11 &&
+      github.actor == 'NTinkicht' &&
+      contains(github.event.comment.body, 'BINDING_EXACT_HEAD_REVIEW') &&
+      !contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Checkout trusted publisher from main with no stored credentials
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Publish provider-run-bound review to the unchanged PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/coordination/publish-mistral-review.py
