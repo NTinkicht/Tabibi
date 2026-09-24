@@ -27,6 +27,9 @@ export default function GuestQueueNextStepsPage() {
           </Link>
         </div>
         <div>
+          <Link href="/guest/privacy-help">Protéger vos informations</Link>
+        </div>
+        <div>
           <Link href="/guest/notification-help">
             Comprendre les notifications de tour
           </Link>
@@ -44,6 +47,9 @@ export default function GuestQueueNextStepsPage() {
           <Link href="/guest/eta-explained?lang=ar">
             فهم تقدير وقت الانتظار
           </Link>
+        </div>
+        <div>
+          <Link href="/guest/privacy-help">حماية معلوماتك</Link>
         </div>
         <div>
           <Link href="/guest/notification-help">فهم إشعارات حلول الدور</Link>
