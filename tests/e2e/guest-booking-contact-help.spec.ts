@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+const PRIVATE_SENTINEL = 'private-guest-bearer-secret';
+
 test('booking contact help explains the French contact contract', async ({
   page,
 }) => {
@@ -18,6 +20,8 @@ test('booking contact help explains the French contact contract', async ({
   await expect(
     section.getByRole('link', { name: 'Revenir à la préparation' }),
   ).toHaveAttribute('href', '/guest/booking-help');
+  expect(page.url()).not.toContain(PRIVATE_SENTINEL);
+  await expect(page.locator('body')).not.toContainText(PRIVATE_SENTINEL);
 });
 
 test('booking contact help explains the Arabic contact contract in RTL', async ({
@@ -29,9 +33,7 @@ test('booking contact help explains the Arabic contact contract in RTL', async (
   await expect(
     section.getByRole('heading', { name: 'بيانات التواصل للحجز' }),
   ).toBeVisible();
-  await expect(
-    section.getByText(/وسيلة تواصل واحدة على الأقل/),
-  ).toBeVisible();
+  await expect(section.getByText(/وسيلة تواصل واحدة على الأقل/)).toBeVisible();
   await expect(section.getByRole('listitem').nth(2)).toContainText(
     'يجب إدخال وسيلة التواصل التي اخترتها قبل تأكيد الحجز.',
   );
