@@ -17,6 +17,10 @@ export default function GuestPrivacyHelpPage() {
             documents médicaux dans un champ non prévu.
           </li>
           <li>
+            Gardez votre lien de réservation privé : une personne qui le reçoit
+            pourrait accéder à votre suivi.
+          </li>
+          <li>
             Fermez la page sur un appareil partagé lorsque vous avez terminé.
           </li>
         </ul>
@@ -34,6 +38,10 @@ export default function GuestPrivacyHelpPage() {
           <li>
             لا تشارك كلمة المرور أو رمز الدخول أو المستندات الطبية في حقل غير
             مخصص لذلك.
+          </li>
+          <li>
+            احتفظ برابط الحجز لنفسك؛ فقد يتمكن من يحصل عليه من الوصول إلى متابعة
+            حجزك.
           </li>
           <li>أغلق الصفحة عند الانتهاء إذا كنت تستخدم جهازاً مشتركاً.</li>
         </ul>
