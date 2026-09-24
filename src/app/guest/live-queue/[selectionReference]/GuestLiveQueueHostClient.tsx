@@ -1326,9 +1326,18 @@ function LiveQueueView({
       </p>
       {content}
       <p>
-        <a href="/guest/help" data-testid="guest-live-queue-help-link">
+        <a
+          href="/guest/help"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-describedby="tabibi-guest-help-new-tab-hint"
+          data-testid="guest-live-queue-help-link"
+        >
           {copy.helpHubLink}
-        </a>
+        </a>{' '}
+        <small id="tabibi-guest-help-new-tab-hint">
+          ({copy.estimateExplainerNewTab})
+        </small>
       </p>
     </section>
   );
