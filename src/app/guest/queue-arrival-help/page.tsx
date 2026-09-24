@@ -12,7 +12,9 @@ export default function GuestQueueArrivalHelpPage() {
         <ul>
           <li>Confirmez votre présence lorsque le bouton est disponible.</li>
           <li>Actualisez le statut si votre connexion a été interrompue.</li>
-          <li>Revenez depuis votre lien de réservation si votre accès a expiré.</li>
+          <li>
+            Revenez depuis votre lien de réservation si votre accès a expiré.
+          </li>
         </ul>
         <Link href="/guest/eta-explained?lang=fr">
           Comprendre le temps d’attente
