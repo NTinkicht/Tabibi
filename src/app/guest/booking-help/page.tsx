@@ -25,6 +25,11 @@ export default function GuestBookingHelpPage() {
         <Link href="/guest/booking-next-steps">
           Passer aux étapes de réservation
         </Link>
+        <div>
+          <Link href="/guest/booking-contact-help">
+            Comprendre les coordonnées requises
+          </Link>
+        </div>
       </section>
 
       <section lang="ar" dir="rtl" aria-labelledby="booking-help-ar">
@@ -41,6 +46,9 @@ export default function GuestBookingHelpPage() {
         </ul>
         <p>صفحة المساعدة هذه لا تطلب أي دفع أو كلمة مرور أو مستند طبي.</p>
         <Link href="/guest/booking-next-steps">الانتقال إلى خطوات الحجز</Link>
+        <div>
+          <Link href="/guest/booking-contact-help">فهم بيانات التواصل المطلوبة</Link>
+        </div>
       </section>
     </main>
   );
