@@ -55,7 +55,10 @@ test('root discovery displays public clinic and doctor names only', async ({
   ]) {
     expect(body).not.toContain(secret);
   }
-  await expect(page.locator('main a')).toHaveCount(0);
+  await expect(page.locator('main a')).toHaveCount(1);
+  await expect(
+    page.getByRole('link', { name: 'Consulter l’aide pour les invités' }),
+  ).toHaveAttribute('href', '/guest/help');
 });
 
 test('empty discovery is a helpful state, not a booking promise', async ({
@@ -174,6 +177,9 @@ test('Arabic directory uses RTL on a mobile viewport', async ({ page }) => {
     'تم تحديث الدليل: 1 عيادة.',
   );
   await expect(page.getByText('د. مريم')).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'عرض مساعدة الضيوف' }),
+  ).toHaveAttribute('href', '/guest/help');
   await expect(page.getByRole('button', { name: 'العربية' })).toHaveAttribute(
     'aria-pressed',
     'true',
