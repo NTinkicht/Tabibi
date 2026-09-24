@@ -62,6 +62,7 @@ type Copy = {
   updated: string;
   estimateExplainerLink: string;
   estimateExplainerNewTab: string;
+  queueHelpLink: string;
   queueStates: Record<string, string>;
   sessionStates: Record<string, string>;
   terminalStates: Record<string, string>;
@@ -89,6 +90,7 @@ const COPY: Record<SupportedLocale, Copy> = {
     updated: 'Updated',
     estimateExplainerLink: 'Why estimates can change',
     estimateExplainerNewTab: 'opens in a new tab',
+    queueHelpLink: 'What to do while waiting',
     queueStates: {
       waiting: 'waiting',
       checked_in: 'checked in',
@@ -128,6 +130,7 @@ const COPY: Record<SupportedLocale, Copy> = {
     updated: 'Mis à jour',
     estimateExplainerLink: 'Pourquoi ces estimations changent',
     estimateExplainerNewTab: 's’ouvre dans un nouvel onglet',
+    queueHelpLink: 'Que faire pendant l’attente',
     queueStates: {
       waiting: 'en attente',
       checked_in: 'enregistré',
@@ -165,6 +168,7 @@ const COPY: Record<SupportedLocale, Copy> = {
     updated: 'آخر تحديث',
     estimateExplainerLink: 'لماذا تتغير هذه التقديرات',
     estimateExplainerNewTab: 'يُفتح في علامة تبويب جديدة',
+    queueHelpLink: 'ماذا تفعل أثناء الانتظار',
     queueStates: {
       waiting: 'في الانتظار',
       checked_in: 'تم تسجيل الوصول',
@@ -478,6 +482,9 @@ export function GuestStatusClient() {
         <small id="tabibi-guest-status-eta-explainer-hint">
           ({copy.estimateExplainerNewTab})
         </small>
+      </p>
+      <p>
+        <a href="/guest/queue-next-steps">{copy.queueHelpLink}</a>
       </p>
       <p>
         <small>
