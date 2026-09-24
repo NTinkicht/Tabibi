@@ -351,6 +351,9 @@ jobs:
               text = text.replace(secret, '[REDACTED]')
           text = re.sub(r'(?i)(authorization\s*:\s*bearer\s+)\S+', r'\1[REDACTED]', text)
           text = re.sub(r'(?i)(MISTRAL_API_KEY\s*[=:]\s*)\S+', r'\1[REDACTED]', text)
+          # Model text is untrusted even when the reviewer is legitimate:
+          # neutralize Markdown fences and @-mentions before public posting.
+          text = text.replace(chr(96), '\u02cb').replace('@', '\uff20')
           target.write_text(text[:50000], encoding='utf-8')
           PY
           fi
