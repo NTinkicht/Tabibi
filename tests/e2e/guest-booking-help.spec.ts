@@ -28,6 +28,9 @@ test('guest booking help exposes French preparation guidance without private dat
   await expect(
     french.getByRole('link', { name: 'Passer aux étapes de réservation' }),
   ).toHaveAttribute('href', '/guest/booking-next-steps');
+  await expect(
+    french.getByRole('link', { name: 'Comprendre les coordonnées requises' }),
+  ).toHaveAttribute('href', '/guest/booking-contact-help');
 
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   expect(await page.locator('body').innerText()).not.toContain(
@@ -60,6 +63,9 @@ test('guest booking help exposes equivalent Arabic RTL preparation guidance', as
   await expect(
     arabic.getByRole('link', { name: 'الانتقال إلى خطوات الحجز' }),
   ).toHaveAttribute('href', '/guest/booking-next-steps');
+  await expect(
+    arabic.getByRole('link', { name: 'فهم بيانات التواصل المطلوبة' }),
+  ).toHaveAttribute('href', '/guest/booking-contact-help');
 
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   expect(await page.locator('body').innerText()).not.toContain(
