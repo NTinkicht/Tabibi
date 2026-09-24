@@ -20,6 +20,9 @@ test('queue arrival help gives French clinic-day guidance', async ({
   await expect(
     section.getByRole('link', { name: 'Comprendre le temps d’attente' }),
   ).toHaveAttribute('href', '/guest/eta-explained?lang=fr');
+  await expect(
+    section.getByRole('link', { name: 'Revoir les étapes pendant l’attente' }),
+  ).toHaveAttribute('href', '/guest/queue-next-steps');
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   await expect(page.locator('body')).not.toContainText(PRIVATE_SENTINEL);
 });
@@ -42,6 +45,9 @@ test('queue arrival help gives Arabic clinic-day guidance in RTL', async ({
   await expect(
     section.getByRole('link', { name: 'فهم وقت الانتظار' }),
   ).toHaveAttribute('href', '/guest/eta-explained?lang=ar');
+  await expect(
+    section.getByRole('link', { name: 'مراجعة خطوات الانتظار' }),
+  ).toHaveAttribute('href', '/guest/queue-next-steps');
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   await expect(page.locator('body')).not.toContainText(PRIVATE_SENTINEL);
 });
