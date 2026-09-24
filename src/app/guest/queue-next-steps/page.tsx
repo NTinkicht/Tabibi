@@ -36,7 +36,9 @@ export default function GuestQueueNextStepsPage() {
         </ol>
         <Link href="/guest/queue-arrival-help">عرض تعليمات الوصول</Link>
         <div>
-          <Link href="/guest/eta-explained?lang=ar">فهم تقدير وقت الانتظار</Link>
+          <Link href="/guest/eta-explained?lang=ar">
+            فهم تقدير وقت الانتظار
+          </Link>
         </div>
       </section>
     </main>
