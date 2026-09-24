@@ -356,7 +356,7 @@ def selftest():
             assert repo == REPO and number == 7
             return commit_authors([{
                 "sha": head_sha,
-                "commit": {"message": "fix\\n\\nMaterial-Author: chatgpt"},
+                "commit": {"message": "fix\n\nMaterial-Author: chatgpt"},
             }], head_sha)
 
     globals()["parent_parser"] = lambda: FixtureParent
