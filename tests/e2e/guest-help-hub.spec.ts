@@ -9,15 +9,27 @@ const ROUTES = [
   '/guest/queue-arrival-help',
 ] as const;
 
-test('guest help hub groups French and Arabic guidance by journey phase', async ({ page }) => {
+test('guest help hub groups French and Arabic guidance by journey phase', async ({
+  page,
+}) => {
   await page.goto('/guest/help');
   const french = page.locator('section[lang="fr"][dir="ltr"]');
   const arabic = page.locator('section[lang="ar"][dir="rtl"]');
 
-  await expect(french.getByRole('heading', { name: 'Aide pour votre parcours invité' })).toBeVisible();
-  await expect(arabic.getByRole('heading', { name: 'مساعدة خلال رحلة الحجز كضيف' })).toBeVisible();
-  await expect(french.getByRole('heading', { level: 2 })).toHaveText(['Avant la réservation', 'Après la réservation']);
-  await expect(arabic.getByRole('heading', { level: 2 })).toHaveText(['قبل الحجز', 'بعد الحجز']);
+  await expect(
+    french.getByRole('heading', { name: 'Aide pour votre parcours invité' }),
+  ).toBeVisible();
+  await expect(
+    arabic.getByRole('heading', { name: 'مساعدة خلال رحلة الحجز كضيف' }),
+  ).toBeVisible();
+  await expect(french.getByRole('heading', { level: 2 })).toHaveText([
+    'Avant la réservation',
+    'Après la réservation',
+  ]);
+  await expect(arabic.getByRole('heading', { level: 2 })).toHaveText([
+    'قبل الحجز',
+    'بعد الحجز',
+  ]);
   await expect(french.getByRole('listitem')).toHaveCount(7);
   await expect(arabic.getByRole('listitem')).toHaveCount(7);
 
@@ -25,12 +37,32 @@ test('guest help hub groups French and Arabic guidance by journey phase', async 
     await expect(french.locator('a[href="' + route + '"]')).toHaveCount(1);
     await expect(arabic.locator('a[href="' + route + '"]')).toHaveCount(1);
   }
-  await expect(french.locator('a[href="/guest/eta-explained?lang=fr"]')).toHaveCount(1);
-  await expect(arabic.locator('a[href="/guest/eta-explained?lang=ar"]')).toHaveCount(1);
-  await expect(page.getByTestId('guest-help-safety-fr')).toContainText('urgence médicale');
-  await expect(page.getByTestId('guest-help-safety-fr')).toContainText('services d’urgence locaux');
-  await expect(page.getByTestId('guest-help-safety-ar')).toContainText('الطوارئ الطبية');
-  await expect(page.getByTestId('guest-help-safety-ar')).toContainText('خدمات الطوارئ المحلية');
+  await expect(
+    french.locator('a[href="/guest/eta-explained?lang=fr"]'),
+  ).toHaveCount(1);
+  await expect(
+    arabic.locator('a[href="/guest/eta-explained?lang=ar"]'),
+  ).toHaveCount(1);
+  await expect(page.getByTestId('guest-help-safety-fr')).toContainText(
+    'urgence médicale',
+  );
+  await expect(page.getByTestId('guest-help-safety-fr')).toContainText(
+    'services d’urgence locaux',
+  );
+  await expect(page.getByTestId('guest-help-safety-fr')).toContainText(
+    'n’attendez pas une mise à jour de la file',
+  );
+  await expect(page.getByTestId('guest-help-safety-ar')).toContainText(
+    'الطوارئ الطبية',
+  );
+  await expect(page.getByTestId('guest-help-safety-ar')).toContainText(
+    'خدمات الطوارئ المحلية',
+  );
+  await expect(page.getByTestId('guest-help-safety-ar')).toContainText(
+    'لا تنتظر تحديث قائمة الانتظار',
+  );
   expect(page.url()).not.toContain('private-guest-bearer-secret');
-  await expect(page.locator('body')).not.toContainText('private-guest-bearer-secret');
+  await expect(page.locator('body')).not.toContainText(
+    'private-guest-bearer-secret',
+  );
 });
