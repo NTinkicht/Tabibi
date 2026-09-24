@@ -20,8 +20,8 @@ export default function GuestBookingContactHelpPage() {
       <section lang="ar" dir="rtl" aria-labelledby="booking-contact-ar">
         <h1 id="booking-contact-ar">بيانات التواصل للحجز</h1>
         <p>
-          أضف وسيلة تواصل واحدة على الأقل حتى تتمكن العيادة من التواصل معك
-          بخصوص الحجز.
+          أضف وسيلة تواصل واحدة على الأقل حتى تتمكن العيادة من التواصل معك بخصوص
+          الحجز.
         </p>
         <ul>
           <li>اختر الهاتف إذا كنت تفضل الاتصال الهاتفي.</li>
