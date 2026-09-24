@@ -32,7 +32,6 @@ ADAPTERS = (
         "script": "scripts/grok-cloud-code-adapter.py",
         "markers": (
             "GROK_CLOUD_CODE_PROPOSAL_V1",
-            "source_lease_id",
             "github.actor == 'NTinkicht'",
             "permissions:",
             "contents: read",
@@ -63,6 +62,8 @@ def main():
             continue
         text = workflow.read_text(encoding="utf-8")
         errors.extend(structural_errors(entry["name"], text, entry["markers"]))
+        if entry["name"] == "grok" and "source_lease_id" not in adapter.read_text(encoding="utf-8"):
+            errors.append("grok: source lease binding missing from trusted parent")
         try:
             result = subprocess.run(
                 [sys.executable, str(adapter), "selftest"],
