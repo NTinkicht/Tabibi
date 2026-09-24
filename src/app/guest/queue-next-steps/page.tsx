@@ -17,6 +17,10 @@ export default function GuestQueueNextStepsPage() {
           <li>
             Lorsque votre tour approche, suivez les indications de la clinique.
           </li>
+          <li>
+            Si la connexion est interrompue, actualisez votre statut plutôt que
+            de créer une nouvelle réservation.
+          </li>
         </ol>
         <Link href="/guest/queue-arrival-help">
           Voir les consignes d’arrivée
@@ -41,6 +45,7 @@ export default function GuestQueueNextStepsPage() {
           <li>احتفظ بصفحة الحالة متاحة وتحقق منها لمعرفة التحديثات.</li>
           <li>اعتبر الوقت المعروض تقديراً وليس ضماناً.</li>
           <li>عندما يقترب دورك، اتبع تعليمات العيادة.</li>
+          <li>إذا انقطع اتصالك، حدّث حالة الحجز بدلاً من إنشاء حجز جديد.</li>
         </ol>
         <Link href="/guest/queue-arrival-help">عرض تعليمات الوصول</Link>
         <div>
