@@ -200,34 +200,28 @@ jobs:
           else
             echo 'status=PROPOSAL_READY' >> "$GITHUB_OUTPUT"
           fi
-          # Provider stderr is not published. Print only sanitized, bounded
-          # diagnostic LINES from the runner for genuine failures. No raw stdout,
-          # prompt, GitHub token, auth file, model patch or secret in public comments.
+          # Never print free-form provider stderr: it might contain prompt,
+          # credentials or patient data. Report only fixed, allowlisted signals.
           if [[ "$code" != "0" ]]; then
             python3 - <<'PY'
           import hashlib
-          import os
           import re
           from pathlib import Path
 
-          raw = Path('/tmp/tabibi-mistral-code-error.txt').read_text(
-              encoding='utf-8', errors='replace'
-          )
-          key = os.environ.get('MISTRAL_API_KEY', '')
-          if key:
-              raw = raw.replace(key, '[REDACTED]')
-          raw = re.sub(r'(?i)(bearer\s+)[^\s]+', r'\1[REDACTED]', raw)
-          raw = re.sub(r'(?i)(api[_-]?key\s*[=:]\s*)[^\s]+', r'\1[REDACTED]', raw)
-          raw = re.sub(r'(?i)(?:https?://)[^\s]+', '[URL_REDACTED]', raw)
-          safe = [
-              line.strip()[:200]
-              for line in raw.splitlines()
-              if re.search(r'(?i)(error|failed|turn.*limit|git repository|trusted|workspace|option|agent|model)', line)
-          ]
-          print('Vibe stderr diagnostic (redacted; at most 5 lines):')
-          for line in safe[-5:]:
-              print(line)
-          print('stderr_sha256=' + hashlib.sha256(raw.encode()).hexdigest()[:16])
+          raw = Path('/tmp/tabibi-mistral-code-error.txt').read_bytes()
+          text = raw.decode('utf-8', errors='replace')
+          categories = {
+              'turn_limit': r'(?i)turn.?limit|max.?turns|turns.*exhausted',
+              'workspace': r'(?i)not a git repository|workspace.*trust|trusted.*workspace|not trusted',
+              'cli_options': r'(?i)unknown option|unrecognized arguments|no such option|invalid.*agent',
+              'entitlement': r'(?i)401|403|unauthorized|unauthorised|invalid.*key|entitlement',
+              'rate_limit': r'(?i)429|rate.?limit|quota|capacity',
+              'context': r'(?i)token limit exceeded|context.*exceeded',
+          }
+          matched = [name for name, pattern in categories.items() if re.search(pattern, text)]
+          print('Vibe diagnostic categories=' + (','.join(matched) if matched else 'unclassified'))
+          print('Vibe stderr bytes=' + str(len(raw)))
+          print('Vibe stderr sha256-prefix=' + hashlib.sha256(raw).hexdigest()[:16])
           PY
           fi
 
