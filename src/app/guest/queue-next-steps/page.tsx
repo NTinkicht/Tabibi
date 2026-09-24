@@ -21,6 +21,11 @@ export default function GuestQueueNextStepsPage() {
         <Link href="/guest/queue-arrival-help">
           Voir les consignes d’arrivée
         </Link>
+        <div>
+          <Link href="/guest/eta-explained?lang=fr">
+            Comprendre l’estimation du temps d’attente
+          </Link>
+        </div>
       </section>
       <section lang="ar" dir="rtl" aria-labelledby="queue-next-ar">
         <h1 id="queue-next-ar">ماذا تفعل أثناء الانتظار</h1>
@@ -30,6 +35,11 @@ export default function GuestQueueNextStepsPage() {
           <li>عندما يقترب دورك، اتبع تعليمات العيادة.</li>
         </ol>
         <Link href="/guest/queue-arrival-help">عرض تعليمات الوصول</Link>
+        <div>
+          <Link href="/guest/eta-explained?lang=ar">
+            فهم تقدير وقت الانتظار
+          </Link>
+        </div>
       </section>
     </main>
   );
