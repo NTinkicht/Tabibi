@@ -24,7 +24,7 @@ export default function GuestNotificationHelpPage() {
         <Link href="/guest/status">Revenir au statut</Link>
       </section>
       <section lang="ar" dir="rtl" aria-labelledby="notification-help-ar">
-        <h2 id="notification-help-ar">فهم إشعارات طبيبي</h2>
+        <h1 id="notification-help-ar">فهم إشعارات طبيبي</h1>
         <ul>
           <li>المواعيد وأوقات الانتظار تقديرية وقد تتغير.</li>
           <li>إشعار حلول الدور يدعوك إلى اتباع تعليمات العيادة.</li>
