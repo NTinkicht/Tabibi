@@ -20,6 +20,9 @@ test('booking contact help explains the French contact contract', async ({
   await expect(
     section.getByRole('link', { name: 'Revenir à la préparation' }),
   ).toHaveAttribute('href', '/guest/booking-help');
+  await expect(
+    section.getByRole('link', { name: 'Protéger vos informations' }),
+  ).toHaveAttribute('href', '/guest/privacy-help');
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   await expect(page.locator('body')).not.toContainText(PRIVATE_SENTINEL);
 });
@@ -40,4 +43,9 @@ test('booking contact help explains the Arabic contact contract in RTL', async (
   await expect(
     section.getByRole('link', { name: 'العودة إلى التحضير' }),
   ).toHaveAttribute('href', '/guest/booking-help');
+  await expect(
+    section.getByRole('link', { name: 'حماية معلوماتك' }),
+  ).toHaveAttribute('href', '/guest/privacy-help');
+  expect(page.url()).not.toContain(PRIVATE_SENTINEL);
+  await expect(page.locator('body')).not.toContainText(PRIVATE_SENTINEL);
 });

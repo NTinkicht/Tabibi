@@ -15,6 +15,7 @@ export default function GuestBookingContactHelpPage() {
           <li>Le moyen choisi doit être renseigné avant la confirmation.</li>
         </ul>
         <Link href="/guest/booking-help">Revenir à la préparation</Link>
+        <Link href="/guest/privacy-help">Protéger vos informations</Link>
       </section>
 
       <section lang="ar" dir="rtl" aria-labelledby="booking-contact-ar">
@@ -29,6 +30,7 @@ export default function GuestBookingContactHelpPage() {
           <li>يجب إدخال وسيلة التواصل التي اخترتها قبل تأكيد الحجز.</li>
         </ul>
         <Link href="/guest/booking-help">العودة إلى التحضير</Link>
+        <Link href="/guest/privacy-help">حماية معلوماتك</Link>
       </section>
     </main>
   );
