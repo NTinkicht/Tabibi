@@ -22,6 +22,10 @@ export default function GuestBookingNextStepsPage() {
           Ce guide ne demande aucun paiement, mot de passe, document médical ou
           code d’accès invité.
         </p>
+        <div role="note" data-testid="booking-emergency-fr">
+          En cas d’urgence médicale, contactez immédiatement les services
+          d’urgence locaux ; n’attendez pas la confirmation de réservation.
+        </div>
         <Link href="/guest/booking-help">Revoir la préparation</Link>
         <div>
           <Link href="/guest/privacy-help">Protéger vos informations</Link>
@@ -54,6 +58,10 @@ export default function GuestBookingNextStepsPage() {
           هذا الدليل لا يطلب أي دفع أو كلمة مرور أو مستند طبي أو رمز دخول
           للزائر.
         </p>
+        <div role="note" data-testid="booking-emergency-ar">
+          في حالة الطوارئ الطبية، اتصل بخدمات الطوارئ المحلية فورًا ولا تنتظر
+          تأكيد الحجز.
+        </div>
         <Link href="/guest/booking-help">مراجعة التحضير</Link>
         <div>
           <Link href="/guest/privacy-help">حماية معلوماتك</Link>
