@@ -47,13 +47,19 @@ describe('Mistral review report publication uses a separate privilege boundary',
   it('publishes only from trusted main without model keys or PR checkout', () => {
     const model = workflow.jobs['mistral-vibe'];
     const publisher = workflow.jobs['publish-review'];
-    const report = model.steps.find((step) => step.name === 'Post Mistral result');
+    const report = model.steps.find(
+      (step) => step.name === 'Post Mistral result',
+    );
     expect(report?.run).toContain('gh issue comment 11');
     expect(report?.run).not.toContain('gh issue comment "$REVIEW_PR"');
-    const checkout = publisher.steps.find((step) => step.uses?.includes('checkout'));
+    const checkout = publisher.steps.find((step) =>
+      step.uses?.includes('checkout'),
+    );
     expect(checkout?.with?.ref).toBe('main');
     expect(checkout?.with?.['persist-credentials']).toBe(false);
-    const publish = publisher.steps.find((step) => step.run?.includes('publish-mistral-review.py'));
+    const publish = publisher.steps.find((step) =>
+      step.run?.includes('publish-mistral-review.py'),
+    );
     expect(publish?.env?.GH_TOKEN).toContain('secrets.GITHUB_TOKEN');
     expect(publisher.steps.some((step) => step.env?.MISTRAL_API_KEY)).toBe(false);
     expect(
