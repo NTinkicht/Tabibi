@@ -2,7 +2,6 @@ import { expect, test, type Page } from '@playwright/test';
 
 const BOOKING_URL = '**/api/public/bookings';
 const STATUS_URL = '**/api/public/bookings/live-queue-status';
-const STREAM_URL = '**/api/public/bookings/live-queue-stream';
 const BEARER = 'test-selection.test-guest-bearer-secret.signature';
 
 async function mockBooking(page: Page, bearer = BEARER) {
@@ -45,7 +44,7 @@ test('guest live queue displays FR help hub link without bearer token', async ({
     });
   });
 
-  const response = await submitBookingForm(page);
+  await submitBookingForm(page);
 
   await expect(page.getByText('G-042')).toBeVisible();
   await expect(page.getByText(/en attente/)).toBeVisible();
@@ -80,7 +79,7 @@ test('guest live queue displays AR help hub link without bearer token', async ({
     });
   });
 
-  const response = await submitBookingForm(page);
+  await submitBookingForm(page);
 
   await expect(page.getByText('G-042')).toBeVisible();
 
