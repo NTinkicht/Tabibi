@@ -14,7 +14,9 @@ export default function GuestQueueNextStepsPage() {
             Considérez l’heure affichée comme une estimation, pas comme une
             garantie.
           </li>
-          <li>Lorsque votre tour approche, suivez les indications de la clinique.</li>
+          <li>
+            Lorsque votre tour approche, suivez les indications de la clinique.
+          </li>
         </ol>
         <Link href="/guest/queue-arrival-help">
           Voir les consignes d’arrivée
