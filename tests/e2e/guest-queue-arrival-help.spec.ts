@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+const PRIVATE_SENTINEL = 'private-guest-bearer-secret';
+
 test('queue arrival help gives French clinic-day guidance', async ({
   page,
 }) => {
@@ -9,10 +11,17 @@ test('queue arrival help gives French clinic-day guidance', async ({
   await expect(
     section.getByRole('heading', { name: 'À votre arrivée à la clinique' }),
   ).toBeVisible();
-  await expect(section.getByText(/Confirmez votre présence/)).toBeVisible();
+  await expect(section.getByRole('listitem')).toHaveCount(3);
+  await expect(section.getByRole('listitem')).toHaveText([
+    'Confirmez votre présence lorsque le bouton est disponible.',
+    'Actualisez le statut si votre connexion a été interrompue.',
+    'Revenez depuis votre lien de réservation si votre accès a expiré.',
+  ]);
   await expect(
     section.getByRole('link', { name: 'Comprendre le temps d’attente' }),
   ).toHaveAttribute('href', '/guest/eta-explained?lang=fr');
+  expect(page.url()).not.toContain(PRIVATE_SENTINEL);
+  await expect(page.locator('body')).not.toContainText(PRIVATE_SENTINEL);
 });
 
 test('queue arrival help gives Arabic clinic-day guidance in RTL', async ({
@@ -24,8 +33,15 @@ test('queue arrival help gives Arabic clinic-day guidance in RTL', async ({
   await expect(
     section.getByRole('heading', { name: 'عند وصولك إلى العيادة' }),
   ).toBeVisible();
-  await expect(section.getByText(/أكد حضورك/)).toBeVisible();
+  await expect(section.getByRole('listitem')).toHaveCount(3);
+  await expect(section.getByRole('listitem')).toHaveText([
+    'أكد حضورك عندما يظهر زر التأكيد.',
+    'حدّث الحالة إذا انقطع اتصالك.',
+    'عد من رابط الحجز الخاص بك إذا انتهت صلاحية الوصول.',
+  ]);
   await expect(
     section.getByRole('link', { name: 'فهم وقت الانتظار' }),
   ).toHaveAttribute('href', '/guest/eta-explained?lang=ar');
+  expect(page.url()).not.toContain(PRIVATE_SENTINEL);
+  await expect(page.locator('body')).not.toContainText(PRIVATE_SENTINEL);
 });
