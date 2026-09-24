@@ -11,8 +11,8 @@ export default function GuestNotificationHelpPage() {
             changer.
           </li>
           <li>
-            Une notification de tour vous invite à suivre les instructions de
-            la clinique.
+            Une notification de tour vous invite à suivre les instructions de la
+            clinique.
           </li>
           <li>
             En cas de doute, vérifiez votre statut dans Tabibi plutôt que de
