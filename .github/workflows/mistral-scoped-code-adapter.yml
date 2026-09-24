@@ -168,12 +168,16 @@ jobs:
           Each path MUST be leased and exist; old text occurs exactly once.
           Change BOTH production code and its test. No secrets, no new paths,
           no Markdown fences, no self-review and no claims tests have run.
+          Produce the EXACT edit payload in the final response, not a plan,
+          commentary, instruction to switch modes, or a list of suggested edits.
+          The only executable tools available are read_file and grep. No shell,
+          write tool, external workspace access or git mutation is authorized.
           If evidence insufficient, return a short reason without patch markers.
           EOF
           printf '\nTrusted PR #%s stream=%s SHA=%s allowed paths=%s\nOwner objective: %s\n' "$REVIEW_PR" "$REVIEW_STREAM" "$REVIEW_SHA" "$ALLOWED_PATHS" "$TASK_OBJECTIVE" >> /tmp/tabibi-mistral-code-prompt.txt
           set +e
           timeout --signal=TERM --kill-after=15s 480s vibe \
-            --trust --agent plan --workdir /tmp/tabibi-mistral-readonly \
+            --trust --agent auto-approve --workdir /tmp/tabibi-mistral-readonly \
             --enabled-tools grep --enabled-tools read_file \
             --max-turns 8 --max-tokens 45000 --output text \
             --prompt "$(cat /tmp/tabibi-mistral-code-prompt.txt)" \

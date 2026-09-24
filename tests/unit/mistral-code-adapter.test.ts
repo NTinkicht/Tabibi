@@ -97,7 +97,9 @@ describe('Mistral code adapter uses owner per-WU leases', () => {
     expect(model.env?.TASK_OBJECTIVE).toContain(
       'steps.lease.outputs.objective',
     );
-    expect(model.run).toContain('--agent plan');
+    expect(model.run).toContain('--agent auto-approve');
+    expect(model.run).not.toContain('--agent plan');
+    expect(model.run).toContain('Produce the EXACT edit payload');
     expect(model.run).toContain('--workdir /tmp/tabibi-mistral-readonly');
     expect(model.run).toContain(
       '--enabled-tools grep --enabled-tools read_file',
@@ -108,6 +110,9 @@ describe('Mistral code adapter uses owner per-WU leases', () => {
     expect(model.run).not.toContain('print(raw)');
     expect(model.run).not.toContain('--yolo');
     expect(model.run).not.toContain('--auto-approve');
+    expect(model.run).not.toContain('--enabled-tools bash');
+    expect(model.run).not.toContain('--enabled-tools write_file');
+    expect(model.run).not.toContain('--enabled-tools edit');
     expect(model.run).not.toContain('git push');
     expect(propose.steps.some((s) => s.uses?.includes('upload-artifact'))).toBe(
       true,
