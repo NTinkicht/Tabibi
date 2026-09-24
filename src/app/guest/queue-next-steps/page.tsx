@@ -18,8 +18,8 @@ export default function GuestQueueNextStepsPage() {
             Lorsque votre tour approche, suivez les indications de la clinique.
           </li>
           <li>
-            Si la connexion est interrompue, actualisez votre statut plutôt
-            que de créer une nouvelle réservation.
+            Si la connexion est interrompue, actualisez votre statut plutôt que
+            de créer une nouvelle réservation.
           </li>
         </ol>
         <Link href="/guest/queue-arrival-help">
