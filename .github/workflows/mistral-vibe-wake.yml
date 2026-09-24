@@ -222,7 +222,11 @@ jobs:
           # are BOTH the staged-diff directory before vibe starts.
           cd "$VIBE_SAFE_WORKDIR"
           set +e
-          timeout --signal=TERM --kill-after=15s 600s \
+          # The Vibe child needs its provider key, NEVER the Actions/gh token.
+          # read_file accepts absolute paths; drop GitHub credentials at exec,
+          # even if a parent/job/environment setting added them implicitly.
+          env -u GITHUB_TOKEN -u GH_TOKEN \
+            timeout --signal=TERM --kill-after=15s 600s \
             vibe \
               --agent plan \
               --workdir "$VIBE_SAFE_WORKDIR" \
@@ -277,17 +281,16 @@ jobs:
             # it is never posted to the public issue comment.
             python - <<'PY'
           import os
-          import re
+          import runpy
           from pathlib import Path
 
           source = Path('/tmp/tabibi-mistral-error.txt')
           target = Path('/tmp/tabibi-mistral-error-scrubbed.txt')
-          text = source.read_text(encoding='utf-8', errors='replace')
-          secret = os.environ.get('MISTRAL_API_KEY', '')
-          if secret:
-              text = text.replace(secret, '[REDACTED]')
-          text = re.sub(r'(?i)(authorization\s*:\s*bearer\s+)\S+', r'\1[REDACTED]', text)
-          text = re.sub(r'(?i)(mistral_api_key\s*[=:]\s*)\S+', r'\1[REDACTED]', text)
+          scrub = runpy.run_path('/tmp/tabibi-mistral-review-proof.py')['redact_public_text']
+          text = scrub(
+              source.read_text(encoding='utf-8', errors='replace'),
+              provider_key=os.environ.get('MISTRAL_API_KEY', ''),
+          )
           lines = text.splitlines()
           target.write_text('\n'.join(lines[-20:]) + '\n', encoding='utf-8')
           PY
@@ -345,17 +348,16 @@ jobs:
             # before any model-authored text can reach a public issue comment.
             python - <<'PY'
           import os
-          import re
+          import runpy
           from pathlib import Path
 
           source = Path('/tmp/tabibi-mistral-output.txt')
           target = Path('/tmp/tabibi-mistral-public.txt')
           text = source.read_text(encoding='utf-8', errors='replace') if source.exists() else ''
-          secret = os.environ.get('MISTRAL_API_KEY', '')
-          if secret:
-              text = text.replace(secret, '[REDACTED]')
-          text = re.sub(r'(?i)(authorization\s*:\s*bearer\s+)\S+', r'\1[REDACTED]', text)
-          text = re.sub(r'(?i)(MISTRAL_API_KEY\s*[=:]\s*)\S+', r'\1[REDACTED]', text)
+          # One trusted helper scrubs the same credential shapes here AND in
+          # the job-log path before the permanent public Issue #11 post.
+          scrub = runpy.run_path('/tmp/tabibi-mistral-review-proof.py')['redact_public_text']
+          text = scrub(text, provider_key=os.environ.get('MISTRAL_API_KEY', ''))
           # Model text is untrusted even when the reviewer is legitimate:
           # neutralize Markdown fences and @-mentions before public posting.
           text = text.replace(chr(96), '\u02cb').replace('@', '\uff20')
