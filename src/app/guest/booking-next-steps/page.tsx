@@ -11,6 +11,10 @@ export default function GuestBookingNextStepsPage() {
           <li>Choisissez la clinique et le médecin souhaités.</li>
           <li>Indiquez au moins un moyen de contact : téléphone ou e-mail.</li>
           <li>
+            Renseignez le moyen de contact choisi comme préféré avant de
+            confirmer.
+          </li>
+          <li>
             Vérifiez vos informations, puis envoyez la demande une seule fois.
           </li>
         </ol>
@@ -43,6 +47,7 @@ export default function GuestBookingNextStepsPage() {
           <li>
             أدخل وسيلة تواصل واحدة على الأقل: الهاتف أو البريد الإلكتروني.
           </li>
+          <li>أدخل وسيلة التواصل المفضلة التي اخترتها قبل التأكيد.</li>
           <li>راجع معلوماتك ثم أرسل الطلب مرة واحدة فقط.</li>
         </ol>
         <p>
