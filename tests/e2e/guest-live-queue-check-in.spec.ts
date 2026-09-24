@@ -38,6 +38,7 @@ async function mockWaitingStatus(page: Page) {
 async function submitBookingForm(page: Page) {
   await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel(/Votre nom|اسمك/).fill('Test Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: /Confirmer|تأكيد/ }).click();
 }
 
@@ -231,6 +232,7 @@ test('Arabic renders the check-in button and success message with RTL parity', a
 
   await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel('اسمك').fill('Test Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
 
