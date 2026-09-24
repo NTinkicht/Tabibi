@@ -1357,11 +1357,11 @@ test('French filters show matching clinics relative to total', async ({
   });
   await search.fill('amine');
   await expect(summary).toHaveText(
-    'Affichage : 1 sur 2 cliniques du répertoire.',
+    'Cliniques correspondantes : 1 sur 2 cliniques du répertoire.',
   );
   await search.fill('introuvable');
   await expect(summary).toHaveText(
-    'Affichage : 0 sur 2 cliniques du répertoire.',
+    'Cliniques correspondantes : 0 sur 2 cliniques du répertoire.',
   );
   await page.getByRole('button', { name: 'Effacer tous les filtres' }).click();
   await expect(summary).toHaveCount(0);
@@ -1402,7 +1402,7 @@ test('Arabic mobile visible total updates after refresh', async ({ page }) => {
     .selectOption('ar');
   const summary = page.getByTestId('visible-clinic-total');
   await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
-  await expect(summary).toHaveText('العيادات المعروضة: 1 من 2.');
+  await expect(summary).toHaveText('العيادات المطابقة: 1 من 2.');
   clinics = [
     ...clinics,
     {
@@ -1413,7 +1413,7 @@ test('Arabic mobile visible total updates after refresh', async ({ page }) => {
     },
   ];
   await page.getByRole('button', { name: 'تحديث' }).click();
-  await expect(summary).toHaveText('العيادات المعروضة: 2 من 3.');
+  await expect(summary).toHaveText('العيادات المطابقة: 2 من 3.');
   await page.getByRole('button', { name: 'مسح جميع عوامل التصفية' }).click();
   await expect(summary).toHaveCount(0);
   await expect(page.locator('.publicClinic')).toHaveCount(3);
@@ -1528,5 +1528,33 @@ test('Arabic RTL mobile can remove one filter without clearing the other', async
   await expect(page.getByTestId('active-filter-summary')).toHaveCount(0);
   expect(await page.locator('main').innerText()).not.toContain(
     'private-filter-remove-clinic',
+  );
+});
+
+test('matching directory total includes clinics not yet revealed by show more', async ({
+  page,
+}) => {
+  const clinics = Array.from({ length: 9 }, (_, index) => ({
+    name: `Clinique ${index + 1}`,
+    defaultLocale: index === 8 ? 'ar' : 'fr',
+    enabledLocales: index === 8 ? ['ar'] : ['fr'],
+    doctors: [],
+  }));
+  await mockDirectory(page, clinics);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await page
+    .getByRole('combobox', { name: 'Langue disponible à la clinique' })
+    .selectOption('fr');
+
+  const matching = page.getByTestId('visible-clinic-total');
+  await expect(matching).toHaveText(
+    'Cliniques correspondantes : 8 sur 9 cliniques du répertoire.',
+  );
+  await expect(page.locator('.publicClinic')).toHaveCount(6);
+  await page.getByRole('button', { name: /Afficher 2 autres cliniques/ }).click();
+  await expect(page.locator('.publicClinic')).toHaveCount(8);
+  await expect(matching).toHaveText(
+    'Cliniques correspondantes : 8 sur 9 cliniques du répertoire.',
   );
 });
