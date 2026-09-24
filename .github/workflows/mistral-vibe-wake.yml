@@ -360,6 +360,15 @@ jobs:
               echo '```'
             fi
           } > /tmp/tabibi-mistral-comment.md
+          # The trusted parent stamps provider-run provenance AFTER model output.
+          # The review-gate pilot correlates this exact run/owner dispatch and
+          # the independently model-generated SHA/verdict before recognizing PASS.
+          if [[ "${TARGET_MODE:-main}" == "review" && "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" && "${RECHECK_READY:-false}" == "true" && "$verdict_ready" == "true" ]]; then
+            dispatch_id="$(jq -r '.comment.id' "$GITHUB_EVENT_PATH")"
+            if [[ "$dispatch_id" =~ ^[0-9]+$ ]]; then
+              printf '\n<!-- tabibi-mistral-review-run:%s dispatch-comment:%s -->\n' "$GITHUB_RUN_ID" "$dispatch_id" >> /tmp/tabibi-mistral-comment.md
+            fi
+          fi
           gh issue comment 11 --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-mistral-comment.md
           if [[ "${TARGET_MODE:-main}" == "review" && "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" && "${RECHECK_READY:-false}" == "true" && "$verdict_ready" == "true" ]]; then
             gh issue comment "$REVIEW_PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-mistral-comment.md
