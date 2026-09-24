@@ -121,7 +121,7 @@ def verified_bot_review(comment, number, sha, actors, dispatch, run, proof):
 
 
 def commit_authors(commits, sha):
-    if not commits or len(commits) >= 100 or commits[-1].get("sha") != sha:
+    if not commits or commits[-1].get("sha") != sha:
         raise ValueError("PR commits incomplete or head changed")
     actors = set()
     for commit in commits:
@@ -168,8 +168,9 @@ def evaluate(number):
         or pr.get("base", {}).get("repo", {}).get("full_name") != REPO
     ):
         raise ValueError("Not a canonical current Tabibi PR")
-    commits = api(f"repos/{REPO}/pulls/{number}/commits?per_page=100")
-    actors = commit_authors(commits, sha)
+    # Share the trusted inference parent's complete paginated provenance proof.
+    # A single first page could falsely block otherwise eligible 100+ commit PRs.
+    actors = parent_parser().material_authors(REPO, number, sha)
     runs = api(
         f"repos/{REPO}/actions/runs?head_sha={sha}&event=pull_request&per_page=30"
     ).get("workflow_runs", [])
@@ -345,6 +346,20 @@ def selftest():
     # Whole-gate regression: a red review must block even after a PASS;
     # repeated PASS reviews must not accidentally block clean current head.
     saved_api = globals()["api"]
+    saved_parent_parser = globals()["parent_parser"]
+    real_parent = saved_parent_parser()
+    class FixtureParent:
+        parse = staticmethod(real_parent.parse)
+
+        @staticmethod
+        def material_authors(repo, number, head_sha):
+            assert repo == REPO and number == 7
+            return commit_authors([{
+                "sha": head_sha,
+                "commit": {"message": "fix\\n\\nMaterial-Author: chatgpt"},
+            }], head_sha)
+
+    globals()["parent_parser"] = lambda: FixtureParent
     try:
         def exercise(verdicts, spoof_bot=False):
             dispatches = {}
@@ -449,6 +464,7 @@ def selftest():
         assert exercise(["CHANGES_REQUIRED"]) is None
     finally:
         globals()["api"] = saved_api
+        globals()["parent_parser"] = saved_parent_parser
         globals()["proof_reader"] = saved_reader
         sealed.api_raw = original_api_raw
     print("Independent review gate pilot selftest passed")
