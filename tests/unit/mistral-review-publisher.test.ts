@@ -71,6 +71,7 @@ describe('Mistral review publisher isolation', () => {
     expect(commands).not.toContain('npm ');
     expect(commands).not.toContain('gh pr merge');
   });
+
   it('never loads PR-controlled hooks or agent instructions with model credentials', () => {
     const model = workflow.jobs['mistral-vibe'];
     const stage = model.steps.find(
@@ -89,5 +90,4 @@ describe('Mistral review publisher isolation', () => {
     expect(execute?.run).not.toContain('--enabled-tools bash');
     expect(execute?.run).not.toContain('--enabled-tools write_file');
   });
-
 });
