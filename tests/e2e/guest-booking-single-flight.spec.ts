@@ -124,6 +124,7 @@ test('French guest booking rejects a duplicate submit while the POST is pending 
   await mockLiveQueueStatus(page);
   await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel('Votre nom').fill('Guest Un');
+  await page.locator('input[type="email"]').fill('guest@example.test');
 
   await submitFormTwice(page);
   expect(await getBookingFetchCallCount(page)).toBe(1);
@@ -166,6 +167,7 @@ test('Arabic RTL guest booking rejects duplicate submits, then a genuine retry a
   await page.goto('/guest/live-queue/test-selection-ref');
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
   await page.getByLabel('اسمك').fill('ضيف');
+  await page.locator('input[type="email"]').fill('guest@example.test');
 
   await submitFormTwice(page);
   expect(await getBookingFetchCallCount(page)).toBe(1);

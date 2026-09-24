@@ -64,6 +64,7 @@ type Copy = {
   contactPhone: string;
   contactEmail: string;
   contactPreferenceLabel: string;
+  contactRequirement: string;
   preferredLocaleLabel: string;
   contactPreferenceNone: string;
   contactPreferencePhone: string;
@@ -139,6 +140,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     contactPhone: 'Téléphone (optionnel)',
     contactEmail: 'Email (optionnel)',
     contactPreferenceLabel: 'Préférence de contact',
+    contactRequirement:
+      'Indiquez au moins un contact : téléphone ou e-mail. Renseignez le moyen de contact choisi.',
     preferredLocaleLabel: 'Langue préférée',
     contactPreferenceNone: 'Aucune',
     contactPreferencePhone: 'Téléphone',
@@ -245,6 +248,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     contactPhone: 'الهاتف (اختياري)',
     contactEmail: 'البريد الإلكتروني (اختياري)',
     contactPreferenceLabel: 'تفضيل الاتصال',
+    contactRequirement:
+      'أدخل وسيلة اتصال واحدة على الأقل: الهاتف أو البريد الإلكتروني. أكمل وسيلة الاتصال المفضلة.',
     preferredLocaleLabel: 'اللغة المفضلة',
     contactPreferenceNone: 'بدون',
     contactPreferencePhone: 'الهاتف',
@@ -499,6 +504,39 @@ export function GuestLiveQueueHostClient({
   // second POST.
   const bookingInFlightRef = useRef(false);
   const bookingFailureHeadingRef = useRef<HTMLHeadingElement>(null);
+  const contactPhoneInputRef = useRef<HTMLInputElement>(null);
+  const contactEmailInputRef = useRef<HTMLInputElement>(null);
+  const [contactValidationAttempted, setContactValidationAttempted] =
+    useState(false);
+
+  useEffect(() => {
+    const phoneInput = contactPhoneInputRef.current;
+    if (!phoneInput) return;
+    const emailInput = contactEmailInputRef.current;
+    const trimmedPhoneLength = contactPhone.trim().length;
+    const trimmedEmailLength = contactEmail.trim().length;
+    const noContact = trimmedPhoneLength === 0 && trimmedEmailLength === 0;
+    const phoneRequired =
+      contactValidationAttempted &&
+      (noContact || contactPreference === 'phone') &&
+      trimmedPhoneLength === 0;
+    const emailRequired =
+      contactValidationAttempted &&
+      (noContact || contactPreference === 'email') &&
+      trimmedEmailLength === 0;
+    phoneInput.setCustomValidity(
+      (trimmedPhoneLength > 0 && trimmedPhoneLength < 3) || phoneRequired
+        ? copy.contactRequirement
+        : '',
+    );
+    emailInput?.setCustomValidity(emailRequired ? copy.contactRequirement : '');
+  }, [
+    contactEmail,
+    contactPhone,
+    contactPreference,
+    contactValidationAttempted,
+    copy.contactRequirement,
+  ]);
 
   // Announce booking failure at the retryable form, not on initial load.
   useEffect(() => {
@@ -578,7 +616,33 @@ export function GuestLiveQueueHostClient({
           <p>{copy.bookingFailedBody}</p>
         </div>
       ) : null}
-      <form onSubmit={submitBooking}>
+      <form
+        onSubmit={(event) => {
+          setContactValidationAttempted(true);
+          const phone = contactPhoneInputRef.current;
+          const email = contactEmailInputRef.current;
+          const trimmedPhoneLength = contactPhone.trim().length;
+          const trimmedEmailLength = contactEmail.trim().length;
+          const noContact =
+            trimmedPhoneLength === 0 && trimmedEmailLength === 0;
+          const missingPreferredPhone =
+            contactPreference === 'phone' && trimmedPhoneLength === 0;
+          const missingPreferredEmail =
+            contactPreference === 'email' && trimmedEmailLength === 0;
+          if (noContact || missingPreferredPhone || missingPreferredEmail) {
+            const invalidInput =
+              missingPreferredEmail ||
+              (noContact && contactPreference === 'email')
+                ? email
+                : phone;
+            invalidInput?.setCustomValidity(copy.contactRequirement);
+            event.preventDefault();
+            invalidInput?.reportValidity();
+            return;
+          }
+          void submitBooking(event);
+        }}
+      >
         <label>
           {copy.privateDisplayName}
           <input
@@ -592,7 +656,10 @@ export function GuestLiveQueueHostClient({
         <label>
           {copy.contactPhone}
           <input
+            ref={contactPhoneInputRef}
             type="tel"
+            minLength={3}
+            aria-describedby="guest-contact-requirement"
             value={contactPhone}
             onChange={(event) => setContactPhone(event.target.value)}
             disabled={phase.kind === 'booking'}
@@ -601,12 +668,17 @@ export function GuestLiveQueueHostClient({
         <label>
           {copy.contactEmail}
           <input
+            ref={contactEmailInputRef}
             type="email"
+            minLength={3}
+            maxLength={254}
+            aria-describedby="guest-contact-requirement"
             value={contactEmail}
             onChange={(event) => setContactEmail(event.target.value)}
             disabled={phase.kind === 'booking'}
           />
         </label>
+        <p id="guest-contact-requirement">{copy.contactRequirement}</p>
         <fieldset disabled={phase.kind === 'booking'}>
           <legend>{copy.contactPreferenceLabel}</legend>
           {(

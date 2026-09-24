@@ -15,6 +15,7 @@ async function openLiveQueue(page: Page) {
   );
   await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel(/Votre nom|اسمك/).fill('Test Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: /Confirmer|تأكيد/ }).click();
 }
 

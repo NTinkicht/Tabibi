@@ -61,6 +61,7 @@ for (const locale of ['fr', 'ar'] as const) {
       await expect(rtlForm).toBeVisible();
     }
     await page.getByLabel(name).fill('Guest');
+    await page.locator('input[type="email"]').fill('guest@example.test');
     await page.getByRole('button', { name: submit }).click();
 
     const errorHeading = page.getByRole('heading', {

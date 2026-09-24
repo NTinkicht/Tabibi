@@ -53,6 +53,7 @@ test('French guest booking clearly labels preferred language and submits selecte
     preferredLanguage.getByRole('radio', { name: 'العربية' }),
   ).toBeChecked();
   await page.getByLabel('Votre nom').fill('Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: 'Confirmer la réservation' }).click();
   await expect.poll(getSelectedLocale).toBe('ar');
   expect(page.url()).not.toContain(PRIVATE_BEARER);
@@ -82,6 +83,7 @@ test('Arabic RTL guest booking labels language independently from contact and su
     preferredLanguage.getByRole('radio', { name: 'Français' }),
   ).toBeChecked();
   await page.getByLabel('اسمك').fill('Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
   await expect.poll(getSelectedLocale).toBe('fr');
   expect(page.url()).not.toContain(PRIVATE_BEARER);
@@ -99,6 +101,7 @@ test('French browser defaults the booking preference to French without manual se
     preferredLanguage.getByRole('radio', { name: 'Français' }),
   ).toBeChecked();
   await page.getByLabel('Votre nom').fill('Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: 'Confirmer la réservation' }).click();
   await expect.poll(getSelectedLocale).toBe('fr');
   expect(page.url()).not.toContain(PRIVATE_BEARER);
@@ -123,6 +126,7 @@ test('Arabic browser defaults preferred booking language to Arabic after hydrati
     preferredLanguage.getByRole('radio', { name: 'العربية' }),
   ).toBeChecked();
   await page.getByLabel('اسمك').fill('Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
   await expect.poll(getSelectedLocale).toBe('ar');
   expect(page.url()).not.toContain(PRIVATE_BEARER);

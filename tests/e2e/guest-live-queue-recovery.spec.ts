@@ -25,6 +25,7 @@ async function mockBooking(page: Page, bearer = BEARER) {
 async function submitBookingForm(page: Page, name = 'Test Guest') {
   await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel(/Votre nom|اسمك/).fill(name);
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: /Confirmer|تأكيد/ }).click();
 }
 
@@ -117,6 +118,7 @@ test('a fresh authorized re-entry (a successful booking retry) immediately refle
 
   await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel(/Votre nom|اسمك/).fill('Test Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   const submit = page.getByRole('button', { name: /Confirmer/ });
   await submit.click();
   await expect(page.getByText(/indisponible/)).toBeVisible();
@@ -323,6 +325,7 @@ test('Arabic renders the stale-response suppression and reload-recovery behavior
 
   await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel('اسمك').fill('Test Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
 

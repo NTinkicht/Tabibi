@@ -25,6 +25,7 @@ async function mockBooking(page: Page, bearer = BEARER) {
 async function submitBookingForm(page: Page) {
   const response = await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel(/Votre nom|اسمك/).fill('Test Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: /Confirmer|تأكيد/ }).click();
   return response;
 }
@@ -718,6 +719,7 @@ test('Arabic renders RTL and French renders LTR with equivalent state semantics'
     });
   });
   await page.getByLabel('اسمك').fill('Test Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
   await expect(page.getByText('في الانتظار')).toBeVisible();
@@ -761,6 +763,7 @@ test('reuses the same idempotency key across a retry after a failed submission',
 
   await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel(/Votre nom|اسمك/).fill('Test Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   const submit = page.getByRole('button', { name: /Confirmer|تأكيد/ });
   await submit.click();
   await expect(page.getByText(/indisponible|غير متاح/)).toBeVisible();

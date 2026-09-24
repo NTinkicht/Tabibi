@@ -27,6 +27,7 @@ async function submitBookingForm(
 ) {
   await page.goto(path);
   await page.getByLabel(/Votre nom|اسمك/).fill('Test Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: /Confirmer|تأكيد/ }).click();
 }
 
@@ -200,6 +201,7 @@ test('Arabic renders the active-consultation status with RTL parity', async ({
 
   await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel('اسمك').fill('Test Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
 
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
@@ -247,6 +249,7 @@ test('Arabic uses the dedicated singular and dual noun forms for 1 and 2 minutes
 
   await page.goto('/guest/live-queue/test-selection-ref');
   await page.getByLabel('اسمك').fill('Test Guest');
+  await page.locator('input[type="email"]').fill('guest@example.test');
   await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
 
   await expect(
