@@ -1552,7 +1552,9 @@ test('matching directory total includes clinics not yet revealed by show more', 
     'Cliniques correspondantes : 8 sur 9 cliniques du répertoire.',
   );
   await expect(page.locator('.publicClinic')).toHaveCount(6);
-  await page.getByRole('button', { name: /Afficher 2 autres cliniques/ }).click();
+  await page
+    .getByRole('button', { name: /Afficher 2 autres cliniques/ })
+    .click();
   await expect(page.locator('.publicClinic')).toHaveCount(8);
   await expect(matching).toHaveText(
     'Cliniques correspondantes : 8 sur 9 cliniques du répertoire.',
