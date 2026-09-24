@@ -12,7 +12,7 @@ Parent: #481. This is a staged implementation contract, **not** proof of a funct
 
 ## Execution strategy
 1. Start with the GitHub-hosted, manual/owner-only **readiness check**, upgraded to call both existing adapter selftests; this does not invoke any model, consume credits or obtain provider credentials. Reuse the existing scoped code adapters rather than build duplicates.
-2. The **existing** Mistral scoped-code Action is eligible for actual inference only after an owner confirms the configured key is a Vibe-specific key for the intended organization, included allowance is available, and PAYG is disabled. A generic Studio API key is not sufficient evidence of subscription-backed execution. Validate on a synthetic bounded WU, with one canonical branch, least-privilege token, no forked/untrusted code receiving credentials, and a maximum runtime/turn budget.
+2. The **existing** Mistral scoped-code Action is eligible for actual inference only after an owner confirms the configured key is authorized for Vibe in the intended Mistral Organization, included allowance is available, and PAYG is disabled. Mistral documents that its plan usage is shared across Vibe, Studio and API; the key name or a successful whoami response alone does not prove PAYG status or remaining allowance. Validate on a synthetic bounded WU, with one canonical branch, least-privilege token, no forked/untrusted code receiving credentials, and a maximum runtime/turn budget.
 3. For Grok, use an owner-linked Grok Bot cloud routine that consumes the authorized GitHub PR lease and posts a bounded proposal to the **existing** Grok Cloud Code Proposal Adapter. API-key-only Actions would be metered and are NOT authorized. Do not export or serialize owner OAuth into hosted runners. Until an actual Codespace-OFF Bot-to-PR proof exists, record `AUTH_BLOCKED` or `RUNTIME_UNVERIFIED` and do not claim Grok is an autonomous cloud coder.
 4. GitHub issue/PR state is the durable queue. Existing adapter leases bind actor, capability, PR, exact head SHA, stream and bounded file scope. Extend the next dispatcher revision to bind issue identity and expiry as well; do not claim those fields are enforced by the existing adapters. A trusted dispatcher verifies repo, sender, lease, authorship and current branch before executing. One active material implementer and one canonical PR per WU.
 5. After changes, use exact-head required CI and an independent non-author full-SHA review. On failure, reassign the **same** branch/PR to the implementer. Limit attempts and time; classify quota/auth failures and fail over without paying. Merge only after all gates pass, then replenish the queue.
@@ -23,6 +23,10 @@ Parent: #481. This is a staged implementation contract, **not** proof of a funct
 - A model cannot access provider credentials, production data or a write token by reading an untrusted repository file or PR body.
 - Cancelled/failed run leaves a resumable canonical stream, not a duplicate branch.
 - No API/PAYG, keepalive, added hosting or new owner spending is implicitly enabled.
+
+## Provider documentation
+- Mistral: https://docs.mistral.ai/vibe/code/cli/api-keys-profiles and https://docs.mistral.ai/admin/billing-usage/subscriptions (included usage shared across Vibe, API and Studio; PAYG setting is an Organization decision).
+- Grok: https://docs.x.ai/build/cli/headless-scripting and https://docs.x.ai/grok-bot/skills-routines-and-automations (a cloud Bot routine is separate from a GitHub-hosted Grok Build CLI runner).
 
 ## Acceptance evidence
 A Codespace-OFF owner-issued WU is implemented on a GitHub-hosted worker, creates a real tested PR, receives a valid independent review, remediates any findings, and is mechanically merged after exact-head gates. Prove separately for each provider. A readiness check or a plan-only PR does not satisfy this acceptance criterion.
