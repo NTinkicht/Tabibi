@@ -16,7 +16,9 @@ export default function GuestPrivacyHelpPage() {
             Ne partagez jamais votre mot de passe, un code d’accès ou des
             documents médicaux dans un champ non prévu.
           </li>
-          <li>Fermez la page sur un appareil partagé lorsque vous avez terminé.</li>
+          <li>
+            Fermez la page sur un appareil partagé lorsque vous avez terminé.
+          </li>
         </ul>
         <Link href="/guest/booking-contact-help">
           Revenir à l’aide sur les coordonnées
