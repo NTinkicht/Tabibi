@@ -39,22 +39,29 @@ def after(text):
     return dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
 
 
+def parent_parser():
+    location = Path("scripts/mistral-review-target.py")
+    spec = importlib.util.spec_from_file_location("trusted_mistral_target", location)
+    if spec is None or spec.loader is None:
+        raise ValueError("Shared trusted review parser unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def single_owner_dispatch(body, number, sha, actors):
-    if body.count("BINDING_EXACT_HEAD_REVIEW") != 1:
+    """Use the SAME trusted grammar as the actual model-dispatch parent."""
+    try:
+        target = parent_parser().parse(body)
+    except (ValueError, TypeError):
         return False
-    fields = {}
-    for name in ("review_pr", "review_sha", "material_authors"):
-        hits = re.findall(r"(?m)^" + name + r":[ \t]*(.*?)[ \t]*$", body)
-        if len(hits) != 1:
-            return False
-        fields[name] = hits[0].strip()
-    authors = {x.strip().lower() for x in fields["material_authors"].split(",")}
-    return (
-        fields["review_pr"] == str(number)
-        and fields["review_sha"] == sha
-        and authors == actors
-        and ACTOR not in authors
-        and "mistral" not in authors
+    return bool(
+        target is not None
+        and target[0] == number
+        and target[1] == sha
+        and set(target[2].split(",")) == actors
+        and ACTOR not in actors
+        and "mistral" not in actors
     )
 
 
