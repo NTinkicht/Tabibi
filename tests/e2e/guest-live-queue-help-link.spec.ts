@@ -191,11 +191,11 @@ test('opens help in a new tab without losing the live guest session', async ({
   const popupPromise = page.waitForEvent('popup');
   await helpLink.click();
   const helpPage = await popupPromise;
-  await expect(helpPage).toHaveURL(/\\/guest\\/help$/);
+  await expect.poll(() => new URL(helpPage.url()).pathname).toBe('/guest/help');
   expect(helpPage.url()).not.toContain(BEARER);
   await helpPage.close();
 
-  await expect(page).toHaveURL(/\\/guest\\/live-queue\\/test-selection-ref$/);
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/guest/live-queue/test-selection-ref');
   await expect(page.getByText('G-042')).toBeVisible();
   await expect(page.getByText(/en attente/)).toBeVisible();
   expect(await page.locator('body').innerText()).not.toContain(BEARER);
