@@ -175,7 +175,7 @@ jobs:
           timeout --signal=TERM --kill-after=15s 480s vibe \
             --trust --agent plan --workdir /tmp/tabibi-mistral-readonly \
             --enabled-tools grep --enabled-tools read_file \
-            --max-turns 3 --max-tokens 45000 --output text \
+            --max-turns 8 --max-tokens 45000 --output text \
             --prompt "$(cat /tmp/tabibi-mistral-code-prompt.txt)" \
             > /tmp/tabibi-mistral-code.txt 2> /tmp/tabibi-mistral-code-error.txt
           code=$?
@@ -187,12 +187,43 @@ jobs:
             echo 'status=TOKEN_BUDGET_EXCEEDED' >> "$GITHUB_OUTPUT"
           elif [[ "$code" != 0 ]] && grep -Eqi '429|rate.?limit|quota|capacity' /tmp/tabibi-mistral-code-error.txt; then
             echo 'status=CAPACITY_DEGRADED' >> "$GITHUB_OUTPUT"
+          elif [[ "$code" != 0 ]] && grep -Eqi 'turn.?limit|max.?turns|turns.*exhausted' /tmp/tabibi-mistral-code-error.txt; then
+            echo 'status=TURN_LIMIT_EXCEEDED' >> "$GITHUB_OUTPUT"
+          elif [[ "$code" != 0 ]] && grep -Eqi 'not a git repository|workspace.*trust|trusted.*workspace|not trusted' /tmp/tabibi-mistral-code-error.txt; then
+            echo 'status=WORKSPACE_NOT_READY' >> "$GITHUB_OUTPUT"
+          elif [[ "$code" != 0 ]] && grep -Eqi 'unknown option|unrecognized arguments|no such option|invalid.*agent' /tmp/tabibi-mistral-code-error.txt; then
+            echo 'status=CLI_INCOMPATIBLE' >> "$GITHUB_OUTPUT"
+          elif [[ "$code" != 0 ]] && grep -Eqi '401|403|unauthorized|unauthorised|invalid.*key|entitlement' /tmp/tabibi-mistral-code-error.txt; then
+            echo 'status=AUTH_OR_ENTITLEMENT_FAILED' >> "$GITHUB_OUTPUT"
           elif [[ "$code" != 0 ]]; then
             echo 'status=EXECUTION_FAILED' >> "$GITHUB_OUTPUT"
           else
             echo 'status=PROPOSAL_READY' >> "$GITHUB_OUTPUT"
           fi
-          # Raw model output/stderr never appear in PR comments or logs.
+          # Never print free-form provider stderr: it might contain prompt,
+          # credentials or patient data. Report only fixed, allowlisted signals.
+          if [[ "$code" != "0" ]]; then
+            python3 - <<'PY'
+          import hashlib
+          import re
+          from pathlib import Path
+
+          raw = Path('/tmp/tabibi-mistral-code-error.txt').read_bytes()
+          text = raw.decode('utf-8', errors='replace')
+          categories = {
+              'turn_limit': r'(?i)turn.?limit|max.?turns|turns.*exhausted',
+              'workspace': r'(?i)not a git repository|workspace.*trust|trusted.*workspace|not trusted',
+              'cli_options': r'(?i)unknown option|unrecognized arguments|no such option|invalid.*agent',
+              'entitlement': r'(?i)401|403|unauthorized|unauthorised|invalid.*key|entitlement',
+              'rate_limit': r'(?i)429|rate.?limit|quota|capacity',
+              'context': r'(?i)token limit exceeded|context.*exceeded',
+          }
+          matched = [name for name, pattern in categories.items() if re.search(pattern, text)]
+          print('Vibe diagnostic categories=' + (','.join(matched) if matched else 'unclassified'))
+          print('Vibe stderr bytes=' + str(len(raw)))
+          print('Vibe stderr sha256-prefix=' + hashlib.sha256(raw).hexdigest()[:16])
+          PY
+          fi
 
       - name: Refuse to upload a proposal that echoes the model API credential
         if: steps.model.outputs.exit_code == '0'

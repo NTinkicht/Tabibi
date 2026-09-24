@@ -102,7 +102,10 @@ describe('Mistral code adapter uses owner per-WU leases', () => {
     expect(model.run).toContain(
       '--enabled-tools grep --enabled-tools read_file',
     );
-    expect(model.run).toContain('--max-turns 3');
+    expect(model.run).toContain('--max-turns 8');
+    expect(model.run).toContain('Vibe diagnostic categories=');
+    expect(model.run).not.toContain('print(line)');
+    expect(model.run).not.toContain('print(raw)');
     expect(model.run).not.toContain('--yolo');
     expect(model.run).not.toContain('--auto-approve');
     expect(model.run).not.toContain('git push');
