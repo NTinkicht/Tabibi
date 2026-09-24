@@ -49,6 +49,18 @@ test('queue next steps are bilingual, RTL-aware and link to safe guidance', asyn
   await expect(
     arabic.getByRole('link', { name: 'حماية معلوماتك' }),
   ).toHaveAttribute('href', '/guest/privacy-help');
+  await expect(page.getByTestId('waiting-emergency-fr')).toContainText(
+    'services d’urgence locaux',
+  );
+  await expect(page.getByTestId('waiting-emergency-fr')).toContainText(
+    'n’attendez pas une mise à jour de la file',
+  );
+  await expect(page.getByTestId('waiting-emergency-ar')).toContainText(
+    'خدمات الطوارئ المحلية',
+  );
+  await expect(page.getByTestId('waiting-emergency-ar')).toContainText(
+    'ولا تنتظر تحديث قائمة الانتظار',
+  );
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   expect(await page.locator('body').innerText()).not.toContain(
     PRIVATE_SENTINEL,
