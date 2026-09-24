@@ -105,7 +105,7 @@ def material_authors(repo, number, exact_sha):
                 raise ValueError("Commit provenance SHA is invalid")
             message = commit.get("commit", {}).get("message", "")
             trailers = re.findall(
-                r"(?mi)^Material-Author:[ \\t]*([a-z0-9_-]+)[ \\t]*$", message
+                r"(?mi)^Material-Author:[ \t]*([a-z0-9_-]+)[ \t]*$", message
             )
             if len(trailers) != 1:
                 raise ValueError("Missing or conflicting per-commit actor provenance")
