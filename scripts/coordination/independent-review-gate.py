@@ -270,6 +270,77 @@ def selftest():
     assert not exact_head_ci([green, dict(green, id=3, run_attempt=2,
                                          conclusion="failure")],
                              lambda _: jobs, sha)
+    # Whole-gate regression: a red review must block even after a PASS;
+    # repeated PASS reviews must not accidentally block clean current head.
+    saved_api = globals()["api"]
+    try:
+        def exercise(verdicts):
+            dispatches = {}
+            runs = {}
+            comments = []
+            for index, verdict in enumerate(verdicts):
+                identifier = 44 + index
+                run_id = 18 + index
+                hour = 10 + index
+                dispatches[str(identifier)] = dict(
+                    dispatch, id=identifier,
+                    created_at=f"2026-09-24T{hour:02d}:00:00Z",
+                )
+                runs[str(run_id)] = dict(
+                    run, id=run_id,
+                    created_at=f"2026-09-24T{hour:02d}:01:00Z",
+                    updated_at=f"2026-09-24T{hour:02d}:03:00Z",
+                )
+                comments.append(dict(
+                    comment,
+                    created_at=f"2026-09-24T{hour:02d}:02:00Z",
+                    body=comment["body"]
+                    .replace("VERDICT: PASS", f"VERDICT: {verdict}")
+                    .replace("review-run:18", f"review-run:{run_id}")
+                    .replace("dispatch-comment:44", f"dispatch-comment:{identifier}"),
+                ))
+
+            def mocked_api(route):
+                if route.endswith("/pulls/7"):
+                    return {
+                        "state": "open", "draft": False,
+                        "head": {"sha": sha, "repo": {"full_name": REPO}},
+                        "base": {"ref": "main", "repo": {"full_name": REPO}},
+                    }
+                if route.endswith("/pulls/7/commits?per_page=100"):
+                    return [{
+                        "sha": sha,
+                        "commit": {"message": "fix\n\nMaterial-Author: chatgpt"},
+                    }]
+                if "/actions/runs?head_sha=" in route:
+                    return {"workflow_runs": [green]}
+                if route.endswith("/actions/runs/2/jobs?filter=latest&per_page=100"):
+                    return {"jobs": jobs}
+                if "/issues/7/comments?per_page=100&page=" in route:
+                    return comments if route.endswith("page=1") else []
+                for name, prefix, values in (
+                    ("dispatch", "/issues/comments/", dispatches),
+                    ("run", "/actions/runs/", runs),
+                ):
+                    if prefix in route:
+                        key = route.rsplit("/", 1)[-1]
+                        if key in values:
+                            return values[key]
+                raise ValueError("Unexpected mock route")
+
+            globals()["api"] = mocked_api
+            try:
+                return evaluate(7)
+            except ValueError:
+                return None
+
+        assert exercise(["PASS"]) == sha
+        assert exercise(["PASS", "PASS"]) == sha
+        assert exercise(["PASS", "CHANGES_REQUIRED"]) is None
+        assert exercise(["PASS", "PASS_WITH_MINOR_FINDINGS"]) is None
+        assert exercise(["CHANGES_REQUIRED"]) is None
+    finally:
+        globals()["api"] = saved_api
     print("Independent review gate pilot selftest passed")
 
 
