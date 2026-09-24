@@ -21,9 +21,7 @@ export default function GuestQueueArrivalHelpPage() {
 
       <section lang="ar" dir="rtl" aria-labelledby="queue-arrival-ar">
         <h1 id="queue-arrival-ar">عند وصولك إلى العيادة</h1>
-        <p>
-          أبقِ صفحة قائمة الانتظار مفتوحة واتبع الحالة المعروضة لحجزك فقط.
-        </p>
+        <p>أبقِ صفحة قائمة الانتظار مفتوحة واتبع الحالة المعروضة لحجزك فقط.</p>
         <ul>
           <li>أكد حضورك عندما يظهر زر التأكيد.</li>
           <li>حدّث الحالة إذا انقطع اتصالك.</li>
