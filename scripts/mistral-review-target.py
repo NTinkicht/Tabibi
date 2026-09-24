@@ -251,6 +251,32 @@ def main():
                     pass
                 else:
                     raise AssertionError("Self/undeclared material author accepted")
+            # 101 commits: one full page plus the actual final head on page 2.
+            # The gate must reuse this exact paginated proof rather than the
+            # former first-page-only commit_authors() limit.
+            def paginated_api(route):
+                if route.endswith("/commits?per_page=100&page=1"):
+                    return [{
+                        "sha": f"{index + 1:040x}",
+                        "commit": {"message": "feat: demo\\n\\nMaterial-Author: chatgpt"},
+                        "author": {"login": "NTinkicht"},
+                    } for index in range(100)]
+                if route.endswith("/commits?per_page=100&page=2"):
+                    return [{
+                        "sha": "a" * 40,
+                        "commit": {"message": "feat: final\\n\\nMaterial-Author: chatgpt"},
+                        "author": {"login": "NTinkicht"},
+                    }]
+                raise ValueError("Unexpected page")
+            globals()["github_json"] = paginated_api
+            assert material_authors("owner/repo", 1, "a" * 40) == {"chatgpt"}
+            assert verify_provenance("owner/repo", 1, "a" * 40, "chatgpt")
+            try:
+                material_authors("owner/repo", 1, "b" * 40)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("Incorrect final head accepted")
         finally:
             globals()["github_json"] = original_api
         print("Mistral review-target parser and security selftests passed")
