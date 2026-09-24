@@ -25,6 +25,9 @@ test('guest booking next steps are clear in French without private data', async 
     french.getByRole('link', { name: 'Revoir la préparation' }),
   ).toHaveAttribute('href', '/guest/booking-help');
   await expect(
+    french.getByRole('link', { name: 'Protéger vos informations' }),
+  ).toHaveAttribute('href', '/guest/privacy-help');
+  await expect(
     french.getByRole('link', {
       name: 'Comprendre les notifications de réservation',
     }),
@@ -60,6 +63,9 @@ test('guest booking next steps are equivalent in Arabic RTL', async ({
   await expect(
     arabic.getByRole('link', { name: 'مراجعة التحضير' }),
   ).toHaveAttribute('href', '/guest/booking-help');
+  await expect(
+    arabic.getByRole('link', { name: 'حماية معلوماتك' }),
+  ).toHaveAttribute('href', '/guest/privacy-help');
   await expect(
     arabic.getByRole('link', { name: 'فهم إشعارات الحجز' }),
   ).toHaveAttribute('href', '/guest/notification-help');
