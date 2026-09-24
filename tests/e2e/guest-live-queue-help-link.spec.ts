@@ -113,14 +113,19 @@ test('guest live queue help link preserves queue polling and status', async ({
     });
   });
 
+  await page.clock.install();
   await submitBookingForm(page);
 
   await expect(page.getByText('G-042')).toBeVisible();
 
   const helpLink = page.getByTestId('guest-live-queue-help-link');
   await expect(helpLink).toBeVisible();
+  await expect.poll(() => pollCount).toBeGreaterThanOrEqual(1);
 
-  await expect(page.getByText(/en attente|تم تسجيل الوصول/)).toBeVisible();
+  await page.clock.fastForward(30_000);
+  await expect.poll(() => pollCount).toBeGreaterThanOrEqual(2);
+  await expect(page.getByText('enregistré')).toBeVisible();
+  await expect(helpLink).toBeVisible();
 });
 
 test('guest live queue help link does not expose capability tokens in DOM', async ({
