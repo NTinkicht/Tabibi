@@ -17,8 +17,14 @@ test('guest privacy help provides equivalent French and Arabic guidance', async 
       name: 'حماية معلوماتك أثناء استخدام مسار الضيف',
     }),
   ).toBeVisible();
-  await expect(french.getByRole('listitem')).toHaveCount(3);
-  await expect(arabic.getByRole('listitem')).toHaveCount(3);
+  await expect(french.getByRole('listitem')).toHaveCount(4);
+  await expect(french.getByRole('listitem').nth(2)).toHaveText(
+    'Gardez votre lien de réservation privé : une personne qui le reçoit pourrait accéder à votre suivi.',
+  );
+  await expect(arabic.getByRole('listitem')).toHaveCount(4);
+  await expect(arabic.getByRole('listitem').nth(2)).toHaveText(
+    'احتفظ برابط الحجز لنفسك؛ فقد يتمكن من يحصل عليه من الوصول إلى متابعة حجزك.',
+  );
   await expect(
     french.getByRole('link', { name: 'Revenir à l’aide sur les coordonnées' }),
   ).toHaveAttribute('href', '/guest/booking-contact-help');
