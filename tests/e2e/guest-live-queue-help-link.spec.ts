@@ -195,7 +195,9 @@ test('opens help in a new tab without losing the live guest session', async ({
   expect(helpPage.url()).not.toContain(BEARER);
   await helpPage.close();
 
-  await expect.poll(() => new URL(page.url()).pathname).toBe('/guest/live-queue/test-selection-ref');
+  await expect
+    .poll(() => new URL(page.url()).pathname)
+    .toBe('/guest/live-queue/test-selection-ref');
   await expect(page.getByText('G-042')).toBeVisible();
   await expect(page.getByText(/en attente/)).toBeVisible();
   expect(await page.locator('body').innerText()).not.toContain(BEARER);
