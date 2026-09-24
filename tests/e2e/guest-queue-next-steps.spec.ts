@@ -32,7 +32,5 @@ test('queue next steps are bilingual, RTL-aware and link to safe guidance', asyn
     arabic.getByRole('link', { name: 'فهم تقدير وقت الانتظار' }),
   ).toHaveAttribute('href', '/guest/eta-explained?lang=ar');
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
-  expect(await page.locator('body').innerText()).not.toContain(
-    PRIVATE_SENTINEL,
-  );
+  expect(await page.locator('body').innerText()).not.toContain(PRIVATE_SENTINEL);
 });
