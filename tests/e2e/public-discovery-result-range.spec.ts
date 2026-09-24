@@ -65,11 +65,10 @@ test('French result range reveals public clinics in bounded batches and resets o
   await expect(range).toHaveText(
     'Résultats affichés : 1 à 6 sur 8 cliniques correspondantes.',
   );
+  // A single changing live-region sentence; no duplicate name/content count.
+  await expect(range).not.toHaveAttribute('aria-label');
+  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
   await expect(range).toHaveAttribute('role', 'status');
-  await expect(range).toHaveAttribute(
-    'aria-label',
-    'Cliniques correspondantes : 8. Cliniques actuellement affichées : 6.',
-  );
   await expect(page.locator('.publicClinic')).toHaveCount(6);
   const showMore = page.getByTestId('show-more-clinics');
   await expect(showMore).toHaveText('Afficher 2 autres cliniques');
@@ -78,10 +77,9 @@ test('French result range reveals public clinics in bounded batches and resets o
   await expect(range).toHaveText(
     'Résultats affichés : 1 à 8 sur 8 cliniques correspondantes.',
   );
-  await expect(range).toHaveAttribute(
-    'aria-label',
-    'Cliniques correspondantes : 8. Cliniques actuellement affichées : 8.',
-  );
+  // A single changing live-region sentence; no duplicate name/content count.
+  await expect(range).not.toHaveAttribute('aria-label');
+  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
   await expect(showMore).toHaveCount(0);
 
   const search = page.getByRole('searchbox', {
@@ -91,15 +89,17 @@ test('French result range reveals public clinics in bounded batches and resets o
   await expect(range).toHaveText(
     'Résultats affichés : 1 à 1 sur 1 clinique correspondante.',
   );
+  // A single changing live-region sentence; no duplicate name/content count.
+  await expect(range).not.toHaveAttribute('aria-label');
+  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
   await expect(page.locator('.publicClinic')).toHaveCount(1);
   await search.fill('aucune clinique');
   await expect(range).toHaveText(
     'Aucun résultat parmi 0 cliniques correspondantes.',
   );
-  await expect(range).toHaveAttribute(
-    'aria-label',
-    'Cliniques correspondantes : 0. Cliniques actuellement affichées : 0.',
-  );
+  // A single changing live-region sentence; no duplicate name/content count.
+  await expect(range).not.toHaveAttribute('aria-label');
+  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
   await expect(page.locator('.publicClinic')).toHaveCount(0);
   await search.press('Escape');
   await expect(search).toHaveValue('');
@@ -107,6 +107,9 @@ test('French result range reveals public clinics in bounded batches and resets o
   await expect(range).toHaveText(
     'Résultats affichés : 1 à 6 sur 8 cliniques correspondantes.',
   );
+  // A single changing live-region sentence; no duplicate name/content count.
+  await expect(range).not.toHaveAttribute('aria-label');
+  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
   expect(await page.locator('main').innerText()).not.toContain(
     'private-range-tenant',
   );
@@ -128,14 +131,16 @@ test('Arabic RTL mobile result range respects sorting, filters and public-data b
   await expect(range).toHaveText(
     'النتائج المعروضة: من 1 إلى 6 من أصل 7 عيادة مطابقة.',
   );
-  await expect(range).toHaveAttribute(
-    'aria-label',
-    'العيادات المطابقة: 7. العيادات المعروضة حاليًا: 6.',
-  );
+  // A single changing live-region sentence; no duplicate name/content count.
+  await expect(range).not.toHaveAttribute('aria-label');
+  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
   await page.getByTestId('show-more-clinics').click();
   await expect(range).toHaveText(
     'النتائج المعروضة: من 1 إلى 7 من أصل 7 عيادة مطابقة.',
   );
+  // A single changing live-region sentence; no duplicate name/content count.
+  await expect(range).not.toHaveAttribute('aria-label');
+  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
   const search = page.getByRole('searchbox', {
     name: 'ابحث عن عيادة أو طبيب',
   });
@@ -143,18 +148,22 @@ test('Arabic RTL mobile result range respects sorting, filters and public-data b
   await expect(range).toHaveText(
     'النتائج المعروضة: من 1 إلى 1 من أصل 1 عيادة مطابقة.',
   );
+  // A single changing live-region sentence; no duplicate name/content count.
+  await expect(range).not.toHaveAttribute('aria-label');
+  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
   await expect(page.locator('.publicClinic')).toHaveCount(1);
   await search.fill('لا تطابق');
   await expect(range).toHaveText('لا توجد نتائج معروضة من أصل 0 عيادة مطابقة.');
-  await expect(range).toHaveAttribute(
-    'aria-label',
-    'العيادات المطابقة: 0. العيادات المعروضة حاليًا: 0.',
-  );
+  await expect(range).not.toHaveAttribute('aria-label');
+  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
   await search.press('Escape');
   await expect(page.locator('.publicClinic')).toHaveCount(6);
   await expect(range).toHaveText(
     'النتائج المعروضة: من 1 إلى 6 من أصل 7 عيادة مطابقة.',
   );
+  // A single changing live-region sentence; no duplicate name/content count.
+  await expect(range).not.toHaveAttribute('aria-label');
+  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
   expect(await page.locator('main').innerText()).not.toContain(
     'private-range-tenant',
   );
@@ -176,12 +185,11 @@ test('visible clinic total reports the true match count, not the revealed batch,
   await expect(range).toHaveText(
     'Résultats affichés : 1 à 6 sur 7 cliniques correspondantes.',
   );
+  // A single changing live-region sentence; no duplicate name/content count.
+  await expect(range).not.toHaveAttribute('aria-label');
+  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
   await expect(visibleTotal).toHaveText(
     'Cliniques correspondantes : 7 sur 10 cliniques du répertoire.',
-  );
-  await expect(range).toHaveAttribute(
-    'aria-label',
-    'Cliniques correspondantes : 7. Cliniques actuellement affichées : 6.',
   );
   await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
 
@@ -190,6 +198,9 @@ test('visible clinic total reports the true match count, not the revealed batch,
   await expect(range).toHaveText(
     'Résultats affichés : 1 à 7 sur 7 cliniques correspondantes.',
   );
+  // A single changing live-region sentence; no duplicate name/content count.
+  await expect(range).not.toHaveAttribute('aria-label');
+  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
   await expect(visibleTotal).toHaveText(
     'Cliniques correspondantes : 7 sur 10 cliniques du répertoire.',
   );
