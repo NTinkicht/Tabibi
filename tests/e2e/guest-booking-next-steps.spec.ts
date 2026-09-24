@@ -11,11 +11,14 @@ test('guest booking next steps are clear in French without private data', async 
   await expect(
     french.getByRole('heading', { name: 'Continuer votre réservation' }),
   ).toBeVisible();
-  await expect(french.getByRole('listitem')).toHaveCount(4);
+  await expect(french.getByRole('listitem')).toHaveCount(5);
+  await expect(french.getByRole('listitem').nth(3)).toHaveText(
+    'Renseignez le moyen de contact choisi comme préféré avant de confirmer.',
+  );
   await expect(french.getByRole('listitem').nth(0)).toHaveText(
     'Retournez au parcours de réservation invité.',
   );
-  await expect(french.getByRole('listitem').nth(3)).toHaveText(
+  await expect(french.getByRole('listitem').nth(4)).toHaveText(
     'Vérifiez vos informations, puis envoyez la demande une seule fois.',
   );
   await expect(french.locator('p').last()).toContainText(
@@ -50,11 +53,14 @@ test('guest booking next steps are equivalent in Arabic RTL', async ({
   await expect(
     arabic.getByRole('heading', { name: 'تابع حجز موعدك' }),
   ).toBeVisible();
-  await expect(arabic.getByRole('listitem')).toHaveCount(4);
+  await expect(arabic.getByRole('listitem')).toHaveCount(5);
+  await expect(arabic.getByRole('listitem').nth(3)).toHaveText(
+    'أدخل وسيلة التواصل المفضلة التي اخترتها قبل التأكيد.',
+  );
   await expect(arabic.getByRole('listitem').nth(0)).toHaveText(
     'ارجع إلى مسار حجز الموعد للزائر.',
   );
-  await expect(arabic.getByRole('listitem').nth(3)).toHaveText(
+  await expect(arabic.getByRole('listitem').nth(4)).toHaveText(
     'راجع معلوماتك ثم أرسل الطلب مرة واحدة فقط.',
   );
   await expect(arabic.locator('p').last()).toContainText(
