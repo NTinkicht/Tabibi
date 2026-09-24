@@ -44,6 +44,9 @@ test('guest booking next steps are clear in French without private data', async 
   await expect(
     french.getByRole('link', { name: 'Préparer votre arrivée à la clinique' }),
   ).toHaveAttribute('href', '/guest/queue-arrival-help');
+  await expect(
+    french.getByRole('link', { name: 'Voir toutes les rubriques d’aide' }),
+  ).toHaveAttribute('href', '/guest/help');
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   expect(await page.locator('body').innerText()).not.toContain(
     PRIVATE_SENTINEL,
@@ -90,8 +93,39 @@ test('guest booking next steps are equivalent in Arabic RTL', async ({
   await expect(
     arabic.getByRole('link', { name: 'استعد للوصول إلى العيادة' }),
   ).toHaveAttribute('href', '/guest/queue-arrival-help');
+  await expect(
+    arabic.getByRole('link', { name: 'عرض جميع مواضيع المساعدة' }),
+  ).toHaveAttribute('href', '/guest/help');
   expect(page.url()).not.toContain(PRIVATE_SENTINEL);
   expect(await page.locator('body').innerText()).not.toContain(
     PRIVATE_SENTINEL,
   );
+});
+
+test('booking next steps do not copy private booking data onto the help hub link', async ({
+  page,
+}) => {
+  await page.goto(
+    `/guest/booking-next-steps?bookingReference=${PRIVATE_SENTINEL}&capability=${PRIVATE_SENTINEL}`,
+  );
+
+  const frenchHelp = page
+    .locator('section[lang="fr"][dir="ltr"]')
+    .getByRole('link', { name: 'Voir toutes les rubriques d’aide' });
+  const arabicHelp = page
+    .locator('section[lang="ar"][dir="rtl"]')
+    .getByRole('link', { name: 'عرض جميع مواضيع المساعدة' });
+  await expect(frenchHelp).toHaveAttribute('href', '/guest/help');
+  await expect(arabicHelp).toHaveAttribute('href', '/guest/help');
+  expect(await page.locator('body').innerText()).not.toContain(
+    PRIVATE_SENTINEL,
+  );
+
+  await frenchHelp.click();
+  await expect(page).toHaveURL(/\/guest\/help$/);
+  await expect(page.getByTestId('guest-help-hub')).toBeVisible();
+  expect(new URL(page.url()).search).toBe('');
+  expect(page.url()).not.toContain(PRIVATE_SENTINEL);
+  expect(page.url()).not.toContain('bookingReference');
+  expect(page.url()).not.toContain('capability');
 });
