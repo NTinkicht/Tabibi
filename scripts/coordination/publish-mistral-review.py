@@ -53,6 +53,16 @@ def parent():
     return module
 
 
+def proof_reader():
+    location = Path("scripts/coordination/mistral-review-proof.py")
+    spec = importlib.util.spec_from_file_location("trusted_mistral_proof", location)
+    if spec is None or spec.loader is None:
+        raise ValueError("Run-scoped proof helper unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def trusted_report(comment, *, run_id, dispatch_id, number, sha):
     body = comment.get("body") or ""
     markers = MARKER.findall(body)
@@ -127,6 +137,13 @@ def publish():
         number=number, sha=sha,
     ):
         raise ValueError("Predecessor's provider-run report not verified")
+    sealed = proof_reader()
+    proof = sealed.read_run_proof(run_id)
+    if not sealed.matches(
+        proof, source, run_id=run_id, dispatch_id=dispatch_id,
+        pr=number, sha=sha,
+    ):
+        raise ValueError("Run-scoped artifact does not authenticate review report")
     body = source["body"]
     if any(
         c.get("user", {}).get("login") == "github-actions[bot]"
