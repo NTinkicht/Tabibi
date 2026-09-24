@@ -67,6 +67,9 @@ test('guest live queue displays FR help hub link without bearer token', async ({
 test('guest live queue displays AR help hub link without bearer token', async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'language', { get: () => 'ar-DZ' });
+  });
   await mockBooking(page);
   await page.route(STATUS_URL, async (route) => {
     await route.fulfill({
@@ -87,6 +90,7 @@ test('guest live queue displays AR help hub link without bearer token', async ({
   await expect(helpLink).toBeVisible();
   await expect(helpLink).toHaveText('عرض جميع مواضيع المساعدة');
   await expect(helpLink).toHaveAttribute('href', '/guest/help');
+  await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
 
   expect(await page.locator('body').innerText()).not.toContain(BEARER);
   expect(page.url()).not.toContain(BEARER);
