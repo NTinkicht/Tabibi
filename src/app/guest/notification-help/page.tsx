@@ -6,11 +6,21 @@ export default function GuestNotificationHelpPage() {
       <section lang="fr" dir="ltr" aria-labelledby="notification-help-fr">
         <h1 id="notification-help-fr">Comprendre les notifications Tabibi</h1>
         <ul>
-          <li>Les horaires et temps d’attente restent estimatifs et peuvent changer.</li>
-          <li>Une notification de tour vous invite à suivre les instructions de la clinique.</li>
-          <li>En cas de doute, vérifiez votre statut dans Tabibi plutôt que de répondre au message.</li>
+          <li>
+            Les horaires et temps d’attente restent estimatifs et peuvent changer.
+          </li>
+          <li>
+            Une notification de tour vous invite à suivre les instructions de la clinique.
+          </li>
+          <li>
+            En cas de doute, vérifiez votre statut dans Tabibi plutôt que de
+            répondre au message.
+          </li>
         </ul>
-        <p>Tabibi ne vous demandera jamais votre mot de passe ou un paiement dans une notification opérationnelle.</p>
+        <p>
+          Tabibi ne vous demandera jamais votre mot de passe ou un paiement dans
+          une notification opérationnelle.
+        </p>
         <Link href="/guest/status">Revenir au statut</Link>
       </section>
       <section lang="ar" dir="rtl" aria-labelledby="notification-help-ar">
