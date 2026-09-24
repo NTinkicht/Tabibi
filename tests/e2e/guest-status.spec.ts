@@ -51,6 +51,9 @@ test('guest status renders provisional waiting state without leaking bearer mate
   await expect(page.getByText('G-018')).toBeVisible();
   await expect(page.getByText(/Expected arrival window:/)).toBeVisible();
   await expect(page.getByText(/Declared clinic delay:/)).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'What to do while waiting' }),
+  ).toHaveAttribute('href', '/guest/queue-next-steps');
   const explainer = page.getByRole('link', {
     name: 'Why estimates can change',
   });
@@ -215,6 +218,9 @@ test('guest status selects French copy from browser locale', async ({
   await page.goto('/guest/status');
   await expect(page.getByText('Patients avant vous : 2')).toBeVisible();
   await expect(page.locator('section[lang="fr"][dir="ltr"]')).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Que faire pendant l’attente' }),
+  ).toHaveAttribute('href', '/guest/queue-next-steps');
   const explainer = page.getByRole('link', {
     name: 'Pourquoi ces estimations changent',
   });
@@ -242,6 +248,9 @@ test('guest status selects Arabic RTL copy from browser locale', async ({
   await page.goto('/guest/status');
   await expect(page.getByText('المرضى قبلك: 2')).toBeVisible();
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'ماذا تفعل أثناء الانتظار' }),
+  ).toHaveAttribute('href', '/guest/queue-next-steps');
   const explainer = page.getByRole('link', {
     name: 'لماذا تتغير هذه التقديرات',
   });
