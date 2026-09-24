@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-24T22:21:19.721601+00:00
+- Last sync: 2026-09-24T22:48:52.370339+00:00
 
 ## Team Room charter
 
@@ -23631,5 +23631,34 @@ Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5823179677
 I'll analyze this and get back to you.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5823183829
+
+---
+
+### 2026-09-24T22:44:05Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr487:38883d6c6ec1ba4f592eac18a829aa0503bd00de -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #487
+head: 38883d6c6ec1ba4f592eac18a829aa0503bd00de
+CI_GREEN_HANDOFF — PR #487 exact head `38883d6c6ec1ba4f592eac18a829aa0503bd00de` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5823453035
+
+---
+
+### 2026-09-24T22:48:37Z — NTinkicht
+
+TABIBI MERGE UNBLOCK CHECKPOINT — LIVE exact-head evidence and issued reviews; do not count this as an independent PASS.
+
+PR #487 infra/security final HEAD `38883d6c6ec1ba4f592eac18a829aa0503bd00de`: 3/3 CI GREEN run 36068835551; both Grok prior actionable thread fixes independently checked against the committed code and author-reconciled/resolved (sealed original Issue #11 report vs distinct PR copy + `cd "$VIBE_SAFE_WORKDIR"` before Vibe). Fresh owner Grok NONAUTHOR review lease on PR comment 5823484437; PRIORITY CLAUDE PERSISTENT security re-review should target this SHA, NOT prior 0299/7b4d/f799/a6bb. Do not @claude-trigger the GitHub Action again: runs 36064310553/36066875547 produced `is_error:true`, num_turns=1, cost=0, no result. No Mistral unsafe-main reviewer, no CI-only merge.
+
+PR #479 WU168 HEAD `77484454976d488081ef5fe7dc3a8780ea790b30`: 3/3 CI GREEN 36064387858, CodeRabbit old-head two findings resolved; owner Grok NONAUTHOR review lease PR comment 5823484131. Claude earlier PASS at 4198 was RETRACTED and invalid. Do not self-gate via Mistral/ChatGPT.
+
+PR #488 WU169 HEAD `5260639ecdd890125e99cc85626ebc98fea4d7b8`: 3/3 CI GREEN 36063969396; retried @coderabbitai full review PR comment 5823478186 AFTER included-capacity reset; bot confirmed FULL REVIEW TRIGGERED 5823479271, now process/reconcile its actual verdict. Don't repeat request/spend.
+
+On any genuine current-head qualified nonauthor PASS + 3 green exact-head jobs + no unreconciled Medium+ and unchanged head/base, execute expected-head merge immediately, verify main and start next disjoint WU as scheduled. Do not wait for owner/Kaporal technical approval, and never fabricate provider review provenance.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5823500966
 
 ---
