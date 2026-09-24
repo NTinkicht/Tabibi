@@ -40,6 +40,9 @@ export default function GuestBookingNextStepsPage() {
             Préparer votre arrivée à la clinique
           </Link>
         </div>
+        <div>
+          <Link href="/guest/help">Voir toutes les rubriques d’aide</Link>
+        </div>
       </section>
 
       <section lang="ar" dir="rtl" aria-labelledby="booking-next-ar">
@@ -71,6 +74,9 @@ export default function GuestBookingNextStepsPage() {
         </div>
         <div>
           <Link href="/guest/queue-arrival-help">استعد للوصول إلى العيادة</Link>
+        </div>
+        <div>
+          <Link href="/guest/help">عرض جميع مواضيع المساعدة</Link>
         </div>
       </section>
     </main>
