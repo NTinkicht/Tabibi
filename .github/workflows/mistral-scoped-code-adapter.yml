@@ -175,7 +175,7 @@ jobs:
           timeout --signal=TERM --kill-after=15s 480s vibe \
             --trust --agent plan --workdir /tmp/tabibi-mistral-readonly \
             --enabled-tools grep --enabled-tools read_file \
-            --max-turns 3 --max-tokens 45000 --output text \
+            --max-turns 8 --max-tokens 45000 --output text \
             --prompt "$(cat /tmp/tabibi-mistral-code-prompt.txt)" \
             > /tmp/tabibi-mistral-code.txt 2> /tmp/tabibi-mistral-code-error.txt
           code=$?
@@ -187,12 +187,49 @@ jobs:
             echo 'status=TOKEN_BUDGET_EXCEEDED' >> "$GITHUB_OUTPUT"
           elif [[ "$code" != 0 ]] && grep -Eqi '429|rate.?limit|quota|capacity' /tmp/tabibi-mistral-code-error.txt; then
             echo 'status=CAPACITY_DEGRADED' >> "$GITHUB_OUTPUT"
+          elif [[ "$code" != 0 ]] && grep -Eqi 'turn.?limit|max.?turns|turns.*exhausted' /tmp/tabibi-mistral-code-error.txt; then
+            echo 'status=TURN_LIMIT_EXCEEDED' >> "$GITHUB_OUTPUT"
+          elif [[ "$code" != 0 ]] && grep -Eqi 'not a git repository|workspace.*trust|trusted.*workspace|not trusted' /tmp/tabibi-mistral-code-error.txt; then
+            echo 'status=WORKSPACE_NOT_READY' >> "$GITHUB_OUTPUT"
+          elif [[ "$code" != 0 ]] && grep -Eqi 'unknown option|unrecognized arguments|no such option|invalid.*agent' /tmp/tabibi-mistral-code-error.txt; then
+            echo 'status=CLI_INCOMPATIBLE' >> "$GITHUB_OUTPUT"
+          elif [[ "$code" != 0 ]] && grep -Eqi '401|403|unauthorized|unauthorised|invalid.*key|entitlement' /tmp/tabibi-mistral-code-error.txt; then
+            echo 'status=AUTH_OR_ENTITLEMENT_FAILED' >> "$GITHUB_OUTPUT"
           elif [[ "$code" != 0 ]]; then
             echo 'status=EXECUTION_FAILED' >> "$GITHUB_OUTPUT"
           else
             echo 'status=PROPOSAL_READY' >> "$GITHUB_OUTPUT"
           fi
-          # Raw model output/stderr never appear in PR comments or logs.
+          # Provider stderr is not published. Print only sanitized, bounded
+          # diagnostic LINES from the runner for genuine failures. No raw stdout,
+          # prompt, GitHub token, auth file, model patch or secret in public comments.
+          if [[ "$code" != "0" ]]; then
+            python3 - <<'PY'
+          import hashlib
+          import os
+          import re
+          from pathlib import Path
+
+          raw = Path('/tmp/tabibi-mistral-code-error.txt').read_text(
+              encoding='utf-8', errors='replace'
+          )
+          key = os.environ.get('MISTRAL_API_KEY', '')
+          if key:
+              raw = raw.replace(key, '[REDACTED]')
+          raw = re.sub(r'(?i)(bearer\s+)[^\s]+', r'\1[REDACTED]', raw)
+          raw = re.sub(r'(?i)(api[_-]?key\s*[=:]\s*)[^\s]+', r'\1[REDACTED]', raw)
+          raw = re.sub(r'(?i)(?:https?://)[^\s]+', '[URL_REDACTED]', raw)
+          safe = [
+              line.strip()[:200]
+              for line in raw.splitlines()
+              if re.search(r'(?i)(error|failed|turn.*limit|git repository|trusted|workspace|option|agent|model)', line)
+          ]
+          print('Vibe stderr diagnostic (redacted; at most 5 lines):')
+          for line in safe[-5:]:
+              print(line)
+          print('stderr_sha256=' + hashlib.sha256(raw.encode()).hexdigest()[:16])
+          PY
+          fi
 
       - name: Refuse to upload a proposal that echoes the model API credential
         if: steps.model.outputs.exit_code == '0'
