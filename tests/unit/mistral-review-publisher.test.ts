@@ -60,7 +60,7 @@ describe('Mistral review publisher isolation', () => {
     const checkout = out.steps[0];
     const publish = out.steps[1];
     expect(checkout.uses).toContain('actions/checkout@');
-    expect(checkout.with?.ref).toBe('main');
+    expect(checkout.with?.ref).toContain('github.sha');
     expect(checkout.with?.['persist-credentials']).toBe(false);
     expect(publish.run).toContain('publish-mistral-review.py');
     expect(publish.env?.GH_TOKEN).toContain('secrets.GITHUB_TOKEN');
