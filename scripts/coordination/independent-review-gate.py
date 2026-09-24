@@ -156,9 +156,18 @@ def evaluate(number):
     # A single page limit is fail closed, never silently ignore older findings.
     if len(comments) >= 100:
         raise ValueError("PR comments require pagination/reconciliation")
-    dispatches = api(f"repos/{REPO}/issues/11/comments?per_page=100&page=4")
-    # Do not accept only the newest 100 issue #11 posts as full history
-    # without checking that each reference is explicitly matched.
+    dispatches = []
+    for page in range(1, 12):
+        page_comments = api(
+            f"repos/{REPO}/issues/11/comments?per_page=100&page={page}"
+        )
+        if not isinstance(page_comments, list):
+            raise ValueError("Missing trusted dispatch history")
+        dispatches.extend(page_comments)
+        if len(page_comments) < 100:
+            break
+    else:
+        raise ValueError("Trusted dispatch history exceeds checked bound")
     eligible_dispatch = {
         str(d.get("id")): d for d in dispatches
         if d.get("user", {}).get("login") == "NTinkicht"
