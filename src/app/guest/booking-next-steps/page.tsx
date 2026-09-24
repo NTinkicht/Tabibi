@@ -42,9 +42,9 @@ export default function GuestBookingNextStepsPage() {
           للزائر.
         </p>
         <Link href="/guest/booking-help">مراجعة التحضير</Link>
-        <p>
+        <div>
           <Link href="/guest/queue-arrival-help">استعد للوصول إلى العيادة</Link>
-        </p>
+        </div>
       </section>
     </main>
   );
