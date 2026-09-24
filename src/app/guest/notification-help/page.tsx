@@ -24,6 +24,11 @@ export default function GuestNotificationHelpPage() {
           une notification opérationnelle.
         </p>
         <Link href="/guest/status">Revenir au statut</Link>
+        <div>
+          <Link href="/guest/queue-next-steps">
+            Consulter les étapes pendant l’attente
+          </Link>
+        </div>
       </section>
       <section lang="ar" dir="rtl" aria-labelledby="notification-help-ar">
         <h1 id="notification-help-ar">فهم إشعارات طبيبي</h1>
@@ -34,6 +39,9 @@ export default function GuestNotificationHelpPage() {
         </ul>
         <p>لن يطلب منك طبيبي كلمة المرور أو الدفع داخل إشعار تشغيلي.</p>
         <Link href="/guest/status">العودة إلى الحالة</Link>
+        <div>
+          <Link href="/guest/queue-next-steps">مراجعة خطوات الانتظار</Link>
+        </div>
       </section>
     </main>
   );
