@@ -82,16 +82,17 @@ def verified_bot_review(comment, number, sha, actors, dispatch, run):
         or run.get("conclusion") != "success"
         or run.get("path") != ".github/workflows/mistral-vibe-wake.yml"
     ):
-        return False
+        return None
     try:
         created = after(comment["created_at"])
         opened = after(run["created_at"])
         completed = after(run["updated_at"])
         dispatched = after(dispatch["created_at"])
-        return (dispatched <= opened <= dispatched + dt.timedelta(minutes=2)
-                and opened <= created <= completed + dt.timedelta(minutes=3))
+        valid_time = (dispatched <= opened <= dispatched + dt.timedelta(minutes=2)
+                      and opened <= created <= completed + dt.timedelta(minutes=3))
+        return verdict[0] if valid_time else None
     except (KeyError, ValueError, TypeError):
-        return False
+        return None
 
 
 def commit_authors(commits, sha):
@@ -219,21 +220,34 @@ def selftest():
             "<!-- tabibi-mistral-review-run:18 dispatch-comment:44 -->"
         ),
     }
-    assert verified_bot_review(comment, 7, sha, {"chatgpt"}, dispatch, run)
+    assert verified_bot_review(comment, 7, sha, {"chatgpt"}, dispatch, run) == "PASS"
     assert not verified_bot_review(comment, 8, sha, {"chatgpt"}, dispatch, run)
     assert not verified_bot_review(comment, 7, "b" * 40, {"chatgpt"}, dispatch, run)
     assert not verified_bot_review(
         dict(comment, user={"login": "NTinkicht"}), 7, sha,
         {"chatgpt"}, dispatch, run
     )
-    assert not verified_bot_review(
+    assert verified_bot_review(
         dict(comment, body=comment["body"].replace("VERDICT: PASS", "VERDICT: CHANGES_REQUIRED")),
         7, sha, {"chatgpt"}, dispatch, run
-    )
+    ) == "CHANGES_REQUIRED"
     assert not verified_bot_review(comment, 7, sha, {"chatgpt"},
                                    dispatch, dict(run, conclusion="failure"))
     assert not verified_bot_review(comment, 7, sha, {"mistral-vibe"},
                                    dispatch, run)
+    assert not verified_bot_review(
+        dict(comment, updated_at="2026-09-24T10:06:00Z"),
+        7, sha, {"chatgpt"}, dispatch, run
+    )
+    assert not verified_bot_review(
+        comment, 7, sha, {"chatgpt"},
+        dict(dispatch, issue_url="https://api.github.com/repos/NTinkicht/Tabibi/issues/99"),
+        run,
+    )
+    assert not verified_bot_review(
+        comment, 7, sha, {"chatgpt"}, dispatch,
+        dict(run, created_at="2026-09-24T10:07:00Z"),
+    )
     assert commit_authors([{
         "sha": sha, "commit": {"message": "fix\n\nMaterial-Author: chatgpt"}
     }], sha) == {"chatgpt"}
