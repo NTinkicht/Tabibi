@@ -19,11 +19,11 @@ export default function GuestBookingNextStepsPage() {
           code d’accès invité.
         </p>
         <Link href="/guest/booking-help">Revoir la préparation</Link>
-        <p>
+        <div>
           <Link href="/guest/queue-arrival-help">
             Préparer votre arrivée à la clinique
           </Link>
-        </p>
+        </div>
       </section>
 
       <section lang="ar" dir="rtl" aria-labelledby="booking-next-ar">
