@@ -19,12 +19,20 @@ test('guest privacy help provides equivalent French and Arabic guidance', async 
   ).toBeVisible();
   await expect(french.getByRole('listitem')).toHaveCount(3);
   await expect(arabic.getByRole('listitem')).toHaveCount(3);
-  await expect(french.getByRole('link')).toHaveAttribute(
-    'href',
-    '/guest/booking-contact-help',
-  );
-  await expect(arabic.getByRole('link')).toHaveAttribute(
-    'href',
-    '/guest/booking-contact-help',
+  await expect(
+    french.getByRole('link', { name: 'Revenir à l’aide sur les coordonnées' }),
+  ).toHaveAttribute('href', '/guest/booking-contact-help');
+  await expect(
+    arabic.getByRole('link', { name: 'العودة إلى مساعدة بيانات التواصل' }),
+  ).toHaveAttribute('href', '/guest/booking-contact-help');
+  await expect(
+    french.getByRole('link', { name: 'Revenir à la préparation' }),
+  ).toHaveAttribute('href', '/guest/booking-help');
+  await expect(
+    arabic.getByRole('link', { name: 'العودة إلى التحضير' }),
+  ).toHaveAttribute('href', '/guest/booking-help');
+  expect(page.url()).not.toContain('private-guest-bearer-secret');
+  await expect(page.locator('body')).not.toContainText(
+    'private-guest-bearer-secret',
   );
 });
