@@ -1544,7 +1544,7 @@ test('matching directory total includes clinics not yet revealed by show more', 
   await page.goto('/');
   await page.getByRole('button', { name: 'Actualiser' }).click();
   await page
-    .getByRole('combobox', { name: 'Langue disponible à la clinique' })
+    .getByRole('combobox', { name: 'Langue proposée par la clinique' })
     .selectOption('fr');
 
   const matching = page.getByTestId('visible-clinic-total');
