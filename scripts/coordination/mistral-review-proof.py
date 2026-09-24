@@ -170,6 +170,50 @@ def selftest():
     assert not matches(proof, dict(comment, body=body.replace(
         "VERDICT: PASS", "VERDICT: CHANGES_REQUIRED"
     )), run_id=18, dispatch_id=44, pr=7, sha=sha)
+    # API and ZIP boundary: a user-authored bot comment must not stand in
+    # for a GitHub artifact uploaded by this exact reviewer run.
+    archive_stream = io.BytesIO()
+    with zipfile.ZipFile(archive_stream, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("proof.json", json.dumps(proof))
+    archive_bytes = archive_stream.getvalue()
+    original_api = globals()["api_raw"]
+    try:
+        def synthetic_api(route):
+            if "/artifacts?name=" in route:
+                return json.dumps({
+                    "artifacts": [{
+                        "id": 991, "name": artifact_name(18),
+                        "expired": False, "workflow_run": {"id": 18},
+                    }],
+                }).encode()
+            if route.endswith("/artifacts/991/zip"):
+                return archive_bytes
+            raise ValueError("Unknown synthetic API path")
+        globals()["api_raw"] = synthetic_api
+        assert read_run_proof(18) == proof
+        assert matches(read_run_proof(18), comment,
+                       run_id=18, dispatch_id=44, pr=7, sha=sha)
+        assert not matches(dict(read_run_proof(18), body_sha256="0"*64),
+                           comment, run_id=18, dispatch_id=44, pr=7, sha=sha)
+        try:
+            read_run_proof(19)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Wrong run accepted an unrelated artifact")
+        def absent_api(route):
+            if "/artifacts?name=" in route:
+                return b'{"artifacts":[]}'
+            raise ValueError("Artifact unavailable")
+        globals()["api_raw"] = absent_api
+        try:
+            read_run_proof(18)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Missing provider artifact accepted")
+    finally:
+        globals()["api_raw"] = original_api
     print("Run-scoped Mistral review proof selftest passed")
 
 
