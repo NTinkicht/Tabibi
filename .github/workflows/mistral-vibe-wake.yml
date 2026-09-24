@@ -38,6 +38,7 @@ jobs:
           set -euo pipefail
           # Never execute a verifier supplied by a PR under review.
           cp scripts/mistral-review-target.py /tmp/tabibi-mistral-review-target.py
+          cp scripts/coordination/mistral-review-proof.py /tmp/tabibi-mistral-review-proof.py
           python3 /tmp/tabibi-mistral-review-target.py selftest
           python3 /tmp/tabibi-mistral-review-target.py prepare
 
@@ -413,6 +414,33 @@ jobs:
           # PR comments need PR-write permission on GitHub App installation tokens.
           # Never give the model/inference job that permission. A fresh job
           # validates this trusted issue-11 report and publishes the PR copy.
+
+      - name: Seal final report before leaving trusted inference job
+        if: >-
+          steps.target.outputs.mode == 'review' &&
+          steps.target.outputs.ready == 'true' &&
+          steps.preflight.outputs.ready == 'true' &&
+          steps.actor.outputs.exit_code == '0' &&
+          steps.recheck.outputs.ready == 'true' &&
+          steps.report.outputs.source_report_id != ''
+        env:
+          REVIEW_PR: ${{ steps.target.outputs.pr }}
+          REVIEW_SHA: ${{ steps.target.outputs.sha }}
+          SOURCE_REPORT_ID: ${{ steps.report.outputs.source_report_id }}
+        run: python3 /tmp/tabibi-mistral-review-proof.py seal
+
+      - name: Upload immutable run-scoped Mistral review evidence
+        if: >-
+          steps.target.outputs.mode == 'review' &&
+          steps.report.outputs.source_report_id != '' &&
+          steps.actor.outputs.exit_code == '0' &&
+          steps.recheck.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tabibi-mistral-review-proof-${{ github.run_id }}
+          path: /tmp/tabibi-mistral-sealed-review/proof.json
+          if-no-files-found: error
+          retention-days: 30
 
   publish-review:
     needs: mistral-vibe
