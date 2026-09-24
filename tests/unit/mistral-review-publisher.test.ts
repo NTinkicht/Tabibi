@@ -72,13 +72,14 @@ describe('Mistral review publisher isolation', () => {
     expect(commands).not.toContain('gh pr merge');
   });
 
-  it('never loads PR-controlled hooks or agent instructions with model credentials', () => {
+  it('blocks PR-controlled hooks and agent instructions', () => {
     const model = workflow.jobs['mistral-vibe'];
     const stage = model.steps.find(
       (s) => s.name === 'Stage only verified diff as data outside PR checkout',
     );
     const execute = model.steps.find(
-      (s) => s.name === 'Run Mistral Vibe in bounded read-only programmatic mode',
+      (s) =>
+        s.name === 'Run Mistral Vibe in bounded read-only programmatic mode',
     );
     expect(stage?.run).toContain('/tmp/tabibi-mistral-clean-review');
     expect(stage?.run).toContain('stat.S_ISREG');
@@ -86,7 +87,9 @@ describe('Mistral review publisher isolation', () => {
     expect(execute?.run).toContain('--workdir "$VIBE_SAFE_WORKDIR"');
     expect(execute?.run).not.toContain('              --trust');
     expect(execute?.run).not.toContain('Consult VIBE.md');
-    expect(execute?.run).toContain('Inspect ONLY staged .tabibi_mistral_review.diff');
+    expect(execute?.run).toContain(
+      'Inspect ONLY staged .tabibi_mistral_review.diff',
+    );
     expect(execute?.run).not.toContain('--enabled-tools bash');
     expect(execute?.run).not.toContain('--enabled-tools write_file');
   });
