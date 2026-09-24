@@ -19,6 +19,8 @@ jobs:
       && !contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      source_report_id: ${{ steps.report.outputs.source_report_id }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -307,6 +309,7 @@ jobs:
         run: python3 /tmp/tabibi-mistral-review-target.py recheck
 
       - name: Post Mistral result
+        id: report
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -397,7 +400,13 @@ jobs:
               printf '\n<!-- tabibi-mistral-review-run:%s dispatch-comment:%s -->\n' "$GITHUB_RUN_ID" "$dispatch_id" >> /tmp/tabibi-mistral-comment.md
             fi
           fi
-          gh issue comment 11 --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-mistral-comment.md
+          posted="$(gh issue comment 11 --repo "$GITHUB_REPOSITORY" --body-file /tmp/tabibi-mistral-comment.md)"
+          if [[ "$posted" =~ issuecomment-([0-9]+) ]]; then
+            printf 'source_report_id=%s\n' "${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "TRUSTED_REVIEW_REPORT_ID_UNAVAILABLE" >&2
+            exit 1
+          fi
           # PR comments need PR-write permission on GitHub App installation tokens.
           # Never give the model/inference job that permission. A fresh job
           # validates this trusted issue-11 report and publishes the PR copy.
@@ -426,4 +435,5 @@ jobs:
       - name: Publish provider-run-bound review to the unchanged PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_REPORT_ID: ${{ needs.mistral-vibe.outputs.source_report_id }}
         run: python3 scripts/coordination/publish-mistral-review.py
