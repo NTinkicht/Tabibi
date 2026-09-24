@@ -86,6 +86,14 @@ describe('Mistral review publisher isolation', () => {
     expect(stage?.run).toContain('os.chmod');
     expect(execute?.run).toContain('--workdir "$VIBE_SAFE_WORKDIR"');
     expect(execute?.run).toContain('cd "$VIBE_SAFE_WORKDIR"');
+    expect(execute?.run).toContain('env -u GITHUB_TOKEN -u GH_TOKEN');
+    expect(execute?.env?.GITHUB_TOKEN).toBeUndefined();
+    expect(execute?.env?.GH_TOKEN).toBeUndefined();
+    const report = model.steps.find((s) => s.name === 'Post Mistral result');
+    expect(report?.run).toContain("['redact_public_text']");
+    expect(report?.run).toContain("'/tmp/tabibi-mistral-public.txt'");
+    expect(execute?.run).toContain("['redact_public_text']");
+    expect(execute?.run).toContain("'/tmp/tabibi-mistral-error-scrubbed.txt'");
     expect(execute?.run).not.toContain('              --trust');
     expect(execute?.run).not.toContain('Consult VIBE.md');
     expect(execute?.run).toContain(
