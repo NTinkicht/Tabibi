@@ -201,7 +201,13 @@ def evaluate(number):
         if len(match) != 1:
             continue
         run_id, dispatch_id = match[0]
-        dispatch = api(f"repos/{REPO}/issues/comments/{dispatch_id}")
+        try:
+            dispatch = api(f"repos/{REPO}/issues/comments/{dispatch_id}")
+        except (ValueError, KeyError, TypeError, subprocess.SubprocessError,
+                json.JSONDecodeError):
+            # A forged bot-origin marker does not get veto power or network
+            # failure power over a genuine separately artifact-sealed review.
+            continue
         if dispatch.get("user", {}).get("login") != "NTinkicht":
             continue
         if not single_owner_dispatch(dispatch.get("body") or "", number, sha, actors):
