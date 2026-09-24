@@ -81,17 +81,14 @@ def read_current_pr(repo, number, exact_sha):
     return data
 
 
-def verify_provenance(repo, number, exact_sha, declared):
-    """Correlate the declared actors with each commit's explicit provenance.
+def material_authors(repo, number, exact_sha):
+    """Get all per-commit material actors through bounded, paginated provenance.
 
-    Under Tabibi's owner-dispatched model most commits have NTinkicht as
-    GitHub committer regardless of the material AI author. A GitHub login
-    alone therefore cannot prove an AI's identity. For binding Mistral gates
-    every reviewed commit MUST have exactly one owner-committed
-    "Material-Author: <actor>" trailer. Missing/conflicting evidence is
-    blocked rather than assumed to match the dispatch's declaration.
+    Shared by the inference parent's review eligibility check and the pilot
+    gate, so a legitimate PR with 100+ commits cannot be rejected by a
+    smaller gate-only first-page limit. Missing/contradictory trailers or a
+    truncated/head-mismatched history still fail closed.
     """
-    actors = set(declared.split(","))
     observed = set()
     found = 0
     last_sha = None
@@ -108,14 +105,13 @@ def verify_provenance(repo, number, exact_sha, declared):
                 raise ValueError("Commit provenance SHA is invalid")
             message = commit.get("commit", {}).get("message", "")
             trailers = re.findall(
-                r"(?mi)^Material-Author:[ \t]*([a-z0-9_-]+)[ \t]*$", message
+                r"(?mi)^Material-Author:[ \\t]*([a-z0-9_-]+)[ \\t]*$", message
             )
             if len(trailers) != 1:
                 raise ValueError("Missing or conflicting per-commit actor provenance")
             actor = trailers[0].lower()
-            if actor in ("mistral-vibe", "mistral") or actor not in actors:
-                raise ValueError("Self-authored or undeclared commit actor")
-            # Model-linked GitHub accounts must not contradict their trailer.
+            if actor in ("mistral-vibe", "mistral"):
+                raise ValueError("Self-authored commit actor")
             login = (commit.get("author") or {}).get("login", "").lower()
             if login in ("mistral-vibe", "mistral"):
                 raise ValueError("GitHub commit has Mistral authorship")
@@ -124,7 +120,14 @@ def verify_provenance(repo, number, exact_sha, declared):
             break
     else:
         raise ValueError("Commit provenance exceeds the safety bound")
-    if not found or last_sha != exact_sha or observed != actors:
+    if not found or last_sha != exact_sha:
+        raise ValueError("Commit provenance does not match exact head")
+    return observed
+
+
+def verify_provenance(repo, number, exact_sha, declared):
+    """Require the owner dispatch to name exactly the observed material actors."""
+    if material_authors(repo, number, exact_sha) != set(declared.split(",")):
         raise ValueError("Commit provenance does not match owner dispatch")
     return True
 
