@@ -23,7 +23,7 @@ export default function GuestPrivacyHelpPage() {
         </Link>
       </section>
       <section lang="ar" dir="rtl" aria-labelledby="privacy-help-ar">
-        <h2 id="privacy-help-ar">حماية معلوماتك أثناء استخدام مسار الضيف</h2>
+        <h1 id="privacy-help-ar">حماية معلوماتك أثناء استخدام مسار الضيف</h1>
         <ul>
           <li>استخدم فقط شاشات طبيبي المخصصة للحجز وقائمة الانتظار.</li>
           <li>
