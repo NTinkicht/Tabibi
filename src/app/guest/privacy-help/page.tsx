@@ -23,6 +23,9 @@ export default function GuestPrivacyHelpPage() {
         <Link href="/guest/booking-contact-help">
           Revenir à l’aide sur les coordonnées
         </Link>
+        <div>
+          <Link href="/guest/booking-help">Revenir à la préparation</Link>
+        </div>
       </section>
       <section lang="ar" dir="rtl" aria-labelledby="privacy-help-ar">
         <h1 id="privacy-help-ar">حماية معلوماتك أثناء استخدام مسار الضيف</h1>
@@ -37,6 +40,9 @@ export default function GuestPrivacyHelpPage() {
         <Link href="/guest/booking-contact-help">
           العودة إلى مساعدة بيانات التواصل
         </Link>
+        <div>
+          <Link href="/guest/booking-help">العودة إلى التحضير</Link>
+        </div>
       </section>
     </main>
   );
