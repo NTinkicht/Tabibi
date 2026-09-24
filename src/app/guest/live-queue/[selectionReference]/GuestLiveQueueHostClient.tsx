@@ -529,9 +529,7 @@ export function GuestLiveQueueHostClient({
         ? copy.contactRequirement
         : '',
     );
-    emailInput?.setCustomValidity(
-      emailRequired ? copy.contactRequirement : '',
-    );
+    emailInput?.setCustomValidity(emailRequired ? copy.contactRequirement : '');
   }, [
     contactEmail,
     contactPhone,
