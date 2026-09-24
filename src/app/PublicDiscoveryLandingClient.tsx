@@ -64,7 +64,7 @@ const copy = {
     searchDoctorTotal: (count: number) =>
       `${count} médecin${count === 1 ? '' : 's'} affiché${count === 1 ? '' : 's'} au total dans les résultats.`,
     visibleClinicTotal: (visible: number, total: number) =>
-      `Affichage : ${visible} sur ${total} clinique${total === 1 ? '' : 's'} du répertoire.`,
+      `Cliniques correspondantes : ${visible} sur ${total} clinique${total === 1 ? '' : 's'} du répertoire.`,
     resultRange: (shown: number, matching: number) =>
       shown === 0
         ? `Aucun résultat parmi ${matching} clinique${matching === 1 ? '' : 's'} correspondante${matching === 1 ? '' : 's'}.`
@@ -124,7 +124,7 @@ const copy = {
     searchDoctorTotal: (count: number) =>
       `إجمالي الأطباء المعروضين في النتائج: ${count}.`,
     visibleClinicTotal: (visible: number, total: number) =>
-      `العيادات المعروضة: ${visible} من ${total}.`,
+      `العيادات المطابقة: ${visible} من ${total}.`,
     resultRange: (shown: number, matching: number) =>
       shown === 0
         ? `لا توجد نتائج معروضة من أصل ${matching} عيادة مطابقة.`
@@ -603,7 +603,7 @@ export default function PublicDiscoveryLandingClient({
                 <p>{t.searchCount(matchingClinics.length)}</p>
                 <p data-testid="visible-clinic-total">
                   {t.visibleClinicTotal(
-                    displayedClinics.length,
+                    matchingClinics.length,
                     clinics.length,
                   )}
                 </p>
