@@ -1,0 +1,41 @@
+name: Autonomous worker readiness (no model calls)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tabibi-worker-readiness
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    if: github.repository == 'NTinkicht/Tabibi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check policy flags without reading credentials
+        env:
+          MISTRAL_GUARD: ${{ vars.TABIBI_MISTRAL_PAYG_DISABLED_CONFIRMED }}
+          GEMINI_GUARD: ${{ vars.TABIBI_GEMINI_ZERO_BILLING_CONFIRMED }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "This workflow performs no provider login, model inference, or code writes."
+          if [[ "$MISTRAL_GUARD" == "true" ]]; then
+            echo "Mistral PAYG-disabled guard: configured (not independently verified)."
+          else
+            echo "::notice::Mistral PAYG-disabled guard is absent; do not enable unattended model execution."
+          fi
+          if [[ "$GEMINI_GUARD" == "true" ]]; then
+            echo "Gemini zero-billing guard: configured (not independently verified)."
+          else
+            echo "::notice::Gemini zero-billing guard is absent."
+          fi
+          echo "::notice::Grok included-subscription headless GitHub-hosted authentication remains unverified. Never export owner OAuth or enable xAI API fallback."
+      - name: Publish next gate
+        run: |
+          echo 'Implementation workers remain DISABLED until provider-specific included-capacity authentication and bounded write-mode isolation are proven.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'See docs/coordination/GITHUB_NATIVE_IMPLEMENTATION_WORKERS.md and issue #481.' >> "$GITHUB_STEP_SUMMARY"
