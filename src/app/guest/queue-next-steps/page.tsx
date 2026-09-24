@@ -21,7 +21,7 @@ export default function GuestQueueNextStepsPage() {
         </Link>
       </section>
       <section lang="ar" dir="rtl" aria-labelledby="queue-next-ar">
-        <h2 id="queue-next-ar">ماذا تفعل أثناء الانتظار</h2>
+        <h1 id="queue-next-ar">ماذا تفعل أثناء الانتظار</h1>
         <ol>
           <li>احتفظ بصفحة الحالة متاحة وتحقق منها لمعرفة التحديثات.</li>
           <li>اعتبر الوقت المعروض تقديراً وليس ضماناً.</li>
