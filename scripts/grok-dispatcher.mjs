@@ -487,11 +487,11 @@ export function reviewPrompt(lease, checks) {
     'Read git diff origin/main...HEAD --stat and git diff origin/main...HEAD exactly once, ' +
     'then inspect ONLY touched source/tests where evidence is missing. Do not ' +
     'scan the entire repository or repeatedly reopen the same files. ' +
-    'Consult ARCHITECTURE.md or PRODUCT.md ONLY if the diff changes their contracts.\\n' +
+    'Consult ARCHITECTURE.md or PRODUCT.md ONLY if the diff changes their contracts.\n' +
     'Bound your investigation: finish the substantive review and write the final ' +
     'verdict by turn 36, retaining a safety margin before max-turns=48. ' +
     'If you cannot complete a reliable full-head review, output VERDICT: CHANGES_REQUIRED ' +
-    'with why evidence is incomplete; never invent a PASS.\\n' +
+    'with why evidence is incomplete; never invent a PASS.\n' +
     `Exact head: ${lease.sha}. Material authors (as recorded by orchestrator): ${lease.authors.join(', ')}.\n` +
     `Exact-head CI observations: ${JSON.stringify(checks)}.\n` +
     'Review correctness, privacy, authorization, RTL/FR/AR, regressions and tests.\n' +
