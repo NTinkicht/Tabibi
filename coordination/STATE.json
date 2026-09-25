@@ -43,10 +43,7 @@
       "mistral-vibe",
       "grok"
     ],
-    "retired_actors": [
-      "gemini_agent",
-      "gemini_chat"
-    ],
+    "retired_actors": ["gemini_agent", "gemini_chat"],
     "slack_role": "attention_and_culture_only",
     "coffee_corner": "optional_no_quota_no_reminders"
   },
@@ -127,10 +124,7 @@
     },
     {
       "id": "EPIC-ORG-002+EPIC-ACTORS-003",
-      "issues": [
-        154,
-        155
-      ],
+      "issues": [154, 155],
       "implementation_pr": 158,
       "final_gated_head": "7d2d52dbc3259cdf9ba43c5bd934b02778b6d6eb",
       "merge_commit": "a7660d5581507f7f243d5ec7a8b18c18f59c98c4",
