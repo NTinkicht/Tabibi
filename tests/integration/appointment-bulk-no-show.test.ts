@@ -207,6 +207,96 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
     expect(counts.rows[0]).toEqual({ receipts: '1', audits: '1' });
   });
 
+  it('never reclassifies cancelled or arrived appointments and leaves queue revision unchanged', async () => {
+    const cancelled = await book('already-cancelled');
+    const arrived = await book('already-arrived');
+    await setScheduledMinutesAgo(cancelled.appointment.id, 30);
+    await setScheduledMinutesAgo(arrived.appointment.id, 30);
+    const lifecycle = new AppointmentLifecycleService(pool);
+    await lifecycle.command(scope, sessionId, cancelled.appointment.id, {
+      command: 'cancel',
+      reason: 'Patient cancelled before arrival',
+      idempotencyKey: 'wu171-cancel-before-bulk',
+      correlationId: 'wu171-cancel-before-bulk',
+    });
+    await lifecycle.command(scope, sessionId, arrived.appointment.id, {
+      command: 'check_in',
+      idempotencyKey: 'wu171-checkin-before-bulk',
+      correlationId: 'wu171-checkin-before-bulk',
+    });
+    const before = await pool.query<{ queue_order_version: string }>(
+      'SELECT queue_order_version FROM consultation_sessions WHERE id=$1',
+      [sessionId],
+    );
+    const result = await service.resolveWaiting(
+      scope,
+      sessionId,
+      bulkInput('already-resolved'),
+    );
+    const after = await pool.query<{ queue_order_version: string }>(
+      'SELECT queue_order_version FROM consultation_sessions WHERE id=$1',
+      [sessionId],
+    );
+    expect(result.scannedAppointmentCount).toBe(0);
+    expect(result.resolvedAppointmentCount).toBe(0);
+    expect(after.rows[0]).toEqual(before.rows[0]);
+    expect(await paired(cancelled.appointment.id)).toEqual({
+      appointment: 'cancelled',
+      entry: 'cancelled',
+    });
+    expect(await paired(arrived.appointment.id)).toEqual({
+      appointment: 'checked_in',
+      entry: 'checked_in',
+    });
+    const perEntryAudits = await pool.query<{ count: string }>(
+      `SELECT count(*)::text count FROM audit_events
+        WHERE clinic_id=$1 AND action='appointment.no_show_bulk'`,
+      [clinicId],
+    );
+    expect(perEntryAudits.rows[0]?.count).toBe('0');
+  });
+
+  it('bumps one queue revision and records privacy-minimal per-entry audit', async () => {
+    const appointment = await book('revision');
+    await setScheduledMinutesAgo(appointment.appointment.id, 30);
+    const before = await pool.query<{ queue_order_version: string }>(
+      'SELECT queue_order_version FROM consultation_sessions WHERE id=$1',
+      [sessionId],
+    );
+    const response = await service.resolveWaiting(
+      scope,
+      sessionId,
+      bulkInput('revision', 'Absent after documented grace'),
+    );
+    const after = await pool.query<{ queue_order_version: string }>(
+      'SELECT queue_order_version FROM consultation_sessions WHERE id=$1',
+      [sessionId],
+    );
+    expect(response.resolvedAppointmentCount).toBe(1);
+    expect(Number(after.rows[0]!.queue_order_version)).toBe(
+      Number(before.rows[0]!.queue_order_version) + 1,
+    );
+    const audit = await pool.query<{
+      entity_id: string;
+      reason: string;
+      queue_entry_id: string;
+    }>(
+      `SELECT entity_id,
+              metadata->>'reason' reason,
+              metadata->>'queueEntryId' queue_entry_id
+         FROM audit_events
+        WHERE clinic_id=$1 AND action='appointment.no_show_bulk'`,
+      [clinicId],
+    );
+    expect(audit.rows).toEqual([
+      {
+        entity_id: appointment.appointment.id,
+        reason: 'Absent after documented grace',
+        queue_entry_id: appointment.appointment.queueEntryId,
+      },
+    ]);
+  });
+
   it('serializes concurrent appointment check-in against bulk absence', async () => {
     const booking = await book('race');
     await setScheduledMinutesAgo(booking.appointment.id, 30);
