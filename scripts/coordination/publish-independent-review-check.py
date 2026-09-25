@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 
 REPO = "NTinkicht/Tabibi"
 CHECK_NAME = "Independent AI review / Verified final head"
@@ -191,6 +192,59 @@ def selftest():
     assert check_body(7, sha, True)["conclusion"] == "success"
     assert check_body(7, sha, False)["head_sha"] == sha
     assert "not a PASS" in check_body(7, sha, False)["output"]["summary"]
+    # A Mistral wake scans multiple independent PRs. Failure on the first
+    # cannot suppress the later PR's authentic current-head check run.
+    saved = {key: globals()[key] for key in ("gh_api", "gate", "publish")}
+    env_keys = ("GITHUB_REPOSITORY", "GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH")
+    previous_env = {key: os.environ.get(key) for key in env_keys}
+    posted = []
+    try:
+        with tempfile.TemporaryDirectory() as folder:
+            event_path = Path(folder) / "event.json"
+            event_path.write_text(json.dumps({
+                "workflow_run": {"name": "Mistral Vibe Wake"}
+            }))
+            os.environ.update({
+                "GITHUB_REPOSITORY": REPO,
+                "GITHUB_EVENT_NAME": "workflow_run",
+                "GITHUB_EVENT_PATH": str(event_path),
+            })
+            def mock_api(route):
+                if route.endswith("/pulls?state=open&per_page=100"):
+                    return [{"number": 7}, {"number": 8}]
+                if route.endswith("/pulls/7") or route.endswith("/pulls/8"):
+                    return {
+                        "state": "open", "draft": False,
+                        "head": {
+                            "sha": sha, "repo": {"full_name": REPO},
+                        },
+                        "base": {"ref": "main"},
+                    }
+                raise ValueError("Unknown fake route")
+            def mock_gate(number, exact_sha):
+                assert exact_sha == sha
+                if number == 7:
+                    raise ValueError("No valid independent review")
+            globals()["gh_api"] = mock_api
+            globals()["gate"] = mock_gate
+            globals()["publish"] = posted.append
+            try:
+                run()
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("Failed PR did not fail overall gate")
+            assert [(x["head_sha"], x["conclusion"]) for x in posted] == [
+                (sha, "failure"), (sha, "success")
+            ]
+    finally:
+        for key, value in saved.items():
+            globals()[key] = value
+        for key, value in previous_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
     print("Trusted SHA-attached independent-review check selftest passed")
 
 
