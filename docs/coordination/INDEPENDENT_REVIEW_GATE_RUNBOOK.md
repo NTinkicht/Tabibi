@@ -8,9 +8,26 @@ Issue #485 incident follow-up. CI-only green is not merge authorization.
 
 Every checked open PR receives an explicit SUCCESS or FAILURE attached to its exact current HEAD. Failure includes missing provider proof, stale head, non-author mismatch, failed CI, adverse authenticated verdict, unresolved inline review threads, CHANGES_REQUESTED native reviews, missing evidence or API errors. No request, bot acknowledgement, owner-written `actor: grok`, CI handoff or self-review is a PASS. The verifier never checks out untrusted PR code with a privileged token.
 
-**Reviewer-proof limitation:** the current `independent-review-gate.py` verifies provider-run-backed, artifact-sealed, clean **Mistral Vibe** review only, and excludes Mistral material authors. Existing Grok owner-account review comments, CodeRabbit `COMMENTED`/skip messages and an owner assertion cannot be treated as equivalent evidence. A separate independently verified adapter for other actors is required before this check can pass those PRs. This intentionally fails closed rather than silently reducing the requirement.
+**Reviewer-proof support (after this change is reviewed and merged):** an artifact-sealed, provider-run-backed Mistral Vibe report OR a completed Grok Build report signed by the pinned, owner-private Codespace worker. A reviewer who materially authored any commit is ineligible. A formal owner-account `actor: grok / VERDICT: PASS` GitHub review, including #496's historic manual review, still does NOT prove worker execution and does not retroactively become signed. The Grok signer only signs after a real CLI result with `stopReason=end_turn`, a request ID, a session ID and exactly one standalone VERDICT. The receipt binds exact PR SHA, lease comment, author set and the entire posted report. The trusted main verifier checks the Ed25519 signature against the public trust registry, rejects edited/forged/stale/self-authored/adverse reviews, and checks fresh 3/3 CI. The Grok proof is an attestation from an owner-controlled trusted worker, **not an xAI-issued cryptographic attestation**; the trusted owner/private Codespace and its key remain security boundaries. The default trust registry has ZERO entries and fails closed until the one-time owner enrollment below. More third-party reviewers need separately audited proof adapters.
 
 The verifier additionally rejects unresolved native GitHub review threads and CHANGES_REQUESTED native reviews. It does not by itself prove every historical top-level medium-or-higher finding was adjudicated, so merge orchestration must still inspect the full conversation, code and reviewer findings under AGENTS.md. Do not call this the final complete multi-provider gate until that requirement has tests and proof.
+
+## Grok Build signer enrollment — one-time owner Codespace action
+
+Do not create or share signing credentials on GitHub, in a PR, or in ChatGPT. Never enable API/PAYG, copy CLI OAuth, or sign a manually typed verdict. Run the following once in your already authenticated Tabibi Codespace:
+
+```bash
+cd /workspaces/Tabibi
+install -d -m 700 "$HOME/.grok"
+umask 077
+openssl genpkey -algorithm Ed25519 -out "$HOME/.grok/review-signing-key.pem"
+chmod 600 "$HOME/.grok/review-signing-key.pem"
+openssl pkey -in "$HOME/.grok/review-signing-key.pem" -pubout
+```
+
+The final command prints **only the public key**. Add it to the existing `coordination/trust/grok-review-public-keys.json` as `{"id":"owner-codespace-v1","public_key_pem":"-----BEGIN PUBLIC KEY-----\\n...\\n-----END PUBLIC KEY-----\\n"}` in a separately reviewed source-controlled commit (or provide the **public key only** to the Tabibi code-author assistant to make that commit). Never publish the `review-signing-key.pem` PRIVATE key. The registry must be merged into `main`; the owner Codespace dispatcher checks private/public correspondence BEFORE any new Grok invocation. Only the trusted `main` reviewer code signs; earlier, already posted unsigned Grok reviews cannot be authenticated retrospectively. A Codespace rebuild that loses the private key needs an audited key-rotation PR and previous key revocation. No private key is ever uploaded to Actions.
+
+Once an independent actor has reviewed and merged the gate-fix PR and the public key is pinned on main: open the owner Codespace on clean main, restart SaveGrok to use the updated worker, and issue ONE new exact-head `ROLE_LEASE_ASSIGNED` only when Grok's **included** capacity is available. A signed clean Grok result on #496's unchanged head can then trigger `Verified Independent AI Review` using workflow_dispatch `pr_number=496`. The current historic owner-submitted #496 Grok PASS and past `GROK_CAPACITY_LIMIT` records do not qualify. An empty/missing registry, altered private key, incomplete result, or exhausted capacity fails closed without a forged PASS.
 
 ## Required main-branch configuration (one-time owner repository settings)
 
