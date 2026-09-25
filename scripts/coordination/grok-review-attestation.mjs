@@ -30,6 +30,21 @@ export function loadSigner(
   const pinned = registry.keys.filter((entry) => entry.id === SIGNER_ID);
   if (pinned.length !== 1) throw new Error('grok_signer_unavailable');
   const filename = path.join(grokHome, 'review-signing-key.pem');
+  // Grok's built-in strict sandbox can READ all ~/.grok! Never let the model
+  // see the signer, even via Bash/symlink. Require an owner-global custom
+  // strict profile with a kernel-enforced read/write deny on this exact file.
+  const sandbox = fs.readFileSync(path.join(grokHome, 'sandbox.toml'), 'utf8');
+  const section = sandbox.match(
+    /^\\[profiles\\.tabibi_signed_review\\]([\\s\\S]*?)(?=^\\[|$(?![\\s\\S]))/m,
+  )?.[1];
+  if (
+    !section ||
+    !/^extends\\s*=\\s*"strict"\\s*$/m.test(section) ||
+    !section.split('\\n').some((line) =>
+      /^deny\\s*=\\s*\\[\\s*"[^"]+"\\s*\\]\\s*$/.test(line) &&
+      line.includes(JSON.stringify(filename).slice(1, -1)),
+    )
+  ) throw new Error('grok_signer_unavailable');
   const stat = fs.lstatSync(filename);
   if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0) {
     throw new Error('grok_signer_unavailable');
