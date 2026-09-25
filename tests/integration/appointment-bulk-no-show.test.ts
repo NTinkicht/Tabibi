@@ -123,7 +123,11 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
     });
 
     await setScheduledMinutesAgo(booking.appointment.id, 16);
-    const late = await service.resolveWaiting(scope, sessionId, bulkInput('after'));
+    const late = await service.resolveWaiting(
+      scope,
+      sessionId,
+      bulkInput('after'),
+    );
     expect(late).toMatchObject({
       sessionId,
       scannedAppointmentCount: 1,
