@@ -76,6 +76,8 @@ describe('committed migration chain', () => {
       appointments: string | null;
       appointment_receipts: string | null;
       appointment_recovery_receipts: string | null;
+      appointment_bulk_no_show_receipts: string | null;
+      clinic_arrival_grace: string;
       guest_exchange_ids: string | null;
       guest_credentials: string | null;
       guest_status_rate_limits: string | null;
@@ -114,6 +116,11 @@ describe('committed migration chain', () => {
          to_regclass('appointments')::text appointments,
          to_regclass('appointment_booking_receipts')::text appointment_receipts,
          to_regclass('appointment_recovery_receipts')::text appointment_recovery_receipts,
+         to_regclass('appointment_bulk_no_show_receipts')::text appointment_bulk_no_show_receipts,
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+            WHERE table_name='clinics' AND column_name='appointment_arrival_grace_minutes'
+         )::text clinic_arrival_grace,
          to_regclass('guest_exchange_ids')::text guest_exchange_ids,
          to_regclass('guest_credentials')::text guest_credentials,
          to_regclass('guest_status_rate_limit_buckets')::text guest_status_rate_limits,
@@ -156,6 +163,8 @@ describe('committed migration chain', () => {
       appointments: 'appointments',
       appointment_receipts: 'appointment_booking_receipts',
       appointment_recovery_receipts: 'appointment_recovery_receipts',
+      appointment_bulk_no_show_receipts: 'appointment_bulk_no_show_receipts',
+      clinic_arrival_grace: 'true',
       guest_exchange_ids: 'guest_exchange_ids',
       guest_credentials: 'guest_credentials',
       guest_status_rate_limits: 'guest_status_rate_limit_buckets',
