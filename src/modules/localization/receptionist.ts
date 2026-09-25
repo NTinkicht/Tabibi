@@ -51,6 +51,19 @@ export const receptionistCopy = {
     startConsultation: 'Démarrer la consultation',
     completeConsultation: 'Terminer la consultation',
     queueReason: 'Motif opérationnel (obligatoire)',
+    bulkNoShowTitle: 'Résoudre les absences sur rendez-vous',
+    bulkNoShowExplanation:
+      'Seuls les rendez-vous encore en attente dont le délai de grâce est écoulé seront marqués absents. Les patients arrivés et sans rendez-vous sont exclus. Cette action est auditée.',
+    bulkNoShowReason: 'Motif collectif obligatoire',
+    bulkNoShowConfirm:
+      'Confirmer la déclaration des absences pour les rendez-vous éligibles ? Cette action est auditée.',
+    bulkNoShowSubmit: 'Déclarer les absences éligibles',
+    bulkNoShowResult: '{count} rendez-vous éligible(s) marqué(s) absent(s).',
+    bulkNoShowNone: 'Aucun rendez-vous éligible à déclarer absent.',
+    bulkNoShowFailed:
+      'La demande ou sa confirmation a échoué. Vérifiez la file avant de réessayer.',
+    bulkNoShowUnavailable:
+      'Actualisez la file pour confirmer la situation avant cette action.',
     registrationOrder: 'Inscription',
     priorityOrder: 'Ordre de service',
     reorderAudited: 'Prioriser / réordonner (audité)',
@@ -135,6 +148,18 @@ export const receptionistCopy = {
     startConsultation: 'بدء الاستشارة',
     completeConsultation: 'إنهاء الاستشارة',
     queueReason: 'السبب التشغيلي (مطلوب)',
+    bulkNoShowTitle: 'تسجيل غياب أصحاب المواعيد',
+    bulkNoShowExplanation:
+      'تشمل العملية فقط المواعيد التي لا تزال في الانتظار بعد انقضاء مهلة الوصول. لا تشمل المرضى الحاضرين أو بدون موعد. يُسجّل هذا الإجراء للمراجعة.',
+    bulkNoShowReason: 'سبب جماعي إلزامي',
+    bulkNoShowConfirm:
+      'هل تؤكد تسجيل غياب المواعيد المؤهلة؟ سيتم تدقيق هذا الإجراء.',
+    bulkNoShowSubmit: 'تسجيل غياب المواعيد المؤهلة',
+    bulkNoShowResult: 'تم تسجيل غياب {count} من أصحاب المواعيد المؤهلة.',
+    bulkNoShowNone: 'لا توجد مواعيد مؤهلة لتسجيل الغياب.',
+    bulkNoShowFailed:
+      'تعذر تأكيد الطلب أو تنفيذه. تحقق من القائمة قبل إعادة المحاولة.',
+    bulkNoShowUnavailable: 'حدّث القائمة للتأكد من حالتها قبل تنفيذ الإجراء.',
     registrationOrder: 'ترتيب التسجيل',
     priorityOrder: 'ترتيب الخدمة',
     reorderAudited: 'تقديم / إعادة ترتيب (مدقّق)',
