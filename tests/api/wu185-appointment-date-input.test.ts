@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+type StaffAuthModule = typeof import('@/platform/http/staff-auth');
+
 const book = vi.hoisted(() => vi.fn());
 vi.mock('@/modules/appointment', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/modules/appointment')>();
@@ -13,9 +15,7 @@ vi.mock('@/modules/appointment', async (importOriginal) => {
   };
 });
 vi.mock('@/platform/http/staff-auth', async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import('@/platform/http/staff-auth')
-  >();
+  const actual = await importOriginal<StaffAuthModule>();
   return {
     ...actual,
     authenticatedClinicScope: async (_request: Request, clinicId: string) => ({
@@ -43,10 +43,7 @@ function post(body: Record<string, unknown>) {
   return POST(
     new Request(url, {
       method: 'POST',
-      headers: {
-        origin: 'http://localhost',
-        'content-type': 'application/json',
-      },
+      headers: { origin: 'http://localhost' },
       body: JSON.stringify(body),
     }),
     context(),
