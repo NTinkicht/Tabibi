@@ -99,6 +99,10 @@ describe('Mistral code adapter uses owner per-WU leases', () => {
     );
     expect(model.run).toContain('--agent auto-approve');
     expect(model.run).not.toContain('--agent plan');
+    expect(model.run).toContain('cd /tmp/tabibi-mistral-readonly');
+    expect(model.run).toContain('env -u GITHUB_TOKEN -u GH_TOKEN');
+    expect(model.run).not.toMatch(/\\s--trust(?:\\s|$)/);
+    expect(model.run).not.toContain('VIBE_HOME="$GITHUB_WORKSPACE"');
     expect(model.run).toContain('Produce the EXACT edit payload');
     expect(model.run).toContain('--workdir /tmp/tabibi-mistral-readonly');
     expect(model.run).toContain(
@@ -135,6 +139,7 @@ describe('Mistral code adapter uses owner per-WU leases', () => {
     const stage = named(propose, 'Stage ONLY allowlisted read paths for Vibe');
     expect(stage.run).toContain("os.environ['ALLOWED_PATHS']");
     expect(stage.run).toContain('current.is_symlink()');
+    expect(stage.run).toContain('source.stat().st_nlink != 1');
     expect(stage.run).toContain('shutil.copyfile(source, dest)');
     const patch = named(
       validate,
