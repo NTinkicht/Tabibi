@@ -9,8 +9,14 @@ import { fileURLToPath } from 'node:url';
 
 export const SIGNER_ID = 'owner-codespace-v1';
 export const MARKER = 'tabibi-grok-attestation-v1';
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const DEFAULT_REGISTRY = path.join(ROOT, 'coordination/trust/grok-review-public-keys.json');
+const ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../..',
+);
+const DEFAULT_REGISTRY = path.join(
+  ROOT,
+  'coordination/trust/grok-review-public-keys.json',
+);
 const SHA = /^[a-f0-9]{40}$/;
 const SAFE_ID = /^[a-z0-9][a-z0-9-]{2,63}$/;
 const HEX_SHA256 = /^[a-f0-9]{64}$/;
@@ -26,7 +32,8 @@ export function loadSigner(
     registry.version !== 1 ||
     !Array.isArray(registry.keys) ||
     registry.keys.length > 8
-  ) throw new Error('grok_signer_unavailable');
+  )
+    throw new Error('grok_signer_unavailable');
   const pinned = registry.keys.filter((entry) => entry.id === SIGNER_ID);
   if (pinned.length !== 1) throw new Error('grok_signer_unavailable');
   const filename = path.join(grokHome, 'review-signing-key.pem');
@@ -41,7 +48,8 @@ export function loadSigner(
   if (
     !lines.includes('extends = "strict"') ||
     !lines.includes(`deny = ["${filename}"]`)
-  ) throw new Error('grok_signer_unavailable');
+  )
+    throw new Error('grok_signer_unavailable');
   const stat = fs.lstatSync(filename);
   if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0) {
     throw new Error('grok_signer_unavailable');
@@ -59,12 +67,21 @@ export function loadSigner(
   return { id: SIGNER_ID, privateKey };
 }
 
-export function signAttestedReview(lease, answer, visible, signer, at = new Date()) {
+export function signAttestedReview(
+  lease,
+  answer,
+  visible,
+  signer,
+  at = new Date(),
+) {
   if (
-    !Number.isSafeInteger(lease.pr) || lease.pr <= 0 ||
-    !Number.isSafeInteger(lease.commentId) || lease.commentId <= 0 ||
+    !Number.isSafeInteger(lease.pr) ||
+    lease.pr <= 0 ||
+    !Number.isSafeInteger(lease.commentId) ||
+    lease.commentId <= 0 ||
     !SHA.test(lease.sha) ||
-    !Array.isArray(lease.authors) || !lease.authors.length ||
+    !Array.isArray(lease.authors) ||
+    !lease.authors.length ||
     lease.authors.includes('grok') ||
     answer?.stopReason !== 'end_turn' ||
     typeof answer.text !== 'string' ||
@@ -73,12 +90,19 @@ export function signAttestedReview(lease, answer, visible, signer, at = new Date
     !/^[a-zA-Z0-9-]{8,128}$/.test(answer.requestId) ||
     typeof answer.sessionId !== 'string' ||
     !/^[a-zA-Z0-9-]{8,128}$/.test(answer.sessionId) ||
-    !signer?.privateKey || signer.id !== SIGNER_ID ||
-    typeof visible !== 'string' || visible.length > 22000 ||
+    !signer?.privateKey ||
+    signer.id !== SIGNER_ID ||
+    typeof visible !== 'string' ||
+    visible.length > 22000 ||
     !visible.includes(`source_lease_comment: ${lease.commentId}`) ||
     !visible.includes(`exact_sha: ${lease.sha}`)
-  ) throw new Error('grok_attestation_invalid');
-  const verdicts = [...answer.text.matchAll(/^VERDICT:[ \t]*(PASS|PASS_WITH_MINOR_FINDINGS|CHANGES_REQUIRED)[ \t]*$/gm)];
+  )
+    throw new Error('grok_attestation_invalid');
+  const verdicts = [
+    ...answer.text.matchAll(
+      /^VERDICT:[ \t]*(PASS|PASS_WITH_MINOR_FINDINGS|CHANGES_REQUIRED)[ \t]*$/gm,
+    ),
+  ];
   if (verdicts.length !== 1) throw new Error('grok_attestation_invalid');
   const issuedAt = at.toISOString();
   const payload = {
@@ -94,18 +118,29 @@ export function signAttestedReview(lease, answer, visible, signer, at = new Date
     provider_request_id: answer.requestId,
     provider_session_id: answer.sessionId,
     stop_reason: answer.stopReason,
-    review_body_sha256: crypto.createHash('sha256').update(visible, 'utf8').digest('hex'),
+    review_body_sha256: crypto
+      .createHash('sha256')
+      .update(visible, 'utf8')
+      .digest('hex'),
     issued_at: issuedAt,
   };
-  if (!HEX_SHA256.test(payload.review_body_sha256) || !SAFE_ID.test(payload.key_id)) {
+  if (
+    !HEX_SHA256.test(payload.review_body_sha256) ||
+    !SAFE_ID.test(payload.key_id)
+  ) {
     throw new Error('grok_attestation_invalid');
   }
   const canonical = Buffer.from(JSON.stringify(payload), 'utf8');
   const signature = crypto.sign(null, canonical, signer.privateKey);
   return (
-    visible + '\n\n<!-- ' + MARKER + ':' +
-    canonical.toString('base64url') + ':' +
-    signature.toString('base64url') + ' -->'
+    visible +
+    '\n\n<!-- ' +
+    MARKER +
+    ':' +
+    canonical.toString('base64url') +
+    ':' +
+    signature.toString('base64url') +
+    ' -->'
   );
 }
 
