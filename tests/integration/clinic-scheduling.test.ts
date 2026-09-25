@@ -307,8 +307,8 @@ describe('doctor-global session lifecycle invariant', () => {
     // Two independently committed commands are allowed to race. The final
     // doctor-wide state must be coherent regardless of which commits first.
     const raced = await race(
-      () => run(first.entry.id, 'complete_consultation'),
-      () => sessions.transition(scopeB, sessionB, 'open'),
+      () => run(first.entry.id, 'complete_consultation').then(() => undefined),
+      () => sessions.transition(scopeB, sessionB, 'open').then(() => undefined),
     );
     expect(raced[0].status).toBe('fulfilled');
     if (raced[1].status === 'rejected') {
