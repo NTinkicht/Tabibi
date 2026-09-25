@@ -51,10 +51,12 @@ describe('Grok Codespace independent review signature', () => {
         registry,
         JSON.stringify({
           version: 1,
-          keys: [{
-            id: attest.SIGNER_ID,
-            public_key_pem: publicPem,
-          }],
+          keys: [
+            {
+              id: attest.SIGNER_ID,
+              public_key_pem: publicPem,
+            },
+          ],
         }),
       );
       const signer = attest.loadSigner(home, registry);
@@ -79,12 +81,10 @@ describe('Grok Codespace independent review signature', () => {
       expect(proof.review_body_sha256).toBe(
         createHash('sha256').update(visible).digest('hex'),
       );
-      expect(
-        verify(null, payload, createPublicKey(publicPem), signature),
-      ).toBe(true);
-      expect(
-        verify(null, payload, other.publicKey, signature),
-      ).toBe(false);
+      expect(verify(null, payload, createPublicKey(publicPem), signature)).toBe(
+        true,
+      );
+      expect(verify(null, payload, other.publicKey, signature)).toBe(false);
       expect(
         verify(
           null,
