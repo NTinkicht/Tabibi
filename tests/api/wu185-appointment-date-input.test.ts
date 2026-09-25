@@ -13,7 +13,9 @@ vi.mock('@/modules/appointment', async (importOriginal) => {
   };
 });
 vi.mock('@/platform/http/staff-auth', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/platform/http/staff-auth')>();
+  const actual = await importOriginal<
+    typeof import('@/platform/http/staff-auth')
+  >();
   return {
     ...actual,
     authenticatedClinicScope: async (_request: Request, clinicId: string) => ({
@@ -41,7 +43,10 @@ function post(body: Record<string, unknown>) {
   return POST(
     new Request(url, {
       method: 'POST',
-      headers: { origin: 'http://localhost', 'content-type': 'application/json' },
+      headers: {
+        origin: 'http://localhost',
+        'content-type': 'application/json',
+      },
       body: JSON.stringify(body),
     }),
     context(),
@@ -82,7 +87,9 @@ describe('WU185 staff appointment instant ingress', () => {
       scheduledEndAt: Date;
     };
     expect(input.scheduledStartAt).toBeInstanceOf(Date);
-    expect(input.scheduledStartAt.toISOString()).toBe('2028-02-29T09:00:00.000Z');
+    expect(input.scheduledStartAt.toISOString()).toBe(
+      '2028-02-29T09:00:00.000Z',
+    );
     expect(input.scheduledEndAt.toISOString()).toBe('2028-02-29T10:00:00.000Z');
   });
 });
