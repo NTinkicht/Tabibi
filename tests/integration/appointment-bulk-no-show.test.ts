@@ -340,6 +340,48 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
     }
   });
 
+  it('serializes appointment cancellation against bulk absence with no split pair', async () => {
+    const booking = await book('cancel-race');
+    await setScheduledMinutesAgo(booking.appointment.id, 30);
+    const lifecycle = new AppointmentLifecycleService(pool);
+    let arrived = 0;
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const contend = async <T>(operation: () => Promise<T>): Promise<T> => {
+      arrived++;
+      if (arrived === 2) release();
+      await barrier;
+      return operation();
+    };
+    const outcomes = await Promise.allSettled([
+      contend(() =>
+        service.resolveWaiting(scope, sessionId, bulkInput('cancel-race')),
+      ),
+      contend(() =>
+        lifecycle.command(scope, sessionId, booking.appointment.id, {
+          command: 'cancel',
+          reason: 'Patient cancelled independently',
+          idempotencyKey: 'wu171-concurrent-cancel',
+          correlationId: 'wu171-concurrent-cancel',
+        }),
+      ),
+    ]);
+    const state = await paired(booking.appointment.id);
+    expect([
+      { appointment: 'no_show', entry: 'no_show' },
+      { appointment: 'cancelled', entry: 'cancelled' },
+    ]).toContainEqual(state);
+    expect(outcomes.some((result) => result.status === 'fulfilled')).toBe(true);
+    if (outcomes[0]?.status === 'fulfilled')
+      expect(outcomes[0].value.resolvedAppointmentCount).toBe(
+        state.entry === 'no_show' ? 1 : 0,
+      );
+    if (outcomes[1]?.status === 'fulfilled')
+      expect(state).toEqual({ appointment: 'cancelled', entry: 'cancelled' });
+  });
+
   for (const status of ['planned', 'paused'] as const) {
     it(`explicitly resolves an expired booked arrival in ${status} session`, async () => {
       await pool.query(
