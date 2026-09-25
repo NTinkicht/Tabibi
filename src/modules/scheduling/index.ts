@@ -119,8 +119,19 @@ export class SchedulingService {
     const daysAhead = input.daysAhead ?? 7;
     if (!Number.isInteger(daysAhead) || daysAhead < 7 || daysAhead > 366)
       throw new RangeError('daysAhead must be an integer from 7 through 366');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.startDate))
-      throw new TypeError('startDate must use YYYY-MM-DD');
+    // Reject nonexistent calendar days before passing a date to PostgreSQL.
+    // JavaScript Date and PostgreSQL otherwise have different normalization
+    // and error paths for February 30 / non-leap February 29.
+    const parsedStart = /^\d{4}-\d{2}-\d{2}$/.test(input.startDate)
+      ? new Date(`${input.startDate}T00:00:00.000Z`)
+      : null;
+    if (
+      !parsedStart ||
+      Number(input.startDate.slice(0, 4)) < 1 ||
+      !Number.isFinite(parsedStart.getTime()) ||
+      parsedStart.toISOString().slice(0, 10) !== input.startDate
+    )
+      throw new TypeError('startDate must be a real YYYY-MM-DD calendar day');
 
     return inTransaction(this.pool, async (client) => {
       await requireScheduleWrite(client, scope, input.doctorId);
