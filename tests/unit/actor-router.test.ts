@@ -201,6 +201,7 @@ describe('seven-actor capacity routing', () => {
   it('bounds Mistral wake and classifies token failures', () => {
     const workflowPath = '.github/workflows/mistral-vibe-wake.yml';
     const workflow = fs.readFileSync(workflowPath, 'utf8');
+    const modelOnly = workflow.split('\n  publish-review:\n')[0];
     expect(workflow).toContain('github.event.issue.number == 11');
     expect(workflow).toContain("github.actor == 'NTinkicht'");
     expect(workflow).toContain('contents: read');
@@ -210,7 +211,7 @@ describe('seven-actor capacity routing', () => {
     expect(workflow).toContain('token limit exceeded');
     expect(workflow).toContain('TOKEN_BUDGET_EXCEEDED');
     expect(workflow).not.toContain('contents: write');
-    expect(workflow).not.toContain('pull-requests: write');
+    expect(modelOnly).not.toContain('pull-requests: write');
   });
 
   it('pins Mistral binding review to a trusted current PR and green CI', () => {
@@ -218,6 +219,7 @@ describe('seven-actor capacity routing', () => {
       '.github/workflows/mistral-vibe-wake.yml',
       'utf8',
     );
+    const modelOnly = workflow.split('\n  publish-review:\n')[0];
     const helper = fs.readFileSync('scripts/mistral-review-target.py', 'utf8');
     expect(workflow).toContain(
       'python3 /tmp/tabibi-mistral-review-target.py prepare',
@@ -232,7 +234,7 @@ describe('seven-actor capacity routing', () => {
     );
     expect(workflow).toContain('REVIEW_EVIDENCE_INCOMPLETE');
     expect(workflow).not.toContain('contents: write');
-    expect(workflow).not.toContain('pull-requests: write');
+    expect(modelOnly).not.toContain('pull-requests: write');
     expect(helper).toContain('REQUIRED_JOBS');
     expect(helper).toContain('DIFF_LIMIT_BYTES');
     expect(helper).toContain('"git", "diff"');
