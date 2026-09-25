@@ -124,9 +124,12 @@ describe('guest inbox API', () => {
       ['', 20],
     ] as const) {
       getSnapshot.mockClear();
-      const response = await GET(request(`/api/guest/inbox?limit=${encodeURIComponent(value)}`));
+      const response = await GET(
+        request(`/api/guest/inbox?limit=${encodeURIComponent(value)}`),
+      );
       expect(response.status).toBe(200);
-      expect(getSnapshot).toHaveBeenCalledExactlyOnceWith(bearer, expected);
+      expect(getSnapshot).toHaveBeenCalledTimes(1);
+      expect(getSnapshot).toHaveBeenCalledWith(bearer, expected);
     }
   });
 
