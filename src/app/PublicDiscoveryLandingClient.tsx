@@ -599,7 +599,7 @@ export default function PublicDiscoveryLandingClient({
               )}
             </div>
             {(query || clinicLanguage !== 'all' || onlyListedDoctors) && (
-              <div>
+              <div data-testid="filtered-count-block">
                 <p>{t.searchCount(matchingClinics.length)}</p>
                 <p data-testid="visible-clinic-total">
                   {t.visibleClinicTotal(matchingClinics.length, clinics.length)}
