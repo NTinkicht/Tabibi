@@ -7,6 +7,10 @@ export interface EtaRevisionInput {
   estimatedConsultationMinutes: number;
   estimateSource: 'fallback' | 'historical_median' | 'observed_median';
   observedSampleCount: number;
+  /** Bound the revision to committed queue mutations even when ETA rounds equal. */
+  queueOrderVersion?: number;
+  /** Retain monotonic delay changes across clear / re-declare of same value. */
+  delayVersion?: number;
 }
 
 /**
@@ -22,6 +26,8 @@ export function createEtaRevision(input: EtaRevisionInput): string {
     input.estimatedConsultationMinutes,
     input.estimateSource,
     input.observedSampleCount,
+    input.queueOrderVersion ?? 0,
+    input.delayVersion ?? 0,
   ].join(':');
 
   const digest = createHmac('sha256', guestBearerSigningSecret())

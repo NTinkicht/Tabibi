@@ -321,6 +321,81 @@ describe('receptionist dashboard read model', () => {
     expect(waitingEntry.eta).toMatchObject({ patientsAhead: 0 });
   });
 
+  it('changes ETA revision on committed call even when rounded wait inputs are identical', async () => {
+    const queue = new QueueService(pool);
+    const first = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'WU174 first',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu174-first',
+      correlationId: 'wu174-first',
+    });
+    const second = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'WU174 second',
+      preferredLocale: 'ar',
+      idempotencyKey: 'wu174-second',
+      correlationId: 'wu174-second',
+    });
+    const command = (id: string, action: 'check_in' | 'call') =>
+      queue.command(scope, ids.sessionA, id, {
+        command: action,
+        idempotencyKey: `wu174-${id}-${action}`,
+        correlationId: 'wu174-revision',
+      });
+    await command(first.entry.id, 'check_in');
+    await command(second.entry.id, 'check_in');
+
+    const dashboard = new ReceptionistDashboardService(pool);
+    const before = await dashboard.getSnapshot(scope, ids.sessionA);
+    const firstRead = before.entries.find((row) => row.id === second.entry.id)!;
+    expect(firstRead.eta).toMatchObject({
+      patientsAhead: 1,
+      estimatedConsultationMinutes: 15,
+    });
+    const stable = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(
+      stable.entries.find((row) => row.id === second.entry.id)?.eta?.revision,
+    ).toBe(firstRead.eta?.revision);
+
+    await command(first.entry.id, 'call');
+    const after = await dashboard.getSnapshot(scope, ids.sessionA);
+    const secondRead = after.entries.find((row) => row.id === second.entry.id)!;
+    expect(secondRead.eta).toMatchObject({
+      patientsAhead: 1,
+      estimatedConsultationMinutes: 15,
+      minWaitMinutes: firstRead.eta?.minWaitMinutes,
+      maxWaitMinutes: firstRead.eta?.maxWaitMinutes,
+    });
+    expect(after.session.queueOrderVersion).toBeGreaterThan(
+      before.session.queueOrderVersion,
+    );
+    expect(secondRead.eta?.revision).not.toBe(firstRead.eta?.revision);
+
+    // Committed delay version matters even if the operator restores the
+    // same displayed number of minutes; a retry does not add a version.
+    const sessions = new SessionService(pool);
+    const cleared = await sessions.delay(scope, ids.sessionA, {
+      command: 'clear_delay',
+      expectedVersion: 1,
+      idempotencyKey: 'wu174-clear-delay',
+      correlationId: 'wu174-delay',
+    });
+    expect(cleared.delayVersion).toBe(2);
+    await sessions.delay(scope, ids.sessionA, {
+      command: 'declare_delay',
+      minutes: 20,
+      expectedVersion: 2,
+      idempotencyKey: 'wu174-redeclare-delay',
+      correlationId: 'wu174-delay',
+    });
+    const restored = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(restored.session.declaredDelayMinutes).toBe(
+      before.session.declaredDelayMinutes,
+    );
+    expect(
+      restored.entries.find((row) => row.id === second.entry.id)?.eta?.revision,
+    ).not.toBe(secondRead.eta?.revision);
+  });
+
   it('denies wrong roles and treats a cross-clinic session as absent', async () => {
     await pool.query(
       `UPDATE clinic_memberships SET role='doctor' WHERE clinic_id=$1 AND user_id=$2`,

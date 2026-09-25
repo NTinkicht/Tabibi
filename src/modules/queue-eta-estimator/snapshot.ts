@@ -7,6 +7,8 @@ export interface EtaSnapshotInput {
   estimatedConsultationMinutes: number;
   estimateSource: QueueEtaEstimateSource;
   observedSampleCount: number;
+  queueOrderVersion?: number;
+  delayVersion?: number;
 }
 
 export interface EtaSnapshot {
