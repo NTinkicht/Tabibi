@@ -166,34 +166,30 @@ describe('shared deterministic queue ETA estimator', () => {
       declaredDelayMinutes: 0,
       estimatedConsultationMinutes: 12,
     };
-    for (const patientsAhead of [
+    const rejects = (input: Parameters<typeof computeQueueEtaRange>[0]) => {
+      expect(() => computeQueueEtaRange(input)).toThrow(RangeError);
+    };
+    const invalidCounts = [
       -1,
       1.5,
       Number.NaN,
       Infinity,
       Number.MAX_SAFE_INTEGER + 1,
-    ]) {
-      expect(() =>
-        computeQueueEtaRange({ ...valid, patientsAhead }),
-      ).toThrow(RangeError);
+    ];
+    for (const patientsAhead of invalidCounts) {
+      rejects({ ...valid, patientsAhead });
     }
     for (const declaredDelayMinutes of [-1, Number.NaN, Infinity]) {
-      expect(() =>
-        computeQueueEtaRange({ ...valid, declaredDelayMinutes }),
-      ).toThrow(RangeError);
+      rejects({ ...valid, declaredDelayMinutes });
     }
     for (const estimatedConsultationMinutes of [0, -1, Number.NaN, Infinity]) {
-      expect(() =>
-        computeQueueEtaRange({ ...valid, estimatedConsultationMinutes }),
-      ).toThrow(RangeError);
+      rejects({ ...valid, estimatedConsultationMinutes });
     }
-    expect(() =>
-      computeQueueEtaRange({
-        patientsAhead: Number.MAX_SAFE_INTEGER,
-        declaredDelayMinutes: 0,
-        estimatedConsultationMinutes: Number.MAX_VALUE,
-      }),
-    ).toThrow(RangeError);
+    rejects({
+      patientsAhead: Number.MAX_SAFE_INTEGER,
+      declaredDelayMinutes: 0,
+      estimatedConsultationMinutes: Number.MAX_VALUE,
+    });
     expect(computeQueueEtaRange({ ...valid, patientsAhead: 0 })).toEqual({
       minWaitMinutes: 0,
       maxWaitMinutes: 0,
