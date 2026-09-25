@@ -7,6 +7,8 @@ import {
 } from '@/modules/appointment';
 import { AppointmentBulkNoShowService } from '@/modules/appointment/bulk-no-show';
 import { AppointmentLifecycleService } from '@/modules/appointment/lifecycle';
+import { QueueService } from '@/modules/queue';
+import { ReceptionistDashboardService } from '@/modules/receptionist-dashboard';
 import { SessionService } from '@/modules/session';
 import { migrate } from '../../scripts/db/lib';
 
@@ -295,6 +297,54 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
         queue_entry_id: appointment.appointment.queueEntryId,
       },
     ]);
+  });
+
+  it('refreshes checked-in ETA revision after committed bulk waiting no-show without changing work ahead', async () => {
+    const appointment = await book('wu174-revision');
+    await setScheduledMinutesAgo(appointment.appointment.id, 30);
+    const queue = new QueueService(pool);
+    const checked = await queue.registerWalkIn(scope, sessionId, {
+      privateDisplayName: 'WU174 synthetic present',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu174-registered',
+      correlationId: 'wu174-registered',
+    });
+    await queue.command(scope, sessionId, checked.entry.id, {
+      command: 'check_in',
+      idempotencyKey: 'wu174-checked',
+      correlationId: 'wu174-checked',
+    });
+    const dashboard = new ReceptionistDashboardService(pool);
+    const before = await dashboard.getSnapshot(scope, sessionId);
+    const prior = before.entries.find((item) => item.id === checked.entry.id)!;
+    expect(prior.eta).toMatchObject({ patientsAhead: 0 });
+    const receipt = await service.resolveWaiting(
+      scope,
+      sessionId,
+      bulkInput('wu174-revision'),
+    );
+    expect(receipt.resolvedAppointmentCount).toBe(1);
+    const after = await dashboard.getSnapshot(scope, sessionId);
+    const current = after.entries.find((item) => item.id === checked.entry.id)!;
+    expect(current.eta).toMatchObject({
+      patientsAhead: prior.eta?.patientsAhead,
+      minWaitMinutes: prior.eta?.minWaitMinutes,
+      maxWaitMinutes: prior.eta?.maxWaitMinutes,
+    });
+    expect(after.session.queueOrderVersion).toBe(
+      before.session.queueOrderVersion + 1,
+    );
+    expect(current.eta?.revision).not.toBe(prior.eta?.revision);
+    const retry = await service.resolveWaiting(
+      scope,
+      sessionId,
+      bulkInput('wu174-revision'),
+    );
+    expect(retry).toEqual(receipt);
+    const stable = await dashboard.getSnapshot(scope, sessionId);
+    expect(
+      stable.entries.find((item) => item.id === checked.entry.id)?.eta?.revision,
+    ).toBe(current.eta?.revision);
   });
 
   it('serializes concurrent appointment check-in against bulk absence', async () => {
