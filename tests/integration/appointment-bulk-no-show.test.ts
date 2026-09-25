@@ -450,6 +450,7 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
     await queue.command(scope, sessionId, walkIn.entry.id, {
       command: 'cancel',
       reason: 'Walk-in left before consultation',
+      cancellationSource: 'patient',
       idempotencyKey: 'wu175-walk-in-cancel',
       correlationId: 'wu175-walk-in-cancel',
     });
