@@ -189,7 +189,9 @@ export function computeQueueEtaRange({
     !Number.isFinite(estimatedConsultationMinutes) ||
     estimatedConsultationMinutes <= 0
   ) {
-    throw new RangeError('ETA inputs must be finite, non-negative and physically valid');
+    throw new RangeError(
+      'ETA inputs must be finite, non-negative and physically valid',
+    );
   }
 
   const minWaitMinutes = Math.round(
