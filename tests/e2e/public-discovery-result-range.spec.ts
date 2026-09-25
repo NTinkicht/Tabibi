@@ -191,7 +191,20 @@ test('visible clinic total reports the true match count, not the revealed batch,
   await expect(visibleTotal).toHaveText(
     'Cliniques correspondantes : 7 sur 10 cliniques du répertoire.',
   );
-  await expect(page.locator('.publicSearch [role="status"]')).toHaveCount(0);
+  // Check the filtered counts themselves, not just other status elements in
+  // .publicSearch. The separate active-filter announcement is outside this
+  // block and must not be mistaken for a duplicate count announcement.
+  const filteredCount = page.getByTestId('filtered-count-block');
+  await expect(filteredCount).not.toHaveAttribute('aria-live', /.+/);
+  await expect(filteredCount).not.toHaveAttribute(
+    'role',
+    /^(status|alert|log|marquee|timer)$/,
+  );
+  await expect(
+    filteredCount.locator(
+      '[aria-live], [role="status"], [role="alert"], [role="log"], [role="marquee"], [role="timer"]',
+    ),
+  ).toHaveCount(0);
 
   await page.getByTestId('show-more-clinics').click();
   await expect(page.locator('.publicClinic')).toHaveCount(7);
@@ -204,6 +217,16 @@ test('visible clinic total reports the true match count, not the revealed batch,
   await expect(visibleTotal).toHaveText(
     'Cliniques correspondantes : 7 sur 10 cliniques du répertoire.',
   );
+  await expect(filteredCount).not.toHaveAttribute('aria-live', /.+/);
+  await expect(filteredCount).not.toHaveAttribute(
+    'role',
+    /^(status|alert|log|marquee|timer)$/,
+  );
+  await expect(
+    filteredCount.locator(
+      '[aria-live], [role="status"], [role="alert"], [role="log"], [role="marquee"], [role="timer"]',
+    ),
+  ).toHaveCount(0);
 });
 
 test('French keyboard reveal focuses first newly shown clinic and never steals search focus', async ({
