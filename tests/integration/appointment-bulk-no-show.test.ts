@@ -348,7 +348,6 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
     ).toBe(current.eta?.revision);
   });
 
-
   it('WU175 completes a mixed clinic day only after explicit resolution, with committed ETA and audit evidence', async () => {
     const expired = await book('wu175-expired');
     const future = await book('wu175-future');
