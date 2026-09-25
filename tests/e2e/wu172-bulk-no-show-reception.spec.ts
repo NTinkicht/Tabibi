@@ -91,16 +91,16 @@ for (const locale of ['fr', 'ar'] as const) {
       locale === 'fr'
         ? 'Déclarer les absences éligibles'
         : 'تسجيل غياب المواعيد المؤهلة';
-    await page.getByRole('textbox', { name: reasonLabel }).fill('Absence vérifiée');
+    await page
+      .getByRole('textbox', { name: reasonLabel })
+      .fill('Absence vérifiée');
     page.once('dialog', (dialog) => void dialog.dismiss());
     await page.getByRole('button', { name: submit }).click();
     expect(requests).toHaveLength(0);
     page.once('dialog', (dialog) => void dialog.accept());
     await page.getByRole('button', { name: submit }).click();
     await expect(page.getByRole('status')).toContainText(
-      locale === 'fr'
-        ? '1 rendez-vous éligible(s)'
-        : 'تم تسجيل غياب 1',
+      locale === 'fr' ? '1 rendez-vous éligible(s)' : 'تم تسجيل غياب 1',
     );
     expect(requests).toHaveLength(1);
     expect(requests[0].reason).toBe('Absence vérifiée');
@@ -139,9 +139,9 @@ test('WU172: retry after connectivity loss reuses the same key and zero-result i
   const button = page.getByRole('button', {
     name: 'Déclarer les absences éligibles',
   });
-  await page.getByRole('textbox', { name: 'Motif collectif obligatoire' }).fill(
-    'Absence vérifiée',
-  );
+  await page
+    .getByRole('textbox', { name: 'Motif collectif obligatoire' })
+    .fill('Absence vérifiée');
   page.on('dialog', (dialog) => void dialog.accept());
   await button.click();
   await expect(page.getByRole('status')).toContainText(
