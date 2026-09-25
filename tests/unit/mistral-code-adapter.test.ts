@@ -101,7 +101,7 @@ describe('Mistral code adapter uses owner per-WU leases', () => {
     expect(model.run).not.toContain('--agent plan');
     expect(model.run).toContain('cd /tmp/tabibi-mistral-readonly');
     expect(model.run).toContain('env -u GITHUB_TOKEN -u GH_TOKEN');
-    const modelCommand = model.run
+    const modelCommand = (model.run ?? '')
       .split('\n')
       .filter((line) => !line.trimStart().startsWith('#'))
       .join('\n');
