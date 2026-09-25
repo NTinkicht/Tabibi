@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail-closed independent AI review gate for Tabibi PR heads (pilot).
 
-Only a provider-run-backed, owner-dispatched Mistral review is eligible here.
+An artifact-sealed Mistral or pinned-worker-signed Grok review is eligible here.
 No user-authored "Claude reviewed" assertion, bot capacity reply, old SHA,
 CI_GREEN_HANDOFF, missing trailer, or unverified model comment is a gate.
 This script is intentionally read-only; branch rulesets must separately REQUIRE
@@ -70,6 +70,16 @@ def proof_reader():
     spec = importlib.util.spec_from_file_location("trusted_mistral_proof", location)
     if spec is None or spec.loader is None:
         raise ValueError("Run-scoped reviewer proof helper missing")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def grok_reader():
+    location = Path("scripts/coordination/grok-review-proof.py")
+    spec = importlib.util.spec_from_file_location("trusted_grok_proof", location)
+    if spec is None or spec.loader is None:
+        raise ValueError("Trusted Grok proof verifier unavailable")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -193,6 +203,21 @@ def evaluate(number):
     else:
         raise ValueError("PR comment history exceeds checked bound")
     eligible = []
+    # The signer lives ONLY in a trusted owner Codespace; the pinned public
+    # key lives on main. Review text or a formal owner-account "grok PASS"
+    # without an actual signed worker receipt remains ineligible.
+    grok = grok_reader()
+    dispatches = {
+        item["id"]: item for item in comments
+        if isinstance(item.get("id"), int)
+    }
+    for comment in comments:
+        if "tabibi-grok-attestation-v1:" in (comment.get("body") or ""):
+            signed_verdict = grok.verified_review(
+                comment, number, sha, actors, dispatches
+            )
+            if signed_verdict is not None:
+                eligible.append(signed_verdict)
     for comment in comments:
         # Public-PR adversaries can write arbitrary markers. Only an actual
         # github-actions bot comment may trigger a dispatch/run lookup.
@@ -227,7 +252,7 @@ def evaluate(number):
         if verdict is not None:
             eligible.append(verdict)
     if "PASS" not in eligible or any(v != "PASS" for v in eligible):
-        raise ValueError("No clean current-head independent PASS or adverse verdict")
+        raise ValueError("No clean current-head authenticated independent PASS or adverse verdict")
     # Inline reviewer findings require separate reconciliation; even this
     # verified proof is advisory until the complete merge gate is implemented.
     return sha
