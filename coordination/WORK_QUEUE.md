@@ -6,7 +6,7 @@ Status values: `ACTIVE`, `READY`, `BLOCKED`, `DONE`, `CANCELLED`.
 
 ## Product delivery after WU169 — snapshot 2026-09-25
 
-**WU169 has merged**: PR #488 merge `9829612ab5deccd39878a824c608c1639582ca13`. WU168 PR #479 merge `6713cc2fbd445435b8621a317bac3cdccbe54b2c`. The stale implementation issues #346 (WU95), #383 (WU113), #385 (WU114), #476 (WU168) and #477 (WU169) were verified against merged PRs and closed. Epics #2/#3/#4/#6 are closed; Epic #5 (deterministic live queue and ETA) is still open. Do NOT re-activate Issue #6 or the obsolete WU66 continuation.
+**WU169 has merged**: PR #488 merge `9829612ab5deccd39878a824c608c1639582ca13`. WU168 PR #479 merge `6713cc2fbd445435b8621a317bac3cdccbe54b2c`. The stale implementation issues #346 (WU95), #383 (WU113), #385 (WU114), #476 (WU168) and #477 (WU169) were verified against merged PRs and closed. Duplicate WU112 Issue #382 was also reconciled against WU119 PR #395 and closed. Epics #2/#3/#4/#6 are closed; Epic #5 (deterministic live queue and ETA) is still open. Do NOT re-activate Issue #6 or the obsolete WU66 continuation.
 
 PR #487, merge `7e3d044717f07ab514d772b3206ecfa22b1b067a`, is a review-proof pilot, **NOT enforced branch protection**. Its latest Mistral review disclosed material co-authorship and `merge_ready: no`; no verifiable independent nonauthor final-head gate was found before merge. Issue #485 records this incident; resolve by tested SHA-bound check, broad reviewer-proof support and required GitHub main ruleset, not by fabricated PASS or human routine PR sign-off.
 
@@ -17,7 +17,7 @@ PR #487, merge `7e3d044717f07ab514d772b3206ecfa22b1b067a`, is a review-proof pil
 | REVIEW-GATE-485 / PR #489 | ACTIVE | Trusted-main verified exact-head review check and negative tests; green CI, actual nonauthor review, then ruleset activation and live blocked/allowed proof; cannot count an unrequired check as enforcement |
 | MISTRAL-BOUNDARY-355 / PR #490 | ACTIVE | Remove untrusted PR hooks/`--trust` and inherited GitHub credentials; CI, independent security review and merge; acknowledge remaining model provider-key read surface |
 | STATE-RECONCILE-491 | ACTIVE | Correct STATE.json and WORK_QUEUE.md; derive a genuine next product WU only after acceptance audit |
-| WU112 / #382 | READY TO RECONCILE | Compare WU119 PR #395 actual reconnect/fallback guidance with WU112, then close/supersede or implement missing acceptance |
+| WU112 / #382 | DONE (superseded by WU119) | PR #395 merged FR/AR reconnect/fallback/recovery guidance and Playwright coverage; duplicate Issue #382 reconciled and closed |
 | GROK-CLOUD #323/#340/#339 | READY TO VERIFY | Real no-Codespace provider run and trusted scoped code push with independent non-Grok review; adapter code/lease alone is not execution |
 | MISTRAL-CLOUD #341/#355 | READY TO VERIFY | Real included-capacity review/code/test run, trusted push, 3-job CI and independent non-Mistral gate; PAYG off |
 | PRODUCT-ACCEPTANCE-POST-WU169 | READY | Audit Epic #5 and PRODUCT.md across end-to-end clinic day with concrete code/tests; define smallest actual next feature WU |
