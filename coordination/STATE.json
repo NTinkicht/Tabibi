@@ -173,7 +173,7 @@
   "product_architect": "chatgpt",
   "deterministic_referee": "ci",
   "open_blockers": 2,
-  "open_majors": null,
+  "open_majors": 0,
   "human_decision_required": true,
   "pending_findings": [
     {
