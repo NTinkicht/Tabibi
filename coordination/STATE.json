@@ -1,13 +1,13 @@
 {
   "project": "Tabibi",
-  "phase": "product_delivery_post_epic",
-  "state": "wu66_complete_product_handoff_ready",
+  "phase": "product_delivery_and_governance_hardening",
+  "state": "wu169_merged_product_acceptance_audit_pending",
   "current_pr": null,
-  "current_issue": null,
+  "current_issue": 491,
   "last_actor": "chatgpt",
   "next_actor": "actor_router",
-  "next_action": "Reconcile the live remaining open product epics after merged WU66 and define the smallest dependency-ready bounded work unit. Issue #6 is closed/completed and must not be routed. Establish exactly one canonical issue/lease/branch/PR for the selected slice, preserving zero-extra-spend and exact-head independent review rules.",
-  "operating_model": "six-active-actor-mesh-v10-epic-company-os-v3",
+  "next_action": "Reconcile Epic #5 and complete a bounded end-to-end clinic-day acceptance-gap audit against PRODUCT.md and implemented code/tests, then define the smallest real next product WU. In parallel finish issue #485 fail-closed required-check adoption and issue #355 Mistral code-runner hardening; live GitHub PR and review state remains authoritative.",
+  "operating_model": "seven-registered-actors-runtime-and-included-capacity-conditional-company-os-v3",
   "binding_protocols": [
     "AGENTS.md",
     "coordination/BOOTSTRAP.md",
@@ -40,7 +40,8 @@
       "claude",
       "copilot",
       "gemini-cli",
-      "mistral-vibe"
+      "mistral-vibe",
+      "grok"
     ],
     "retired_actors": ["gemini_agent", "gemini_chat"],
     "slack_role": "attention_and_culture_only",
@@ -49,7 +50,7 @@
   "agents": {
     "chatgpt": {
       "status": "available",
-      "current_activity": "Post-WU66 state reconciliation and bounded product handoff; available for orchestration or implementation subject to lease."
+      "current_activity": "Issue #485 governance check PR #489, Issue #355 Mistral security PR #490, Issue #491 state reconciliation and next product acceptance audit; all PR/CI status requires live GitHub refresh."
     },
     "codex": {
       "status": "available_subject_to_included_capacity",
@@ -70,17 +71,42 @@
     "mistral-vibe": {
       "status": "available_probe_passed",
       "current_activity": "Bounded coding/design/docs/QA/overflow review; existing subscription allowance only, PAYG forbidden."
+    },
+    "grok": {
+      "status": "runtime_conditional",
+      "current_activity": "Owner Grok Build read-only review previously demonstrated; Codespace-OFF Grok Bot implementation/review continuity remains subject to real provider run evidence in Issues #323/#339/#340."
     }
   },
   "role_leases": {},
-  "current_work": null,
+  "current_work": {
+    "snapshot_date": "2026-09-25",
+    "streams": [
+      {
+        "id": "REVIEW-GATE-485",
+        "issue": 485,
+        "pr": 489,
+        "scope": "Trusted exact-head review check pilot plus owner required-check settings and review-source coverage"
+      },
+      {
+        "id": "MISTRAL-BOUNDARY-355",
+        "issue": 355,
+        "pr": 490,
+        "scope": "Remove --trust and inherited GitHub tokens from staged Mistral coding model path"
+      },
+      {
+        "id": "POST-WU169-RECONCILIATION",
+        "issue": 491,
+        "scope": "Sync company state, audit remaining Epic #5/product acceptance before new feature number"
+      }
+    ]
+  },
   "next_work": {
-    "id": "PRODUCT-CONTINUATION-002",
+    "id": "PRODUCT-ACCEPTANCE-AUDIT-POST-WU169",
     "status": "ready_for_bounded_decomposition",
-    "parent_issue": null,
-    "scope": "Reconcile live open product epics #2, #3, #4 and #5 against merged work through WU66, then select the smallest dependency-ready remaining slice. Closed Issue #6 is explicitly excluded. Do not introduce paid provider/API dependencies.",
+    "parent_issue": 5,
+    "scope": "Audit merged WUs through WU169 against PRODUCT.md and open Epic #5, verify full clinic-day journeys, identify genuine unimplemented acceptance gaps without redoing merged WUs or assuming all roadmap work complete.",
     "preferred_actor": "actor_router",
-    "next_action": "Use live GitHub and current code to define one bounded work unit with deterministic acceptance/tests, record the lease, then establish exactly one canonical implementation stream."
+    "next_action": "Record a concrete acceptance-gap matrix with real code/test references, then open one smallest nonoverlapping source+test product WU."
   },
   "activation_evidence": {
     "gemini-cli": "probe passed: actor/repo/no-self-gating correct; no intentional repository edits; environment churn inspected/restored",
@@ -120,12 +146,37 @@
       "merge_commit": "70dcdf0c0122a04cc2d233336ca33b801e784e68",
       "review_evidence": "Exact-head CI green; independent CodeRabbit exact-head review reported no actionable comments and no actionable merge risk.",
       "status": "merged"
+    },
+    {
+      "id": "WU168",
+      "issue": 476,
+      "implementation_pr": 479,
+      "final_head": "08db3d08faa8f5b1a5a7af73929a417f1625f2ad",
+      "merge_commit": "6713cc2fbd445435b8621a317bac3cdccbe54b2c",
+      "status": "merged"
+    },
+    {
+      "id": "WU169",
+      "issue": 477,
+      "implementation_pr": 488,
+      "final_head": "5f59eec48af430b17a64e7f7d3279310ae6f794d",
+      "merge_commit": "9829612ab5deccd39878a824c608c1639582ca13",
+      "status": "merged"
     }
   ],
   "product_architect": "chatgpt",
   "deterministic_referee": "ci",
-  "open_blockers": 0,
+  "open_blockers": 2,
   "open_majors": 0,
-  "human_decision_required": false,
-  "pending_findings": []
+  "human_decision_required": true,
+  "pending_findings": [
+    {
+      "issue": 485,
+      "detail": "PR #487 merged without a verifiable independent non-material-author final-head gate; check workflow alone is not repository ruleset enforcement. One-time owner ruleset/settings action is required only after verified usable provider-proof paths."
+    },
+    {
+      "issue": 355,
+      "detail": "Mistral scoped coding workflow still used Vibe --trust on main until PR #490 security hardening merges; no untrusted-PR hook execution may be accepted as safe."
+    }
+  ]
 }
