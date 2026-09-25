@@ -599,7 +599,7 @@ export default function PublicDiscoveryLandingClient({
               )}
             </div>
             {(query || clinicLanguage !== 'all' || onlyListedDoctors) && (
-              <div role="status" aria-live="polite" aria-atomic="true">
+              <div data-testid="filtered-count-block">
                 <p>{t.searchCount(matchingClinics.length)}</p>
                 <p data-testid="visible-clinic-total">
                   {t.visibleClinicTotal(matchingClinics.length, clinics.length)}
@@ -664,7 +664,12 @@ export default function PublicDiscoveryLandingClient({
             </button>
           )}
         {state === 'ready' && clinics.length > 0 && (
-          <p data-testid="clinic-result-range" aria-live="polite">
+          <p
+            data-testid="clinic-result-range"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             {t.resultRange(displayedClinics.length, matchingClinics.length)}
           </p>
         )}
