@@ -4,7 +4,8 @@
 The preceding inference job has issues:write and pull-requests:read; this fresh
 job has pull-requests:write but no Mistral credential, PR checkout or model.
 Only repost a provider-run-bound review already published by the trusted parent
-to Issue #11. This is delivery, NOT a merge approval or owner attestation.
+to Issue #11. An authenticated clean PASS also publishes a commit-pinned native
+GitHub APPROVE review (like OneCompany), never an automatic merge or self-gate.
 """
 import importlib.util
 import json
@@ -96,6 +97,55 @@ def comments(number):
     raise ValueError("Comment pagination bound exceeded")
 
 
+def native_approval(number, sha, *, run_id, report_id):
+    """Publish a commit-bound APPROVE only after the caller checked sealed proof.
+
+    This privileged publisher runs separately from model inference. Mistral has
+    no pull-request-write token; a raw model statement can never call this path.
+    """
+    if not (str(run_id).isdigit() and str(report_id).isdigit()):
+        raise ValueError("Untrusted review identity")
+    marker = f"tabibi-mistral-native-v1 run={run_id} report={report_id} sha={sha}"
+    for page in range(1, 11):
+        batch = api(f"repos/{REPO}/pulls/{number}/reviews?per_page=100&page={page}")
+        if not isinstance(batch, list):
+            raise ValueError("Native review history unavailable")
+        for review in batch:
+            if marker in (review.get("body") or ""):
+                if (
+                    review.get("user", {}).get("login") == "github-actions[bot]"
+                    and review.get("state") == "APPROVED"
+                    and review.get("commit_id") == sha
+                ):
+                    print("CURRENT_RUN_NATIVE_MISTRAL_APPROVAL_ALREADY_PUBLISHED")
+                    return
+                raise ValueError("Conflicting native review marker")
+        if len(batch) < 100:
+            break
+    else:
+        raise ValueError("Native review history exceeds bound")
+    approval = api(
+        f"repos/{REPO}/pulls/{number}/reviews",
+        body={
+            "commit_id": sha,
+            "event": "APPROVE",
+            "body": (
+                "Authenticated independent Mistral Vibe exact-head technical PASS.\n\n"
+                f"PR #{number}; exact head {sha}.\n"
+                f"Run: https://github.com/{REPO}/actions/runs/{run_id}\n"
+                f"Immutable evidence: https://github.com/{REPO}/issues/11#issuecomment-{report_id}\n\n"
+                "A run-sealed, independently executed, non-material-author PASS was verified "
+                "against the unchanged current PR and green 3/3 CI by the trusted parent. "
+                "This native review does not authorize merge without all other Tabibi gates.\n\n"
+                f"<!-- {marker} -->"
+            ),
+        },
+    )
+    if approval.get("state") != "APPROVED" or approval.get("commit_id") != sha:
+        raise ValueError("Native current-head approval not confirmed")
+    print(f"CURRENT_RUN_NATIVE_MISTRAL_APPROVED PR #{number} SHA {sha}")
+
+
 def publish():
     if os.environ.get("GITHUB_REPOSITORY") != REPO:
         raise ValueError("Wrong repository")
@@ -146,23 +196,34 @@ def publish():
     ):
         raise ValueError("Run-scoped artifact does not authenticate review report")
     body = source["body"]
-    if any(
+    copied = any(
         c.get("user", {}).get("login") == "github-actions[bot]"
         and MARKER.search(c.get("body") or "")
         and c.get("body") == body
         for c in comments(number)
-    ):
-        print("CURRENT_RUN_REVIEW_ALREADY_PUBLISHED")
-        return
+    )
 
-    # Race fence immediately before posting; no fork/untrusted checkout,
-    # provider secret, execution of PR scripts or force merge.
+    # Race fence immediately before ANY write; an old sealed result is not
+    # approval of a new SHA, even when GitHub still displays its old PASS.
     trusted.read_current_pr(REPO, number, sha)
     trusted.verify_provenance(REPO, number, sha, actors)
     if not trusted.ci_green(REPO, sha):
         raise ValueError("Current head/CI changed before publication")
-    api(f"repos/{REPO}/issues/{number}/comments", body={"body": body})
-    print(f"CURRENT_RUN_REVIEW_PUBLISHED PR #{number} SHA {sha}")
+    if not copied:
+        api(f"repos/{REPO}/issues/{number}/comments", body={"body": body})
+        print(f"CURRENT_RUN_REVIEW_PUBLISHED PR #{number} SHA {sha}")
+    else:
+        print("CURRENT_RUN_REVIEW_ALREADY_PUBLISHED")
+
+    # The new GitHub Actions create/approve repository setting allows a real
+    # bot APPROVE, but only after the artifact-sealed non-author PASS above.
+    # A CHANGES_REQUIRED / minor-only / failed / stale review never approves.
+    if VERDICT.findall(body) == ["PASS"]:
+        trusted.read_current_pr(REPO, number, sha)
+        trusted.verify_provenance(REPO, number, sha, actors)
+        if not trusted.ci_green(REPO, sha):
+            raise ValueError("Current head/CI changed before native approval")
+        native_approval(number, sha, run_id=run_id, report_id=source_report_id)
 
 
 def publish_copy_path_selftest():
@@ -192,6 +253,7 @@ def publish_copy_path_selftest():
         "body": review_body,
     }
     pr_comments = []
+    native_reviews = []
     real_target = parent()
     proof_mod = proof_reader()
     proof = proof_mod.proof_for(
@@ -241,6 +303,19 @@ def publish_copy_path_selftest():
                     "body": body["body"]}
             pr_comments.append(copy)
             return copy
+        if route == f"repos/{REPO}/pulls/487/reviews?per_page=100&page=1":
+            return native_reviews
+        if route == f"repos/{REPO}/pulls/487/reviews":
+            assert body is not None
+            assert body.get("event") == "APPROVE"
+            assert body.get("commit_id") == sha
+            assert "run=123 report=777" in body.get("body", "")
+            approved = {
+                "id": 999, "user": {"login": "github-actions[bot]"},
+                "state": "APPROVED", "commit_id": sha, "body": body["body"],
+            }
+            native_reviews.append(approved)
+            return approved
         raise ValueError("Unexpected publisher API route")
 
     event = {
@@ -283,12 +358,16 @@ def publish_copy_path_selftest():
         assert pr_comments == [{
             "id": 888, "user": {"login": "github-actions[bot]"}, "body": review_body,
         }], pr_comments
-        # The identical bot copy is already on the PR: no second post.
+        assert len(native_reviews) == 1
+        assert native_reviews[0]["state"] == "APPROVED"
+        assert native_reviews[0]["commit_id"] == sha
+        # Idempotent on retry: neither the sealed copy nor bot approval doubles.
         publish()
         assert pr_comments == [{
             "id": 888, "user": {"login": "github-actions[bot]"}, "body": review_body,
         }], pr_comments
-        # An edited sealed report must fail closed before any copy is posted.
+        assert len(native_reviews) == 1
+        # An edited sealed report must fail closed before any copy or approval.
         sealed_source["updated_at"] = "2026-09-24T10:30:00Z"
         try:
             publish()
@@ -297,6 +376,34 @@ def publish_copy_path_selftest():
         else:
             raise AssertionError("Edited sealed report was published")
         sealed_source["updated_at"] = "2026-09-24T10:02:00Z"
+        # Native approval is reserved for exact clean PASS only, even though
+        # an adverse run may publish its sealed PR COMMENT for triage.
+        assert VERDICT.findall(review_body) == ["PASS"]
+        assert VERDICT.findall(review_body.replace("VERDICT: PASS", "VERDICT: CHANGES_REQUIRED")) != ["PASS"]
+        assert VERDICT.findall(review_body.replace("VERDICT: PASS", "VERDICT: PASS_WITH_MINOR_FINDINGS")) != ["PASS"]
+        # Collision/misbound review marker cannot be silently overwritten.
+        bad = [dict(native_reviews[0], user={"login": "NTinkicht"})]
+        native_reviews[:] = bad
+        try:
+            native_approval(487, sha, run_id="123", report_id="777")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("A spoofed native review marker was accepted")
+        native_reviews[:] = []
+        # Explicit stale-head rejection is performed again before native approval.
+        class StaleTarget(FakeTarget):
+            @staticmethod
+            def read_current_pr(repo, number, exact_sha):
+                raise ValueError("PR head moved")
+        globals()["parent"] = lambda: StaleTarget
+        try:
+            publish()
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("A stale head was approved")
+        assert not native_reviews
     finally:
         globals().update(saved_globals)
         proof_mod.api_raw = saved_api_raw
