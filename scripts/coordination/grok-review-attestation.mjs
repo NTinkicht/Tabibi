@@ -34,16 +34,13 @@ export function loadSigner(
   // see the signer, even via Bash/symlink. Require an owner-global custom
   // strict profile with a kernel-enforced read/write deny on this exact file.
   const sandbox = fs.readFileSync(path.join(grokHome, 'sandbox.toml'), 'utf8');
-  const section = sandbox.match(
-    /^\\[profiles\\.tabibi_signed_review\\]([\\s\\S]*?)(?=^\\[|$(?![\\s\\S]))/m,
-  )?.[1];
+  const section = sandbox
+    .split('[profiles.tabibi_signed_review]')[1]
+    ?.split('\\n[')[0];
+  const lines = section?.split('\\n').map((line) => line.trim()) || [];
   if (
-    !section ||
-    !/^extends\\s*=\\s*"strict"\\s*$/m.test(section) ||
-    !section.split('\\n').some((line) =>
-      /^deny\\s*=\\s*\\[\\s*"[^"]+"\\s*\\]\\s*$/.test(line) &&
-      line.includes(JSON.stringify(filename).slice(1, -1)),
-    )
+    !lines.includes('extends = "strict"') ||
+    !lines.includes(`deny = ["${filename}"]`)
   ) throw new Error('grok_signer_unavailable');
   const stat = fs.lstatSync(filename);
   if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0) {
