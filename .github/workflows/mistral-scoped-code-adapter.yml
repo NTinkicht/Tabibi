@@ -89,7 +89,7 @@ jobs:
                   current = current / part
                   if current.is_symlink():
                       raise SystemExit('READ_PATH_BLOCKED')
-              if not source.is_file() or source.stat().st_size > 200_000:
+              if not source.is_file() or source.stat().st_nlink != 1 or source.stat().st_size > 200_000:
                   raise SystemExit('READ_PATH_BLOCKED')
               dest = stage / path
               dest.parent.mkdir(parents=True, exist_ok=True)
@@ -175,9 +175,14 @@ jobs:
           If evidence insufficient, return a short reason without patch markers.
           EOF
           printf '\nTrusted PR #%s stream=%s SHA=%s allowed paths=%s\nOwner objective: %s\n' "$REVIEW_PR" "$REVIEW_STREAM" "$REVIEW_SHA" "$ALLOWED_PATHS" "$TASK_OBJECTIVE" >> /tmp/tabibi-mistral-code-prompt.txt
+          # PR-controlled files are untrusted DATA. Never activate Vibe project
+          # hooks/instructions via --trust, and keep default Actions credentials
+          # out of the read_file-capable model process even if added upstream.
+          cd /tmp/tabibi-mistral-readonly
           set +e
-          timeout --signal=TERM --kill-after=15s 480s vibe \
-            --trust --agent auto-approve --workdir /tmp/tabibi-mistral-readonly \
+          env -u GITHUB_TOKEN -u GH_TOKEN \
+            timeout --signal=TERM --kill-after=15s 480s vibe \
+            --agent auto-approve --workdir /tmp/tabibi-mistral-readonly \
             --enabled-tools grep --enabled-tools read_file \
             --max-turns 8 --max-tokens 45000 --output text \
             --prompt "$(cat /tmp/tabibi-mistral-code-prompt.txt)" \
