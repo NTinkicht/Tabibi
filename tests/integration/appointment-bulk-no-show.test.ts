@@ -343,7 +343,8 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
     expect(retry).toEqual(receipt);
     const stable = await dashboard.getSnapshot(scope, sessionId);
     expect(
-      stable.entries.find((item) => item.id === checked.entry.id)?.eta?.revision,
+      stable.entries.find((item) => item.id === checked.entry.id)?.eta
+        ?.revision,
     ).toBe(current.eta?.revision);
   });
 
