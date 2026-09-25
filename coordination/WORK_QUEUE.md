@@ -1,33 +1,29 @@
 # Tabibi Work Queue
 
-This is the human-readable work marketplace. Live GitHub evidence is authoritative for transient PR/CI/review facts.
+GitHub is authoritative for live PRs, CI, reviews and leases; this is a dated snapshot, NOT permission to merge.
 
 Status values: `ACTIVE`, `READY`, `BLOCKED`, `DONE`, `CANCELLED`.
 
-## Current company round - product delivery after WU66
+## Product delivery after WU169 — snapshot 2026-09-25
 
-Epic restructuring is **DONE**, and product delivery has advanced through **WU66**.
+**WU169 has merged**: PR #488 merge `9829612ab5deccd39878a824c608c1639582ca13`. WU168 PR #479 merge `6713cc2fbd445435b8621a317bac3cdccbe54b2c`. The stale implementation issues #346 (WU95), #383 (WU113), #385 (WU114), #476 (WU168) and #477 (WU169) were verified against merged PRs and closed. Epics #2/#3/#4/#6 are closed; Epic #5 (deterministic live queue and ETA) is still open. Do NOT re-activate Issue #6 or the obsolete WU66 continuation.
 
-- PR #151 / `EPIC-CONTEXT-001` merged as `d935e5f72c74126f8b01e6a7688a3a96be7c0723`.
-- PR #158 / `EPIC-ORG-002` + `EPIC-ACTORS-003` merged as `a7660d5581507f7f243d5ec7a8b18c18f59c98c4` after green exact-head CI and an eligible independent non-author PASS/MERGE_READY gate.
-- Issues #154 and #155 are completed.
-- WU25 deferred ordering/test hardening was completed in PR #152, merged as `27ab7b4e9499db2087f454f7a1f562129dddeaa8`.
-- WU66 / Issue #268 was completed in PR #269, merged as `70dcdf0c0122a04cc2d233336ca33b801e784e68` after exact-head CI and exact-head independent review evidence.
-- Issue #6 is closed/completed and is **not** a valid continuation target.
+PR #487, merge `7e3d044717f07ab514d772b3206ecfa22b1b067a`, is a review-proof pilot, **NOT enforced branch protection**. Its latest Mistral review disclosed material co-authorship and `merge_ready: no`; no verifiable independent nonauthor final-head gate was found before merge. Issue #485 records this incident; resolve by tested SHA-bound check, broad reviewer-proof support and required GitHub main ruleset, not by fabricated PASS or human routine PR sign-off.
 
-The company remains in normal product-delivery mode under Company OS v3. The next product action is to reconcile the remaining live open product epics (#2, #3, #4 and #5) against the codebase and merged work through WU66, select the smallest dependency-ready bounded slice, then establish exactly one canonical implementation lease/branch/PR.
+| Workstream | Status | Scope and real next evidence |
+| --- | --- | --- |
+| WU168 / #476 | DONE | Guest queue help link, PR #479 merged; implementation issue closed |
+| WU169 / #477 | DONE | FR/AR accessible clinic count, PR #488 merged; implementation issue closed |
+| REVIEW-GATE-485 / PR #489 | ACTIVE | Trusted-main verified exact-head review check and negative tests; green CI, actual nonauthor review, then ruleset activation and live blocked/allowed proof; cannot count an unrequired check as enforcement |
+| MISTRAL-BOUNDARY-355 / PR #490 | ACTIVE | Remove untrusted PR hooks/`--trust` and inherited GitHub credentials; CI, independent security review and merge; acknowledge remaining model provider-key read surface |
+| STATE-RECONCILE-491 | ACTIVE | Correct STATE.json and WORK_QUEUE.md; derive a genuine next product WU only after acceptance audit |
+| WU112 / #382 | READY TO RECONCILE | Compare WU119 PR #395 actual reconnect/fallback guidance with WU112, then close/supersede or implement missing acceptance |
+| GROK-CLOUD #323/#340/#339 | READY TO VERIFY | Real no-Codespace provider run and trusted scoped code push with independent non-Grok review; adapter code/lease alone is not execution |
+| MISTRAL-CLOUD #341/#355 | READY TO VERIFY | Real included-capacity review/code/test run, trusted push, 3-job CI and independent non-Mistral gate; PAYG off |
+| PRODUCT-ACCEPTANCE-POST-WU169 | READY | Audit Epic #5 and PRODUCT.md across end-to-end clinic day with concrete code/tests; define smallest actual next feature WU |
+| HEADROOM-SHADOW-001 | READY | Non-sensitive, read-only fidelity evaluation |
 
-| Task ID | Status | Preferred actor | Scope | Expected artifact | Code allowed? |
-| --- | --- | --- | --- | --- | --- |
-| EPIC-CONTEXT-001 | DONE | ChatGPT | Zero-extra-cost context router/capacity governor | PR #151 merged (`d935e5f…`) | Complete |
-| EPIC-ORG-002 | DONE | ChatGPT | Spotify-inspired squads/chapters/guilds + deterministic six-actor routing | PR #158 merged (`a7660d5…`) | Complete |
-| EPIC-ACTORS-003 | DONE | ChatGPT | Activate `gemini-cli` and `mistral-vibe` as zero-extra-spend actors | Activation evidence + PR #158 merged | Complete |
-| WU25-FOLLOWUP-ORDER-001 | DONE | Codex | Expired-claim eligibility ordering hardening | PR #152 merged (`27ab7b4…`) | Complete |
-| WU25-FOLLOWUP-TEST-001 | DONE | Copilot | Deterministic ordering regression coverage | PR #152 merged (`27ab7b4…`) | Complete |
-| WU66 | DONE | Claude | Guest check-in recovery and lifecycle hardening | PR #269 merged (`70dcdf0…`), Issue #268 closed | Complete |
-| PRODUCT-CONTINUATION-001 | CANCELLED | Actor router | Obsolete continuation of closed Issue #6 | Superseded by live post-WU66 reconciliation | No |
-| PRODUCT-CONTINUATION-002 | READY | Actor router | Reconcile live open epics #2/#3/#4/#5 after WU66; select the smallest dependency-ready bounded slice with deterministic acceptance/tests. Explicitly exclude closed Issue #6. | One canonical issue/lease/branch/PR for the next product work unit | Yes, after explicit lease |
-| HEADROOM-SHADOW-001 | READY | Copilot or other non-author test lane | Historical/non-sensitive fidelity samples under shadow rules | Metrics + fidelity findings | Read-only evaluation |
+One material implementer per disjoint stream. A CI trigger or unexecuted review request is not a PASS. No PAYG or additional AI spend. No routine owner or Kaporal159 validation, but owner-only spending/credentials/legal/destructive production decisions remain.
 
 ## Current actor status
 
@@ -37,6 +33,7 @@ The company remains in normal product-delivery mode under Company OS v3. The nex
 - **Copilot:** AVAILABLE subject to included education entitlement - QA/Test Automation and eligible non-author Code Review.
 - **Gemini CLI (`gemini-cli`):** AVAILABLE - activation probe passed; scouting/research/long-context/QA/overflow review; free/non-billable allowance only.
 - **Mistral Vibe (`mistral-vibe`):** AVAILABLE - activation probe passed; bounded coding/docs/design/QA/overflow review; existing subscription allowance only, PAYG forbidden.
+- **Grok:** ACTIVE registered actor; Codespace-off cloud availability and autonomous code delivery still require real provider execution evidence (Issues #340/#339).
 - **CodeRabbit:** SUPPLEMENTAL reviewer source; material findings still require reconciliation.
 - **Gemini Agent / Gemini Chat:** RETIRED historical identities - never route/wake/probe/lease.
 
