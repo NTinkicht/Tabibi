@@ -38,6 +38,7 @@ const committedMigrations = [
   '0030_dependent_booking_reference.sql',
   '0031_appointment_bulk_no_show.sql',
   '0032_doctor_global_consultation_open_guard.sql',
+  '0033_doctor_global_consultation_insert_guard.sql',
 ];
 
 beforeAll(async () => {
