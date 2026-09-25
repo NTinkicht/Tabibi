@@ -36,8 +36,8 @@ export function loadSigner(
   const sandbox = fs.readFileSync(path.join(grokHome, 'sandbox.toml'), 'utf8');
   const section = sandbox
     .split('[profiles.tabibi_signed_review]')[1]
-    ?.split('\\n[')[0];
-  const lines = section?.split('\\n').map((line) => line.trim()) || [];
+    ?.split('\n[')[0];
+  const lines = section?.split('\n').map((line) => line.trim()) || [];
   if (
     !lines.includes('extends = "strict"') ||
     !lines.includes(`deny = ["${filename}"]`)
