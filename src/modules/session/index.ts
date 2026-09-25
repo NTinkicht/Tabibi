@@ -433,6 +433,16 @@ export class SessionService {
               throw new SessionConflictError(
                 'Doctor already has an open session',
               );
+            if (
+              typeof error === 'object' &&
+              error &&
+              'code' in error &&
+              error.code === '23514' &&
+              target === 'open'
+            )
+              throw new SessionConflictError(
+                'Doctor has an active consultation in another session',
+              );
             throw error;
           }
         },

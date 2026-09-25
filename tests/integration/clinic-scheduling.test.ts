@@ -5,6 +5,7 @@ import { migrate } from '../../scripts/db/lib';
 import { ClinicService } from '@/modules/clinic';
 import { AuthorizationError } from '@/modules/identity';
 import { SchedulingService } from '@/modules/scheduling';
+import { QueueConflictError, QueueService } from '@/modules/queue';
 import { SessionConflictError, SessionService } from '@/modules/session';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 12 });
@@ -240,6 +241,95 @@ describe('doctor-global session lifecycle invariant', () => {
       [ids.doctor],
     );
     expect(open.rows).toHaveLength(1);
+  });
+
+  it('blocks cross-clinic opening while a paused session still has an active consultation', async () => {
+    const sessions = new SessionService(pool);
+    const queue = new QueueService(pool);
+    const sessionA = await seedSession(ids.clinicA, '2026-09-07');
+    const sessionB = await seedSession(ids.clinicB, '2026-09-08');
+    await sessions.transition(scopeA, sessionA, 'open');
+
+    const first = await queue.registerWalkIn(scopeA, sessionA, {
+      privateDisplayName: 'Synthetic first',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu173-first',
+      correlationId: 'wu173-first',
+    });
+    const second = await queue.registerWalkIn(scopeA, sessionA, {
+      privateDisplayName: 'Synthetic second',
+      preferredLocale: 'ar',
+      idempotencyKey: 'wu173-second',
+      correlationId: 'wu173-second',
+    });
+    const run = (
+      entry: string,
+      command: Parameters<QueueService['command']>[3]['command'],
+    ) =>
+      queue.command(scopeA, sessionA, entry, {
+        command,
+        idempotencyKey: `wu173-${entry}-${command}`,
+        correlationId: 'wu173-synthetic',
+      });
+
+    await run(first.entry.id, 'check_in');
+    await run(first.entry.id, 'call');
+    await run(first.entry.id, 'start_consultation');
+    await run(second.entry.id, 'check_in');
+    await run(second.entry.id, 'call');
+    await sessions.transition(scopeA, sessionA, 'paused');
+
+    // Pausing does not terminate an in-progress consultation, but cannot
+    // start the already-called second entry or open the doctor's B session.
+    await expect(
+      run(second.entry.id, 'start_consultation'),
+    ).rejects.toBeInstanceOf(QueueConflictError);
+    await expect(
+      sessions.transition(scopeB, sessionB, 'open'),
+    ).rejects.toBeInstanceOf(SessionConflictError);
+    await expect(
+      pool.query("UPDATE consultation_sessions SET status='open' WHERE id=$1", [
+        sessionB,
+      ]),
+    ).rejects.toMatchObject({ code: '23514' });
+    const blocked = await pool.query<{
+      active: string;
+      opened: string;
+    }>(
+      `SELECT
+         (SELECT COUNT(*)::text FROM queue_entries entry
+           JOIN consultation_sessions session ON session.id=entry.session_id
+           WHERE session.doctor_id=$1 AND entry.state='in_consultation') AS active,
+         (SELECT COUNT(*)::text FROM consultation_sessions
+           WHERE doctor_id=$1 AND status='open') AS opened`,
+      [ids.doctor],
+    );
+    expect(blocked.rows[0]).toEqual({ active: '1', opened: '0' });
+
+    // Two independently committed commands are allowed to race. The final
+    // doctor-wide state must be coherent regardless of which commits first.
+    const raced = await race(
+      () => run(first.entry.id, 'complete_consultation').then(() => undefined),
+      () => sessions.transition(scopeB, sessionB, 'open').then(() => undefined),
+    );
+    expect(raced[0].status).toBe('fulfilled');
+    if (raced[1].status === 'rejected') {
+      expect(raced[1].reason).toBeInstanceOf(SessionConflictError);
+      await sessions.transition(scopeB, sessionB, 'open');
+    }
+    const final = await pool.query<{
+      active: string;
+      opened: string;
+    }>(
+      `SELECT
+         (SELECT COUNT(*)::text FROM queue_entries entry
+           JOIN consultation_sessions session ON session.id=entry.session_id
+           WHERE session.doctor_id=$1 AND entry.state='in_consultation') AS active,
+         (SELECT COUNT(*)::text FROM consultation_sessions
+           WHERE doctor_id=$1 AND status='open') AS opened`,
+      [ids.doctor],
+    );
+    expect(final.rows[0]).toEqual({ active: '0', opened: '1' });
   });
 
   it('rejects cross-clinic session IDs and terminal-state transitions', async () => {

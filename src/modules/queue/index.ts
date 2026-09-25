@@ -537,6 +537,15 @@ export class QueueService {
         throw new QueueConflictError(
           'Queue lifecycle commands require an open or paused session',
         );
+      // Reception can resolve and check in on a paused session, but may not
+      // call or START another consultation until the doctor resumes service.
+      if (
+        session.rows[0].status === 'paused' &&
+        ['call', 'start_consultation'].includes(rawInput.command)
+      )
+        throw new QueueConflictError(
+          'Cannot call or start a consultation while the session is paused',
+        );
 
       const current = await client.query<{
         state: QueueEntryState;
