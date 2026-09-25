@@ -36,9 +36,9 @@ describe('WU82 deterministic ETA revision', () => {
       delayVersion: 3,
     };
     expect(createEtaRevision(current)).toBe(createEtaRevision({ ...current }));
-    expect(
-      createEtaRevision({ ...current, queueOrderVersion: 22 }),
-    ).not.toBe(createEtaRevision(current));
+    expect(createEtaRevision({ ...current, queueOrderVersion: 22 })).not.toBe(
+      createEtaRevision(current),
+    );
     expect(createEtaRevision({ ...current, delayVersion: 4 })).not.toBe(
       createEtaRevision(current),
     );
