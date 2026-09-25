@@ -159,4 +159,24 @@ describe('shared deterministic queue ETA estimator', () => {
       maxWaitMinutes: 56,
     });
   });
+
+  it('does not treat empty duration text as a clamped observed or historical sample', () => {
+    expect(selectConsultationEstimate(['', ' ', '\t'], [20, 30, 40])).toEqual({
+      estimatedConsultationMinutes: 30,
+      estimateSource: 'historical_median',
+      observedSampleCount: 0,
+    });
+    expect(selectConsultationEstimate([], ['', '   ', '\t'])).toEqual({
+      estimatedConsultationMinutes: 15,
+      estimateSource: 'fallback',
+      observedSampleCount: 0,
+    });
+    expect(
+      selectConsultationEstimate(['', ' 12 ', '14', '16'], [40, 50, 60]),
+    ).toEqual({
+      estimatedConsultationMinutes: 14,
+      estimateSource: 'observed_median',
+      observedSampleCount: 3,
+    });
+  });
 });

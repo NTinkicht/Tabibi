@@ -37,9 +37,16 @@ export interface ActiveConsultationRemainingInput {
 }
 
 function normalizeSamples(samples: readonly DurationSample[]): number[] {
+  // Empty DB text is absence of evidence, not a real zero-minute sample.
+  // Number('') / Number('   ') otherwise become 0 and are clamped to 2,
+  // potentially selecting a spurious historical or observed median.
   return samples
     .map((value) =>
-      value === null || value === undefined ? Number.NaN : Number(value),
+      value === null ||
+      value === undefined ||
+      (typeof value === 'string' && value.trim() === '')
+        ? Number.NaN
+        : Number(value),
     )
     .filter((value) => Number.isFinite(value))
     .map((value) =>
