@@ -13,9 +13,10 @@ import {
 
 export const REPO = 'NTinkicht/Tabibi';
 export const MARKER = 'ROLE_LEASE_ASSIGNED';
-// Focused full PR reviews need more than 12 turns; a lease still runs once with
-// a strict finite turn budget and an independent 12-minute wall-clock timeout.
-export const GROK_REVIEW_MAX_TURNS = 28;
+// Allow a bounded complete review of a medium PR without silently signing
+// an incomplete result. Stay under subscription limits: one lease = one CLI
+// call, no automatic retries, no metered fallback, and a 15-minute deadline.
+export const GROK_REVIEW_MAX_TURNS = 48;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STATE = path.join(ROOT, '.tabibi', 'grok-dispatch');
 const SHA = /^[a-f0-9]{40}$/;
@@ -482,10 +483,15 @@ function recentComments(pr) {
 export function reviewPrompt(lease, checks) {
   return (
     `You are actor=grok reviewing NTinkicht/Tabibi PR #${lease.pr} in READ-ONLY mode.\n` +
-    'First read AGENTS.md, GROK.md and SECURITY.md for review guardrails. ' +
-    'Inspect git diff origin/main...HEAD --stat, then git diff origin/main...HEAD, ' +
-    'the touched source and tests. Consult ARCHITECTURE.md or PRODUCT.md ' +
-    'only when relevant; avoid rereading unrelated files.\n' +
+    'Read AGENTS.md, GROK.md and SECURITY.md once for binding review guardrails. ' +
+    'Read git diff origin/main...HEAD --stat and git diff origin/main...HEAD exactly once, ' +
+    'then inspect ONLY touched source/tests where evidence is missing. Do not ' +
+    'scan the entire repository or repeatedly reopen the same files. ' +
+    'Consult ARCHITECTURE.md or PRODUCT.md ONLY if the diff changes their contracts.\\n' +
+    'Bound your investigation: finish the substantive review and write the final ' +
+    'verdict by turn 36, retaining a safety margin before max-turns=48. ' +
+    'If you cannot complete a reliable full-head review, output VERDICT: CHANGES_REQUIRED ' +
+    'with why evidence is incomplete; never invent a PASS.\\n' +
     `Exact head: ${lease.sha}. Material authors (as recorded by orchestrator): ${lease.authors.join(', ')}.\n` +
     `Exact-head CI observations: ${JSON.stringify(checks)}.\n` +
     'Review correctness, privacy, authorization, RTL/FR/AR, regressions and tests.\n' +
@@ -580,7 +586,7 @@ function runReview(lease, { dryRun = false } = {}) {
         '--output-format',
         'json',
       ],
-      { cwd: work, env, timeout: 12 * 60_000 },
+      { cwd: work, env, timeout: 15 * 60_000 },
     );
     let answer;
     try {
