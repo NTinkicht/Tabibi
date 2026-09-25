@@ -348,6 +348,122 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
     ).toBe(current.eta?.revision);
   });
 
+
+  it('WU175 completes a mixed clinic day only after explicit resolution, with committed ETA and audit evidence', async () => {
+    const expired = await book('wu175-expired');
+    const future = await book('wu175-future');
+    await setScheduledMinutesAgo(expired.appointment.id, 30);
+    await setScheduledMinutesAgo(future.appointment.id, 2);
+    const queue = new QueueService(pool);
+    const walkIn = await queue.registerWalkIn(scope, sessionId, {
+      privateDisplayName: 'WU175 synthetic walk-in',
+      preferredLocale: 'ar',
+      idempotencyKey: 'wu175-register-walk-in',
+      correlationId: 'wu175-register-walk-in',
+    });
+    await queue.command(scope, sessionId, walkIn.entry.id, {
+      command: 'check_in',
+      idempotencyKey: 'wu175-walk-in-arrived',
+      correlationId: 'wu175-walk-in-arrived',
+    });
+    const sessions = new SessionService(pool);
+    const dashboard = new ReceptionistDashboardService(pool);
+    const before = await dashboard.getSnapshot(scope, sessionId);
+    const beforeEta = before.entries.find((item) => item.id === walkIn.entry.id)?.eta;
+    expect(beforeEta).toMatchObject({ patientsAhead: 0 });
+
+    await expect(
+      sessions.command(scope, sessionId, {
+        command: 'close',
+        idempotencyKey: 'wu175-close-with-active-entries',
+        correlationId: 'wu175-close-with-active-entries',
+      }),
+    ).rejects.toThrow();
+
+    const input = bulkInput('wu175-day', 'Verified expired appointment absence');
+    const receipt = await service.resolveWaiting(scope, sessionId, input);
+    expect(receipt).toMatchObject({
+      resolvedAppointmentCount: 1,
+      arrivalGraceMinutes: 15,
+    });
+    expect(JSON.stringify(receipt)).not.toContain('WU175 synthetic');
+    expect(await paired(expired.appointment.id)).toEqual({
+      appointment: 'no_show',
+      entry: 'no_show',
+    });
+    expect(await paired(future.appointment.id)).toEqual({
+      appointment: 'confirmed',
+      entry: 'waiting',
+    });
+    const live = await queue.listOperational(scope, sessionId);
+    expect(live.entries.find((item) => item.id === walkIn.entry.id)?.state).toBe(
+      'checked_in',
+    );
+    const after = await dashboard.getSnapshot(scope, sessionId);
+    const afterEta = after.entries.find((item) => item.id === walkIn.entry.id)?.eta;
+    expect(after.session.queueOrderVersion).toBe(
+      before.session.queueOrderVersion + 1,
+    );
+    expect(afterEta).toMatchObject({
+      patientsAhead: beforeEta?.patientsAhead,
+      minWaitMinutes: beforeEta?.minWaitMinutes,
+      maxWaitMinutes: beforeEta?.maxWaitMinutes,
+    });
+    expect(afterEta?.revision).not.toBe(beforeEta?.revision);
+
+    expect(await service.resolveWaiting(scope, sessionId, input)).toEqual(
+      receipt,
+    );
+    const stable = await dashboard.getSnapshot(scope, sessionId);
+    expect(stable.session.queueOrderVersion).toBe(
+      after.session.queueOrderVersion,
+    );
+    expect(
+      stable.entries.find((item) => item.id === walkIn.entry.id)?.eta?.revision,
+    ).toBe(afterEta?.revision);
+    await expect(
+      sessions.command(scope, sessionId, {
+        command: 'close',
+        idempotencyKey: 'wu175-close-still-blocked',
+        correlationId: 'wu175-close-still-blocked',
+      }),
+    ).rejects.toThrow();
+
+    await new AppointmentLifecycleService(pool).command(
+      scope,
+      sessionId,
+      future.appointment.id,
+      {
+        command: 'cancel',
+        reason: 'Future appointment cancelled explicitly',
+        idempotencyKey: 'wu175-future-cancel',
+        correlationId: 'wu175-future-cancel',
+      },
+    );
+    await queue.command(scope, sessionId, walkIn.entry.id, {
+      command: 'cancel',
+      reason: 'Walk-in left before consultation',
+      idempotencyKey: 'wu175-walk-in-cancel',
+      correlationId: 'wu175-walk-in-cancel',
+    });
+    const closed = await sessions.command(scope, sessionId, {
+      command: 'close',
+      idempotencyKey: 'wu175-close-after-explicit-resolution',
+      correlationId: 'wu175-close-after-explicit-resolution',
+    });
+    expect(closed.status).toBe('closed');
+    expect(await paired(future.appointment.id)).toEqual({
+      appointment: 'cancelled',
+      entry: 'cancelled',
+    });
+    const audit = await pool.query<{ count: string }>(
+      `SELECT count(*)::text count FROM audit_events
+        WHERE clinic_id=$1 AND action='appointment.no_show_bulk'`,
+      [clinicId],
+    );
+    expect(audit.rows[0]?.count).toBe('1');
+  });
+
   it('serializes concurrent appointment check-in against bulk absence', async () => {
     const booking = await book('race');
     await setScheduledMinutesAgo(booking.appointment.id, 30);
