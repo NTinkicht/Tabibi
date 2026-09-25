@@ -369,7 +369,9 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
     const sessions = new SessionService(pool);
     const dashboard = new ReceptionistDashboardService(pool);
     const before = await dashboard.getSnapshot(scope, sessionId);
-    const beforeEta = before.entries.find((item) => item.id === walkIn.entry.id)?.eta;
+    const beforeEta = before.entries.find(
+      (item) => item.id === walkIn.entry.id,
+    )?.eta;
     expect(beforeEta).toMatchObject({ patientsAhead: 0 });
 
     await expect(
@@ -380,7 +382,10 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
       }),
     ).rejects.toThrow();
 
-    const input = bulkInput('wu175-day', 'Verified expired appointment absence');
+    const input = bulkInput(
+      'wu175-day',
+      'Verified expired appointment absence',
+    );
     const receipt = await service.resolveWaiting(scope, sessionId, input);
     expect(receipt).toMatchObject({
       resolvedAppointmentCount: 1,
@@ -396,11 +401,13 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
       entry: 'waiting',
     });
     const live = await queue.listOperational(scope, sessionId);
-    expect(live.entries.find((item) => item.id === walkIn.entry.id)?.state).toBe(
-      'checked_in',
-    );
+    expect(
+      live.entries.find((item) => item.id === walkIn.entry.id)?.state,
+    ).toBe('checked_in');
     const after = await dashboard.getSnapshot(scope, sessionId);
-    const afterEta = after.entries.find((item) => item.id === walkIn.entry.id)?.eta;
+    const afterEta = after.entries.find(
+      (item) => item.id === walkIn.entry.id,
+    )?.eta;
     expect(after.session.queueOrderVersion).toBe(
       before.session.queueOrderVersion + 1,
     );
