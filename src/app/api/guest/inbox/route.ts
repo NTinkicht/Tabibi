@@ -38,8 +38,11 @@ function guestBearer(request: Request): string | null {
 function boundedLimit(request: Request): number {
   const raw = new URL(request.url).searchParams.get('limit');
   if (!raw) return DEFAULT_LIMIT;
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_LIMIT;
+  // parseInt accepts partial input such as "2junk" or "1.5". Treat malformed
+  // pagination as absent rather than silently changing the requested window.
+  if (!/^[0-9]+$/.test(raw)) return DEFAULT_LIMIT;
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) return DEFAULT_LIMIT;
   return Math.min(parsed, MAX_LIMIT);
 }
 
