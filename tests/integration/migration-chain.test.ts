@@ -36,6 +36,7 @@ const committedMigrations = [
   '0028_public_guest_check_in_operations.sql',
   '0029_account_owned_dependents.sql',
   '0030_dependent_booking_reference.sql',
+  '0031_appointment_bulk_no_show.sql',
 ];
 
 beforeAll(async () => {
