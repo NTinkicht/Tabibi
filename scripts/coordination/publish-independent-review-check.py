@@ -147,6 +147,7 @@ def run():
         raise ValueError("Repository mismatch")
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
     numbers = pr_numbers(os.environ.get("GITHUB_EVENT_NAME", ""), event)
+    any_blocked = False
     for number in numbers:
         if not isinstance(number, int) or number <= 0:
             raise ValueError("Invalid PR")
@@ -168,7 +169,11 @@ def run():
         # A workflow invocation must itself fail on blocked evidence; the
         # correctly SHA-attached check-run has already been written.
         if not passed:
-            raise ValueError("Independent review gate blocked")
+            any_blocked = True
+    # One failed PR cannot starve the other independent PR checks when a
+    # completed Issue #11 wake re-evaluates multiple open work streams.
+    if any_blocked:
+        raise ValueError("Independent review gate blocked for one or more PRs")
     return 0
 
 
