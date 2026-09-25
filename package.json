@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --check .",
+    "format": "prettier --check . || (prettier --write tests/integration/appointment-bulk-no-show.test.ts && git diff -- tests/integration/appointment-bulk-no-show.test.ts && exit 1)",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit --project api",
