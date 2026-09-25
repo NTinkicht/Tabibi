@@ -44,6 +44,10 @@ describe('Grok Codespace independent review signature', () => {
     try {
       fs.writeFileSync(file, pem, { mode: 0o600 });
       fs.writeFileSync(
+        path.join(home, 'sandbox.toml'),
+        `[profiles.tabibi_signed_review]\nextends = "strict"\ndeny = ["${file}"]\n`,
+      );
+      fs.writeFileSync(
         registry,
         JSON.stringify({
           version: 1,
