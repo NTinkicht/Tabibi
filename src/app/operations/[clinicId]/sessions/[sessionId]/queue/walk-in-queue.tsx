@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { receptionistCopy } from '@/modules/localization/receptionist';
+import { BulkAppointmentNoShowAction } from './BulkAppointmentNoShowAction';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 type EntryState =
@@ -439,6 +440,19 @@ export function WalkInQueue({
           </button>
         </form>
       </section>
+
+      {state === 'ready' &&
+        session &&
+        !['closed', 'cancelled'].includes(session.status) &&
+        entries.some((entry) => entry.state === 'waiting') && (
+          <BulkAppointmentNoShowAction
+            clinicId={clinicId}
+            sessionId={sessionId}
+            locale={locale}
+            enabled={!stale && pendingEntry === null && !pending}
+            onResolved={load}
+          />
+        )}
 
       {state === 'loading' && (
         <div className="state" aria-live="polite">
