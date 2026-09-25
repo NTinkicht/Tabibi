@@ -639,6 +639,7 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
       service.resolveWaiting(scope, sessionId, bulkInput('terminal')),
     ).rejects.toBeInstanceOf(AppointmentConflictError);
   });
+
   it('WU182 resolves an expired booking despite 501 future waiting appointments and retains the eligible cap', async () => {
     const expired = await book('wu182-expired');
     await setScheduledMinutesAgo(expired.appointment.id, 30);
@@ -697,7 +698,11 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
     );
     expect(future.rows[0]?.count).toBe('501');
     expect(
-      await service.resolveWaiting(scope, sessionId, bulkInput('wu182-only-expired')),
+      await service.resolveWaiting(
+        scope,
+        sessionId,
+        bulkInput('wu182-only-expired'),
+      ),
     ).toEqual(receipt);
 
     // The 500-candidate safety cap still rejects an actually eligible set
@@ -720,5 +725,4 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
     );
     expect(remaining.rows[0]?.count).toBe('501');
   });
-
 });
