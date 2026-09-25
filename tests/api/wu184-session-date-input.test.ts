@@ -34,7 +34,7 @@ const base = {
   doctorId,
   serviceDate: '2028-02-29',
   startsAt: '2028-02-29T09:00:00.000Z',
-  endsAt: '2028-02-29T10:00:00+01:00',
+  endsAt: '2028-02-29T11:00:00+01:00',
 };
 function post(body: Record<string, unknown>) {
   return POST(
@@ -82,6 +82,6 @@ describe('WU184 staff session instant ingress', () => {
     };
     expect(input.startsAt).toBeInstanceOf(Date);
     expect(input.startsAt.toISOString()).toBe('2028-02-29T09:00:00.000Z');
-    expect(input.endsAt.toISOString()).toBe('2028-02-29T09:00:00.000Z');
+    expect(input.endsAt.toISOString()).toBe('2028-02-29T10:00:00.000Z');
   });
 });
