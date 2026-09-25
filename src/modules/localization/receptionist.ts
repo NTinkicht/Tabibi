@@ -62,7 +62,8 @@ export const receptionistCopy = {
     bulkNoShowNone: 'Aucun rendez-vous éligible à déclarer absent.',
     bulkNoShowFailed:
       'La demande ou sa confirmation a échoué. Vérifiez la file avant de réessayer.',
-    bulkNoShowUnavailable: 'Actualisez la file pour confirmer la situation avant cette action.',
+    bulkNoShowUnavailable:
+      'Actualisez la file pour confirmer la situation avant cette action.',
     registrationOrder: 'Inscription',
     priorityOrder: 'Ordre de service',
     reorderAudited: 'Prioriser / réordonner (audité)',
