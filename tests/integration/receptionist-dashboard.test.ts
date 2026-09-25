@@ -335,10 +335,7 @@ describe('receptionist dashboard read model', () => {
       idempotencyKey: 'wu174-second',
       correlationId: 'wu174-second',
     });
-    const command = (
-      id: string,
-      action: 'check_in' | 'call',
-    ) =>
+    const command = (id: string, action: 'check_in' | 'call') =>
       queue.command(scope, ids.sessionA, id, {
         command: action,
         idempotencyKey: `wu174-${id}-${action}`,
