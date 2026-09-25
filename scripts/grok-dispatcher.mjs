@@ -6,7 +6,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { loadSigner, buildAttestedReview } from './coordination/grok-review-attestation.mjs';
+import {
+  loadSigner,
+  buildAttestedReview,
+} from './coordination/grok-review-attestation.mjs';
 
 export const REPO = 'NTinkicht/Tabibi';
 export const MARKER = 'ROLE_LEASE_ASSIGNED';
