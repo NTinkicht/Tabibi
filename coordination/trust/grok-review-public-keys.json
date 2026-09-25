@@ -1,4 +1,9 @@
 {
   "version": 1,
-  "keys": []
+  "keys": [
+    {
+      "id": "owner-codespace-v1",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA2C8vIJy7S/XbbS55rp38ZK2jDzPAZpF5TwNZEYBMY7o=\n-----END PUBLIC KEY-----\n"
+    }
+  ]
 }
