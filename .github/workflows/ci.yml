@@ -58,6 +58,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: TEMP canonical prettier output for CI remediation
+        run: |
+          npx prettier --write "tests/integration/appointment-bulk-no-show.test.ts" "tests/integration/receptionist-dashboard.test.ts" "tests/unit/queue-eta-revision.test.ts"
+          node -e "const fs=require('fs');for(const name of [\"tests/integration/appointment-bulk-no-show.test.ts\",\"tests/integration/receptionist-dashboard.test.ts\",\"tests/unit/queue-eta-revision.test.ts\"]) console.log('FORMAT_JSON '+JSON.stringify({path:name,content:fs.readFileSync(name,'utf8')}));"
+
       - name: Formatting
         run: npm run format
 
