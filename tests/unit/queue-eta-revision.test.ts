@@ -29,6 +29,22 @@ describe('WU82 deterministic ETA revision', () => {
     );
   });
 
+  it('changes when a committed queue/delay version changes with identical rounded ETA', () => {
+    const current = {
+      ...baseline,
+      queueOrderVersion: 21,
+      delayVersion: 3,
+    };
+    expect(createEtaRevision(current)).toBe(createEtaRevision({ ...current }));
+    expect(
+      createEtaRevision({ ...current, queueOrderVersion: 22 }),
+    ).not.toBe(createEtaRevision(current));
+    expect(createEtaRevision({ ...current, delayVersion: 4 })).not.toBe(
+      createEtaRevision(current),
+    );
+    expect(createEtaRevision(current)).toMatch(/^eta-v2-[0-9a-f]{32}$/);
+  });
+
   it('uses an explicit versioned opaque prefix', () => {
     expect(createEtaRevision(baseline)).toMatch(/^eta-v2-[0-9a-f]{32}$/);
   });
