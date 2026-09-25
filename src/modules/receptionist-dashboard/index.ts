@@ -195,6 +195,8 @@ export class ReceptionistDashboardService {
                 estimate.estimatedConsultationMinutes,
               estimateSource: estimate.estimateSource,
               observedSampleCount: estimate.observedSampleCount,
+              queueOrderVersion: Number(first.queue_order_version),
+              delayVersion: first.delay_version,
             })
           : null;
         const eta =
