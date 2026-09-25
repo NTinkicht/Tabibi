@@ -1,0 +1,67 @@
+name: Verified Independent AI Review
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+  issue_comment:
+    types: [created, edited]
+  workflow_run:
+    workflows: [CI, Mistral Vibe Wake]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Canonical open Tabibi PR number to recheck
+        type: string
+        required: true
+
+# The verifier runs ONLY the default-branch source. Do not check out or
+# execute the PR head with checks:write. Its evidence check is PR-SHA-attached.
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  actions: read
+  checks: write
+
+concurrency:
+  group: verified-review-${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Publish trusted exact-head reviewer check
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout only trusted main gate code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      # Initial bootstrap PR cannot run an unmerged verifier from trusted main.
+      # No success check is published until trusted main actually contains it.
+      - name: Check whether trusted main verifier is installed
+        id: installed
+        shell: bash
+        run: |
+          if test -f scripts/coordination/publish-independent-review-check.py; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'Bootstrap-only: main does not contain the verifier; no review check published.'
+          fi
+
+      - name: Prove fail-closed event and check-run behavior
+        if: steps.installed.outputs.ready == 'true'
+        run: python3 scripts/coordination/publish-independent-review-check.py selftest
+
+      - name: Verify current head and publish a SHA-bound check run
+        if: steps.installed.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/coordination/publish-independent-review-check.py
