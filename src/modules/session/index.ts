@@ -175,9 +175,16 @@ async function idempotent(
 }
 
 function validateDate(value: string): void {
+  // Date.parse normalizes nonexistent calendar days (e.g. February 30).
+  // A session must never silently move to another clinic-local service day.
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T00:00:00.000Z`)
+    : null;
   if (
-    !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
-    Number.isNaN(Date.parse(`${value}T00:00:00Z`))
+    !parsed ||
+    Number(value.slice(0, 4)) < 1 ||
+    !Number.isFinite(parsed.getTime()) ||
+    parsed.toISOString().slice(0, 10) !== value
   )
     throw new SessionValidationError(
       'serviceDate must be a valid YYYY-MM-DD date',
