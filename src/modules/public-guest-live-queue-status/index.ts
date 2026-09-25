@@ -52,6 +52,8 @@ type StatusRow = {
   in_consultation_started_at: Date | null;
   service_position: string | null;
   declared_delay_minutes: number | null;
+  queue_order_version: string;
+  delay_version: number;
   duration_samples: Array<number | string> | null;
   historical_duration_samples: Array<number | string> | null;
 };
@@ -153,6 +155,8 @@ export class PublicGuestLiveQueueStatusService {
               entry.in_consultation_started_at,
               ordered.service_position::text AS service_position,
               session.declared_delay_minutes,
+              session.queue_order_version,
+              session.delay_version,
               (SELECT array_agg(duration_minutes) FROM durations) AS duration_samples,
               (SELECT array_agg(duration_minutes) FROM historical_durations) AS historical_duration_samples
          FROM guest_credentials credential
@@ -255,6 +259,8 @@ export class PublicGuestLiveQueueStatusService {
       estimatedConsultationMinutes: estimate.estimatedConsultationMinutes,
       estimateSource: estimate.estimateSource,
       observedSampleCount: estimate.observedSampleCount,
+      queueOrderVersion: Number(row.queue_order_version),
+      delayVersion: row.delay_version,
     });
 
     return {
