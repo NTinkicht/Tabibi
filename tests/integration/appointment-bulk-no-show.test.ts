@@ -639,4 +639,86 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
       service.resolveWaiting(scope, sessionId, bulkInput('terminal')),
     ).rejects.toBeInstanceOf(AppointmentConflictError);
   });
+  it('WU182 resolves an expired booking despite 501 future waiting appointments and retains the eligible cap', async () => {
+    const expired = await book('wu182-expired');
+    await setScheduledMinutesAgo(expired.appointment.id, 30);
+
+    // Set-based synthetic fixture keeps CI bounded; real PG constraints,
+    // clinic/session/doctor/patient links and queue states are exercised.
+    await pool.query(
+      `INSERT INTO patient_operational_records
+         (id, clinic_id, private_display_name, preferred_locale)
+       SELECT md5('wu182-p-' || g)::uuid, $1,
+              'WU182 future patient ' || g, 'fr'
+         FROM generate_series(1, 501) AS g`,
+      [clinicId],
+    );
+    await pool.query(
+      `INSERT INTO queue_entries
+         (id, clinic_id, session_id, patient_id, state, source,
+          registration_order, public_display_label)
+       SELECT md5('wu182-q-' || g)::uuid, $1, $2,
+              md5('wu182-p-' || g)::uuid, 'waiting', 'appointment',
+              g + 1, 'WU182-' || g
+         FROM generate_series(1, 501) AS g`,
+      [clinicId, sessionId],
+    );
+    await pool.query(
+      `INSERT INTO appointments
+         (id, clinic_id, doctor_id, session_id, patient_id, queue_entry_id,
+          status, scheduled_start_at, scheduled_end_at, preferred_locale)
+       SELECT md5('wu182-a-' || g)::uuid, $1, $2, $3,
+              md5('wu182-p-' || g)::uuid, md5('wu182-q-' || g)::uuid,
+              'confirmed', transaction_timestamp() + interval '20 minutes',
+              transaction_timestamp() + interval '40 minutes', 'fr'
+         FROM generate_series(1, 501) AS g`,
+      [clinicId, doctorId, sessionId],
+    );
+
+    const receipt = await service.resolveWaiting(
+      scope,
+      sessionId,
+      bulkInput('wu182-only-expired'),
+    );
+    expect(receipt).toMatchObject({
+      scannedAppointmentCount: 1,
+      resolvedAppointmentCount: 1,
+      arrivalGraceMinutes: 15,
+    });
+    expect(await paired(expired.appointment.id)).toEqual({
+      appointment: 'no_show',
+      entry: 'no_show',
+    });
+    const future = await pool.query<{ count: string }>(
+      `SELECT count(*)::text count
+         FROM appointments
+        WHERE clinic_id=$1 AND session_id=$2 AND status='confirmed'`,
+      [clinicId, sessionId],
+    );
+    expect(future.rows[0]?.count).toBe('501');
+    expect(
+      await service.resolveWaiting(scope, sessionId, bulkInput('wu182-only-expired')),
+    ).toEqual(receipt);
+
+    // The 500-candidate safety cap still rejects an actually eligible set
+    // larger than 500, rather than quietly processing a partial page.
+    await pool.query(
+      `UPDATE appointments
+          SET scheduled_start_at=transaction_timestamp()-interval '30 minutes',
+              scheduled_end_at=transaction_timestamp()+interval '15 minutes'
+        WHERE clinic_id=$1 AND session_id=$2 AND status='confirmed'`,
+      [clinicId, sessionId],
+    );
+    await expect(
+      service.resolveWaiting(scope, sessionId, bulkInput('wu182-eligible-cap')),
+    ).rejects.toBeInstanceOf(AppointmentConflictError);
+    const remaining = await pool.query<{ count: string }>(
+      `SELECT count(*)::text count
+         FROM appointments
+        WHERE clinic_id=$1 AND session_id=$2 AND status='confirmed'`,
+      [clinicId, sessionId],
+    );
+    expect(remaining.rows[0]?.count).toBe('501');
+  });
+
 });
