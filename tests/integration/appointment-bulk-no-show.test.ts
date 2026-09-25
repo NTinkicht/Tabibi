@@ -211,13 +211,28 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
     const booking = await book('race');
     await setScheduledMinutesAgo(booking.appointment.id, 30);
     const lifecycle = new AppointmentLifecycleService(pool);
+    // Start both commands after the same explicit barrier rather than
+    // relying on incidental scheduling of two promises.
+    let arrived = 0;
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const contend = async <T>(operation: () => Promise<T>): Promise<T> => {
+      arrived++;
+      if (arrived === 2) release();
+      await barrier;
+      return operation();
+    };
     const results = await Promise.allSettled([
-      service.resolveWaiting(scope, sessionId, bulkInput('race')),
-      lifecycle.command(scope, sessionId, booking.appointment.id, {
-        command: 'check_in',
-        idempotencyKey: 'wu171-checkin-race',
-        correlationId: 'wu171-checkin-race',
-      }),
+      contend(() => service.resolveWaiting(scope, sessionId, bulkInput('race'))),
+      contend(() =>
+        lifecycle.command(scope, sessionId, booking.appointment.id, {
+          command: 'check_in',
+          idempotencyKey: 'wu171-checkin-race',
+          correlationId: 'wu171-checkin-race',
+        }),
+      ),
     ]);
     const state = await paired(booking.appointment.id);
     expect([
