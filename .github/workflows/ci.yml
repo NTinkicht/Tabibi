@@ -58,6 +58,12 @@ jobs:
       - name: Formatting
         run: npm run format
 
+      - name: Show bounded Prettier patch for WU171 diagnostic
+        if: failure()
+        run: |
+          npx prettier --write tests/integration/appointment-bulk-no-show.test.ts
+          git diff -- tests/integration/appointment-bulk-no-show.test.ts
+
       - name: Lint
         run: npm run lint
 
