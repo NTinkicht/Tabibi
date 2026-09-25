@@ -225,7 +225,9 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
       return operation();
     };
     const results = await Promise.allSettled([
-      contend(() => service.resolveWaiting(scope, sessionId, bulkInput('race'))),
+      contend(() =>
+        service.resolveWaiting(scope, sessionId, bulkInput('race')),
+      ),
       contend(() =>
         lifecycle.command(scope, sessionId, booking.appointment.id, {
           command: 'check_in',
