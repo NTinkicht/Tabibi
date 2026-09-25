@@ -33,8 +33,6 @@ export function hasAppointmentArrivalGraceExpired(input: {
       'Arrival grace minutes must be an integer between 0 and 1440',
     );
 
-  return (
-    observedAt.getTime() >=
-    scheduledStartAt.getTime() + graceMinutes * 60_000
-  );
+  const deadline = scheduledStartAt.getTime() + graceMinutes * 60_000;
+  return observedAt.getTime() >= deadline;
 }
