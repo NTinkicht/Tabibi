@@ -37,6 +37,9 @@ jobs:
       - name: Offline independent-review proof negative tests
         run: python3 scripts/coordination/independent-review-gate.py selftest
 
+      - name: Offline Grok signed-review proof and forgery negative tests
+        run: python3 scripts/coordination/grok-review-proof.py
+
       - name: Offline SHA-attached independent-review check regression tests
         run: python3 scripts/coordination/publish-independent-review-check.py selftest
 
