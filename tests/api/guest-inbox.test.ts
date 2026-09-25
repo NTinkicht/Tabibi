@@ -106,6 +106,30 @@ describe('guest inbox API', () => {
     });
   });
 
+  it('accepts only strict bounded decimal guest inbox limits', async () => {
+    getSnapshot.mockResolvedValue({ items: [], unreadCount: 0 });
+
+    for (const [value, expected] of [
+      ['1', 1],
+      ['50', 50],
+      ['51', 50],
+      ['999', 50],
+      ['2junk', 20],
+      ['1.5', 20],
+      ['-1', 20],
+      ['+1', 20],
+      [' 2 ', 20],
+      ['0', 20],
+      ['9007199254740992', 20],
+      ['', 20],
+    ] as const) {
+      getSnapshot.mockClear();
+      const response = await GET(request(`/api/guest/inbox?limit=${encodeURIComponent(value)}`));
+      expect(response.status).toBe(200);
+      expect(getSnapshot).toHaveBeenCalledExactlyOnceWith(bearer, expected);
+    }
+  });
+
   it('rejects a missing bearer before inbox lookup with hardened headers', async () => {
     const response = await GET(
       new Request('https://tabibi.test/api/guest/inbox'),
