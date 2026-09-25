@@ -20,6 +20,7 @@ describe('session foundation domain rules', () => {
     expect(canTransitionSession('closed', 'open')).toBe(false);
     expect(canTransitionSession('planned', 'paused')).toBe(false);
   });
+
   it('rejects nonexistent service dates before database access', async () => {
     // No DB methods: invalid date errors must be raised before authorization,
     // clinic-local date formatting, or PostgreSQL date normalization.
@@ -51,5 +52,4 @@ describe('session foundation domain rules', () => {
       ).rejects.toBeInstanceOf(SessionValidationError);
     }
   });
-
 });
