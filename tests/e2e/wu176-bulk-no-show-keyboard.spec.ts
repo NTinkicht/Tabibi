@@ -94,7 +94,8 @@ for (const locale of ['fr', 'ar'] as const) {
       `/operations/${clinicId}/sessions/${sessionId}/queue?locale=${locale}`,
     );
     const reason = page.getByRole('textbox', {
-      name: locale === 'fr' ? 'Motif collectif obligatoire' : 'سبب جماعي إلزامي',
+      name:
+        locale === 'fr' ? 'Motif collectif obligatoire' : 'سبب جماعي إلزامي',
     });
     const submit = page.getByRole('button', {
       name:
