@@ -130,13 +130,13 @@ def native_approval(number, sha, *, run_id, report_id):
             "commit_id": sha,
             "event": "APPROVE",
             "body": (
-                "Authenticated independent Mistral Vibe exact-head technical PASS.\\n\\n"
-                f"PR #{number}; exact head {sha}.\\n"
-                f"Run: https://github.com/{REPO}/actions/runs/{run_id}\\n"
-                f"Immutable evidence: https://github.com/{REPO}/issues/11#issuecomment-{report_id}\\n\\n"
+                "Authenticated independent Mistral Vibe exact-head technical PASS.\n\n"
+                f"PR #{number}; exact head {sha}.\n"
+                f"Run: https://github.com/{REPO}/actions/runs/{run_id}\n"
+                f"Immutable evidence: https://github.com/{REPO}/issues/11#issuecomment-{report_id}\n\n"
                 "A run-sealed, independently executed, non-material-author PASS was verified "
                 "against the unchanged current PR and green 3/3 CI by the trusted parent. "
-                "This native review does not authorize merge without all other Tabibi gates.\\n\\n"
+                "This native review does not authorize merge without all other Tabibi gates.\n\n"
                 f"<!-- {marker} -->"
             ),
         },
