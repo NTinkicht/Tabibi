@@ -117,15 +117,16 @@ export function BulkAppointmentNoShowAction({
             disabled={!enabled || pending}
           />
         </label>
-        <button
-          type="submit"
-          disabled={!enabled || pending || !reason.trim()}
-        >
+        <button type="submit" disabled={!enabled || pending || !reason.trim()}>
           {pending ? t.pending : t.bulkNoShowSubmit}
         </button>
       </form>
       {!enabled && <p>{t.bulkNoShowUnavailable}</p>}
-      {message && <p role="status" aria-live="polite">{message}</p>}
+      {message && (
+        <p role="status" aria-live="polite">
+          {message}
+        </p>
+      )}
     </section>
   );
 }
