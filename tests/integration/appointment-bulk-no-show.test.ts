@@ -233,6 +233,56 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
     }
   });
 
+  for (const status of ['planned', 'paused'] as const) {
+    it(`explicitly resolves an expired booked arrival in ${status} session`, async () => {
+      await pool.query(
+        `UPDATE consultation_sessions SET status=$2 WHERE id=$1`,
+        [sessionId, status],
+      );
+      const booking = await book(`status-${status}`);
+      await setScheduledMinutesAgo(booking.appointment.id, 30);
+      const receipt = await service.resolveWaiting(
+        scope,
+        sessionId,
+        bulkInput(`status-${status}`),
+      );
+      expect(receipt.resolvedAppointmentCount).toBe(1);
+      expect(await paired(booking.appointment.id)).toEqual({
+        appointment: 'no_show',
+        entry: 'no_show',
+      });
+    });
+  }
+
+  it('keeps normal close explicit and blocked until booked absence is resolved', async () => {
+    const booking = await book('close');
+    await setScheduledMinutesAgo(booking.appointment.id, 30);
+    const sessions = new SessionService(pool);
+    await expect(
+      sessions.command(scope, sessionId, {
+        command: 'close',
+        idempotencyKey: 'wu171-close-too-early',
+        correlationId: 'wu171-close-too-early',
+      }),
+    ).rejects.toThrow();
+    const receipt = await service.resolveWaiting(
+      scope,
+      sessionId,
+      bulkInput('before-close'),
+    );
+    expect(receipt.resolvedAppointmentCount).toBe(1);
+    const closed = await sessions.command(scope, sessionId, {
+      command: 'close',
+      idempotencyKey: 'wu171-close-after-bulk',
+      correlationId: 'wu171-close-after-bulk',
+    });
+    expect(closed.status).toBe('closed');
+    expect(await paired(booking.appointment.id)).toEqual({
+      appointment: 'no_show',
+      entry: 'no_show',
+    });
+  });
+
   it('rejects wrong clinic, revoked role and terminal session', async () => {
     const booking = await book('denied');
     await setScheduledMinutesAgo(booking.appointment.id, 30);
