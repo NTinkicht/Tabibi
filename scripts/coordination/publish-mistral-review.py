@@ -253,6 +253,7 @@ def publish_copy_path_selftest():
         "body": review_body,
     }
     pr_comments = []
+    native_reviews = []
     real_target = parent()
     proof_mod = proof_reader()
     proof = proof_mod.proof_for(
@@ -302,6 +303,19 @@ def publish_copy_path_selftest():
                     "body": body["body"]}
             pr_comments.append(copy)
             return copy
+        if route == f"repos/{REPO}/pulls/487/reviews?per_page=100&page=1":
+            return native_reviews
+        if route == f"repos/{REPO}/pulls/487/reviews":
+            assert body is not None
+            assert body.get("event") == "APPROVE"
+            assert body.get("commit_id") == sha
+            assert "run=123 report=777" in body.get("body", "")
+            approved = {
+                "id": 999, "user": {"login": "github-actions[bot]"},
+                "state": "APPROVED", "commit_id": sha, "body": body["body"],
+            }
+            native_reviews.append(approved)
+            return approved
         raise ValueError("Unexpected publisher API route")
 
     event = {
@@ -344,12 +358,16 @@ def publish_copy_path_selftest():
         assert pr_comments == [{
             "id": 888, "user": {"login": "github-actions[bot]"}, "body": review_body,
         }], pr_comments
-        # The identical bot copy is already on the PR: no second post.
+        assert len(native_reviews) == 1
+        assert native_reviews[0]["state"] == "APPROVED"
+        assert native_reviews[0]["commit_id"] == sha
+        # Idempotent on retry: neither the sealed copy nor bot approval doubles.
         publish()
         assert pr_comments == [{
             "id": 888, "user": {"login": "github-actions[bot]"}, "body": review_body,
         }], pr_comments
-        # An edited sealed report must fail closed before any copy is posted.
+        assert len(native_reviews) == 1
+        # An edited sealed report must fail closed before any copy or approval.
         sealed_source["updated_at"] = "2026-09-24T10:30:00Z"
         try:
             publish()
@@ -358,6 +376,34 @@ def publish_copy_path_selftest():
         else:
             raise AssertionError("Edited sealed report was published")
         sealed_source["updated_at"] = "2026-09-24T10:02:00Z"
+        # Native approval is reserved for exact clean PASS only, even though
+        # an adverse run may publish its sealed PR COMMENT for triage.
+        assert VERDICT.findall(review_body) == ["PASS"]
+        assert VERDICT.findall(review_body.replace("VERDICT: PASS", "VERDICT: CHANGES_REQUIRED")) != ["PASS"]
+        assert VERDICT.findall(review_body.replace("VERDICT: PASS", "VERDICT: PASS_WITH_MINOR_FINDINGS")) != ["PASS"]
+        # Collision/misbound review marker cannot be silently overwritten.
+        bad = [dict(native_reviews[0], user={"login": "NTinkicht"})]
+        native_reviews[:] = bad
+        try:
+            native_approval(487, sha, run_id="123", report_id="777")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("A spoofed native review marker was accepted")
+        native_reviews[:] = []
+        # Explicit stale-head rejection is performed again before native approval.
+        class StaleTarget(FakeTarget):
+            @staticmethod
+            def read_current_pr(repo, number, exact_sha):
+                raise ValueError("PR head moved")
+        globals()["parent"] = lambda: StaleTarget
+        try:
+            publish()
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("A stale head was approved")
+        assert not native_reviews
     finally:
         globals().update(saved_globals)
         proof_mod.api_raw = saved_api_raw
