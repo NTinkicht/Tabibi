@@ -344,7 +344,9 @@ describe('doctor-global session lifecycle invariant', () => {
       idempotencyKey: 'wu177-register',
       correlationId: 'wu177-register',
     });
-    const progress = (command: Parameters<QueueService['command']>[3]['command']) =>
+    const progress = (
+      command: Parameters<QueueService['command']>[3]['command'],
+    ) =>
       queue.command(scopeA, sessionA, active.entry.id, {
         command,
         idempotencyKey: `wu177-${command}`,
@@ -365,8 +367,9 @@ describe('doctor-global session lifecycle invariant', () => {
       );
 
     const forbiddenId = randomUUID();
-    await expect(directInsert(forbiddenId, ids.doctor, 'open'))
-      .rejects.toMatchObject({ code: '23514' });
+    await expect(
+      directInsert(forbiddenId, ids.doctor, 'open'),
+    ).rejects.toMatchObject({ code: '23514' });
     const absent = await pool.query(
       'SELECT id FROM consultation_sessions WHERE id=$1',
       [forbiddenId],
@@ -376,19 +379,24 @@ describe('doctor-global session lifecycle invariant', () => {
     // Planned sessions reserve no open stream. The normal open transition
     // must still refuse until the paused consultation is completed.
     const sessionB = randomUUID();
-    await expect(directInsert(sessionB, ids.doctor, 'planned')).resolves.toBeDefined();
-    await expect(sessions.transition(scopeB, sessionB, 'open'))
-      .rejects.toBeInstanceOf(SessionConflictError);
+    await expect(
+      directInsert(sessionB, ids.doctor, 'planned'),
+    ).resolves.toBeDefined();
+    await expect(
+      sessions.transition(scopeB, sessionB, 'open'),
+    ).rejects.toBeInstanceOf(SessionConflictError);
 
     // Guard must be doctor-specific, not a blanket clinic-wide prohibition.
     const otherUser = randomUUID();
     const otherDoctor = randomUUID();
     await pool.query(
-      "INSERT INTO users(id,auth_subject,display_name) VALUES($1,'wu177-other-doctor','WU177 Doctor')",
+      `INSERT INTO users(id,auth_subject,display_name)
+       VALUES($1,'wu177-other-doctor','WU177 Doctor')`,
       [otherUser],
     );
     await pool.query(
-      "INSERT INTO doctor_profiles(id,user_id,display_name) VALUES($1,$2,'WU177 Doctor')",
+      `INSERT INTO doctor_profiles(id,user_id,display_name)
+       VALUES($1,$2,'WU177 Doctor')`,
       [otherDoctor, otherUser],
     );
     await pool.query(
@@ -396,7 +404,9 @@ describe('doctor-global session lifecycle invariant', () => {
       [ids.clinicB, otherDoctor],
     );
     const otherOpen = randomUUID();
-    await expect(directInsert(otherOpen, otherDoctor, 'open')).resolves.toBeDefined();
+    await expect(
+      directInsert(otherOpen, otherDoctor, 'open'),
+    ).resolves.toBeDefined();
 
     await progress('complete_consultation');
     await sessions.transition(scopeB, sessionB, 'open');
