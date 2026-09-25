@@ -262,7 +262,10 @@ describe('doctor-global session lifecycle invariant', () => {
       idempotencyKey: 'wu173-second',
       correlationId: 'wu173-second',
     });
-    const run = (entry: string, command: Parameters<QueueService['command']>[3]['command']) =>
+    const run = (
+      entry: string,
+      command: Parameters<QueueService['command']>[3]['command'],
+    ) =>
       queue.command(scopeA, sessionA, entry, {
         command,
         idempotencyKey: `wu173-${entry}-${command}`,
@@ -285,10 +288,9 @@ describe('doctor-global session lifecycle invariant', () => {
       sessions.transition(scopeB, sessionB, 'open'),
     ).rejects.toBeInstanceOf(SessionConflictError);
     await expect(
-      pool.query(
-        "UPDATE consultation_sessions SET status='open' WHERE id=$1",
-        [sessionB],
-      ),
+      pool.query("UPDATE consultation_sessions SET status='open' WHERE id=$1", [
+        sessionB,
+      ]),
     ).rejects.toMatchObject({ code: '23514' });
     const blocked = await pool.query<{
       active: string;
