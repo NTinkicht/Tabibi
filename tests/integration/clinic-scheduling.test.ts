@@ -332,6 +332,91 @@ describe('doctor-global session lifecycle invariant', () => {
     expect(final.rows[0]).toEqual({ active: '0', opened: '1' });
   });
 
+  it('WU177 rejects a direct open INSERT while another clinic has the doctor in consultation', async () => {
+    const sessions = new SessionService(pool);
+    const queue = new QueueService(pool);
+    const sessionA = await seedSession(ids.clinicA, '2026-09-07');
+    await sessions.transition(scopeA, sessionA, 'open');
+
+    const active = await queue.registerWalkIn(scopeA, sessionA, {
+      privateDisplayName: 'WU177 synthetic active',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu177-register',
+      correlationId: 'wu177-register',
+    });
+    const progress = (
+      command: Parameters<QueueService['command']>[3]['command'],
+    ) =>
+      queue.command(scopeA, sessionA, active.entry.id, {
+        command,
+        idempotencyKey: `wu177-${command}`,
+        correlationId: 'wu177-synthetic',
+      });
+    await progress('check_in');
+    await progress('call');
+    await progress('start_consultation');
+    await sessions.transition(scopeA, sessionA, 'paused');
+
+    const directInsert = (id: string, doctor: string, status: string) =>
+      pool.query(
+        `INSERT INTO consultation_sessions
+           (id, clinic_id, doctor_id, service_date, starts_at, ends_at, status)
+         VALUES ($1,$2,$3,'2026-09-08','2026-09-08 09:00Z',
+                 '2026-09-08 12:00Z',$4)`,
+        [id, ids.clinicB, doctor, status],
+      );
+
+    const forbiddenId = randomUUID();
+    await expect(
+      directInsert(forbiddenId, ids.doctor, 'open'),
+    ).rejects.toMatchObject({ code: '23514' });
+    const absent = await pool.query(
+      'SELECT id FROM consultation_sessions WHERE id=$1',
+      [forbiddenId],
+    );
+    expect(absent.rowCount).toBe(0);
+
+    // Planned sessions reserve no open stream. The normal open transition
+    // must still refuse until the paused consultation is completed.
+    const sessionB = randomUUID();
+    await expect(
+      directInsert(sessionB, ids.doctor, 'planned'),
+    ).resolves.toBeDefined();
+    await expect(
+      sessions.transition(scopeB, sessionB, 'open'),
+    ).rejects.toBeInstanceOf(SessionConflictError);
+
+    // Guard must be doctor-specific, not a blanket clinic-wide prohibition.
+    const otherUser = randomUUID();
+    const otherDoctor = randomUUID();
+    await pool.query(
+      `INSERT INTO users(id,auth_subject,display_name)
+       VALUES($1,'wu177-other-doctor','WU177 Doctor')`,
+      [otherUser],
+    );
+    await pool.query(
+      `INSERT INTO doctor_profiles(id,user_id,display_name)
+       VALUES($1,$2,'WU177 Doctor')`,
+      [otherDoctor, otherUser],
+    );
+    await pool.query(
+      'INSERT INTO doctor_clinics(clinic_id,doctor_id) VALUES($1,$2)',
+      [ids.clinicB, otherDoctor],
+    );
+    const otherOpen = randomUUID();
+    await expect(
+      directInsert(otherOpen, otherDoctor, 'open'),
+    ).resolves.toBeDefined();
+
+    await progress('complete_consultation');
+    await sessions.transition(scopeB, sessionB, 'open');
+    const final = await pool.query<{ id: string; status: string }>(
+      'SELECT id,status::text FROM consultation_sessions WHERE id=$1',
+      [sessionB],
+    );
+    expect(final.rows[0]).toEqual({ id: sessionB, status: 'open' });
+  });
+
   it('rejects cross-clinic session IDs and terminal-state transitions', async () => {
     const sessions = new SessionService(pool);
     const session = await seedSession(ids.clinicB, '2026-09-08');
