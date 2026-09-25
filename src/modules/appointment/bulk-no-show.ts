@@ -103,8 +103,9 @@ export class AppointmentBulkNoShowService {
       if (graceMinutes === undefined || !observedAt)
         throw new AppointmentConflictError('Clinic no-show policy unavailable');
 
-      // One bounded, stable candidate set. Unlike queue-based no_show, bulk
-      // absence is only for booked/confirmed appointments still waiting.
+      // One bounded, stable set of grace-eligible candidates. Unlike queue-based
+      // no_show, bulk absence is only for booked/confirmed appointments still
+      // waiting, never future arrivals or contactless walk-ins.
       const candidates = await client.query<{
         id: string;
         queue_entry_id: string;
@@ -122,10 +123,20 @@ export class AppointmentBulkNoShowService {
           WHERE appointment.clinic_id=$1 AND appointment.session_id=$2
             AND appointment.status IN ('booked','confirmed')
             AND entry.source='appointment' AND entry.state='waiting'
+            -- Limit only grace-eligible absences. Future waiting bookings
+            -- cannot crowd an expired patient out of this bounded action.
+            AND appointment.scheduled_start_at <=
+              $4::timestamptz - ($5::integer * interval '1 minute')
           ORDER BY appointment.id
           LIMIT $3
           FOR UPDATE OF appointment`,
-        [scope.clinicId, sessionId, MAX_BULK_CANDIDATES + 1],
+        [
+          scope.clinicId,
+          sessionId,
+          MAX_BULK_CANDIDATES + 1,
+          observedAt,
+          graceMinutes,
+        ],
       );
       if (candidates.rows.length > MAX_BULK_CANDIDATES)
         throw new AppointmentConflictError(
