@@ -100,16 +100,29 @@ def seal():
         raise ValueError("Wrong repository")
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
     trigger = event.get("comment") or {}
-    if (
-        (event.get("issue") or {}).get("number") != 11
-        or trigger.get("user", {}).get("login") != "NTinkicht"
-        or event.get("action") != "created"
-    ):
+    workflow_run = event.get("workflow_run") or {}
+    owner_dispatch = (
+        (event.get("issue") or {}).get("number") == 11
+        and trigger.get("user", {}).get("login") == "NTinkicht"
+        and event.get("action") == "created"
+    )
+    ci_dispatch = (
+        event.get("action") == "completed"
+        and workflow_run.get("name") == "CI"
+        and workflow_run.get("event") == "pull_request"
+        and workflow_run.get("conclusion") == "success"
+        and workflow_run.get("head_repository", {}).get("full_name") == REPO
+        and workflow_run.get("head_sha") == os.environ.get("REVIEW_SHA")
+    )
+    if not (owner_dispatch or ci_dispatch):
         raise ValueError("Untrusted review dispatch")
+    dispatch_id = str(
+        trigger.get("id") if owner_dispatch else workflow_run.get("id", "")
+    )
     proof = proof_for(
         Path("/tmp/tabibi-mistral-comment.md").read_text(),
         run_id=os.environ["GITHUB_RUN_ID"],
-        dispatch_id=str(trigger.get("id", "")),
+        dispatch_id=dispatch_id,
         pr=os.environ["REVIEW_PR"],
         sha=os.environ["REVIEW_SHA"],
         report_id=os.environ["SOURCE_REPORT_ID"],
