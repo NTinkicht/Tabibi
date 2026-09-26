@@ -152,22 +152,41 @@ def publish():
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
     issue = event.get("issue") or {}
     trigger = event.get("comment") or {}
-    if (
-        issue.get("number") != 11
-        or trigger.get("user", {}).get("login") != "NTinkicht"
-        or event.get("action") != "created"
-    ):
-        raise ValueError("Not owner-issued Issue #11 dispatch")
+    workflow_run = event.get("workflow_run") or {}
+    owner_dispatch = (
+        issue.get("number") == 11
+        and trigger.get("user", {}).get("login") == "NTinkicht"
+        and event.get("action") == "created"
+    )
+    ci_dispatch = (
+        event.get("action") == "completed"
+        and workflow_run.get("name") == "CI"
+        and workflow_run.get("event") == "pull_request"
+        and workflow_run.get("conclusion") == "success"
+        and workflow_run.get("head_repository", {}).get("full_name") == REPO
+    )
+    if not (owner_dispatch or ci_dispatch):
+        raise ValueError("Not a trusted review dispatch")
     run_id = os.environ.get("GITHUB_RUN_ID", "")
-    dispatch_id = str(trigger.get("id", ""))
+    dispatch_id = str(
+        trigger.get("id") if owner_dispatch else workflow_run.get("id", "")
+    )
     if not (run_id.isdigit() and dispatch_id.isdigit()):
         raise ValueError("Invalid run/dispatch identity")
 
     trusted = parent()
-    target = trusted.parse(trigger.get("body") or "")
-    if target is None:
-        raise ValueError("Not a binding exact-head review")
-    number, sha, actors = target
+    if owner_dispatch:
+        target = trusted.parse(trigger.get("body") or "")
+        if target is None:
+            raise ValueError("Not a binding exact-head review")
+        number, sha, actors = target
+    else:
+        proof = proof_reader().read_run_proof(run_id)
+        number = int(proof.get("pr", "0"))
+        sha = str(proof.get("sha", ""))
+        if sha != workflow_run.get("head_sha"):
+            raise ValueError("CI dispatch SHA does not match sealed proof")
+        actors = ",".join(sorted(trusted.material_authors(REPO, number, sha)))
     trusted.read_current_pr(REPO, number, sha)
     trusted.verify_provenance(REPO, number, sha, actors)
     if not trusted.ci_green(REPO, sha):
