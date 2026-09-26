@@ -29,6 +29,7 @@ jobs:
     timeout-minutes: 15
     outputs:
       source_report_id: ${{ steps.report.outputs.source_report_id }}
+      review_sealed: ${{ steps.seal.outputs.review_sealed }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -436,6 +437,7 @@ jobs:
           # validates this trusted issue-11 report and publishes the PR copy.
 
       - name: Seal final report before leaving trusted inference job
+        id: seal
         if: >-
           steps.target.outputs.mode == 'review' &&
           steps.target.outputs.ready == 'true' &&
@@ -447,7 +449,11 @@ jobs:
           REVIEW_PR: ${{ steps.target.outputs.pr }}
           REVIEW_SHA: ${{ steps.target.outputs.sha }}
           SOURCE_REPORT_ID: ${{ steps.report.outputs.source_report_id }}
-        run: python3 /tmp/tabibi-mistral-review-proof.py seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 /tmp/tabibi-mistral-review-proof.py seal
+          echo "review_sealed=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload immutable run-scoped Mistral review evidence
         if: >-
@@ -466,13 +472,13 @@ jobs:
     needs: mistral-vibe
     if: >-
       needs.mistral-vibe.result == 'success' &&
+      needs.mistral-vibe.outputs.review_sealed == 'true' &&
       ((github.event_name == 'issue_comment' &&
         github.event.issue.number == 11 &&
         github.actor == 'NTinkicht' &&
         contains(github.event.comment.body, 'BINDING_EXACT_HEAD_REVIEW') &&
         !contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')) ||
-       (github.event_name == 'workflow_run' &&
-        needs.mistral-vibe.outputs.source_report_id != ''))
+       github.event_name == 'workflow_run')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
