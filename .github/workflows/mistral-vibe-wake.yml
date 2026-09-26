@@ -3,6 +3,9 @@ name: Mistral Vibe Wake
 on:
   issue_comment:
     types: [created]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
 
 permissions:
   contents: read
@@ -13,10 +16,15 @@ permissions:
 jobs:
   mistral-vibe:
     if: >-
-      github.event.issue.number == 11 &&
-      github.actor == 'NTinkicht' &&
-      contains(github.event.comment.body, '@mistral-vibe')
-      && !contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.number == 11 &&
+       github.actor == 'NTinkicht' &&
+       contains(github.event.comment.body, '@mistral-vibe') &&
+       !contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')) ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -32,7 +40,9 @@ jobs:
         id: target
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DISPATCH_BODY: ${{ github.event.comment.body }}
+          DISPATCH_BODY: ${{ github.event.comment.body || '' }}
+          AUTO_REVIEW_SHA: ${{ github.event.workflow_run.head_sha || '' }}
+          AUTO_REVIEW_RUN_ID: ${{ github.event.workflow_run.id || '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -40,7 +50,11 @@ jobs:
           cp scripts/mistral-review-target.py /tmp/tabibi-mistral-review-target.py
           cp scripts/coordination/mistral-review-proof.py /tmp/tabibi-mistral-review-proof.py
           python3 /tmp/tabibi-mistral-review-target.py selftest
-          python3 /tmp/tabibi-mistral-review-target.py prepare
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
+            python3 /tmp/tabibi-mistral-review-target.py auto-prepare
+          else
+            python3 /tmp/tabibi-mistral-review-target.py prepare
+          fi
 
       - name: Checkout verified same-repository exact PR head
         if: steps.target.outputs.ready == 'true' && steps.target.outputs.mode == 'review'
@@ -165,7 +179,7 @@ jobs:
         id: actor
         env:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          DISPATCH_BODY: ${{ github.event.comment.body }}
+          DISPATCH_BODY: ${{ github.event.comment.body || format('AUTO_BINDING_EXACT_HEAD_REVIEW PR #{0} SHA {1}', steps.target.outputs.pr, steps.target.outputs.sha) }}
           VIBE_HOME: /tmp/tabibi-vibe-home
           TARGET_MODE: ${{ steps.target.outputs.mode }}
           REVIEW_PR: ${{ steps.target.outputs.pr }}
@@ -405,7 +419,7 @@ jobs:
           # The review-gate pilot correlates this exact run/owner dispatch and
           # the independently model-generated SHA/verdict before recognizing PASS.
           if [[ "${TARGET_MODE:-main}" == "review" && "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" && "${RECHECK_READY:-false}" == "true" && "$verdict_ready" == "true" ]]; then
-            dispatch_id="$(jq -r '.comment.id' "$GITHUB_EVENT_PATH")"
+            dispatch_id="$(jq -r '.comment.id // .workflow_run.id // empty' "$GITHUB_EVENT_PATH")"
             if [[ "$dispatch_id" =~ ^[0-9]+$ ]]; then
               printf '\n<!-- tabibi-mistral-review-run:%s dispatch-comment:%s -->\n' "$GITHUB_RUN_ID" "$dispatch_id" >> /tmp/tabibi-mistral-comment.md
             fi
@@ -452,10 +466,12 @@ jobs:
     needs: mistral-vibe
     if: >-
       needs.mistral-vibe.result == 'success' &&
-      github.event.issue.number == 11 &&
-      github.actor == 'NTinkicht' &&
-      contains(github.event.comment.body, 'BINDING_EXACT_HEAD_REVIEW') &&
-      !contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')
+      ((github.event_name == 'issue_comment' &&
+        github.event.issue.number == 11 &&
+        github.actor == 'NTinkicht' &&
+        contains(github.event.comment.body, 'BINDING_EXACT_HEAD_REVIEW') &&
+        !contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')) ||
+       github.event_name == 'workflow_run')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
