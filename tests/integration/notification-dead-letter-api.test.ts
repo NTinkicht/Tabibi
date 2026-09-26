@@ -193,13 +193,15 @@ describe('notification dead-letter HTTP boundary', () => {
   });
 
   it('rejects invalid limits before querying the observability repository', async () => {
-    const response = await GET(
-      request(ids.clinicA, '?limit=101'),
-      context(ids.clinicA),
-    );
+    for (const token of ['101', '1.5', '+2', ' 2 ', '1e2', '01', 'abc']) {
+      const response = await GET(
+        request(ids.clinicA, `?limit=${encodeURIComponent(token)}`),
+        context(ids.clinicA),
+      );
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ error: 'invalid_request' });
-    expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: 'invalid_request' });
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    }
   });
 });

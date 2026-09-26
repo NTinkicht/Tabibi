@@ -4,9 +4,10 @@ import { NotificationDeadLetterObservabilityRepository } from '@/modules/notific
 import { getPool } from '@/platform/database/pool';
 import { authenticatedClinicScope } from '@/platform/http/staff-auth';
 import { operationalJson } from '@/platform/http/operational-response';
+import { strictLimit100Schema } from '@/platform/http/query-limit';
 
 const querySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).optional(),
+  limit: strictLimit100Schema.optional(),
 });
 
 type Context = { params: Promise<{ clinicId: string }> };

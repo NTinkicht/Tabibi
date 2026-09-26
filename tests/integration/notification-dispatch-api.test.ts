@@ -330,13 +330,15 @@ describe('notification dispatch HTTP boundary', () => {
       'wu41-event-invalid-limit',
     );
 
-    const response = await POST(
-      request(ids.clinicA, '?limit=101'),
-      context(ids.clinicA),
-    );
+    for (const token of ['101', '1.5', '+2', ' 2 ', '1e2', '01', 'abc']) {
+      const response = await POST(
+        request(ids.clinicA, `?limit=${encodeURIComponent(token)}`),
+        context(ids.clinicA),
+      );
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ error: 'invalid_request' });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: 'invalid_request' });
+    }
     const row = await pool.query<{ state: string }>(
       'SELECT state FROM notification_outbox WHERE id=$1',
       [intent.id],
