@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { POST } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/appointments/bulk-no-show/route';
 
-const clinicId = '00000000-0000-0000-0000-000000000000';
-const sessionId = '11111111-1111-1111-1111-111111111111';
+const clinicId = '00000000-0000-4000-8000-000000000000';
+const sessionId = '11111111-1111-4111-8111-111111111111';
 const url = `http://localhost/api/clinics/${clinicId}/sessions/${sessionId}/appointments/bulk-no-show`;
 const context = {
   params: Promise.resolve({ clinicId, sessionId }),
