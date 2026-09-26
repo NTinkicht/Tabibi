@@ -7,11 +7,28 @@ import {
 } from '@/platform/http/staff-auth';
 import { operationalJson } from '@/platform/http/operational-response';
 
+// A JS Date coercion can silently turn February 30 into March 2. Staff
+// scheduling accepts only explicit absolute instants with a real calendar day.
+const absoluteInstantSchema = z
+  .string()
+  .datetime({ offset: true })
+  .refine((value) => {
+    const day = value.slice(0, 10);
+    const calendar = new Date(`${day}T00:00:00.000Z`);
+    return (
+      Number(day.slice(0, 4)) > 0 &&
+      Number.isFinite(calendar.getTime()) &&
+      calendar.toISOString().slice(0, 10) === day &&
+      Number.isFinite(new Date(value).getTime())
+    );
+  }, 'Timestamp must contain a real calendar day')
+  .transform((value) => new Date(value));
+
 const createSchema = z.object({
   doctorId: z.string().uuid(),
   serviceDate: z.string(),
-  startsAt: z.coerce.date(),
-  endsAt: z.coerce.date(),
+  startsAt: absoluteInstantSchema,
+  endsAt: absoluteInstantSchema,
 });
 type Context = { params: Promise<{ clinicId: string }> };
 export async function GET(
