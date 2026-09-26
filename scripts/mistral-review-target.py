@@ -156,7 +156,7 @@ def trusted_ci_definition(repo, exact_sha):
     )
 
 
-def ci_green(repo, exact_sha):
+def ci_green(repo, exact_sha, expected_run_id=None):
     if not trusted_ci_definition(repo, exact_sha):
         return False
     runs = github_json(
@@ -180,6 +180,11 @@ def ci_green(repo, exact_sha):
             run.get("id") or 0,
         ),
     )
+    if (
+        expected_run_id is not None
+        and latest.get("id") != expected_run_id
+    ):
+        return False
     if latest.get("status") != "completed" or latest.get("conclusion") != "success":
         return False
     jobs = github_json(
@@ -301,6 +306,9 @@ def main():
             assert ci_green("owner/repo", "a" * 40), (
                 "Trusted exact-head CI workflow was rejected"
             )
+            assert not ci_green("owner/repo", "a" * 40, 999), (
+                "A different workflow_run event was accepted as the trusted CI run"
+            )
             def provenance_api(route):
                 if "/pulls/" in route and "/commits?" in route:
                     return [{"sha": "a" * 40,
@@ -371,7 +379,7 @@ def main():
                 return
             number = int(matches[0]["number"])
             authors = ",".join(sorted(material_authors(repo, number, exact_sha)))
-            if not authors or not ci_green(repo, exact_sha):
+            if not authors or not ci_green(repo, exact_sha, int(run_id)):
                 blocked("CI_NOT_GREEN")
                 return
             output(
