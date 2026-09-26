@@ -160,6 +160,42 @@ describe('shared deterministic queue ETA estimator', () => {
     });
   });
 
+  it('rejects nonphysical numeric inputs before publishing ETA bounds', () => {
+    const valid = {
+      patientsAhead: 2,
+      declaredDelayMinutes: 0,
+      estimatedConsultationMinutes: 12,
+    };
+    const rejects = (input: Parameters<typeof computeQueueEtaRange>[0]) => {
+      expect(() => computeQueueEtaRange(input)).toThrow(RangeError);
+    };
+    const invalidCounts = [
+      -1,
+      1.5,
+      Number.NaN,
+      Infinity,
+      Number.MAX_SAFE_INTEGER + 1,
+    ];
+    for (const patientsAhead of invalidCounts) {
+      rejects({ ...valid, patientsAhead });
+    }
+    for (const declaredDelayMinutes of [-1, Number.NaN, Infinity]) {
+      rejects({ ...valid, declaredDelayMinutes });
+    }
+    for (const estimatedConsultationMinutes of [0, -1, Number.NaN, Infinity]) {
+      rejects({ ...valid, estimatedConsultationMinutes });
+    }
+    rejects({
+      patientsAhead: Number.MAX_SAFE_INTEGER,
+      declaredDelayMinutes: 0,
+      estimatedConsultationMinutes: Number.MAX_VALUE,
+    });
+    expect(computeQueueEtaRange({ ...valid, patientsAhead: 0 })).toEqual({
+      minWaitMinutes: 0,
+      maxWaitMinutes: 0,
+    });
+  });
+
   it('does not treat empty duration text as a clamped observed or historical sample', () => {
     expect(selectConsultationEstimate(['', ' ', '\t'], [20, 30, 40])).toEqual({
       estimatedConsultationMinutes: 30,

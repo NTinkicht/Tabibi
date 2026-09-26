@@ -181,16 +181,31 @@ export function computeQueueEtaRange({
   declaredDelayMinutes,
   estimatedConsultationMinutes,
 }: QueueEtaRangeInput): QueueEtaRange {
-  return {
-    minWaitMinutes: Math.round(
-      declaredDelayMinutes +
-        patientsAhead * estimatedConsultationMinutes * ETA_MIN_MULTIPLIER,
-    ),
-    maxWaitMinutes: Math.round(
-      declaredDelayMinutes +
-        patientsAhead * estimatedConsultationMinutes * ETA_MAX_MULTIPLIER,
-    ),
-  };
+  if (
+    !Number.isSafeInteger(patientsAhead) ||
+    patientsAhead < 0 ||
+    !Number.isFinite(declaredDelayMinutes) ||
+    declaredDelayMinutes < 0 ||
+    !Number.isFinite(estimatedConsultationMinutes) ||
+    estimatedConsultationMinutes <= 0
+  ) {
+    throw new RangeError(
+      'ETA inputs must be finite, non-negative and physically valid',
+    );
+  }
+
+  const minWaitMinutes = Math.round(
+    declaredDelayMinutes +
+      patientsAhead * estimatedConsultationMinutes * ETA_MIN_MULTIPLIER,
+  );
+  const maxWaitMinutes = Math.round(
+    declaredDelayMinutes +
+      patientsAhead * estimatedConsultationMinutes * ETA_MAX_MULTIPLIER,
+  );
+  if (!Number.isFinite(minWaitMinutes) || !Number.isFinite(maxWaitMinutes)) {
+    throw new RangeError('ETA bounds must be finite');
+  }
+  return { minWaitMinutes, maxWaitMinutes };
 }
 
 export { createEtaRevision, type EtaRevisionInput } from './revision';
