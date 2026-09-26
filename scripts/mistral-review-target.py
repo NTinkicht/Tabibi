@@ -283,6 +283,40 @@ def main():
         return
 
     repo = os.environ["GITHUB_REPOSITORY"]
+    if command == "auto-prepare":
+        try:
+            exact_sha = os.environ.get("AUTO_REVIEW_SHA", "")
+            run_id = os.environ.get("AUTO_REVIEW_RUN_ID", "")
+            if not SHA.fullmatch(exact_sha) or not run_id.isascii() or not run_id.isdigit():
+                blocked("REVIEW_TARGET_BLOCKED")
+                return
+            candidates = github_json(
+                f"repos/{repo}/commits/{exact_sha}/pulls?per_page=20"
+            )
+            matches = [
+                item for item in candidates
+                if item.get("state") == "open"
+                and item.get("head", {}).get("sha") == exact_sha
+                and item.get("head", {}).get("repo", {}).get("full_name") == repo
+                and item.get("base", {}).get("repo", {}).get("full_name") == repo
+                and item.get("base", {}).get("ref") == "main"
+            ]
+            if len(matches) != 1:
+                blocked("REVIEW_TARGET_BLOCKED")
+                return
+            number = int(matches[0]["number"])
+            authors = ",".join(sorted(material_authors(repo, number, exact_sha)))
+            if not authors or not ci_green(repo, exact_sha):
+                blocked("CI_NOT_GREEN")
+                return
+            output(
+                ready="true", status="OK", mode="review",
+                pr=number, sha=exact_sha, authors=authors
+            )
+        except (ValueError, subprocess.SubprocessError, json.JSONDecodeError):
+            blocked("REVIEW_TARGET_BLOCKED")
+        return
+
     if command == "prepare":
         try:
             target = parse(os.environ["DISPATCH_BODY"])
