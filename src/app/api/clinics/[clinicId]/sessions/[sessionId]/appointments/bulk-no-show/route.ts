@@ -11,6 +11,11 @@ const schema = z.object({
   reason: z.string().trim().min(1).max(500),
 });
 
+const paramsSchema = z.object({
+  clinicId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+});
+
 type Context = { params: Promise<{ clinicId: string; sessionId: string }> };
 
 export async function POST(
@@ -19,7 +24,7 @@ export async function POST(
 ): Promise<Response> {
   return operationalJson(request, async (correlationId) => {
     requireSameOrigin(request);
-    const { clinicId, sessionId } = await context.params;
+    const { clinicId, sessionId } = paramsSchema.parse(await context.params);
     const scope = await authenticatedClinicScope(request, clinicId);
     const input = schema.parse(await request.json());
     const receipt = await new AppointmentBulkNoShowService(
