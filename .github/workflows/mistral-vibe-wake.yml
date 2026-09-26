@@ -40,9 +40,9 @@ jobs:
         id: target
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DISPATCH_BODY: ${{ github.event.comment.body || '' }}
-          AUTO_REVIEW_SHA: ${{ github.event.workflow_run.head_sha || '' }}
-          AUTO_REVIEW_RUN_ID: ${{ github.event.workflow_run.id || '' }}
+          DISPATCH_BODY: ${{ github.event.comment.body }}
+          AUTO_REVIEW_SHA: ${{ github.event.workflow_run.head_sha }}
+          AUTO_REVIEW_RUN_ID: ${{ github.event.workflow_run.id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -179,7 +179,7 @@ jobs:
         id: actor
         env:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          DISPATCH_BODY: ${{ github.event.comment.body || format('AUTO_BINDING_EXACT_HEAD_REVIEW PR #{0} SHA {1}', steps.target.outputs.pr, steps.target.outputs.sha) }}
+          DISPATCH_BODY: ${{ github.event.comment.body }}
           VIBE_HOME: /tmp/tabibi-vibe-home
           TARGET_MODE: ${{ steps.target.outputs.mode }}
           REVIEW_PR: ${{ steps.target.outputs.pr }}
