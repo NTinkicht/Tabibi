@@ -15,6 +15,7 @@ import sys
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 REVIEW_MARKER = re.compile(r"(?m)^BINDING_EXACT_HEAD_REVIEW\s*$")
 REQUIRED_JOBS = {"Quality and build", "PostgreSQL integration", "Browser smoke"}
+CI_WORKFLOW_PATH = ".github/workflows/ci.yml"
 DIFF_LIMIT_BYTES = 120_000
 
 
@@ -132,7 +133,32 @@ def verify_provenance(repo, number, exact_sha, declared):
     return True
 
 
-def ci_green(repo, exact_sha):
+def trusted_ci_definition(repo, exact_sha):
+    """Require the reviewed head to use the exact CI workflow trusted on main.
+
+    pull_request workflows execute PR-controlled YAML. Job names/conclusions are
+    therefore meaningful only while the workflow blob itself is unchanged from
+    the default branch. Infrastructure PRs that change CI must use an explicit
+    owner-dispatched review instead of the automatic workflow_run lane.
+    """
+    reviewed = github_json(
+        f"repos/{repo}/contents/{CI_WORKFLOW_PATH}?ref={exact_sha}"
+    )
+    trusted = github_json(
+        f"repos/{repo}/contents/{CI_WORKFLOW_PATH}?ref=main"
+    )
+    reviewed_sha = reviewed.get("sha", "")
+    return (
+        reviewed.get("type") == "file"
+        and trusted.get("type") == "file"
+        and SHA.fullmatch(reviewed_sha) is not None
+        and reviewed_sha == trusted.get("sha")
+    )
+
+
+def ci_green(repo, exact_sha, expected_run_id=None):
+    if not trusted_ci_definition(repo, exact_sha):
+        return False
     runs = github_json(
         f"repos/{repo}/actions/runs?head_sha={exact_sha}&event=pull_request&per_page=30"
     ).get("workflow_runs", [])
@@ -142,6 +168,7 @@ def ci_green(repo, exact_sha):
         run for run in runs
         if run.get("name") == "CI" and run.get("head_sha") == exact_sha
         and run.get("event") == "pull_request"
+        and run.get("path") == CI_WORKFLOW_PATH
     ]
     if not relevant:
         return False
@@ -153,6 +180,11 @@ def ci_green(repo, exact_sha):
             run.get("id") or 0,
         ),
     )
+    if (
+        expected_run_id is not None
+        and latest.get("id") != expected_run_id
+    ):
+        return False
     if latest.get("status") != "completed" or latest.get("conclusion") != "success":
         return False
     jobs = github_json(
@@ -219,22 +251,63 @@ def main():
         original_api = github_json
         try:
             def mock_api(route):
+                if "/contents/" in route:
+                    return {"type": "file", "sha": "c" * 40}
                 if "/actions/runs?" in route:
                     return {"workflow_runs": [
-                        {"name": "CI", "head_sha": "a" * 40,
-                         "event": "pull_request", "run_number": 1,
-                         "run_attempt": 1, "id": 10, "status": "completed",
-                         "conclusion": "success"},
-                        {"name": "CI", "head_sha": "a" * 40,
-                         "event": "pull_request", "run_number": 2,
-                         "run_attempt": 1, "id": 11, "status": "completed",
-                         "conclusion": "failure"},
+                        {"name": "CI", "path": CI_WORKFLOW_PATH,
+                         "head_sha": "a" * 40, "event": "pull_request",
+                         "run_number": 1, "run_attempt": 1, "id": 10,
+                         "status": "completed", "conclusion": "success"},
+                        {"name": "CI", "path": CI_WORKFLOW_PATH,
+                         "head_sha": "a" * 40, "event": "pull_request",
+                         "run_number": 2, "run_attempt": 1, "id": 11,
+                         "status": "completed", "conclusion": "failure"},
                     ]}
                 return {"jobs": [{"name": name, "conclusion": "success"}
                                  for name in REQUIRED_JOBS]}
             globals()["github_json"] = mock_api
             assert not ci_green("owner/repo", "a" * 40), (
                 "Older green CI masked latest failure"
+            )
+
+            def tampered_ci_api(route):
+                if route.endswith(f"/contents/{CI_WORKFLOW_PATH}?ref=main"):
+                    return {"type": "file", "sha": "c" * 40}
+                if "/contents/" in route:
+                    return {"type": "file", "sha": "d" * 40}
+                if "/actions/runs?" in route:
+                    return {"workflow_runs": [{
+                        "name": "CI", "path": CI_WORKFLOW_PATH,
+                        "head_sha": "a" * 40, "event": "pull_request",
+                        "run_number": 3, "run_attempt": 1, "id": 12,
+                        "status": "completed", "conclusion": "success",
+                    }]}
+                return {"jobs": [{"name": name, "conclusion": "success"}
+                                 for name in REQUIRED_JOBS]}
+            globals()["github_json"] = tampered_ci_api
+            assert not ci_green("owner/repo", "a" * 40), (
+                "PR-controlled CI workflow was trusted for automatic review"
+            )
+
+            def trusted_ci_api(route):
+                if "/contents/" in route:
+                    return {"type": "file", "sha": "c" * 40}
+                if "/actions/runs?" in route:
+                    return {"workflow_runs": [{
+                        "name": "CI", "path": CI_WORKFLOW_PATH,
+                        "head_sha": "a" * 40, "event": "pull_request",
+                        "run_number": 3, "run_attempt": 1, "id": 12,
+                        "status": "completed", "conclusion": "success",
+                    }]}
+                return {"jobs": [{"name": name, "conclusion": "success"}
+                                 for name in REQUIRED_JOBS]}
+            globals()["github_json"] = trusted_ci_api
+            assert ci_green("owner/repo", "a" * 40), (
+                "Trusted exact-head CI workflow was rejected"
+            )
+            assert not ci_green("owner/repo", "a" * 40, 999), (
+                "A different workflow_run event was accepted as the trusted CI run"
             )
             def provenance_api(route):
                 if "/pulls/" in route and "/commits?" in route:
@@ -283,6 +356,40 @@ def main():
         return
 
     repo = os.environ["GITHUB_REPOSITORY"]
+    if command == "auto-prepare":
+        try:
+            exact_sha = os.environ.get("AUTO_REVIEW_SHA", "")
+            run_id = os.environ.get("AUTO_REVIEW_RUN_ID", "")
+            if not SHA.fullmatch(exact_sha) or not run_id.isascii() or not run_id.isdigit():
+                blocked("REVIEW_TARGET_BLOCKED")
+                return
+            candidates = github_json(
+                f"repos/{repo}/commits/{exact_sha}/pulls?per_page=20"
+            )
+            matches = [
+                item for item in candidates
+                if item.get("state") == "open"
+                and item.get("head", {}).get("sha") == exact_sha
+                and item.get("head", {}).get("repo", {}).get("full_name") == repo
+                and item.get("base", {}).get("repo", {}).get("full_name") == repo
+                and item.get("base", {}).get("ref") == "main"
+            ]
+            if len(matches) != 1:
+                blocked("REVIEW_TARGET_BLOCKED")
+                return
+            number = int(matches[0]["number"])
+            authors = ",".join(sorted(material_authors(repo, number, exact_sha)))
+            if not authors or not ci_green(repo, exact_sha, int(run_id)):
+                blocked("CI_NOT_GREEN")
+                return
+            output(
+                ready="true", status="OK", mode="review",
+                pr=number, sha=exact_sha, authors=authors
+            )
+        except (ValueError, subprocess.SubprocessError, json.JSONDecodeError):
+            blocked("REVIEW_TARGET_BLOCKED")
+        return
+
     if command == "prepare":
         try:
             target = parse(os.environ["DISPATCH_BODY"])

@@ -3,6 +3,9 @@ name: Mistral Vibe Wake
 on:
   issue_comment:
     types: [created]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
 
 permissions:
   contents: read
@@ -13,14 +16,20 @@ permissions:
 jobs:
   mistral-vibe:
     if: >-
-      github.event.issue.number == 11 &&
-      github.actor == 'NTinkicht' &&
-      contains(github.event.comment.body, '@mistral-vibe')
-      && !contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.number == 11 &&
+       github.actor == 'NTinkicht' &&
+       contains(github.event.comment.body, '@mistral-vibe') &&
+       !contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')) ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
       source_report_id: ${{ steps.report.outputs.source_report_id }}
+      review_sealed: ${{ steps.seal.outputs.review_sealed }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -33,6 +42,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DISPATCH_BODY: ${{ github.event.comment.body }}
+          AUTO_REVIEW_SHA: ${{ github.event.workflow_run.head_sha }}
+          AUTO_REVIEW_RUN_ID: ${{ github.event.workflow_run.id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -40,7 +51,11 @@ jobs:
           cp scripts/mistral-review-target.py /tmp/tabibi-mistral-review-target.py
           cp scripts/coordination/mistral-review-proof.py /tmp/tabibi-mistral-review-proof.py
           python3 /tmp/tabibi-mistral-review-target.py selftest
-          python3 /tmp/tabibi-mistral-review-target.py prepare
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
+            python3 /tmp/tabibi-mistral-review-target.py auto-prepare
+          else
+            python3 /tmp/tabibi-mistral-review-target.py prepare
+          fi
 
       - name: Checkout verified same-repository exact PR head
         if: steps.target.outputs.ready == 'true' && steps.target.outputs.mode == 'review'
@@ -405,7 +420,7 @@ jobs:
           # The review-gate pilot correlates this exact run/owner dispatch and
           # the independently model-generated SHA/verdict before recognizing PASS.
           if [[ "${TARGET_MODE:-main}" == "review" && "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" && "${RECHECK_READY:-false}" == "true" && "$verdict_ready" == "true" ]]; then
-            dispatch_id="$(jq -r '.comment.id' "$GITHUB_EVENT_PATH")"
+            dispatch_id="$(jq -r '.comment.id // .workflow_run.id // empty' "$GITHUB_EVENT_PATH")"
             if [[ "$dispatch_id" =~ ^[0-9]+$ ]]; then
               printf '\n<!-- tabibi-mistral-review-run:%s dispatch-comment:%s -->\n' "$GITHUB_RUN_ID" "$dispatch_id" >> /tmp/tabibi-mistral-comment.md
             fi
@@ -422,6 +437,7 @@ jobs:
           # validates this trusted issue-11 report and publishes the PR copy.
 
       - name: Seal final report before leaving trusted inference job
+        id: seal
         if: >-
           steps.target.outputs.mode == 'review' &&
           steps.target.outputs.ready == 'true' &&
@@ -433,7 +449,11 @@ jobs:
           REVIEW_PR: ${{ steps.target.outputs.pr }}
           REVIEW_SHA: ${{ steps.target.outputs.sha }}
           SOURCE_REPORT_ID: ${{ steps.report.outputs.source_report_id }}
-        run: python3 /tmp/tabibi-mistral-review-proof.py seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 /tmp/tabibi-mistral-review-proof.py seal
+          echo "review_sealed=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload immutable run-scoped Mistral review evidence
         if: >-
@@ -452,10 +472,13 @@ jobs:
     needs: mistral-vibe
     if: >-
       needs.mistral-vibe.result == 'success' &&
-      github.event.issue.number == 11 &&
-      github.actor == 'NTinkicht' &&
-      contains(github.event.comment.body, 'BINDING_EXACT_HEAD_REVIEW') &&
-      !contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')
+      needs.mistral-vibe.outputs.review_sealed == 'true' &&
+      ((github.event_name == 'issue_comment' &&
+        github.event.issue.number == 11 &&
+        github.actor == 'NTinkicht' &&
+        contains(github.event.comment.body, 'BINDING_EXACT_HEAD_REVIEW') &&
+        !contains(github.event.comment.body, 'MISTRAL_LEASED_CODE_V1')) ||
+       github.event_name == 'workflow_run')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
