@@ -10,6 +10,10 @@ const schema = z.object({
   command: z.enum(['open', 'pause', 'resume', 'close', 'cancel']),
   reason: z.string().optional(),
 });
+const paramsSchema = z.object({
+  clinicId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+});
 type Context = { params: Promise<{ clinicId: string; sessionId: string }> };
 export async function POST(
   request: Request,
@@ -17,7 +21,7 @@ export async function POST(
 ): Promise<Response> {
   return operationalJson(request, async (correlationId) => {
     requireSameOrigin(request);
-    const { clinicId, sessionId } = await context.params;
+    const { clinicId, sessionId } = paramsSchema.parse(await context.params);
     const scope = await authenticatedClinicScope(request, clinicId);
     const input = schema.parse(await request.json());
     const session = await new SessionService(getPool()).command(
