@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+import importlib.util
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -9,8 +11,15 @@ OWNER, NAME = REPO.split("/", 1)
 EVENT = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
 CI_WORKFLOW_NAME = "CI"
 CI_JOBS = frozenset({"Quality and build", "PostgreSQL integration", "Browser smoke"})
-REVIEW_CHECK = "Independent AI review / Verified final head"
 MAX_PAGES = 10
+MISTRAL_NATIVE_REVIEW = re.compile(
+    r"<!-- tabibi-mistral-native-v1 run=([0-9]{1,15}) "
+    r"report=([0-9]{1,15}) sha=([a-f0-9]{40}) -->"
+)
+TRUSTED_EXTERNAL_REVIEWERS = frozenset({
+    "coderabbitai[bot]",
+    "copilot-pull-request-reviewer[bot]",
+})
 
 # Changes to the machinery that proves CI/review provenance are never auto-merged
 # by that same machinery. They require the normal external/manual merge path.
@@ -163,35 +172,81 @@ def latest_ci_green(sha):
     )
 
 
-def latest_review_check_green(sha):
-    checks = []
-    for page in range(1, MAX_PAGES + 1):
-        payload = gh(
-            f"repos/{REPO}/commits/{sha}/check-runs?per_page=100&page={page}"
-        )
-        batch = payload.get("check_runs", [])
-        checks.extend(batch)
-        if len(batch) < 100:
-            break
-    else:
-        raise RuntimeError("CHECK_RUN_PAGE_BOUND_EXCEEDED")
-    matches = [check for check in checks if check.get("name") == REVIEW_CHECK]
-    if not matches:
+def mistral_proof_reader():
+    path = Path("scripts/coordination/mistral-review-proof.py")
+    spec = importlib.util.spec_from_file_location("trusted_mistral_proof", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("MISTRAL_REVIEW_PROOF_HELPER_UNAVAILABLE")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def authenticated_mistral_approval(review, number, sha):
+    """Verify the native approval against the trusted run-sealed Mistral proof.
+
+    This replaces the removed verifier check-run without trusting a generic
+    github-actions[bot] approval. The proof artifact, immutable Issue #11
+    report, workflow identity, PR number and exact head must all agree.
+    """
+    body = review.get("body") or ""
+    markers = MISTRAL_NATIVE_REVIEW.findall(body)
+    if len(markers) != 1:
         return False
-    latest = max(matches, key=lambda check: check.get("id") or 0)
-    return (
-        latest.get("status") == "completed"
-        and latest.get("conclusion") == "success"
-    )
+    run_id, report_id, marker_sha = markers[0]
+    if marker_sha != sha:
+        return False
+    try:
+        run = gh(f"repos/{REPO}/actions/runs/{run_id}")
+        if (
+            run.get("name") != "Mistral Vibe Wake"
+            or run.get("path") != ".github/workflows/mistral-vibe-wake.yml"
+            or run.get("head_branch") != "main"
+            or run.get("event") not in {"issue_comment", "workflow_run"}
+            or run.get("status") != "completed"
+            or run.get("conclusion") != "success"
+            or run.get("head_repository", {}).get("full_name") != REPO
+        ):
+            return False
+        proof_reader = mistral_proof_reader()
+        proof = proof_reader.read_run_proof(run_id)
+        if (
+            str(proof.get("run_id")) != run_id
+            or str(proof.get("report_id")) != report_id
+            or str(proof.get("pr")) != str(number)
+            or proof.get("sha") != sha
+            or proof.get("verdict") != "PASS"
+        ):
+            return False
+        # Re-authenticate the immutable Issue #11 report and its digest.
+        proof_reader.sealed_report(proof)
+        return True
+    except (
+        RuntimeError, ValueError, TypeError, KeyError, OSError,
+        subprocess.SubprocessError, json.JSONDecodeError,
+    ):
+        return False
+
+
+def eligible_approval(review, number, sha, author):
+    if review.get("state") != "APPROVED" or review.get("commit_id") != sha:
+        return False
+    user = review.get("user") or {}
+    login = user.get("login", "").lower()
+    if not login or login == author:
+        return False
+    if login == "github-actions[bot]":
+        return authenticated_mistral_approval(review, number, sha)
+    if user.get("type") != "Bot":
+        return True
+    return login in TRUSTED_EXTERNAL_REVIEWERS
 
 
 def review_gate_clean(number, sha, author):
     reviews = all_reviews(number)
     approvals = [
         review for review in reviews
-        if review.get("state") == "APPROVED"
-        and review.get("commit_id") == sha
-        and review.get("user", {}).get("login", "").lower() != author
+        if eligible_approval(review, number, sha, author)
     ]
     adverse = [
         review for review in reviews
@@ -234,9 +289,6 @@ def gates(number):
     if not latest_ci_green(sha):
         print(f"PR #{number}: LATEST_EXACT_HEAD_CI_NOT_GREEN")
         return None
-    if not latest_review_check_green(sha):
-        print(f"PR #{number}: VERIFIED_REVIEW_CHECK_NOT_GREEN")
-        return None
     author = pr.get("user", {}).get("login", "").lower()
     if not review_gate_clean(number, sha, author):
         print(f"PR #{number}: INDEPENDENT_REVIEW_OR_THREADS_NOT_CLEAN")
@@ -261,8 +313,8 @@ for number in candidate_numbers():
     ):
         print(f"PR #{number}: HEAD_MOVED_OR_NOT_MERGEABLE")
         continue
-    if not latest_ci_green(sha) or not latest_review_check_green(sha):
-        print(f"PR #{number}: FINAL_CI_OR_REVIEW_CHECK_CHANGED")
+    if not latest_ci_green(sha):
+        print(f"PR #{number}: FINAL_CI_CHANGED")
         continue
     if not review_gate_clean(number, sha, author):
         print(f"PR #{number}: FINAL_REVIEW_RECHECK_BLOCKED")
