@@ -173,6 +173,7 @@ def latest_ci_green(sha):
 
 
 def mistral_proof_reader():
+    """Load the trusted run-sealed Mistral proof verifier from the repository."""
     path = Path("scripts/coordination/mistral-review-proof.py")
     spec = importlib.util.spec_from_file_location("trusted_mistral_proof", path)
     if spec is None or spec.loader is None:
@@ -250,6 +251,7 @@ def authenticated_mistral_approval(review, number, sha):
 
 
 def eligible_approval(review, number, sha, author):
+    """Accept only exact-head, non-author approvals from authenticated reviewers."""
     if review.get("state") != "APPROVED" or review.get("commit_id") != sha:
         return False
     user = review.get("user") or {}
@@ -264,6 +266,7 @@ def eligible_approval(review, number, sha, author):
 
 
 def review_gate_clean(number, sha, author):
+    """Require one eligible exact-head approval and no adverse/unresolved review."""
     reviews = all_reviews(number)
     approvals = [
         review for review in reviews
@@ -400,6 +403,7 @@ def selftest_authenticated_review_gate():
 
 
 def main():
+    """Reconcile all eligible PRs and merge only after rechecking every live gate."""
     for number in candidate_numbers():
         first = gates(number)
         if not first:
