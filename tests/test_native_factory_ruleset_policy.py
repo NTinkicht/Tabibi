@@ -15,6 +15,7 @@ RESTRICTED={".github/workflows/**","scripts/**","coordination/**"}
 def base_ruleset():
     return {
         "enforcement":"active",
+        "target":"branch",
         "bypass_actors":[],
         "conditions":{"ref_name":{"include":["~DEFAULT_BRANCH"],"exclude":[]}},
         "rules":[
@@ -53,8 +54,7 @@ class RulesetPolicyTests(unittest.TestCase):
     def assert_policy(self,r,expected):
         self.assertEqual(
             p.strict_ruleset_enforces(
-                r,branch="main",required_checks=REQUIRED,default_branch="main",
-                required_restricted_paths=RESTRICTED
+                r,branch="main",required_checks=REQUIRED,default_branch="main"
             ),
             expected,
         )
@@ -99,17 +99,28 @@ class RulesetPolicyTests(unittest.TestCase):
                 self.assert_policy(r,False)
 
     def test_missing_pr_or_force_push_protection_fails(self):
-        for missing in ("pull_request","deletion","non_fast_forward","file_path_restriction"):
+        for missing in ("pull_request","deletion","non_fast_forward"):
             with self.subTest(missing=missing):
                 r=base_ruleset()
                 r["rules"]=[x for x in r["rules"] if x["type"] != missing]
                 self.assert_policy(r,False)
 
-    def test_missing_control_path_restriction_fails(self):
+    def test_optional_control_path_restriction_is_enforced_when_requested(self):
         r=base_ruleset()
+        self.assertTrue(p.strict_ruleset_enforces(
+            r, branch="main", required_checks=REQUIRED, default_branch="main",
+            required_restricted_paths=RESTRICTED,
+        ))
         for rule in r["rules"]:
             if rule["type"] == "file_path_restriction":
                 rule["parameters"]["restricted_file_paths"].remove("scripts/**")
+        self.assertFalse(p.strict_ruleset_enforces(
+            r, branch="main", required_checks=REQUIRED, default_branch="main",
+            required_restricted_paths=RESTRICTED,
+        ))
+
+    def test_non_branch_ruleset_fails(self):
+        r=base_ruleset(); r["target"]="tag"
         self.assert_policy(r,False)
 
     def test_excluded_or_inactive_ruleset_fails(self):
