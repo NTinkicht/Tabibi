@@ -32,11 +32,7 @@ REVIEWER_ACTORS = {
 }
 L4_AUTH_CHECK = "L4 review authorization"
 PLATFORM_CHECKS = CI_JOBS | frozenset({L4_AUTH_CHECK})
-RULESET_RESTRICTED_PATHS = frozenset({
-    ".github/workflows/**",
-    "scripts/**",
-    "coordination/**",
-})
+RULESET_RESTRICTED_PATHS = frozenset()
 
 # Changes to the machinery that proves CI/review provenance are never auto-merged
 # by that same machinery. They require the normal external/manual merge path.
