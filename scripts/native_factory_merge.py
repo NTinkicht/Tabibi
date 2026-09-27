@@ -4,7 +4,6 @@ import json
 import os
 import re
 import subprocess
-import zipfile
 from pathlib import Path
 
 REPO = os.environ["GITHUB_REPOSITORY"]
@@ -183,6 +182,21 @@ def mistral_proof_reader():
     return module
 
 
+def expected_mistral_native_body(number, sha, run_id, report_id):
+    """Return the exact body emitted by the trusted Mistral review publisher."""
+    marker = f"tabibi-mistral-native-v1 run={run_id} report={report_id} sha={sha}"
+    return (
+        "Authenticated independent Mistral Vibe exact-head technical PASS.\n\n"
+        f"PR #{number}; exact head {sha}.\n"
+        f"Run: https://github.com/{REPO}/actions/runs/{run_id}\n"
+        f"Immutable evidence: https://github.com/{REPO}/issues/11#issuecomment-{report_id}\n\n"
+        "A run-sealed, independently executed, non-material-author PASS was verified "
+        "against the unchanged current PR and green 3/3 CI by the trusted parent. "
+        "This native review does not authorize merge without all other Tabibi gates.\n\n"
+        f"<!-- {marker} -->"
+    )
+
+
 def authenticated_mistral_approval(review, number, sha):
     """Verify the native approval against the trusted run-sealed Mistral proof.
 
@@ -195,13 +209,19 @@ def authenticated_mistral_approval(review, number, sha):
     if len(markers) != 1:
         return False
     run_id, report_id, marker_sha = markers[0]
-    if marker_sha != sha:
+    if (
+        marker_sha != sha
+        or body != expected_mistral_native_body(number, sha, run_id, report_id)
+    ):
         return False
     try:
         run = gh(f"repos/{REPO}/actions/runs/{run_id}")
+        workflow_path = run.get("path") or ""
+        workflow_file, separator, workflow_ref = workflow_path.partition("@")
         if (
             run.get("name") != "Mistral Vibe Wake"
-            or run.get("path") != ".github/workflows/mistral-vibe-wake.yml"
+            or workflow_file != ".github/workflows/mistral-vibe-wake.yml"
+            or (separator and workflow_ref != "main")
             or run.get("head_branch") != "main"
             or run.get("event") not in {"issue_comment", "workflow_run"}
             or run.get("status") != "completed"
@@ -222,11 +242,10 @@ def authenticated_mistral_approval(review, number, sha):
         # Re-authenticate the immutable Issue #11 report and its digest.
         proof_reader.sealed_report(proof)
         return True
-    except (
-        RuntimeError, ValueError, TypeError, KeyError, OSError, ImportError,
-        AttributeError, subprocess.SubprocessError, json.JSONDecodeError,
-        zipfile.BadZipFile,
-    ):
+    except Exception:
+        # A malformed trusted helper or unexpected proof-verification failure
+        # makes this approval ineligible; it must not abort reconciliation of
+        # unrelated candidate PRs.
         return False
 
 
@@ -298,35 +317,127 @@ def gates(number):
     return pr, sha, author
 
 
-for number in candidate_numbers():
-    first = gates(number)
-    if not first:
-        continue
-    _, sha, author = first
+def selftest_authenticated_review_gate():
+    """Exercise exact-body, workflow-ref and fail-closed proof authentication."""
+    sha = "a" * 40
+    number = 7
+    run_id = "123"
+    report_id = "456"
+    body = expected_mistral_native_body(number, sha, run_id, report_id)
+    review = {
+        "state": "APPROVED",
+        "commit_id": sha,
+        "user": {"login": "github-actions[bot]", "type": "Bot"},
+        "body": body,
+    }
+    proof = {
+        "run_id": run_id,
+        "report_id": report_id,
+        "pr": str(number),
+        "sha": sha,
+        "verdict": "PASS",
+    }
 
-    # Close the review/thread race as tightly as the REST merge API permits:
-    # re-fetch the unchanged PR and repeat every custom review gate immediately
-    # before the expected-head merge request.
-    pr = gh(f"repos/{REPO}/pulls/{number}")
-    if (
-        pr.get("state") != "open"
-        or pr.get("head", {}).get("sha") != sha
-        or pr.get("mergeable") is not True
-    ):
-        print(f"PR #{number}: HEAD_MOVED_OR_NOT_MERGEABLE")
-        continue
-    if not latest_ci_green(sha):
-        print(f"PR #{number}: FINAL_CI_CHANGED")
-        continue
-    if not review_gate_clean(number, sha, author):
-        print(f"PR #{number}: FINAL_REVIEW_RECHECK_BLOCKED")
-        continue
+    class FakeProof:
+        @staticmethod
+        def read_run_proof(_run_id):
+            assert str(_run_id) == run_id
+            return dict(proof)
 
-    merged = gh(
-        f"repos/{REPO}/pulls/{number}/merge",
-        method="PUT",
-        fields={"sha": sha, "merge_method": "squash"},
-    )
-    if not merged.get("merged"):
-        raise RuntimeError(f"MERGE_REJECTED PR #{number}")
-    print(f"NATIVE_FACTORY_MERGED PR #{number} exact head {sha}")
+        @staticmethod
+        def sealed_report(candidate):
+            assert candidate == proof
+            return {"id": int(report_id)}
+
+    original_gh = globals()["gh"]
+    original_reader = globals()["mistral_proof_reader"]
+    try:
+        def fake_gh(route, method=None, fields=None):
+            assert route == f"repos/{REPO}/actions/runs/{run_id}"
+            return {
+                "name": "Mistral Vibe Wake",
+                "path": ".github/workflows/mistral-vibe-wake.yml@main",
+                "head_branch": "main",
+                "event": "issue_comment",
+                "status": "completed",
+                "conclusion": "success",
+                "head_repository": {"full_name": REPO},
+            }
+
+        globals()["gh"] = fake_gh
+        globals()["mistral_proof_reader"] = lambda: FakeProof
+        assert authenticated_mistral_approval(review, number, sha)
+        assert eligible_approval(review, number, sha, "ntinkicht")
+
+        forged = dict(review, body=body.replace("Immutable evidence:", "Evidence:"))
+        assert not authenticated_mistral_approval(forged, number, sha)
+
+        stale = dict(review, commit_id="b" * 40)
+        assert not eligible_approval(stale, number, sha, "ntinkicht")
+
+        def wrong_ref_gh(route, method=None, fields=None):
+            value = fake_gh(route, method, fields)
+            value["path"] = ".github/workflows/mistral-vibe-wake.yml@feature"
+            return value
+        globals()["gh"] = wrong_ref_gh
+        assert not authenticated_mistral_approval(review, number, sha)
+
+        globals()["gh"] = fake_gh
+        globals()["mistral_proof_reader"] = lambda: (_ for _ in ()).throw(
+            Exception("malformed helper")
+        )
+        assert not authenticated_mistral_approval(review, number, sha)
+
+        untrusted_bot = dict(
+            review,
+            user={"login": "unknown-review-bot[bot]", "type": "Bot"},
+        )
+        assert not eligible_approval(untrusted_bot, number, sha, "ntinkicht")
+    finally:
+        globals()["gh"] = original_gh
+        globals()["mistral_proof_reader"] = original_reader
+    print("Authenticated native review gate selftest passed")
+
+
+def main():
+    for number in candidate_numbers():
+        first = gates(number)
+        if not first:
+            continue
+        _, sha, author = first
+
+        # Close the review/thread race as tightly as the REST merge API permits:
+        # re-fetch the unchanged PR and repeat every custom review gate immediately
+        # before the expected-head merge request.
+        pr = gh(f"repos/{REPO}/pulls/{number}")
+        if (
+            pr.get("state") != "open"
+            or pr.get("head", {}).get("sha") != sha
+            or pr.get("mergeable") is not True
+        ):
+            print(f"PR #{number}: HEAD_MOVED_OR_NOT_MERGEABLE")
+            continue
+        if not latest_ci_green(sha):
+            print(f"PR #{number}: FINAL_CI_CHANGED")
+            continue
+        if not review_gate_clean(number, sha, author):
+            print(f"PR #{number}: FINAL_REVIEW_RECHECK_BLOCKED")
+            continue
+
+        merged = gh(
+            f"repos/{REPO}/pulls/{number}/merge",
+            method="PUT",
+            fields={"sha": sha, "merge_method": "squash"},
+        )
+        if not merged.get("merged"):
+            raise RuntimeError(f"MERGE_REJECTED PR #{number}")
+        print(f"NATIVE_FACTORY_MERGED PR #{number} exact head {sha}")
+
+
+if __name__ == "__main__":
+    if len(__import__("sys").argv) == 2 and __import__("sys").argv[1] == "selftest":
+        selftest_authenticated_review_gate()
+    elif len(__import__("sys").argv) == 1:
+        main()
+    else:
+        raise SystemExit("usage: native_factory_merge.py [selftest]")
