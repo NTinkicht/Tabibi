@@ -16,7 +16,12 @@ def base_ruleset():
         "bypass_actors":[],
         "conditions":{"ref_name":{"include":["~DEFAULT_BRANCH"],"exclude":[]}},
         "rules":[
-            {"type":"pull_request","parameters":{}},
+            {"type":"pull_request","parameters":{
+                "required_approving_review_count":1,
+                "dismiss_stale_reviews_on_push":True,
+                "require_last_push_approval":True,
+                "required_review_thread_resolution":True,
+            }},
             {"type":"deletion"},
             {"type":"non_fast_forward"},
             {
@@ -62,6 +67,20 @@ class RulesetPolicyTests(unittest.TestCase):
         r=base_ruleset()
         r["rules"][-1]["parameters"]["required_status_checks"].pop()
         self.assertFalse(p.strict_ruleset_enforces(r,branch="main",required_checks=REQUIRED,default_branch="main"))
+
+    def test_pull_request_rule_requires_fresh_exact_head_approval(self):
+        for field, value in (
+            ("required_approving_review_count", 0),
+            ("dismiss_stale_reviews_on_push", False),
+            ("require_last_push_approval", False),
+            ("required_review_thread_resolution", False),
+        ):
+            with self.subTest(field=field):
+                r=base_ruleset()
+                r["rules"][0]["parameters"][field]=value
+                self.assertFalse(p.strict_ruleset_enforces(
+                    r,branch="main",required_checks=REQUIRED,default_branch="main"
+                ))
 
     def test_missing_pr_or_force_push_protection_fails(self):
         for missing in ("pull_request","deletion","non_fast_forward"):
