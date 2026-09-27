@@ -332,7 +332,9 @@ describe('doctor-global session lifecycle invariant', () => {
     expect(final.rows[0]).toEqual({ active: '0', opened: '1' });
   });
 
-  it('allows exactly one concurrent cross-clinic doctor-global consultation transition', async () => {
+  it(
+    'allows exactly one concurrent cross-clinic doctor-global consultation transition',
+    async () => {
     const sessionA = await seedSession(ids.clinicA, '2026-09-07');
     const sessionB = await seedSession(ids.clinicB, '2026-09-08');
     const patientA = randomUUID();
@@ -395,9 +397,12 @@ describe('doctor-global session lifecycle invariant', () => {
       [ids.doctor],
     );
     expect(active.rows[0]?.count).toBe('1');
-  });
+    },
+  );
 
-  it('serializes a QueueService start against a direct cross-clinic writer without deadlock', async () => {
+  it(
+    'serializes a QueueService start against a direct cross-clinic writer without deadlock',
+    async () => {
     const sessions = new SessionService(pool);
     const queue = new QueueService(pool);
     const sessionA = await seedSession(ids.clinicA, '2026-09-07');
@@ -481,7 +486,8 @@ describe('doctor-global session lifecycle invariant', () => {
       [ids.doctor],
     );
     expect(active.rows[0]?.count).toBe('1');
-  });
+    },
+  );
 
   it('WU177 rejects a direct open INSERT while another clinic has the doctor in consultation', async () => {
     const sessions = new SessionService(pool);
