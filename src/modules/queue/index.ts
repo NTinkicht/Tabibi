@@ -554,10 +554,7 @@ export class QueueService {
         throw new QueueConflictError(
           'Consultation session was not found in this clinic',
         );
-      if (
-        startDoctorId !== null &&
-        session.rows[0].doctor_id !== startDoctorId
-      )
+      if (startDoctorId !== null && session.rows[0].doctor_id !== startDoctorId)
         throw new QueueConflictError(
           'Consultation session doctor changed during command execution',
         );
@@ -673,7 +670,8 @@ export class QueueService {
           error &&
           'code' in error &&
           (error.code === '23505' ||
-            (rawInput.command === 'start_consultation' && error.code === '23514'))
+            (rawInput.command === 'start_consultation' &&
+              error.code === '23514'))
         )
           throw new QueueConflictError(
             rawInput.command === 'call'
