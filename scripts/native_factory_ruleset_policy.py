@@ -88,6 +88,7 @@ def strict_ruleset_enforces(
 
     rule_types=set()
     strict=False
+    pull_request_fresh_review=False
     contexts=set()
     for rule in ruleset.get("rules") or []:
         if not isinstance(rule, dict):
@@ -95,6 +96,16 @@ def strict_ruleset_enforces(
         kind=rule.get("type")
         if isinstance(kind, str):
             rule_types.add(kind)
+        if kind=="pull_request":
+            params=rule.get("parameters")
+            pull_request_fresh_review = bool(
+                isinstance(params, dict)
+                and type(params.get("required_approving_review_count")) is int
+                and params["required_approving_review_count"] >= 1
+                and params.get("dismiss_stale_reviews_on_push") is True
+                and params.get("require_last_push_approval") is True
+                and params.get("required_review_thread_resolution") is True
+            )
         if kind=="required_status_checks":
             params=rule.get("parameters") or {}
             strict = params.get("strict_required_status_checks_policy") is True
@@ -111,6 +122,7 @@ def strict_ruleset_enforces(
     return bool(
         {"pull_request","required_status_checks","deletion","non_fast_forward"}
         .issubset(rule_types)
+        and pull_request_fresh_review
         and strict
         and required.issubset(contexts)
     )
