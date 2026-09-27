@@ -427,26 +427,26 @@ describe('receptionist dashboard read model', () => {
 
     const dashboard = new ReceptionistDashboardService(pool);
     const before = await dashboard.getSnapshot(scope, ids.sessionA);
-    const beforeEta = before.entries.find((row) => row.id === second.entry.id)?.eta;
+    const beforeEta = before.entries.find(
+      (row) => row.id === second.entry.id,
+    )?.eta;
     expect(beforeEta).not.toBeNull();
 
-    await command(
-      first.entry.id,
-      'start_consultation',
-      'wu192-first-start',
-    );
+    await command(first.entry.id, 'start_consultation', 'wu192-first-start');
     const after = await dashboard.getSnapshot(scope, ids.sessionA);
-    const afterEta = after.entries.find((row) => row.id === second.entry.id)?.eta;
-    expect(after.session.queueOrderVersion).toBe(before.session.queueOrderVersion + 1);
+    const afterEta = after.entries.find(
+      (row) => row.id === second.entry.id,
+    )?.eta;
+    expect(after.session.queueOrderVersion).toBe(
+      before.session.queueOrderVersion + 1,
+    );
     expect(afterEta?.revision).not.toBe(beforeEta?.revision);
 
-    await command(
-      first.entry.id,
-      'start_consultation',
-      'wu192-first-start',
-    );
+    await command(first.entry.id, 'start_consultation', 'wu192-first-start');
     const retry = await dashboard.getSnapshot(scope, ids.sessionA);
-    expect(retry.session.queueOrderVersion).toBe(after.session.queueOrderVersion);
+    expect(retry.session.queueOrderVersion).toBe(
+      after.session.queueOrderVersion,
+    );
     expect(
       retry.entries.find((row) => row.id === second.entry.id)?.eta?.revision,
     ).toBe(afterEta?.revision);
