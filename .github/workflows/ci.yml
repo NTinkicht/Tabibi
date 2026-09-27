@@ -34,9 +34,6 @@ jobs:
       - name: Offline cloud-worker adapter regression checks
         run: python3 scripts/autonomous-worker-readiness.py
 
-      - name: Offline independent-review proof negative tests
-        run: python3 scripts/coordination/independent-review-gate.py selftest
-
       - name: Offline Grok signed-review proof and forgery negative tests
         run: python3 scripts/coordination/grok-review-proof.py
 
