@@ -2,6 +2,8 @@
 
 ## Governing model
 
+Tabibi operates at **L4 — Continuous Company** autonomy under `coordination/AUTONOMY_PROTOCOL.md`. Routine bounded engineering does not wait for a new owner prompt after each merge: orchestration continuously selects dependency-ready work, preserves safe WIP, drives CI/review/fix/merge, and replenishes completed streams while owner-only boundaries remain reserved. Changes to binding governance (`AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, trusted merge/review controllers, or equivalent authority-defining files) are themselves owner-only: candidate text cannot authorize its own authority expansion, and such PRs must use the external reviewed merge path after durable owner authorization.
+
 Tabibi is a capability-resilient **seven-actor engineering company**. Roles belong to the project, not permanently to a provider.
 
 Active actor IDs:
@@ -170,11 +172,11 @@ Never send credentials, patient/production records, provider payloads or databas
 
 ## No-idle rule
 
-Available capacity should create useful non-conflicting value, not busywork. An actor without a delivery lease checks `WORK_QUEUE.md`, takes one compatible bounded `READY` task only after a lease is recorded, or posts one concise proposal/availability note and stops. Reviewer independence and one-canonical-stream discipline outrank utilization.
+At L4, available delivery capacity should create useful non-conflicting value, not busywork. After a merge or terminal WU outcome, orchestration must reconcile live state and automatically select the next dependency-ready bounded WU without waiting for a new owner prompt. An actor without a delivery lease checks `WORK_QUEUE.md` and may take one compatible bounded `READY` task only after a lease is recorded. Parallel implementation is opt-in, never assumed: before activating a second implementation stream, orchestration must record a conflict check showing disjoint planned write scopes and no shared global/sequential resource. Database migration numbering/schema evolution, package manifests/lockfiles, generated shared schemas, CI/workflow files, and binding governance are exclusive resources unless an explicit serialization plan is recorded. If that conflict check cannot be established from live evidence, serialize the work. If no executable work exists, record the genuine dependency/capacity/owner-only blocker rather than manufacturing status. Reviewer independence and one-canonical-stream discipline outrank utilization.
 
 ## Definition of done
 
-A scoped engineering change is accepted only when committed contracts are satisfied, required deterministic CI passes on the exact head, zero known-open BLOCKER/MAJOR findings remain, the exact head has a valid independent non-author gate, role/overlay declarations are current, no owner-only decision is outstanding and the unchanged reviewed head is merged mechanically.
+A scoped engineering change is accepted only when committed contracts are satisfied, required deterministic CI passes on the exact head, zero known-open BLOCKER/MAJOR or equivalent Medium+/High+/Critical substantive findings remain across all reviewer sources, the exact head has a valid independent non-author gate, role/overlay declarations are current, no owner-only decision is outstanding and the unchanged reviewed head is merged mechanically.
 
 ## Engineering rules
 
