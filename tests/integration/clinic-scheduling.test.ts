@@ -191,11 +191,14 @@ async function seedSession(
   return id;
 }
 
-async function race<T>(left: () => Promise<T>, right: () => Promise<T>) {
+async function race(
+  left: () => Promise<unknown>,
+  right: () => Promise<unknown>,
+) {
   let release!: () => void;
   const barrier = new Promise<void>((resolve) => (release = resolve));
   let arrived = 0;
-  const contender = async (operation: () => Promise<T>) => {
+  const contender = async (operation: () => Promise<unknown>) => {
     arrived += 1;
     if (arrived === 2) release();
     await barrier;
@@ -330,6 +333,157 @@ describe('doctor-global session lifecycle invariant', () => {
       [ids.doctor],
     );
     expect(final.rows[0]).toEqual({ active: '0', opened: '1' });
+  });
+
+  it('allows exactly one concurrent cross-clinic doctor-global consultation transition', async () => {
+    const sessionA = await seedSession(ids.clinicA, '2026-09-07');
+    const sessionB = await seedSession(ids.clinicB, '2026-09-08');
+    const patientA = randomUUID();
+    const patientB = randomUUID();
+    const entryA = randomUUID();
+    const entryB = randomUUID();
+
+    await pool.query(
+      `INSERT INTO patient_operational_records
+         (id,clinic_id,private_display_name,preferred_locale)
+       VALUES ($1,$2,'WU192 A','fr'),($3,$4,'WU192 B','ar')`,
+      [patientA, ids.clinicA, patientB, ids.clinicB],
+    );
+    await pool.query(
+      `INSERT INTO queue_entries
+         (id,clinic_id,session_id,patient_id,state,source,registration_order,
+          eligibility_order,public_display_label)
+       VALUES
+         ($1,$2,$3,$4,'called','walk_in',1,1,'WU192-A'),
+         ($5,$6,$7,$8,'called','walk_in',1,1,'WU192-B')`,
+      [
+        entryA,
+        ids.clinicA,
+        sessionA,
+        patientA,
+        entryB,
+        ids.clinicB,
+        sessionB,
+        patientB,
+      ],
+    );
+
+    const results = await race(
+      () =>
+        pool.query(
+          `UPDATE queue_entries SET state='in_consultation' WHERE id=$1`,
+          [entryA],
+        ),
+      () =>
+        pool.query(
+          `UPDATE queue_entries SET state='in_consultation' WHERE id=$1`,
+          [entryB],
+        ),
+    );
+
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    const rejected = results.find((result) => result.status === 'rejected');
+    expect(rejected).toMatchObject({
+      reason: expect.objectContaining({ code: '23514' }),
+    });
+
+    const active = await pool.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count
+         FROM queue_entries entry
+         JOIN consultation_sessions session
+           ON session.id=entry.session_id AND session.clinic_id=entry.clinic_id
+        WHERE session.doctor_id=$1 AND entry.state='in_consultation'`,
+      [ids.doctor],
+    );
+    expect(active.rows[0]?.count).toBe('1');
+  });
+
+  it('serializes a QueueService start against a direct cross-clinic writer without deadlock', async () => {
+    const sessions = new SessionService(pool);
+    const queue = new QueueService(pool);
+    const sessionA = await seedSession(ids.clinicA, '2026-09-07');
+    const sessionB = await seedSession(ids.clinicB, '2026-09-08');
+    await sessions.transition(scopeA, sessionA, 'open');
+
+    const serviceEntry = await queue.registerWalkIn(scopeA, sessionA, {
+      privateDisplayName: 'WU192 service contender',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu192-mixed-service',
+      correlationId: 'wu192-mixed-service',
+    });
+    await queue.command(scopeA, sessionA, serviceEntry.entry.id, {
+      command: 'check_in',
+      idempotencyKey: 'wu192-mixed-checkin',
+      correlationId: 'wu192-mixed',
+    });
+    await queue.command(scopeA, sessionA, serviceEntry.entry.id, {
+      command: 'call',
+      idempotencyKey: 'wu192-mixed-call',
+      correlationId: 'wu192-mixed',
+    });
+
+    const directPatient = randomUUID();
+    const directEntry = randomUUID();
+    await pool.query(
+      `INSERT INTO patient_operational_records
+         (id,clinic_id,private_display_name,preferred_locale)
+       VALUES ($1,$2,'WU192 direct contender','ar')`,
+      [directPatient, ids.clinicB],
+    );
+    await pool.query(
+      `INSERT INTO queue_entries
+         (id,clinic_id,session_id,patient_id,state,source,registration_order,
+          eligibility_order,public_display_label)
+       VALUES ($1,$2,$3,$4,'called','walk_in',1,1,'WU192-DIRECT')`,
+      [directEntry, ids.clinicB, sessionB, directPatient],
+    );
+
+    const results = await race(
+      () =>
+        queue.command(scopeA, sessionA, serviceEntry.entry.id, {
+          command: 'start_consultation',
+          idempotencyKey: 'wu192-mixed-start',
+          correlationId: 'wu192-mixed',
+        }),
+      () =>
+        pool.query(
+          `UPDATE queue_entries SET state='in_consultation' WHERE id=$1`,
+          [directEntry],
+        ),
+    );
+
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    const rejected = results.find((result) => result.status === 'rejected');
+    expect(rejected?.status).toBe('rejected');
+    if (rejected?.status === 'rejected') {
+      const reason = rejected.reason;
+      expect(
+        reason instanceof QueueConflictError ||
+          (typeof reason === 'object' &&
+            reason !== null &&
+            'code' in reason &&
+            reason.code === '23514'),
+      ).toBe(true);
+      expect(
+        typeof reason === 'object' && reason !== null && 'code' in reason
+          ? reason.code
+          : undefined,
+      ).not.toBe('40P01');
+    }
+
+    const active = await pool.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count
+         FROM queue_entries entry
+         JOIN consultation_sessions session
+           ON session.id=entry.session_id AND session.clinic_id=entry.clinic_id
+        WHERE session.doctor_id=$1 AND entry.state='in_consultation'`,
+      [ids.doctor],
+    );
+    expect(active.rows[0]?.count).toBe('1');
   });
 
   it('WU177 rejects a direct open INSERT while another clinic has the doctor in consultation', async () => {

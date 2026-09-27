@@ -524,14 +524,39 @@ export class QueueService {
         return receipt.rows[0].response;
       }
 
-      const session = await client.query<{ status: string }>(
-        `SELECT status FROM consultation_sessions
+      // start_consultation shares the doctor-global service boundary with
+      // session open/resume. Resolve the immutable doctor identifier without a
+      // row lock, acquire the global lock first, then take the local session
+      // row lock. This preserves the documented global-before-local ordering.
+      let startDoctorId: string | null = null;
+      if (rawInput.command === 'start_consultation') {
+        const identified = await client.query<{ doctor_id: string }>(
+          `SELECT doctor_id FROM consultation_sessions
+            WHERE id=$1 AND clinic_id=$2`,
+          [sessionId, scope.clinicId],
+        );
+        if (!identified.rows[0])
+          throw new QueueConflictError(
+            'Consultation session was not found in this clinic',
+          );
+        startDoctorId = identified.rows[0].doctor_id;
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          startDoctorId,
+        ]);
+      }
+
+      const session = await client.query<{ status: string; doctor_id: string }>(
+        `SELECT status,doctor_id FROM consultation_sessions
           WHERE id=$1 AND clinic_id=$2 FOR UPDATE`,
         [sessionId, scope.clinicId],
       );
       if (!session.rows[0])
         throw new QueueConflictError(
           'Consultation session was not found in this clinic',
+        );
+      if (startDoctorId !== null && session.rows[0].doctor_id !== startDoctorId)
+        throw new QueueConflictError(
+          'Consultation session doctor changed during command execution',
         );
       if (!['open', 'paused'].includes(session.rows[0].status))
         throw new QueueConflictError(
@@ -644,7 +669,9 @@ export class QueueService {
           typeof error === 'object' &&
           error &&
           'code' in error &&
-          error.code === '23505'
+          (error.code === '23505' ||
+            (rawInput.command === 'start_consultation' &&
+              error.code === '23514'))
         )
           throw new QueueConflictError(
             rawInput.command === 'call'
@@ -655,6 +682,7 @@ export class QueueService {
       }
       const changesEffectiveOrder =
         rawInput.command === 'check_in' ||
+        rawInput.command === 'start_consultation' ||
         prior === 'checked_in' ||
         (current.rows[0]!.priority_order !== null && prior === 'waiting');
       if (

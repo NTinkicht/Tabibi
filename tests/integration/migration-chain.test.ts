@@ -39,6 +39,7 @@ const committedMigrations = [
   '0031_appointment_bulk_no_show.sql',
   '0032_doctor_global_consultation_open_guard.sql',
   '0033_doctor_global_consultation_insert_guard.sql',
+  '0034_doctor_global_active_consultation_guard.sql',
 ];
 
 beforeAll(async () => {
@@ -94,6 +95,7 @@ describe('committed migration chain', () => {
       temp_audit_constraint: string | null;
       retry_constraint_validated: boolean;
       retry_claim_index_definition: string;
+      doctor_active_consultations: string | null;
     }>(
       `SELECT
          EXISTS (
@@ -150,7 +152,8 @@ describe('committed migration chain', () => {
            WHERE conname='notification_outbox_retry_schedule_check') retry_constraint_validated,
          pg_get_indexdef(
            'notification_outbox_dispatch_claim_eligible_idx'::regclass
-         ) retry_claim_index_definition`,
+         ) retry_claim_index_definition,
+         to_regclass('doctor_active_consultations')::text doctor_active_consultations`,
     );
 
     expect(artifacts.rows[0]).toEqual({
@@ -181,6 +184,7 @@ describe('committed migration chain', () => {
       temp_audit_constraint: null,
       retry_constraint_validated: true,
       retry_claim_index_definition: expect.stringContaining('next_attempt_at'),
+      doctor_active_consultations: 'doctor_active_consultations',
     });
   });
 
