@@ -73,8 +73,9 @@ def strict_ruleset_enforces(
     required_checks: Iterable[str],
     default_branch: str | None,
     required_integration_id: int = 15368,
+    required_restricted_paths: Iterable[str] = (),
 ) -> bool:
-    """Require active, non-bypassable, publisher-bound PR/check enforcement."""
+    """Require active, non-bypassable L4 branch enforcement from one trusted ruleset."""
     if (
         not isinstance(ruleset, dict)
         or ruleset.get("enforcement") != "active"
@@ -90,6 +91,7 @@ def strict_ruleset_enforces(
     rule_types: set[str] = set()
     status_params: dict | None = None
     pr_params: dict | None = None
+    restricted_paths: set[str] = set()
     for rule in ruleset.get("rules") or []:
         if not isinstance(rule, dict):
             return False
@@ -106,6 +108,12 @@ def strict_ruleset_enforces(
             if not isinstance(params, dict):
                 return False
             pr_params = params
+        elif kind == "file_path_restriction":
+            params = rule.get("parameters")
+            values = params.get("restricted_file_paths") if isinstance(params, dict) else None
+            if not isinstance(values, list):
+                return False
+            restricted_paths.update(str(value) for value in values if value)
 
     if status_params is None or pr_params is None:
         return False
@@ -115,14 +123,14 @@ def strict_ruleset_enforces(
         int(pr_params.get("required_approving_review_count") or 0) < 1
         or pr_params.get("dismiss_stale_reviews_on_push") is not True
         or pr_params.get("require_last_push_approval") is not True
+        or pr_params.get("required_review_thread_resolution") is not True
     ):
         return False
 
     specs = status_params.get("required_status_checks")
     if not isinstance(specs, list):
         return False
-    required = set(required_checks)
-    for context in required:
+    for context in set(required_checks):
         if not any(
             isinstance(item, dict)
             and item.get("context") == context
@@ -131,10 +139,14 @@ def strict_ruleset_enforces(
         ):
             return False
 
+    if not set(required_restricted_paths).issubset(restricted_paths):
+        return False
+
     return {
         "pull_request",
         "required_status_checks",
         "deletion",
         "non_fast_forward",
+        "file_path_restriction",
     }.issubset(rule_types)
 
