@@ -85,6 +85,11 @@ def grok_reader():
     return module
 
 
+def trusted_ci_definition(sha):
+    """Re-check that the reviewed head still uses the CI workflow trusted on main."""
+    return bool(parent_parser().trusted_ci_definition(REPO, sha))
+
+
 def trusted_dispatch(dispatch, number, sha, actors, run):
     """Authenticate either the legacy owner comment or CI-success auto dispatch."""
     event = run.get("event")
@@ -105,6 +110,7 @@ def trusted_dispatch(dispatch, number, sha, actors, run):
             and dispatch.get("conclusion") == "success"
             and dispatch.get("head_sha") == sha
             and dispatch.get("head_repository", {}).get("full_name") == REPO
+            and trusted_ci_definition(sha)
             and any(
                 isinstance(pr, dict)
                 and pr.get("number") == number
@@ -322,6 +328,7 @@ def selftest():
     }
     sealed = proof_reader()
     saved_reader = globals()["proof_reader"]
+    saved_trusted_ci_definition = globals()["trusted_ci_definition"]
     original_api_raw = sealed.api_raw
     # The sealed document is the Issue #11 report (id 900+); the PR-side copy
     # is a DIFFERENT comment (id 123+) with an identical body. A genuine
@@ -337,6 +344,7 @@ def selftest():
 
     sealed.api_raw = sealed_api_raw
     globals()["proof_reader"] = lambda: sealed
+    globals()["trusted_ci_definition"] = lambda exact_sha: exact_sha == sha
     sealed_reports["900"] = {
         "id": 900, "user": {"login": "github-actions[bot]"},
         "issue_url": f"https://api.github.com/repos/{REPO}/issues/11",
@@ -411,6 +419,11 @@ def selftest():
     assert verified_bot_review(
         auto_comment, 7, sha, {"chatgpt"}, auto_dispatch, auto_run, auto_proof
     ) == "PASS"
+    globals()["trusted_ci_definition"] = lambda exact_sha: False
+    assert not verified_bot_review(
+        auto_comment, 7, sha, {"chatgpt"}, auto_dispatch, auto_run, auto_proof
+    )
+    globals()["trusted_ci_definition"] = lambda exact_sha: exact_sha == sha
     assert not verified_bot_review(
         auto_comment, 7, sha, {"chatgpt"},
         dict(auto_dispatch, head_sha="b" * 40), auto_run, auto_proof,
@@ -560,6 +573,7 @@ def selftest():
         globals()["api"] = saved_api
         globals()["parent_parser"] = saved_parent_parser
         globals()["proof_reader"] = saved_reader
+        globals()["trusted_ci_definition"] = saved_trusted_ci_definition
         sealed.api_raw = original_api_raw
     print("Independent review gate pilot selftest passed")
 
