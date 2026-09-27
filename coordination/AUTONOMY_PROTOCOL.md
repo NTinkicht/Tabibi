@@ -2,6 +2,10 @@
 
 Status: **binding project coordination protocol**.
 
+Autonomy level: **L4 — Continuous Company** (owner-authorized 2026-09-27).
+
+L4 authorizes continuous governed engineering flow: after any merge or terminal WU outcome, orchestration immediately reconciles live GitHub state and selects the next dependency-ready bounded WU without waiting for a new owner prompt. It also authorizes routine implementation, deterministic CI remediation, independent exact-head review orchestration, policy-compliant mechanical merge, no-idle detection and failover. L4 does not authorize new spending/PAYG, credential expansion, legal/business-policy changes, destructive production actions, sensitive-data publication, or irreducible product-direction decisions.
+
 This protocol defines how Tabibi continues without Nassim acting as routine messenger, scheduler, reviewer coordinator, idle-agent detector or merge coordinator. It supplements `AGENTS.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, `coordination/COLLABORATION_PROTOCOL.md`, and `coordination/COMPANY_OPERATING_SYSTEM.md`.
 
 ## 1. Source of truth
@@ -71,7 +75,7 @@ An active lease with no evidence/checkpoint for 30 minutes is potentially stale 
 4. An eligible independent non-author reviewer inspects the exact head.
 5. Routine implementation findings return to the current implementer on the same stream.
 6. After fixes, CI and exact-head review repeat.
-7. Once the exact head has green required CI, zero known-open BLOCKER/MAJOR findings and a valid independent gate, the merge executor mechanically merges with expected-head protection where supported.
+7. Once the exact head has green required CI, zero known-open BLOCKER/MAJOR or equivalent Medium+/High+/Critical findings across all reviewer sources and a valid independent gate, the merge executor mechanically merges with expected-head protection where supported.
 8. Post-merge state/retro/next-work reconciliation happens immediately; do not wait for Nassim to relay the result.
 
 ### Preferred actors
@@ -201,9 +205,10 @@ After merge:
 
 1. reconcile `STATE.json` and `WORK_QUEUE.md`;
 2. capture a retro only when there is a reusable lesson, with one concrete improvement/no-change conclusion;
-3. activate the next already-approved bounded work if dependency-ready;
-4. otherwise route an architecture/product decision to ChatGPT;
-5. do not auto-expand scope beyond committed product/security contracts.
+3. automatically select and activate the next already-approved dependency-ready bounded work without waiting for a new owner prompt;
+4. fill safe non-conflicting WIP slots when multiple READY units exist, preserving one canonical stream/implementer per WU;
+5. otherwise route a genuine architecture/product ambiguity to ChatGPT, escalating to the owner only when it crosses an owner-only boundary;
+6. do not auto-expand scope beyond committed product/security contracts.
 
 ## 16. Definition of healthy autonomy
 
