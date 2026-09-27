@@ -15,6 +15,14 @@ MAX_PAGES = 10
 # Changes to the machinery that proves CI/review provenance are never auto-merged
 # by that same machinery. They require the normal external/manual merge path.
 TRUSTED_GATE_PATHS = frozenset({
+    "AGENTS.md",
+    "coordination/AUTONOMY_PROTOCOL.md",
+    "coordination/ROLE_FAILOVER_PROTOCOL.md",
+    "coordination/COLLABORATION_PROTOCOL.md",
+    "coordination/COMPANY_OPERATING_SYSTEM.md",
+    "coordination/WORK_UNIT_TEMPLATE.md",
+    "coordination/AI_CAPACITY_POLICY.md",
+    "coordination/ACTOR_REGISTRY.json",
     ".github/workflows/ci.yml",
     ".github/workflows/verified-independent-review.yml",
     ".github/workflows/mistral-vibe-wake.yml",
@@ -54,11 +62,17 @@ def paged_rest(path):
 
 
 def changed_paths(number):
-    return {
-        item["filename"]
-        for item in paged_rest(f"repos/{REPO}/pulls/{number}/files")
-        if isinstance(item, dict) and isinstance(item.get("filename"), str)
-    }
+    paths = set()
+    for item in paged_rest(f"repos/{REPO}/pulls/{number}/files"):
+        if not isinstance(item, dict):
+            continue
+        filename = item.get("filename")
+        previous = item.get("previous_filename")
+        if isinstance(filename, str):
+            paths.add(filename)
+        if isinstance(previous, str):
+            paths.add(previous)
+    return paths
 
 
 def all_reviews(number):
