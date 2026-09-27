@@ -13,6 +13,22 @@ This file is the shared handoff ledger for the four staggered L4 engineering pul
 
 ## Rolling entries
 
+### 2026-09-27T11:28Z — manual remediation checkpoint while schedules paused
+- pulse_id: manual-remediation
+- schedules: PAUSED
+- verified actions:
+  - PR #548 merged after exact-head green CI and independent Mistral PASS.
+  - PR #550 merged at repaired head 68a2519cedd2f6c0796e4e669ea9baf1eaa74cf8 after current-base CI and exact-head Mistral PASS.
+  - PR #551 was rebased onto current main, later provenance hardening regression was detected and repaired, final head c893b1958cf047982b0fcc3266fcdf7e9cff71ee passed CI and exact-head Mistral PASS, then merged.
+- integrity findings:
+  - stale-base evidence was invalidated whenever main/head moved; prior PASSes were not reused.
+  - a broken intermediate #551 heredoc was caught by post-write/live-head verification rather than accepted from commit prose.
+- blockers:
+  - none for #548/#550/#551; all are merged.
+- next executable action: none for these repaired streams; keep schedules paused until owner explicitly resumes them.
+- completion checklist: reconciled=yes; direct_fix=yes; CI_checked=yes; reviews_checked=yes; merge_checked=yes; WU_floor_checked=deferred_while_paused; ledger_written=yes
+
+
 ### 2026-09-27T09:20Z — manual remediation while schedules paused
 - pulse_id: manual-remediation
 - schedules: PAUSED
