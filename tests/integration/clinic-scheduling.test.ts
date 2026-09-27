@@ -191,11 +191,14 @@ async function seedSession(
   return id;
 }
 
-async function race<T>(left: () => Promise<T>, right: () => Promise<T>) {
+async function race(
+  left: () => Promise<unknown>,
+  right: () => Promise<unknown>,
+) {
   let release!: () => void;
   const barrier = new Promise<void>((resolve) => (release = resolve));
   let arrived = 0;
-  const contender = async (operation: () => Promise<T>) => {
+  const contender = async (operation: () => Promise<unknown>) => {
     arrived += 1;
     if (arrived === 2) release();
     await barrier;
