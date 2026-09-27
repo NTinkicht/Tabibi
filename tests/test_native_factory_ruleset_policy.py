@@ -8,7 +8,8 @@ sys.path.insert(0,str(ROOT/"scripts"))
 import native_factory_ruleset_policy as p
 
 
-REQUIRED={"Quality and build","PostgreSQL integration","Browser smoke"}
+REQUIRED={"Quality and build","PostgreSQL integration","Browser smoke","L4 review authorization"}
+RESTRICTED={".github/workflows/**","scripts/**","coordination/**"}
 
 
 def base_ruleset():
@@ -23,6 +24,7 @@ def base_ruleset():
                     "required_approving_review_count":1,
                     "dismiss_stale_reviews_on_push":True,
                     "require_last_push_approval":True,
+                    "required_review_thread_resolution":True,
                 },
             },
             {"type":"deletion"},
@@ -35,8 +37,13 @@ def base_ruleset():
                         {"context":"Quality and build","integration_id":15368},
                         {"context":"PostgreSQL integration","integration_id":15368},
                         {"context":"Browser smoke","integration_id":15368},
+                        {"context":"L4 review authorization","integration_id":15368},
                     ],
                 },
+            },
+            {
+                "type":"file_path_restriction",
+                "parameters":{"restricted_file_paths":sorted(RESTRICTED)},
             },
         ],
     }
@@ -46,7 +53,8 @@ class RulesetPolicyTests(unittest.TestCase):
     def assert_policy(self,r,expected):
         self.assertEqual(
             p.strict_ruleset_enforces(
-                r,branch="main",required_checks=REQUIRED,default_branch="main"
+                r,branch="main",required_checks=REQUIRED,default_branch="main",
+                required_restricted_paths=RESTRICTED
             ),
             expected,
         )
@@ -83,6 +91,7 @@ class RulesetPolicyTests(unittest.TestCase):
             ("required_approving_review_count",0),
             ("dismiss_stale_reviews_on_push",False),
             ("require_last_push_approval",False),
+            ("required_review_thread_resolution",False),
         ):
             with self.subTest(field=field):
                 r=base_ruleset()
@@ -90,11 +99,18 @@ class RulesetPolicyTests(unittest.TestCase):
                 self.assert_policy(r,False)
 
     def test_missing_pr_or_force_push_protection_fails(self):
-        for missing in ("pull_request","deletion","non_fast_forward"):
+        for missing in ("pull_request","deletion","non_fast_forward","file_path_restriction"):
             with self.subTest(missing=missing):
                 r=base_ruleset()
                 r["rules"]=[x for x in r["rules"] if x["type"] != missing]
                 self.assert_policy(r,False)
+
+    def test_missing_control_path_restriction_fails(self):
+        r=base_ruleset()
+        for rule in r["rules"]:
+            if rule["type"] == "file_path_restriction":
+                rule["parameters"]["restricted_file_paths"].remove("scripts/**")
+        self.assert_policy(r,False)
 
     def test_excluded_or_inactive_ruleset_fails(self):
         r=base_ruleset()
