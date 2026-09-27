@@ -97,14 +97,14 @@ jobs:
                   pr.get('base', {}).get('ref') != 'main'
               ):
                   raise ValueError('Canonical PR is stale, forked or not open')
-              # Do not trust the lease declaration for reviewer independence.
-              # Derive material authors from the actual PR commit provenance and
-              # require the declaration to match it exactly.
+              # Verify reviewer independence against immutable PR commit provenance,
+              # not only the lease declaration. Every material commit must carry one
+              # Material-Author trailer and the declared author set must match it.
               actual_authors = set()
               commit_count = 0
               last_sha = None
               material_author = re.compile(
-                  r'(?im)^Material-Author:\\s*([a-z0-9_-]+)\\s*              comments = []
+                  r'(?im)^Material-Author:\s*([a-z0-9_-]+)\s*              comments = []
               for page in range(1, 21):
                   batch = api(
                       f'repos/{repo}/issues/{number}/comments?per_page=100&page={page}'
@@ -236,9 +236,7 @@ jobs:
                       if len(tags) != 1:
                           raise ValueError('Material author provenance missing or ambiguous')
                       actual_authors.add(tags[0].lower())
-                      account = (
-                          (item.get('author') or {}).get('login', '').lower()
-                      )
+                      account = (item.get('author') or {}).get('login', '').lower()
                       if account in {'grok', 'grok[bot]', 'grok-bot'}:
                           raise ValueError('Grok-authored commit cannot be Grok-reviewed')
                   if len(commits) < 100:
