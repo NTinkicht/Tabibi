@@ -72,45 +72,85 @@ def strict_ruleset_enforces(
     branch: str,
     required_checks: Iterable[str],
     default_branch: str | None,
+    required_integration_id: int = 15368,
+    required_restricted_paths: Iterable[str] = (),
 ) -> bool:
-    """Require active, non-bypassable, strict PR/check enforcement for branch."""
+    """Require active, non-bypassable L4 branch enforcement from one trusted ruleset."""
     if (
         not isinstance(ruleset, dict)
         or ruleset.get("enforcement") != "active"
+        or ruleset.get("target") != "branch"
         or not applies_to_branch(
             ruleset, branch, default_branch=default_branch
         )
     ):
         return False
-    bypass=ruleset.get("bypass_actors")
+    bypass = ruleset.get("bypass_actors")
     if not isinstance(bypass, list) or bypass:
         return False
 
-    rule_types=set()
-    strict=False
-    contexts=set()
+    rule_types: set[str] = set()
+    status_params: dict | None = None
+    pr_params: dict | None = None
+    restricted_paths: set[str] = set()
     for rule in ruleset.get("rules") or []:
         if not isinstance(rule, dict):
             return False
-        kind=rule.get("type")
+        kind = rule.get("type")
         if isinstance(kind, str):
             rule_types.add(kind)
-        if kind=="required_status_checks":
-            params=rule.get("parameters") or {}
-            strict = params.get("strict_required_status_checks_policy") is True
-            specs=params.get("required_status_checks")
-            if not isinstance(specs, list):
+        if kind == "required_status_checks":
+            params = rule.get("parameters")
+            if not isinstance(params, dict):
                 return False
-            contexts.update(
-                str(item.get("context"))
-                for item in specs
-                if isinstance(item, dict) and item.get("context")
-            )
+            status_params = params
+        elif kind == "pull_request":
+            params = rule.get("parameters")
+            if not isinstance(params, dict):
+                return False
+            pr_params = params
+        elif kind == "file_path_restriction":
+            params = rule.get("parameters")
+            values = params.get("restricted_file_paths") if isinstance(params, dict) else None
+            if not isinstance(values, list):
+                return False
+            restricted_paths.update(str(value) for value in values if value)
 
-    required=set(required_checks)
-    return bool(
-        {"pull_request","required_status_checks","deletion","non_fast_forward"}
-        .issubset(rule_types)
-        and strict
-        and required.issubset(contexts)
-    )
+    if status_params is None or pr_params is None:
+        return False
+    if status_params.get("strict_required_status_checks_policy") is not True:
+        return False
+    if (
+        int(pr_params.get("required_approving_review_count") or 0) < 1
+        or pr_params.get("dismiss_stale_reviews_on_push") is not True
+        or pr_params.get("require_last_push_approval") is not True
+        or pr_params.get("required_review_thread_resolution") is not True
+    ):
+        return False
+
+    specs = status_params.get("required_status_checks")
+    if not isinstance(specs, list):
+        return False
+    for context in set(required_checks):
+        if not any(
+            isinstance(item, dict)
+            and item.get("context") == context
+            and item.get("integration_id") == required_integration_id
+            for item in specs
+        ):
+            return False
+
+    required_paths = set(required_restricted_paths)
+    if required_paths and not required_paths.issubset(restricted_paths):
+        return False
+
+    required_types = {
+        "pull_request",
+        "required_status_checks",
+        "deletion",
+        "non_fast_forward",
+    }
+    if required_paths:
+        required_types.add("file_path_restriction")
+    return required_types.issubset(rule_types)
+
