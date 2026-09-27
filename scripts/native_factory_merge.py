@@ -6,6 +6,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from native_factory_ruleset_policy import strict_ruleset_enforces
+
 REPO = os.environ["GITHUB_REPOSITORY"]
 OWNER, NAME = REPO.split("/", 1)
 EVENT = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
@@ -41,6 +43,8 @@ TRUSTED_GATE_PATHS = frozenset({
     "scripts/coordination/grok-review-proof.py",
     "scripts/coordination/grok-review-attestation.mjs",
     "scripts/native_factory_merge.py",
+    "scripts/native_factory_ruleset_policy.py",
+    "tests/test_native_factory_ruleset_policy.py",
 })
 
 
@@ -280,6 +284,79 @@ def review_gate_clean(number, sha, author):
     return bool(approvals) and not adverse and not unresolved_threads(number)
 
 
+def _classic_protection_enforces(protection):
+    checks = protection.get("required_status_checks")
+    reviews = protection.get("required_pull_request_reviews")
+    enforce_admins = protection.get("enforce_admins")
+    force_pushes = protection.get("allow_force_pushes")
+    deletions = protection.get("allow_deletions")
+    if (
+        not isinstance(checks, dict)
+        or checks.get("strict") is not True
+        or not isinstance(reviews, dict)
+        or int(reviews.get("required_approving_review_count") or 0) < 1
+        or not isinstance(enforce_admins, dict)
+        or enforce_admins.get("enabled") is not True
+        or not isinstance(force_pushes, dict)
+        or force_pushes.get("enabled") is not False
+        or not isinstance(deletions, dict)
+        or deletions.get("enabled") is not False
+    ):
+        return False
+    contexts = {str(value) for value in checks.get("contexts", []) if value}
+    contexts.update(
+        str(item.get("context"))
+        for item in checks.get("checks", [])
+        if isinstance(item, dict) and item.get("context")
+    )
+    allowances = reviews.get("bypass_pull_request_allowances")
+    if not isinstance(allowances, dict):
+        return False
+    if any(allowances.get(key) for key in ("users", "teams", "apps")):
+        return False
+    return CI_JOBS.issubset(contexts)
+
+
+def strict_base_enforcement():
+    """Require non-bypassable strict GitHub enforcement on main."""
+    try:
+        protection = gh(f"repos/{REPO}/branches/main/protection")
+        if isinstance(protection, dict) and _classic_protection_enforces(protection):
+            return True
+    except RuntimeError:
+        pass
+
+    try:
+        repository = gh(f"repos/{REPO}")
+        default_branch = repository.get("default_branch")
+        if default_branch != "main":
+            return False
+        summaries = gh(f"repos/{REPO}/rulesets")
+    except RuntimeError:
+        return False
+    if not isinstance(summaries, list):
+        return False
+    for summary in summaries:
+        if (
+            not isinstance(summary, dict)
+            or summary.get("enforcement") != "active"
+            or not summary.get("id")
+        ):
+            continue
+        try:
+            detail = gh(f"repos/{REPO}/rulesets/{summary['id']}")
+        except RuntimeError:
+            continue
+        if strict_ruleset_enforces(
+            detail,
+            branch="main",
+            required_checks=CI_JOBS,
+            default_branch=default_branch,
+        ):
+            return True
+    return False
+
+
 def candidate_numbers():
     # Direct review events preserve their PR. Chained workflow_run events from
     # trusted-main workflows frequently do not, so reconcile all open same-repo
@@ -309,6 +386,9 @@ def gates(number):
     sha = pr["head"]["sha"]
     if changed_paths(number) & TRUSTED_GATE_PATHS:
         print(f"PR #{number}: TRUSTED_GATE_CHANGE_REQUIRES_EXTERNAL_MERGE")
+        return None
+    if not strict_base_enforcement():
+        print(f"PR #{number}: PLATFORM_ENFORCEMENT_BLOCKED")
         return None
     if not latest_ci_green(sha):
         print(f"PR #{number}: LATEST_EXACT_HEAD_CI_NOT_GREEN")
@@ -420,6 +500,9 @@ def main():
             or pr.get("mergeable") is not True
         ):
             print(f"PR #{number}: HEAD_MOVED_OR_NOT_MERGEABLE")
+            continue
+        if not strict_base_enforcement():
+            print(f"PR #{number}: FINAL_PLATFORM_ENFORCEMENT_BLOCKED")
             continue
         if not latest_ci_green(sha):
             print(f"PR #{number}: FINAL_CI_CHANGED")
