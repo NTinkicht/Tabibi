@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import zipfile
 from pathlib import Path
 
 REPO = os.environ["GITHUB_REPOSITORY"]
@@ -222,8 +223,9 @@ def authenticated_mistral_approval(review, number, sha):
         proof_reader.sealed_report(proof)
         return True
     except (
-        RuntimeError, ValueError, TypeError, KeyError, OSError,
-        subprocess.SubprocessError, json.JSONDecodeError,
+        RuntimeError, ValueError, TypeError, KeyError, OSError, ImportError,
+        AttributeError, subprocess.SubprocessError, json.JSONDecodeError,
+        zipfile.BadZipFile,
     ):
         return False
 
