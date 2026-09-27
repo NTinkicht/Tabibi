@@ -4,7 +4,6 @@ on:
   workflow_run:
     workflows:
       - CI
-      - Verified Independent AI Review
       - Mistral Vibe Wake
     types:
       - completed
@@ -12,6 +11,8 @@ on:
     types:
       - submitted
       - dismissed
+  schedule:
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -19,13 +20,37 @@ permissions:
   pull-requests: write
   actions: read
   checks: read
+  issues: read
 
 concurrency:
   group: native-factory-merge-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
+  authorize-review:
+    name: L4 review authorization
+    if: github.event_name == 'pull_request_review'
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      checks: read
+      issues: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Authorize exact-head review from trusted main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          L4_AUTHORIZE_ONLY: "1"
+        run: python scripts/native_factory_merge.py
+
   reconcile-and-merge:
+    if: github.event_name != 'pull_request_review'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -37,5 +62,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REQUIRED_CHECKS_JSON: >-
-            ["Quality and build","PostgreSQL integration","Browser smoke"]
+            ["Quality and build","PostgreSQL integration","Browser smoke","L4 review authorization"]
         run: python scripts/native_factory_merge.py
