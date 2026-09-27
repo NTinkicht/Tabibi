@@ -29,6 +29,7 @@ jobs:
       LEASE_BODY: ${{ github.event.comment.body }}
       LEASE_COMMENT_ID: ${{ github.event.comment.id }}
       LEASE_URL: ${{ github.event.comment.html_url }}
+      RUN_ATTEMPT: ${{ github.run_attempt }}
       TARGET_PR: ${{ github.event.issue.number }}
       TARGET_REPO: ${{ github.repository }}
       SLACK_CHANNEL_ID: C0C0RV36QP2
@@ -49,6 +50,8 @@ jobs:
 
           body = os.environ['LEASE_BODY']
           repo = os.environ['TARGET_REPO']
+          if os.environ.get('RUN_ATTEMPT') != '1':
+              raise SystemExit('DUPLICATE_BLOCKED: workflow reruns cannot resend a lease signal')
           number = os.environ['TARGET_PR']
           token = os.environ.get('SLACK_CHATGPT_BOT_TOKEN', '')
           if os.environ.get('GROK_CLOUD_BRIDGE_ENABLED') != 'true':
@@ -94,8 +97,45 @@ jobs:
                   pr.get('base', {}).get('ref') != 'main'
               ):
                   raise ValueError('Canonical PR is stale, forked or not open')
-              # A released/failover lease must not be replayed after the
-              # canonical PR remains at the same SHA.
+              # Verify reviewer independence against immutable PR commit provenance,
+              # not only the lease declaration. Every material commit must carry one
+              # Material-Author trailer and the declared author set must match it.
+              actual_authors = set()
+              commit_count = 0
+              last_sha = None
+              material_author = re.compile(
+                  r'(?im)^Material-Author:\s*([a-z0-9_-]+)\s*$'
+              )
+              for page in range(1, 6):
+                  commits = api(
+                      f'repos/{repo}/pulls/{number}/commits?per_page=100&page={page}'
+                  )
+                  if not isinstance(commits, list):
+                      raise ValueError('Commit provenance unavailable')
+                  for item in commits:
+                      commit_count += 1
+                      last_sha = item.get('sha')
+                      if not re.fullmatch(r'[0-9a-f]{40}', last_sha or ''):
+                          raise ValueError('Commit provenance SHA invalid')
+                      tags = material_author.findall(
+                          item.get('commit', {}).get('message', '')
+                      )
+                      if len(tags) != 1:
+                          raise ValueError('Material author provenance missing or ambiguous')
+                      actual_authors.add(tags[0].lower())
+                      account = (item.get('author') or {}).get('login', '').lower()
+                      if account in {'grok', 'grok[bot]', 'grok-bot'}:
+                          raise ValueError('Grok-authored commit cannot be Grok-reviewed')
+                  if len(commits) < 100:
+                      break
+              else:
+                  raise ValueError('Commit provenance pagination bound exceeded')
+              if commit_count == 0 or last_sha != exact_sha:
+                  raise ValueError('Commit provenance stale or empty')
+              if 'grok' in actual_authors:
+                  raise ValueError('Grok material author cannot self-review')
+              if set(authors) != actual_authors:
+                  raise ValueError('Declared material authors do not match commit provenance')
               comments = []
               for page in range(1, 21):
                   batch = api(
@@ -120,6 +160,7 @@ jobs:
               )
               if any(
                   c.get('id', 0) > source_id and
+                  c.get('user', {}).get('login') == 'NTinkicht' and
                   any(marker in c.get('body', '') for marker in invalidators)
                   for c in comments
               ):
@@ -163,10 +204,13 @@ jobs:
           except (ValueError, subprocess.SubprocessError, json.JSONDecodeError):
               raise SystemExit('LEASE_BLOCKED: no cloud signal sent')
 
-          # Only public engineering metadata travels to Slack. It is a wake
-          # signal, NOT proof that the Bot actually executed or posted a review.
+          import hashlib
+          dispatch_id = hashlib.sha256(
+              f"{repo}:{number}:{os.environ['LEASE_COMMENT_ID']}".encode('utf-8')
+          ).hexdigest()
           signal = (
               'TABIBI_GROK_CLOUD_REVIEW_LEASE_V1\n'
+              f'dispatch_id: {dispatch_id}\n'
               f'repo: {repo}\n'
               f'pr: {number}\n'
               f'exact_sha: {exact_sha}\n'
