@@ -29,6 +29,7 @@ jobs:
       LEASE_BODY: ${{ github.event.comment.body }}
       LEASE_COMMENT_ID: ${{ github.event.comment.id }}
       LEASE_URL: ${{ github.event.comment.html_url }}
+      RUN_ATTEMPT: ${{ github.run_attempt }}
       TARGET_PR: ${{ github.event.issue.number }}
       TARGET_REPO: ${{ github.repository }}
       SLACK_CHANNEL_ID: C0C0RV36QP2
@@ -49,6 +50,8 @@ jobs:
 
           body = os.environ['LEASE_BODY']
           repo = os.environ['TARGET_REPO']
+          if os.environ.get('RUN_ATTEMPT') != '1':
+              raise SystemExit('DUPLICATE_BLOCKED: workflow reruns cannot resend a lease signal')
           number = os.environ['TARGET_PR']
           token = os.environ.get('SLACK_CHATGPT_BOT_TOKEN', '')
           if os.environ.get('GROK_CLOUD_BRIDGE_ENABLED') != 'true':
@@ -94,8 +97,6 @@ jobs:
                   pr.get('base', {}).get('ref') != 'main'
               ):
                   raise ValueError('Canonical PR is stale, forked or not open')
-              # A released/failover lease must not be replayed after the
-              # canonical PR remains at the same SHA.
               comments = []
               for page in range(1, 21):
                   batch = api(
@@ -120,6 +121,7 @@ jobs:
               )
               if any(
                   c.get('id', 0) > source_id and
+                  c.get('user', {}).get('login') == 'NTinkicht' and
                   any(marker in c.get('body', '') for marker in invalidators)
                   for c in comments
               ):
@@ -163,10 +165,13 @@ jobs:
           except (ValueError, subprocess.SubprocessError, json.JSONDecodeError):
               raise SystemExit('LEASE_BLOCKED: no cloud signal sent')
 
-          # Only public engineering metadata travels to Slack. It is a wake
-          # signal, NOT proof that the Bot actually executed or posted a review.
+          import hashlib
+          dispatch_id = hashlib.sha256(
+              f"{repo}:{number}:{os.environ['LEASE_COMMENT_ID']}".encode('utf-8')
+          ).hexdigest()
           signal = (
               'TABIBI_GROK_CLOUD_REVIEW_LEASE_V1\n'
+              f'dispatch_id: {dispatch_id}\n'
               f'repo: {repo}\n'
               f'pr: {number}\n'
               f'exact_sha: {exact_sha}\n'

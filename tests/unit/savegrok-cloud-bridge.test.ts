@@ -82,6 +82,11 @@ describe('SaveGrok cloud lease bridge', () => {
     expect(workflow).toContain("run.get('pull_requests') or []");
     expect(workflow).toContain("latest.get('status') != 'completed'");
     expect(workflow).toContain('filter=latest&per_page=100');
+    expect(workflow).toContain('RUN_ATTEMPT: ${{ github.run_attempt }}');
+    expect(workflow).toContain("RUN_ATTEMPT') != '1'");
+    expect(workflow).toContain("c.get('user', {}).get('login') == 'NTinkicht'");
+    expect(workflow).toContain('hashlib.sha256');
+    expect(workflow).toContain('dispatch_id: {dispatch_id}');
     expect(workflow).toContain('CLOUD_SIGNAL_SENT');
     expect(workflow).toContain(
       'Grok Bot execution and review MUST be separately verified.',
@@ -91,8 +96,6 @@ describe('SaveGrok cloud lease bridge', () => {
   it('parses the embedded lease validator without executing external actions', () => {
     const body = trustedScript.split("python3 - <<'PY'\n")[1]?.split('\nPY')[0];
     expect(body).toBeDefined();
-    // YAML.parse has already removed the block scalar's common indentation;
-    // stripping another ten spaces corrupts nested Python block indentation.
     const script = body;
     const check = spawnSync(
       'python3',
