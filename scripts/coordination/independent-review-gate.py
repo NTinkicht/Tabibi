@@ -85,6 +85,36 @@ def grok_reader():
     return module
 
 
+def trusted_dispatch(dispatch, number, sha, actors, run):
+    """Authenticate either the legacy owner comment or CI-success auto dispatch."""
+    event = run.get("event")
+    if event == "issue_comment":
+        return bool(
+            dispatch.get("updated_at", dispatch.get("created_at")) == dispatch.get("created_at")
+            and (dispatch.get("issue_url") or "").endswith("/issues/11")
+            and dispatch.get("user", {}).get("login") == "NTinkicht"
+            and single_owner_dispatch(dispatch.get("body") or "", number, sha, actors)
+        )
+    if event == "workflow_run":
+        pulls = dispatch.get("pull_requests") or []
+        return bool(
+            dispatch.get("name") == "CI"
+            and dispatch.get("event") == "pull_request"
+            and dispatch.get("path") == ".github/workflows/ci.yml"
+            and dispatch.get("status") == "completed"
+            and dispatch.get("conclusion") == "success"
+            and dispatch.get("head_sha") == sha
+            and dispatch.get("head_repository", {}).get("full_name") == REPO
+            and any(
+                isinstance(pr, dict)
+                and pr.get("number") == number
+                and (pr.get("head") or {}).get("sha") == sha
+                for pr in pulls
+            )
+        )
+    return False
+
+
 def verified_bot_review(comment, number, sha, actors, dispatch, run, proof):
     """No implicit trust in the GitHub login or the model text alone."""
     body = comment.get("body") or ""
@@ -95,31 +125,37 @@ def verified_bot_review(comment, number, sha, actors, dispatch, run, proof):
         or len(marker) != 1
         or len(verdict) != 1
         or comment.get("updated_at", comment.get("created_at")) != comment.get("created_at")
-        or dispatch.get("updated_at", dispatch.get("created_at")) != dispatch.get("created_at")
-        or not (dispatch.get("issue_url") or "").endswith("/issues/11")
         or body.count("**mistral-vibe unattended wake**") != 1
         or f"Target PR #{number} exact_sha={sha};" not in body
         or body.count(sha) < 2
         or str(run.get("id")) != marker[0][0]
         or str(dispatch.get("id")) != marker[0][1]
-        or dispatch.get("user", {}).get("login") != "NTinkicht"
-        or not single_owner_dispatch(dispatch.get("body") or "", number, sha, actors)
         or run.get("name") != "Mistral Vibe Wake"
         or run.get("head_branch") != "main"
-        or run.get("event") != "issue_comment"
+        or run.get("event") not in {"issue_comment", "workflow_run"}
         or run.get("actor", {}).get("login") != "NTinkicht"
         or run.get("status") != "completed"
         or run.get("conclusion") != "success"
         or run.get("path") != ".github/workflows/mistral-vibe-wake.yml"
+        or not trusted_dispatch(dispatch, number, sha, actors, run)
     ):
         return None
     try:
         created = after(comment["created_at"])
         opened = after(run["created_at"])
         completed = after(run["updated_at"])
-        dispatched = after(dispatch["created_at"])
-        valid_time = (dispatched <= opened <= dispatched + dt.timedelta(minutes=2)
-                      and opened <= created <= completed + dt.timedelta(minutes=3))
+        if run.get("event") == "issue_comment":
+            dispatched = after(dispatch["created_at"])
+            valid_time = (
+                dispatched <= opened <= dispatched + dt.timedelta(minutes=2)
+                and opened <= created <= completed + dt.timedelta(minutes=3)
+            )
+        else:
+            dispatched = after(dispatch["updated_at"])
+            valid_time = (
+                dispatched <= opened <= dispatched + dt.timedelta(minutes=2)
+                and opened <= created <= completed + dt.timedelta(minutes=3)
+            )
         return verdict[0] if (
             valid_time and proof_reader().matches(
                 proof, comment, run_id=run["id"], dispatch_id=dispatch["id"],
@@ -228,23 +264,20 @@ def evaluate(number):
             continue
         run_id, dispatch_id = match[0]
         try:
-            dispatch = api(f"repos/{REPO}/issues/comments/{dispatch_id}")
-        except (ValueError, KeyError, TypeError, subprocess.SubprocessError,
-                json.JSONDecodeError):
-            # A forged bot-origin marker does not get veto power or network
-            # failure power over a genuine separately artifact-sealed review.
-            continue
-        if dispatch.get("user", {}).get("login") != "NTinkicht":
-            continue
-        if not single_owner_dispatch(dispatch.get("body") or "", number, sha, actors):
-            continue
-        try:
             run = api(f"repos/{REPO}/actions/runs/{run_id}")
+            if run.get("event") == "issue_comment":
+                dispatch = api(f"repos/{REPO}/issues/comments/{dispatch_id}")
+            elif run.get("event") == "workflow_run":
+                dispatch = api(f"repos/{REPO}/actions/runs/{dispatch_id}")
+            else:
+                continue
             # The comment itself is editable and bot identity is shared across
             # workflows. Only immutable evidence uploaded by THIS run binds it.
             sealed = proof_reader().read_run_proof(run_id)
         except (ValueError, KeyError, TypeError, subprocess.SubprocessError,
                 json.JSONDecodeError):
+            # A forged marker or unavailable dispatch/run proof never gets
+            # veto power over a genuine separately artifact-sealed review.
             continue
         verdict = verified_bot_review(
             comment, number, sha, actors, dispatch, run, sealed,
@@ -346,6 +379,42 @@ def selftest():
     )
     assert not verified_bot_review(comment, 7, sha, {"chatgpt"}, dispatch,
                                    run, dict(proof, body_sha256="0" * 64))
+    auto_dispatch = {
+        "id": 2,
+        "name": "CI",
+        "event": "pull_request",
+        "path": ".github/workflows/ci.yml",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": sha,
+        "head_repository": {"full_name": REPO},
+        "created_at": "2026-09-24T09:58:00Z",
+        "updated_at": "2026-09-24T10:00:30Z",
+        "pull_requests": [{"number": 7, "head": {"sha": sha}}],
+    }
+    auto_run = dict(
+        run,
+        event="workflow_run",
+        created_at="2026-09-24T10:01:00Z",
+        updated_at="2026-09-24T10:03:00Z",
+    )
+    auto_body = comment["body"].replace(
+        "dispatch-comment:44", "dispatch-comment:2"
+    )
+    auto_comment = dict(comment, body=auto_body)
+    sealed_reports["901"] = dict(
+        sealed_reports["900"], id=901, body=auto_body
+    )
+    auto_proof = sealed.proof_for(
+        auto_body, run_id=18, dispatch_id=2, pr=7, sha=sha, report_id=901,
+    )
+    assert verified_bot_review(
+        auto_comment, 7, sha, {"chatgpt"}, auto_dispatch, auto_run, auto_proof
+    ) == "PASS"
+    assert not verified_bot_review(
+        auto_comment, 7, sha, {"chatgpt"},
+        dict(auto_dispatch, head_sha="b" * 40), auto_run, auto_proof,
+    )
     assert commit_authors([{
         "sha": sha, "commit": {"message": "fix\n\nMaterial-Author: chatgpt"}
     }], sha) == {"chatgpt"}
