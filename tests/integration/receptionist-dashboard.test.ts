@@ -396,6 +396,62 @@ describe('receptionist dashboard read model', () => {
     ).not.toBe(secondRead.eta?.revision);
   });
 
+  it('versions ETA when a called patient starts consultation', async () => {
+    const queue = new QueueService(pool);
+    const first = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'WU192 first',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu192-first',
+      correlationId: 'wu192-first',
+    });
+    const second = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'WU192 second',
+      preferredLocale: 'ar',
+      idempotencyKey: 'wu192-second',
+      correlationId: 'wu192-second',
+    });
+    const command = (
+      id: string,
+      action: 'check_in' | 'call' | 'start_consultation',
+      key: string,
+    ) =>
+      queue.command(scope, ids.sessionA, id, {
+        command: action,
+        idempotencyKey: key,
+        correlationId: 'wu192-eta-revision',
+      });
+
+    await command(first.entry.id, 'check_in', 'wu192-first-checkin');
+    await command(second.entry.id, 'check_in', 'wu192-second-checkin');
+    await command(first.entry.id, 'call', 'wu192-first-call');
+
+    const dashboard = new ReceptionistDashboardService(pool);
+    const before = await dashboard.getSnapshot(scope, ids.sessionA);
+    const beforeEta = before.entries.find((row) => row.id === second.entry.id)?.eta;
+    expect(beforeEta).not.toBeNull();
+
+    await command(
+      first.entry.id,
+      'start_consultation',
+      'wu192-first-start',
+    );
+    const after = await dashboard.getSnapshot(scope, ids.sessionA);
+    const afterEta = after.entries.find((row) => row.id === second.entry.id)?.eta;
+    expect(after.session.queueOrderVersion).toBe(before.session.queueOrderVersion + 1);
+    expect(afterEta?.revision).not.toBe(beforeEta?.revision);
+
+    await command(
+      first.entry.id,
+      'start_consultation',
+      'wu192-first-start',
+    );
+    const retry = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(retry.session.queueOrderVersion).toBe(after.session.queueOrderVersion);
+    expect(
+      retry.entries.find((row) => row.id === second.entry.id)?.eta?.revision,
+    ).toBe(afterEta?.revision);
+  });
+
   it('denies wrong roles and treats a cross-clinic session as absent', async () => {
     await pool.query(
       `UPDATE clinic_memberships SET role='doctor' WHERE clinic_id=$1 AND user_id=$2`,
