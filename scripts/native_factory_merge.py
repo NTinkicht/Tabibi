@@ -30,6 +30,10 @@ TRUSTED_GATE_PATHS = frozenset({
     "scripts/mistral-review-target.py",
     "scripts/coordination/mistral-review-proof.py",
     "scripts/coordination/publish-mistral-review.py",
+    "scripts/coordination/independent-review-gate.py",
+    "scripts/coordination/publish-independent-review-check.py",
+    "scripts/coordination/grok-review-proof.py",
+    "scripts/coordination/grok-review-attestation.mjs",
     "scripts/native_factory_merge.py",
 })
 
