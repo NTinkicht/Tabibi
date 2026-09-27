@@ -332,6 +332,67 @@ describe('doctor-global session lifecycle invariant', () => {
     expect(final.rows[0]).toEqual({ active: '0', opened: '1' });
   });
 
+  it('allows exactly one concurrent cross-clinic doctor-global consultation transition', async () => {
+    const sessionA = await seedSession(ids.clinicA, '2026-09-07');
+    const sessionB = await seedSession(ids.clinicB, '2026-09-08');
+    const patientA = randomUUID();
+    const patientB = randomUUID();
+    const entryA = randomUUID();
+    const entryB = randomUUID();
+
+    await pool.query(
+      `INSERT INTO patient_operational_records
+         (id,clinic_id,private_display_name,preferred_locale)
+       VALUES ($1,$2,'WU192 A','fr'),($3,$4,'WU192 B','ar')`,
+      [patientA, ids.clinicA, patientB, ids.clinicB],
+    );
+    await pool.query(
+      `INSERT INTO queue_entries
+         (id,clinic_id,session_id,patient_id,state,source,registration_order,
+          eligibility_order,public_display_label)
+       VALUES
+         ($1,$2,$3,$4,'called','walk_in',1,1,'WU192-A'),
+         ($5,$6,$7,$8,'called','walk_in',1,1,'WU192-B')`,
+      [
+        entryA,
+        ids.clinicA,
+        sessionA,
+        patientA,
+        entryB,
+        ids.clinicB,
+        sessionB,
+        patientB,
+      ],
+    );
+
+    const results = await race(
+      () =>
+        pool.query(
+          `UPDATE queue_entries SET state='in_consultation' WHERE id=$1`,
+          [entryA],
+        ),
+      () =>
+        pool.query(
+          `UPDATE queue_entries SET state='in_consultation' WHERE id=$1`,
+          [entryB],
+        ),
+    );
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find((result) => result.status === 'rejected');
+    expect(rejected).toMatchObject({ reason: expect.objectContaining({ code: '23514' }) });
+
+    const active = await pool.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count
+         FROM queue_entries entry
+         JOIN consultation_sessions session
+           ON session.id=entry.session_id AND session.clinic_id=entry.clinic_id
+        WHERE session.doctor_id=$1 AND entry.state='in_consultation'`,
+      [ids.doctor],
+    );
+    expect(active.rows[0]?.count).toBe('1');
+  });
+
   it('WU177 rejects a direct open INSERT while another clinic has the doctor in consultation', async () => {
     const sessions = new SessionService(pool);
     const queue = new QueueService(pool);
