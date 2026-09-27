@@ -2,6 +2,8 @@
 
 ## Governing model
 
+Tabibi operates at **L4 — Continuous Company** autonomy under `coordination/AUTONOMY_PROTOCOL.md`. Routine bounded engineering does not wait for a new owner prompt after each merge: orchestration continuously selects dependency-ready work, preserves safe WIP, drives CI/review/fix/merge, and replenishes completed streams while owner-only boundaries remain reserved.
+
 Tabibi is a capability-resilient **seven-actor engineering company**. Roles belong to the project, not permanently to a provider.
 
 Active actor IDs:
@@ -170,7 +172,7 @@ Never send credentials, patient/production records, provider payloads or databas
 
 ## No-idle rule
 
-Available capacity should create useful non-conflicting value, not busywork. An actor without a delivery lease checks `WORK_QUEUE.md`, takes one compatible bounded `READY` task only after a lease is recorded, or posts one concise proposal/availability note and stops. Reviewer independence and one-canonical-stream discipline outrank utilization.
+At L4, available delivery capacity should create useful non-conflicting value, not busywork. After a merge or terminal WU outcome, orchestration must reconcile live state and automatically select the next dependency-ready bounded WU without waiting for a new owner prompt. An actor without a delivery lease checks `WORK_QUEUE.md` and may take one compatible bounded `READY` task only after a lease is recorded. When multiple conflict-safe READY units and capacity exist, safe WIP slots may be filled in parallel. If no executable work exists, record the genuine dependency/capacity/owner-only blocker rather than manufacturing status. Reviewer independence and one-canonical-stream discipline outrank utilization.
 
 ## Definition of done
 
