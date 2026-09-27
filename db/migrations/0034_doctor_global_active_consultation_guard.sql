@@ -1,14 +1,48 @@
 -- WU192: enforce the doctor-global active-consultation invariant at the
--- database boundary. Application start_consultation takes this same advisory
--- lock before its local session row lock; this trigger protects direct/future
--- writers and serializes concurrent cross-clinic consultation starts.
-CREATE FUNCTION enforce_doctor_global_active_consultation()
+-- database boundary without mixing advisory-lock and row-lock order.
+--
+-- A dedicated guard row keyed by doctor serializes every transition into
+-- in_consultation, including direct/future SQL writers. PostgreSQL's unique
+-- constraint performs the serialization without taking the application-level
+-- doctor advisory lock after a queue row has already been locked, avoiding the
+-- row-lock <-> advisory-lock deadlock identified during review.
+CREATE TABLE doctor_active_consultations (
+  doctor_id uuid PRIMARY KEY REFERENCES doctor_profiles(id) ON DELETE CASCADE,
+  queue_entry_id uuid NOT NULL UNIQUE REFERENCES queue_entries(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Fail closed if historical data already violates the invariant.
+INSERT INTO doctor_active_consultations (doctor_id, queue_entry_id)
+SELECT session.doctor_id, entry.id
+  FROM queue_entries entry
+  JOIN consultation_sessions session
+    ON session.id = entry.session_id
+   AND session.clinic_id = entry.clinic_id
+ WHERE entry.state = 'in_consultation';
+
+CREATE FUNCTION sync_doctor_active_consultation_guard()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 DECLARE
   target_doctor uuid;
 BEGIN
+  IF TG_OP = 'DELETE' THEN
+    IF OLD.state = 'in_consultation' THEN
+      DELETE FROM doctor_active_consultations
+       WHERE queue_entry_id = OLD.id;
+    END IF;
+    RETURN OLD;
+  END IF;
+
+  IF TG_OP = 'UPDATE'
+     AND OLD.state = 'in_consultation'
+     AND NEW.state IS DISTINCT FROM 'in_consultation' THEN
+    DELETE FROM doctor_active_consultations
+     WHERE queue_entry_id = OLD.id;
+  END IF;
+
   IF NEW.state = 'in_consultation'
      AND (TG_OP = 'INSERT' OR OLD.state IS DISTINCT FROM NEW.state) THEN
     SELECT doctor_id
@@ -22,28 +56,26 @@ BEGIN
         USING ERRCODE = '23503';
     END IF;
 
-    PERFORM pg_advisory_xact_lock(hashtext(target_doctor::text));
-
-    IF EXISTS (
-      SELECT 1
-        FROM queue_entries entry
-        JOIN consultation_sessions session
-          ON session.id = entry.session_id
-         AND session.clinic_id = entry.clinic_id
-       WHERE session.doctor_id = target_doctor
-         AND entry.id <> NEW.id
-         AND entry.state = 'in_consultation'
-    ) THEN
-      RAISE EXCEPTION 'Doctor already has an active consultation'
-        USING ERRCODE = '23514';
-    END IF;
+    BEGIN
+      INSERT INTO doctor_active_consultations (doctor_id, queue_entry_id)
+      VALUES (target_doctor, NEW.id);
+    EXCEPTION
+      WHEN unique_violation THEN
+        RAISE EXCEPTION 'Doctor already has an active consultation'
+          USING ERRCODE = '23514';
+    END;
   END IF;
 
   RETURN NEW;
 END;
 $$;
 
-CREATE TRIGGER queue_entries_doctor_global_consultation_guard
-BEFORE INSERT OR UPDATE OF state ON queue_entries
+CREATE TRIGGER queue_entries_doctor_active_guard_insert_update
+AFTER INSERT OR UPDATE OF state ON queue_entries
 FOR EACH ROW
-EXECUTE FUNCTION enforce_doctor_global_active_consultation();
+EXECUTE FUNCTION sync_doctor_active_consultation_guard();
+
+CREATE TRIGGER queue_entries_doctor_active_guard_delete
+AFTER DELETE ON queue_entries
+FOR EACH ROW
+EXECUTE FUNCTION sync_doctor_active_consultation_guard();
