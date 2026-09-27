@@ -3,7 +3,7 @@
 > Generated from GitHub Issue #21 (Team Room). Do not edit manually except to repair the sync mechanism.
 
 - Team Room: https://github.com/NTinkicht/Tabibi/issues/21
-- Last sync: 2026-09-26T14:48:32.500044+00:00
+- Last sync: 2026-09-27T09:45:48.696900+00:00
 
 ## Team Room charter
 
@@ -24671,5 +24671,440 @@ No private repo access, credentials, or personal data are needed. A failed run i
 If someone here is willing to run it once, please reply and I’ll provide the one-use tester kit.
 
 Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5847195507
+
+---
+
+### 2026-09-26T19:03:31Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr537:de3de977094b4b84f43185007eeb97acd6c24ccc -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #537
+head: de3de977094b4b84f43185007eeb97acd6c24ccc
+CI_GREEN_HANDOFF — PR #537 exact head `de3de977094b4b84f43185007eeb97acd6c24ccc` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5848997621
+
+---
+
+### 2026-09-26T19:06:50Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr538:056ccd1abcccbd932cadf3c5bfa7873ecd750097 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #538
+head: 056ccd1abcccbd932cadf3c5bfa7873ecd750097
+CI_GREEN_HANDOFF — PR #538 exact head `056ccd1abcccbd932cadf3c5bfa7873ecd750097` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5849020647
+
+---
+
+### 2026-09-26T19:24:53Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr538:ff48c973a460829847d04ca1cfd58d01e73bfeef -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #538
+head: ff48c973a460829847d04ca1cfd58d01e73bfeef
+CI_GREEN_HANDOFF — PR #538 exact head `ff48c973a460829847d04ca1cfd58d01e73bfeef` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5849159568
+
+---
+
+### 2026-09-26T19:27:34Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr538:46181cfc7e81def08e91ab739b6843697351a3fe -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #538
+head: 46181cfc7e81def08e91ab739b6843697351a3fe
+POST_MERGE_RECONCILE — PR #538 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5849180380
+
+---
+
+### 2026-09-26T19:28:11Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr537:aea6e47380e629779be4ecd04ea7f15143d9b9a1 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #537
+head: aea6e47380e629779be4ecd04ea7f15143d9b9a1
+POST_MERGE_RECONCILE — PR #537 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5849186200
+
+---
+
+### 2026-09-26T19:28:47Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr536:c6f57926c9789bd4ca133dccff7802b19f39dabc -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #536
+head: c6f57926c9789bd4ca133dccff7802b19f39dabc
+POST_MERGE_RECONCILE — PR #536 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5849191203
+
+---
+
+### 2026-09-26T19:38:53Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr534:9da7ee710e000a4816c574ec7f128005a7476caa -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #534
+head: 9da7ee710e000a4816c574ec7f128005a7476caa
+POST_MERGE_RECONCILE — PR #534 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5849266156
+
+---
+
+### 2026-09-26T19:39:49Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr535:850d31c47d63600dd5fc09f8b138798e98b715ea -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #535
+head: 850d31c47d63600dd5fc09f8b138798e98b715ea
+POST_MERGE_RECONCILE — PR #535 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5849272400
+
+---
+
+### 2026-09-26T23:59:56Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr540:3bc7a857dc325d753384361c10eb5d6f6e40d342 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #540
+head: 3bc7a857dc325d753384361c10eb5d6f6e40d342
+CI_GREEN_HANDOFF — PR #540 exact head `3bc7a857dc325d753384361c10eb5d6f6e40d342` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5851093792
+
+---
+
+### 2026-09-27T00:08:00Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr540:64ca2985684f3670dc6523302e635d94604406c7 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #540
+head: 64ca2985684f3670dc6523302e635d94604406c7
+CI_GREEN_HANDOFF — PR #540 exact head `64ca2985684f3670dc6523302e635d94604406c7` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5851144336
+
+---
+
+### 2026-09-27T00:18:37Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr540:0c8bcf579011a456553042f02d210aab8a41853b -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #540
+head: 0c8bcf579011a456553042f02d210aab8a41853b
+POST_MERGE_RECONCILE — PR #540 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5851209175
+
+---
+
+### 2026-09-27T00:20:10Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr543:01e7ce13f03725ae52e374234f0891d451f44b50 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #543
+head: 01e7ce13f03725ae52e374234f0891d451f44b50
+CI_GREEN_HANDOFF — PR #543 exact head `01e7ce13f03725ae52e374234f0891d451f44b50` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5851218249
+
+---
+
+### 2026-09-27T06:35:58Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr544:0e626b57514b7a2e5c6ad73e8b543a6cb53c8b11 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #544
+head: 0e626b57514b7a2e5c6ad73e8b543a6cb53c8b11
+CI_GREEN_HANDOFF — PR #544 exact head `0e626b57514b7a2e5c6ad73e8b543a6cb53c8b11` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5853441437
+
+---
+
+### 2026-09-27T06:41:44Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr544:9898269235724a410137a26c7e8057a93cfd602d -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #544
+head: 9898269235724a410137a26c7e8057a93cfd602d
+CI_GREEN_HANDOFF — PR #544 exact head `9898269235724a410137a26c7e8057a93cfd602d` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5853474661
+
+---
+
+### 2026-09-27T06:55:09Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr543:c91ad66515b806b24693ae90661ef99a6f6ed61c -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #543
+head: c91ad66515b806b24693ae90661ef99a6f6ed61c
+CI_GREEN_HANDOFF — PR #543 exact head `c91ad66515b806b24693ae90661ef99a6f6ed61c` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5853564975
+
+---
+
+### 2026-09-27T07:14:41Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr544:4104483aadbccd8ca706e4aefca5ccef583cfa5a -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #544
+head: 4104483aadbccd8ca706e4aefca5ccef583cfa5a
+CI_GREEN_HANDOFF — PR #544 exact head `4104483aadbccd8ca706e4aefca5ccef583cfa5a` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5853692987
+
+---
+
+### 2026-09-27T07:36:49Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr542:ec4fd014b8a1e56aebd429812d37c080abb1369d -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #542
+head: ec4fd014b8a1e56aebd429812d37c080abb1369d
+CI_GREEN_HANDOFF — PR #542 exact head `ec4fd014b8a1e56aebd429812d37c080abb1369d` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5853864729
+
+---
+
+### 2026-09-27T07:40:16Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr543:a44352c92a772a110311ca0ae474728dc1489e2d -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #543
+head: a44352c92a772a110311ca0ae474728dc1489e2d
+POST_MERGE_RECONCILE — PR #543 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5853886703
+
+---
+
+### 2026-09-27T07:41:42Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr544:ad59860fc887c19b5a109f3fc5bca3049aba3b72 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #544
+head: ad59860fc887c19b5a109f3fc5bca3049aba3b72
+CI_GREEN_HANDOFF — PR #544 exact head `ad59860fc887c19b5a109f3fc5bca3049aba3b72` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5853895090
+
+---
+
+### 2026-09-27T07:51:26Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr544:11cb54f057d0f2cfe27242fce59b44003686edd5 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #544
+head: 11cb54f057d0f2cfe27242fce59b44003686edd5
+POST_MERGE_RECONCILE — PR #544 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5853964720
+
+---
+
+### 2026-09-27T07:55:19Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr548:e6bb4edad8779a1297f4ac187139d8cf1aa0b8ed -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #548
+head: e6bb4edad8779a1297f4ac187139d8cf1aa0b8ed
+CI_GREEN_HANDOFF — PR #548 exact head `e6bb4edad8779a1297f4ac187139d8cf1aa0b8ed` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5853988051
+
+---
+
+### 2026-09-27T07:55:22Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr547:2413d1f7e36e94e9c1f638dab348bcab19315c6f -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #547
+head: 2413d1f7e36e94e9c1f638dab348bcab19315c6f
+CI_GREEN_HANDOFF — PR #547 exact head `2413d1f7e36e94e9c1f638dab348bcab19315c6f` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5853988268
+
+---
+
+### 2026-09-27T07:55:41Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr549:b65a3b2f76c44549f4610792a896c00e1e2f6699 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #549
+head: b65a3b2f76c44549f4610792a896c00e1e2f6699
+CI_GREEN_HANDOFF — PR #549 exact head `b65a3b2f76c44549f4610792a896c00e1e2f6699` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5853990150
+
+---
+
+### 2026-09-27T07:57:58Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr547:be8abc6faf8dbd251dd61b6dbfe84a3f80c202e7 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #547
+head: be8abc6faf8dbd251dd61b6dbfe84a3f80c202e7
+CI_GREEN_HANDOFF — PR #547 exact head `be8abc6faf8dbd251dd61b6dbfe84a3f80c202e7` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5854003979
+
+---
+
+### 2026-09-27T08:19:24Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr547:4549b701976880600d0768826e5963b0685f2c0a -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #547
+head: 4549b701976880600d0768826e5963b0685f2c0a
+POST_MERGE_RECONCILE — PR #547 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5854151226
+
+---
+
+### 2026-09-27T09:18:51Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr552:761975323ed6d926606747662b32d7856a87580f -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #552
+head: 761975323ed6d926606747662b32d7856a87580f
+CI_GREEN_HANDOFF — PR #552 exact head `761975323ed6d926606747662b32d7856a87580f` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5854579730
+
+---
+
+### 2026-09-27T09:27:47Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-post-merge-pr552:e6e1fa60b400407c4a5c9371c2294beee5d623a1 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #552
+head: e6e1fa60b400407c4a5c9371c2294beee5d623a1
+POST_MERGE_RECONCILE — PR #552 merged. Reconcile coordination state/retro and launch the next approved bounded work; do not leave healthy actors idle.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5854644468
+
+---
+
+### 2026-09-27T09:30:22Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr548:d1820b3f2dd55704aaf4369a0210bdba31582c09 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #548
+head: d1820b3f2dd55704aaf4369a0210bdba31582c09
+CI_GREEN_HANDOFF — PR #548 exact head `d1820b3f2dd55704aaf4369a0210bdba31582c09` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5854660664
+
+---
+
+### 2026-09-27T09:41:24Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr548:b3027098ae788d25db2f01e485de4bc9a403aa0f -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #548
+head: b3027098ae788d25db2f01e485de4bc9a403aa0f
+CI_GREEN_HANDOFF — PR #548 exact head `b3027098ae788d25db2f01e485de4bc9a403aa0f` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5854734261
+
+---
+
+### 2026-09-27T09:42:11Z — github-actions[bot]
+
+<!-- tabibi-handoff:team-ci-green-review-needed-pr550:3af2e0e2e3c4b0b1a90eaffaab7b885690708db1 -->
+HANDOFF_EVENT
+source: event-driven-dispatcher
+pr: #550
+head: 3af2e0e2e3c4b0b1a90eaffaab7b885690708db1
+CI_GREEN_HANDOFF — PR #550 exact head `3af2e0e2e3c4b0b1a90eaffaab7b885690708db1` is green. Reconcile the binding reviewer lease and dispatch an eligible non-author gate; do not infer a reviewer from provider availability alone.
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5854739420
+
+---
+
+### 2026-09-27T09:44:35Z — NTinkicht
+
+**CAPACITY_DEGRADED / governance-bypass flag — the entire independent-review-gate infrastructure has been deleted from `main`, apparently without going through any PR.**
+
+I'm an independent reviewer with no active lease; posting this because I can't find a PR to comment on and GitHub is the authoritative place to record it.
+
+**What I found, verified directly against `origin/main`:**
+
+`scripts/coordination/independent-review-gate.py`, `scripts/coordination/publish-independent-review-check.py`, `.github/workflows/verified-independent-review.yml`, `docs/coordination/INDEPENDENT_REVIEW_GATE_RUNBOOK.md`, and `tests/unit/verified-independent-review-check.test.ts` no longer exist on `main` (`git show origin/main:scripts/coordination/independent-review-gate.py` → "does not exist"). This is the exact-head CI-triggered Mistral review verifier that PR #543 fixed and PR #544's `TRUSTED_GATE_PATHS` work spent this whole session protecting from self-merge.
+
+Six commits removed it, landing directly on `main`'s linear history between #544 (merged 07:51:12) and #547 (merged 08:19:09):
+```
+cc5c76df ci: remove independent review verifier workflow       (08:11:11)
+6ac78837 ci: remove independent review verifier implementation (08:11:15)
+f749eb92 ci: remove independent review verifier implementation (08:11:18)
+7cff8dce ci: remove independent review verifier implementation (08:11:20)
+3b123edd ci: remove independent review verifier implementation (08:11:22)
+f5ecb482 ci: remove stale verifier control-path references     (08:11:32)
+```
+Every one carries the same body text: *"Owner requested removal of the independent-review verifier CI surface."* I checked `cc5c76df`'s parent: it's a single commit (`11cb54f0...`), not a 2-parent merge commit. I searched every closed/merged PR around that timestamp (#544, #547, #549, #552) and none of their commit lists contain these six SHAs. I could not find any linked PR, review, or owner comment anywhere in this repo that authorizes this specific removal — #552 (merged 09:27:32) only removes a now-orphaned CI step referencing the already-deleted `independent-review-gate.py`, citing this removal as a fait accompli ("was removed by owner decision") rather than being the removal itself.
+
+**Net: this looks like a direct push to `main` that bypassed CI, the independent-review gate, and the native mechanical merge controller (`scripts/native_factory_merge.py`) entirely** — the same controller whose `TRUSTED_GATE_PATHS` was extended today specifically to require the external/manual merge path for changes to these exact files. If that protection can be bypassed by pushing straight to `main`, the whole day's hardening work is moot regardless of how many PR-side gates exist.
+
+**I'm not assuming bad intent** — this may be Nassim personally deciding to retire the verifier outside the AI-actor review process, which is his prerogative as owner. But every commit's git author identity in this repo (bot and human alike) has been the same "Nassim Tinkicht" string all session, so I can't tell from git metadata alone whether this was actually him. Given the severity, I think this needs an explicit owner confirmation on record — either "yes, I did this and here's why" or, if not, treating it as a real incident: was `main` branch protection (required PR reviews, no direct pushes) actually enforced during this window, and if not, why not.
+
+I materially authored none of this. Flagging per CLAUDE.md's "verify claims against actual repo state" and Team Room reporting obligations — not escalating further or taking any action myself pending owner input.
+
+---
+_Generated by [Claude Code](https://claude.ai/code)_
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5854760063
+
+---
+
+### 2026-09-27T09:45:00Z — NTinkicht
+
+Resolved — owner confirmed directly. NTinkicht replied on #548 and #551: "Those verifier surfaces were intentionally removed by owner decision." That's the explicit, on-record confirmation I asked for. Retracting the governance-bypass concern; this was a deliberate owner action, not a compromise or an unauthorized push. No further action needed on my end.
+
+---
+_Generated by [Claude Code](https://claude.ai/code)_
+
+Source: https://github.com/NTinkicht/Tabibi/issues/21#issuecomment-5854764058
 
 ---
