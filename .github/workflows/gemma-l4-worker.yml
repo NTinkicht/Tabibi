@@ -1,0 +1,122 @@
+name: Gemma L4 Evidence Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Bounded engineering task
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build exact-head bounded evidence
+        env:
+          TASK: ${{ inputs.task }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet && git diff --cached --quiet || {
+            echo "Checkout must start clean"
+            exit 1
+          }
+          HEAD_SHA="$(git rev-parse HEAD)"
+          git fetch --no-tags origin "$DEFAULT_BRANCH"
+          BASE_SHA="$(git merge-base HEAD "origin/$DEFAULT_BRANCH")"
+          export HEAD_SHA BASE_SHA
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          max_diff = 60000
+          prompt = pathlib.Path(".github/prompts/gemma-bounded-worker.md").read_text(
+              encoding="utf-8"
+          )
+          diff = subprocess.check_output(
+              [
+                  "git",
+                  "diff",
+                  "--no-ext-diff",
+                  "--binary",
+                  f"{os.environ['BASE_SHA']}...{os.environ['HEAD_SHA']}",
+              ],
+              text=True,
+          )
+          encoded = diff.encode("utf-8")
+          if len(encoded) > max_diff:
+              manifest = subprocess.check_output(
+                  [
+                      "git",
+                      "diff",
+                      "--name-only",
+                      f"{os.environ['BASE_SHA']}...{os.environ['HEAD_SHA']}",
+                  ],
+                  text=True,
+              ).splitlines()
+              pathlib.Path("gemma-context-incomplete.json").write_text(
+                  json.dumps(
+                      {
+                          "status": "CONTEXT_INCOMPLETE",
+                          "reason": "DIFF_EXCEEDS_BOUND",
+                          "head_sha": os.environ["HEAD_SHA"],
+                          "base_sha": os.environ["BASE_SHA"],
+                          "diff_bytes": len(encoded),
+                          "max_diff_bytes": max_diff,
+                          "changed_files": manifest,
+                      },
+                      indent=2,
+                  )
+                  + "\n",
+                  encoding="utf-8",
+              )
+              raise SystemExit(
+                  "CONTEXT_INCOMPLETE: diff exceeds bounded evidence limit"
+              )
+          changed = subprocess.check_output(
+              [
+                  "git",
+                  "diff",
+                  "--name-only",
+                  f"{os.environ['BASE_SHA']}...{os.environ['HEAD_SHA']}",
+              ],
+              text=True,
+          ).splitlines()
+          bundle = {
+              "status": "READY_FOR_AUTHORIZED_ORCHESTRATOR",
+              "provider_route": "DISABLED_BY_TABIBI_POLICY",
+              "head_sha": os.environ["HEAD_SHA"],
+              "base_sha": os.environ["BASE_SHA"],
+              "task": os.environ["TASK"],
+              "system_prompt": prompt,
+              "changed_files": changed,
+              "diff": diff,
+          }
+          pathlib.Path("gemma-request-bundle.json").write_text(
+              json.dumps(bundle, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git diff --exit-code -- . \
+            ':!gemma-request-bundle.json' \
+            ':!gemma-context-incomplete.json'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: gemma-l4-evidence
+          path: |
+            gemma-request-bundle.json
+            gemma-context-incomplete.json
+          if-no-files-found: error
