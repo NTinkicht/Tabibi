@@ -673,8 +673,7 @@ export class QueueService {
           error &&
           'code' in error &&
           (error.code === '23505' ||
-            (rawInput.command === 'start_consultation' &&
-              error.code === '23514'))
+            (rawInput.command === 'start_consultation' && error.code === '23514'))
         )
           throw new QueueConflictError(
             rawInput.command === 'call'
