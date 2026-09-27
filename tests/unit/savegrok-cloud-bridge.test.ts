@@ -67,7 +67,9 @@ describe('SaveGrok cloud lease bridge', () => {
     expect(workflow).toContain("pr.get('state') != 'open'");
     expect(workflow).toContain("pr.get('base', {}).get('ref') != 'main'");
     expect(workflow).toContain("'grok' in authors");
-    expect(workflow).toContain("pulls/{number}/commits?per_page=100&page={page}");
+    expect(workflow).toContain(
+      'pulls/{number}/commits?per_page=100&page={page}',
+    );
     expect(workflow).toContain('Material-Author:');
     expect(workflow).toContain("'grok' in actual_authors");
     expect(workflow).toContain('last_sha != exact_sha');
