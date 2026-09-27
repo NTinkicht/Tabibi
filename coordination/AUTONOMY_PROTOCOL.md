@@ -4,7 +4,7 @@ Status: **binding project coordination protocol**.
 
 Autonomy level: **L4 — Continuous Company** (owner-authorized 2026-09-27).
 
-L4 authorizes continuous governed engineering flow: after any merge or terminal WU outcome, orchestration immediately reconciles live GitHub state and selects the next dependency-ready bounded WU without waiting for a new owner prompt. It also authorizes routine implementation, deterministic CI remediation, independent exact-head review orchestration, policy-compliant mechanical merge, no-idle detection and failover. L4 does not authorize new spending/PAYG, credential expansion, legal/business-policy changes, destructive production actions, sensitive-data publication, or irreducible product-direction decisions.
+L4 authorizes continuous governed engineering flow: after any merge or terminal WU outcome, orchestration immediately reconciles live GitHub state and selects the next dependency-ready bounded WU without waiting for a new owner prompt. It also authorizes routine implementation, deterministic CI remediation, independent exact-head review orchestration, policy-compliant mechanical merge, no-idle detection and failover. L4 does not authorize new spending/PAYG, credential creation/expansion/export, legal/business-policy changes, destructive production actions, sensitive-data publication, irreducible product-direction decisions, or amendment of binding governance/authority without durable owner authorization through an external reviewed merge path. Candidate governance text can never authorize its own authority expansion.
 
 This protocol defines how Tabibi continues without Nassim acting as routine messenger, scheduler, reviewer coordinator, idle-agent detector or merge coordinator. It supplements `AGENTS.md`, `coordination/ROLE_FAILOVER_PROTOCOL.md`, `coordination/COLLABORATION_PROTOCOL.md`, and `coordination/COMPANY_OPERATING_SYSTEM.md`.
 
@@ -34,8 +34,10 @@ For every bounded work stream:
 1. exactly one canonical implementation branch/PR exists;
 2. exactly one active implementer lease exists;
 3. all replacement implementers continue the existing stream where technically possible;
-4. parallel work must be orthogonal: architecture/risk, QA, tests, review, observability, documentation, backlog or process improvement;
-5. do not create duplicate implementations merely to use spare model capacity.
+4. parallel implementation streams are allowed only after orchestration records a live conflict check proving disjoint planned write scopes and no shared global/sequential resource; absent that evidence, implementation is serialized;
+5. database migration numbering/schema evolution, package manifests/lockfiles, generated shared schemas, CI/workflow files and binding governance are globally exclusive resources unless an explicit serialization plan is recorded;
+6. orthogonal non-writing work such as architecture/risk, QA, review, observability, documentation and backlog analysis may proceed in parallel when it does not consume a conflicting implementation lease;
+7. do not create duplicate implementations merely to use spare model capacity.
 
 ## 4. Required leases
 
@@ -103,7 +105,7 @@ A valid binding gate records:
 - `code-reviewer` overlay where required;
 - verdict: `PASS`, `PASS_WITH_MINOR_FINDINGS`, or `CHANGES_REQUIRED`;
 - merge-ready status;
-- zero unresolved BLOCKER/MAJOR findings from that review.
+- zero unresolved BLOCKER/MAJOR or equivalent Medium+/High+/Critical substantive findings from that review.
 
 Any code/governance change after the gate invalidates it and requires fresh exact-head review.
 
@@ -186,9 +188,10 @@ When work completes:
 1. post final evidence/checkpoint;
 2. release stale lease;
 3. take another explicit lease if assigned;
-4. otherwise check `WORK_QUEUE.md` for safe `READY` orthogonal work;
-5. claim one bounded useful task or post one concise `TASK_PROPOSAL` / `AVAILABLE_FOR_WORK` note;
-6. stop rather than manufacturing status messages or duplicate work.
+4. otherwise check `WORK_QUEUE.md` for safe `READY` work;
+5. before parallel implementation, record the required conflict check (disjoint write scope + no shared exclusive resource); if the check cannot be established, serialize;
+6. claim one bounded useful task or post one concise `TASK_PROPOSAL` / `AVAILABLE_FOR_WORK` note;
+7. stop rather than manufacturing status messages or duplicate work.
 
 Invalid terminal states include:
 
@@ -206,7 +209,7 @@ After merge:
 1. reconcile `STATE.json` and `WORK_QUEUE.md`;
 2. capture a retro only when there is a reusable lesson, with one concrete improvement/no-change conclusion;
 3. automatically select and activate the next already-approved dependency-ready bounded work without waiting for a new owner prompt;
-4. fill safe non-conflicting WIP slots when multiple READY units exist, preserving one canonical stream/implementer per WU;
+4. fill additional implementation WIP slots only after recording the required conflict check for each pair of active streams; shared migration/schema/package-lock/CI/governance resources force serialization unless an explicit sequencing plan exists;
 5. otherwise route a genuine architecture/product ambiguity to ChatGPT, escalating to the owner only when it crosses an owner-only boundary;
 6. do not auto-expand scope beyond committed product/security contracts.
 
@@ -223,3 +226,17 @@ Tabibi is operating autonomously when:
 - context optimization cannot override evidence;
 - included AI capacity is used deliberately without hidden spending;
 - completed work immediately leaves a valid next action or genuine blocker.
+
+
+## 17. Governance self-amendment boundary
+
+Binding governance and the machinery that determines review/merge authority are owner-only control-plane assets. This includes at minimum `AGENTS.md`, `coordination/AUTONOMY_PROTOCOL.md`, the native merge controller, verified-review workflows, and their trusted proof/parsing helpers.
+
+A PR touching these paths:
+- may be implemented and independently reviewed autonomously;
+- may not use candidate content as evidence that the candidate is authorized;
+- requires durable owner authorization recorded outside the candidate diff;
+- must use the external reviewed merge path rather than the native self-merging controller;
+- still requires exact-head CI, independent non-author review, and reconciliation of all Medium+/P2-or-higher findings.
+
+If owner authorization is absent or ambiguous, fail closed and leave the PR unmerged.
