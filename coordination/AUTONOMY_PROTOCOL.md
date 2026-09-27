@@ -111,7 +111,7 @@ Any code/governance change after the gate invalidates it and requires fresh exac
 
 Before merge, inspect all available reviewer sources.
 
-- Any known-open `BLOCKER` or `MAJOR` from any reviewer source prevents merge until fixed or technically disproven/reconciled.
+- Any known-open `BLOCKER` or `MAJOR`, or equivalent `MEDIUM`/`HIGH`/`CRITICAL` substantive finding from any reviewer source, prevents merge until fixed or technically disproven/reconciled.
 - Supplemental reviewers do not silently become binding gates.
 - A PASS from one reviewer does not erase another reviewer's unresolved material finding.
 - Required CI failures remain independently blocking.
@@ -124,7 +124,7 @@ Merge is allowed only when all are true:
 2. reviewed exact head has not changed;
 3. required exact-head CI is green;
 4. one eligible independent non-author exact-head gate is valid;
-5. all known-open BLOCKER/MAJOR findings across reviewer sources are resolved/reconciled;
+5. all known-open BLOCKER/MAJOR or equivalent Medium+/High+/Critical substantive findings across reviewer sources are resolved/reconciled;
 6. no owner-only/external blocker remains;
 7. the merge executor is acting mechanically, not inventing new policy.
 
