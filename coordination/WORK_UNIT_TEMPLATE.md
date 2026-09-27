@@ -34,6 +34,15 @@ scope:
   exclude:
     - <explicit non-goal>
 
+parallel_safety:
+  write_scope:
+    - <planned repository paths/globs this WU may materially modify>
+  exclusive_resources:
+    - <migration-sequence|schema|package-lock|ci-workflow|governance|generated-schema|none>
+  conflict_check:
+    status: <serialized|required|clear>
+    evidence: <live comparison against every active implementation stream>
+
 invariants:
   - <state/data/security invariant>
 
@@ -52,6 +61,7 @@ review_independence:
 - Active actors are `chatgpt`, `codex`, `claude`, `copilot`, `gemini-cli`, and `mistral-vibe`, subject to `coordination/ACTOR_REGISTRY.json`, capability evidence, current included-plan availability, and authorship independence. Retired actors are not valid lease targets.
 - `gemini-cli` and `mistral-vibe` have no default production merge authority; merge execution remains restricted to actors that explicitly declare `merge_execution` capability in `coordination/ACTOR_REGISTRY.json`.
 - Every active specialist/experience-QA lane names one actor and one overlay. An overlay never creates/shares a lease by itself.
+- Before multiple implementation WUs run in parallel, each WU records `parallel_safety.write_scope`, exclusive resources, and live conflict-check evidence. Any overlapping write scope or shared exclusive resource forces serialization unless an explicit sequencing plan is recorded. Missing/ambiguous conflict evidence also forces serialization.
 - Secondary verifiers cannot issue the authoritative `MERGE_READY` verdict and receive no implementation authority from an overlay. Known-open `BLOCKER`/`MAJOR` findings from any verifier still invalidate merge readiness until reconciled.
 - The merge executor performs only the mechanical merge after every gate in `coordination/AUTONOMY_PROTOCOL.md` passes.
 
