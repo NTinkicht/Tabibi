@@ -295,6 +295,11 @@ def _classic_protection_enforces(protection):
         or checks.get("strict") is not True
         or not isinstance(reviews, dict)
         or int(reviews.get("required_approving_review_count") or 0) < 1
+        or not (
+            reviews.get("dismiss_stale_reviews") is True
+            or reviews.get("require_last_push_approval") is True
+        )
+        or reviews.get("required_conversation_resolution") is not True
         or not isinstance(enforce_admins, dict)
         or enforce_admins.get("enabled") is not True
         or not isinstance(force_pushes, dict)
