@@ -62,5 +62,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REQUIRED_CHECKS_JSON: >-
-            ["Quality and build","PostgreSQL integration","Browser smoke","L4 review authorization"]
+            [
+              "Quality and build",
+              "PostgreSQL integration",
+              "Browser smoke",
+              "L4 review authorization"
+            ]
         run: python scripts/native_factory_merge.py
