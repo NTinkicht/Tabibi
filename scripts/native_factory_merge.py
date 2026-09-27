@@ -295,6 +295,8 @@ def _classic_protection_enforces(protection):
         or checks.get("strict") is not True
         or not isinstance(reviews, dict)
         or int(reviews.get("required_approving_review_count") or 0) < 1
+        or reviews.get("dismiss_stale_reviews") is not True
+        or reviews.get("require_last_push_approval") is not True
         or not isinstance(enforce_admins, dict)
         or enforce_admins.get("enabled") is not True
         or not isinstance(force_pushes, dict)
@@ -303,18 +305,23 @@ def _classic_protection_enforces(protection):
         or deletions.get("enabled") is not False
     ):
         return False
-    contexts = {str(value) for value in checks.get("contexts", []) if value}
-    contexts.update(
-        str(item.get("context"))
-        for item in checks.get("checks", [])
-        if isinstance(item, dict) and item.get("context")
-    )
+    configured = checks.get("checks")
+    if not isinstance(configured, list):
+        return False
+    if not all(
+        any(
+            isinstance(item, dict)
+            and item.get("context") == context
+            and item.get("app_id") == 15368
+            for item in configured
+        )
+        for context in CI_JOBS
+    ):
+        return False
     allowances = reviews.get("bypass_pull_request_allowances")
     if not isinstance(allowances, dict):
         return False
-    if any(allowances.get(key) for key in ("users", "teams", "apps")):
-        return False
-    return CI_JOBS.issubset(contexts)
+    return not any(allowances.get(key) for key in ("users", "teams", "apps"))
 
 
 def strict_base_enforcement():
@@ -331,7 +338,7 @@ def strict_base_enforcement():
         default_branch = repository.get("default_branch")
         if default_branch != "main":
             return False
-        summaries = gh(f"repos/{REPO}/rulesets")
+        summaries = paged_rest(f"repos/{REPO}/rulesets")
     except RuntimeError:
         return False
     if not isinstance(summaries, list):
