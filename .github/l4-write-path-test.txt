@@ -1,0 +1,3 @@
+L4 GitHub connector code-write diagnostic.
+Created 2026-09-27.
+Safe to delete after verification.
