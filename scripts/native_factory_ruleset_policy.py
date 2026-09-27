@@ -79,6 +79,7 @@ def strict_ruleset_enforces(
     if (
         not isinstance(ruleset, dict)
         or ruleset.get("enforcement") != "active"
+        or ruleset.get("target") != "branch"
         or not applies_to_branch(
             ruleset, branch, default_branch=default_branch
         )
@@ -139,14 +140,17 @@ def strict_ruleset_enforces(
         ):
             return False
 
-    if not set(required_restricted_paths).issubset(restricted_paths):
+    required_paths = set(required_restricted_paths)
+    if required_paths and not required_paths.issubset(restricted_paths):
         return False
 
-    return {
+    required_types = {
         "pull_request",
         "required_status_checks",
         "deletion",
         "non_fast_forward",
-        "file_path_restriction",
-    }.issubset(rule_types)
+    }
+    if required_paths:
+        required_types.add("file_path_restriction")
+    return required_types.issubset(rule_types)
 
