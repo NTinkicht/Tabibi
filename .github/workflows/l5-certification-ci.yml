@@ -3,11 +3,11 @@ name: L5 Certification Candidate CI
 on:
   pull_request:
     paths:
-      - "scripts/l5_certification.py"
-      - "tests/l5_certification.test.py"
-      - "scripts/l5_recovery.py"
-      - "scripts/l5_state_machine.py"
-      - ".github/workflows/l5-certification-ci.yml"
+      - 'scripts/l5_certification.py'
+      - 'tests/l5_certification.test.py'
+      - 'scripts/l5_recovery.py'
+      - 'scripts/l5_state_machine.py'
+      - '.github/workflows/l5-certification-ci.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,7 +23,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
-          python-version: "3.12"
+          python-version: '3.12'
       - name: Run L5 certification harness
         run: python -I scripts/l5_certification.py
       - name: Prove certification checks survive optimized mode
