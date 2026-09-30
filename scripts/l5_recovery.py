@@ -5,9 +5,11 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from l5_state_machine import reduce_evidence
 
 MAX_RETRIES = 3
