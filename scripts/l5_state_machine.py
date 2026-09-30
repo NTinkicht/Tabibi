@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
+PASSING_REVIEWS = {"PASS", "PASS_WITH_MINOR_FINDINGS"}
 
 
 def _required_text(evidence: dict, key: str) -> str:
@@ -46,13 +47,22 @@ def reduce_evidence(evidence: dict) -> dict:
     verified = _required_bool(evidence, "verified")
 
     canonical_pr = evidence.get("canonical_pr")
-    active_prs = evidence.get("active_prs", [])
+    if "active_prs" not in evidence:
+        raise ValueError("L5_STATE_ACTIVE_PRS_UNKNOWN")
+    active_prs = evidence["active_prs"]
     if not isinstance(active_prs, list) or not all(type(v) is int and v > 0 for v in active_prs):
         raise ValueError("L5_STATE_ACTIVE_PRS_INVALID")
     if len(set(active_prs)) != len(active_prs):
         raise ValueError("L5_STATE_ACTIVE_PRS_DUPLICATE")
 
-    result = {"repository": repository, "issue": issue, "canonical_pr": canonical_pr, "state": "SELECTED", "next_action": "START_CANONICAL_STREAM", "mutation_allowed": False}
+    result = {
+        "repository": repository,
+        "issue": issue,
+        "canonical_pr": canonical_pr,
+        "state": "SELECTED",
+        "next_action": "START_CANONICAL_STREAM",
+        "mutation_allowed": False,
+    }
     if emergency_stop:
         result.update(next_action="EMERGENCY_STOP_HOLD")
         return result
@@ -82,9 +92,17 @@ def reduce_evidence(evidence: dict) -> dict:
     if _required_bool(evidence, "head_current") is not True or _required_bool(evidence, "base_current") is not True:
         result.update(state="IMPLEMENTING", next_action="RECONCILE_HEAD_BASE")
         return result
+
     if merged:
-        result.update(state="COMPLETE" if verified else "VERIFYING", next_action="REPLENISH_NEXT_READY_WU" if verified else "VERIFY_MERGED_RESULT")
+        if not verified:
+            result.update(state="VERIFYING", next_action="VERIFY_MERGED_RESULT")
+            return result
+        if not _bound_exact_refs(evidence, "verified", head, base):
+            result.update(state="VERIFYING", next_action="RECONCILE_VERIFIED_MERGE_EVIDENCE")
+            return result
+        result.update(state="COMPLETE", next_action="REPLENISH_NEXT_READY_WU")
         return result
+
     if _required_bool(evidence, "implementation_complete") is not True:
         result.update(state="IMPLEMENTING", next_action="CONTINUE_IMPLEMENTATION")
         return result
@@ -101,13 +119,14 @@ def reduce_evidence(evidence: dict) -> dict:
         return result
 
     review = evidence.get("review", "UNKNOWN")
-    if review in {"CHANGES_REQUESTED", "FINDINGS"} or evidence.get("unresolved_threads") is True:
+    unresolved_threads = _required_bool(evidence, "unresolved_threads")
+    if review in {"CHANGES_REQUESTED", "FINDINGS"} or unresolved_threads:
         result.update(state="REMEDIATING", next_action="REMEDIATE_SAME_PR_REVIEW")
         return result
     if review == "OUTAGE":
         result.update(state="REVIEWING", next_action="FAILOVER_TO_ELIGIBLE_NONAUTHOR_REVIEWER")
         return result
-    if review != "PASS":
+    if review not in PASSING_REVIEWS:
         result.update(state="REVIEWING", next_action="DISPATCH_ELIGIBLE_NONAUTHOR_REVIEW")
         return result
     if not _bound_exact_refs(evidence, "review", head, base):
@@ -119,7 +138,7 @@ def reduce_evidence(evidence: dict) -> dict:
     if not isinstance(reviewer, str) or not reviewer.strip():
         result.update(state="REVIEWING", next_action="RECONCILE_REVIEWER_IDENTITY")
         return result
-    if not isinstance(authors, list) or not all(isinstance(a, str) and a.strip() for a in authors):
+    if not isinstance(authors, list) or not authors or not all(isinstance(a, str) and a.strip() for a in authors):
         result.update(state="REVIEWING", next_action="RECONCILE_MATERIAL_AUTHORSHIP")
         return result
     if _required_bool(evidence, "review_eligible") is not True or reviewer.strip().lower() in {a.strip().lower() for a in authors}:
@@ -134,19 +153,56 @@ def reduce_evidence(evidence: dict) -> dict:
 
 def selftest() -> None:
     head, base = "a" * 40, "b" * 40
-    e = {"repository":"NTinkicht/Tabibi","issue":558,"canonical_pr":999,"active_prs":[999],"head_sha":head,"base_sha":base,"head_current":True,"base_current":True,"implementation_complete":True,"emergency_stop":False,"human_only":False,"blocked":False,"merged":False,"verified":False,"ci":"SUCCESS","ci_head_sha":head,"ci_base_sha":base,"review":"PASS","review_head_sha":head,"review_base_sha":base,"reviewer_actor":"mistral-vibe","material_authors":["chatgpt"],"review_eligible":True,"mergeable":True}
-    assert reduce_evidence(e)["state"] == "MERGE_READY"
-    assert reduce_evidence({**e,"active_prs":[999,1000]})["next_action"] == "DUPLICATE_STREAM_RECONCILIATION_REQUIRED"
-    assert reduce_evidence({**e,"ci_head_sha":"c"*40})["next_action"] == "RECONCILE_EXACT_HEAD_CI_EVIDENCE"
-    assert reduce_evidence({**e,"reviewer_actor":"chatgpt"})["next_action"] == "DISPATCH_ELIGIBLE_NONAUTHOR_REVIEW"
+    evidence = {
+        "repository": "NTinkicht/Tabibi",
+        "issue": 558,
+        "canonical_pr": 561,
+        "active_prs": [561],
+        "head_sha": head,
+        "base_sha": base,
+        "head_current": True,
+        "base_current": True,
+        "implementation_complete": True,
+        "emergency_stop": False,
+        "human_only": False,
+        "blocked": False,
+        "merged": False,
+        "verified": False,
+        "verified_head_sha": None,
+        "verified_base_sha": None,
+        "ci": "SUCCESS",
+        "ci_head_sha": head,
+        "ci_base_sha": base,
+        "review": "PASS",
+        "review_head_sha": head,
+        "review_base_sha": base,
+        "reviewer_actor": "mistral-vibe",
+        "material_authors": ["chatgpt"],
+        "review_eligible": True,
+        "unresolved_threads": False,
+        "mergeable": True,
+    }
+    assert reduce_evidence(evidence)["state"] == "MERGE_READY"
+    assert reduce_evidence({**evidence, "review": "PASS_WITH_MINOR_FINDINGS"})["state"] == "MERGE_READY"
+    assert reduce_evidence({**evidence, "active_prs": [561, 562]})["next_action"] == "DUPLICATE_STREAM_RECONCILIATION_REQUIRED"
+    assert reduce_evidence({**evidence, "ci_head_sha": "c" * 40})["next_action"] == "RECONCILE_EXACT_HEAD_CI_EVIDENCE"
+    assert reduce_evidence({**evidence, "reviewer_actor": "chatgpt"})["next_action"] == "DISPATCH_ELIGIBLE_NONAUTHOR_REVIEW"
     print("l5_state_machine selftest PASS")
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(); p.add_argument("--selftest", action="store_true"); p.add_argument("--input", type=Path); a = p.parse_args()
-    if a.selftest: selftest(); return 0
-    if a.input is None: raise SystemExit("--input is required unless --selftest is used")
-    print(json.dumps(reduce_evidence(json.loads(a.input.read_text(encoding="utf-8"))), indent=2, sort_keys=True)); return 0
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--selftest", action="store_true")
+    parser.add_argument("--input", type=Path)
+    args = parser.parse_args()
+    if args.selftest:
+        selftest()
+        return 0
+    if args.input is None:
+        raise SystemExit("--input is required unless --selftest is used")
+    print(json.dumps(reduce_evidence(json.loads(args.input.read_text(encoding="utf-8"))), indent=2, sort_keys=True))
+    return 0
 
 
-if __name__ == "__main__": raise SystemExit(main())
+if __name__ == "__main__":
+    raise SystemExit(main())
