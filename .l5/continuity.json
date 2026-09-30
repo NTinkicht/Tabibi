@@ -5,7 +5,12 @@
   "repository": "NTinkicht/Tabibi",
   "target_open_prs": 3,
   "ready_labels": ["l5-ready", "l4-ready"],
-  "blocking_labels": ["l5-blocked", "l4-blocked", "human-only", "release-go-no-go"],
+  "blocking_labels": [
+    "l5-blocked",
+    "l4-blocked",
+    "human-only",
+    "release-go-no-go"
+  ],
   "base_branch": "main",
   "count_drafts": true,
   "mutation_mode": "PLAN_ONLY",
