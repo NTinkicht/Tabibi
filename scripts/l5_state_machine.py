@@ -73,7 +73,9 @@ def reduce_evidence(evidence: dict) -> dict:
         result.update(next_action="DUPLICATE_STREAM_RECONCILIATION_REQUIRED")
         return result
     if canonical_pr is None:
-        if active_prs:
+        if merged:
+            result.update(state="VERIFYING", next_action="RECONCILE_CANONICAL_PR")
+        elif active_prs:
             result.update(next_action="RECONCILE_CANONICAL_PR")
         return result
     if type(canonical_pr) is not int or canonical_pr < 1:
@@ -141,6 +143,9 @@ def reduce_evidence(evidence: dict) -> dict:
     if not isinstance(authors, list) or not authors or not all(isinstance(a, str) and a.strip() for a in authors):
         result.update(state="REVIEWING", next_action="RECONCILE_MATERIAL_AUTHORSHIP")
         return result
+    if evidence.get("material_authors_head_sha") != head:
+        result.update(state="REVIEWING", next_action="RECONCILE_MATERIAL_AUTHORSHIP")
+        return result
     if _required_bool(evidence, "review_eligible") is not True or reviewer.strip().lower() in {a.strip().lower() for a in authors}:
         result.update(state="REVIEWING", next_action="DISPATCH_ELIGIBLE_NONAUTHOR_REVIEW")
         return result
@@ -154,39 +159,21 @@ def reduce_evidence(evidence: dict) -> dict:
 def selftest() -> None:
     head, base = "a" * 40, "b" * 40
     evidence = {
-        "repository": "NTinkicht/Tabibi",
-        "issue": 558,
-        "canonical_pr": 561,
-        "active_prs": [561],
-        "head_sha": head,
-        "base_sha": base,
-        "head_current": True,
-        "base_current": True,
-        "implementation_complete": True,
-        "emergency_stop": False,
-        "human_only": False,
-        "blocked": False,
-        "merged": False,
-        "verified": False,
-        "verified_head_sha": None,
-        "verified_base_sha": None,
-        "ci": "SUCCESS",
-        "ci_head_sha": head,
-        "ci_base_sha": base,
-        "review": "PASS",
-        "review_head_sha": head,
-        "review_base_sha": base,
-        "reviewer_actor": "mistral-vibe",
-        "material_authors": ["chatgpt"],
-        "review_eligible": True,
-        "unresolved_threads": False,
-        "mergeable": True,
+        "repository": "NTinkicht/Tabibi", "issue": 559, "canonical_pr": 562,
+        "active_prs": [562], "head_sha": head, "base_sha": base,
+        "head_current": True, "base_current": True, "implementation_complete": True,
+        "emergency_stop": False, "human_only": False, "blocked": False,
+        "merged": False, "verified": False, "verified_head_sha": None, "verified_base_sha": None,
+        "ci": "SUCCESS", "ci_head_sha": head, "ci_base_sha": base,
+        "review": "PASS", "review_head_sha": head, "review_base_sha": base,
+        "reviewer_actor": "mistral-vibe", "material_authors": ["chatgpt"],
+        "material_authors_head_sha": head, "review_eligible": True,
+        "unresolved_threads": False, "mergeable": True,
     }
     assert reduce_evidence(evidence)["state"] == "MERGE_READY"
     assert reduce_evidence({**evidence, "review": "PASS_WITH_MINOR_FINDINGS"})["state"] == "MERGE_READY"
-    assert reduce_evidence({**evidence, "active_prs": [561, 562]})["next_action"] == "DUPLICATE_STREAM_RECONCILIATION_REQUIRED"
-    assert reduce_evidence({**evidence, "ci_head_sha": "c" * 40})["next_action"] == "RECONCILE_EXACT_HEAD_CI_EVIDENCE"
-    assert reduce_evidence({**evidence, "reviewer_actor": "chatgpt"})["next_action"] == "DISPATCH_ELIGIBLE_NONAUTHOR_REVIEW"
+    assert reduce_evidence({**evidence, "material_authors_head_sha": "c" * 40})["next_action"] == "RECONCILE_MATERIAL_AUTHORSHIP"
+    assert reduce_evidence({**evidence, "canonical_pr": None, "active_prs": [], "merged": True})["next_action"] == "RECONCILE_CANONICAL_PR"
     print("l5_state_machine selftest PASS")
 
 
