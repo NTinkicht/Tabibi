@@ -11,7 +11,7 @@ from pathlib import Path
 POLICY_PATH = Path("scripts/l5_continuity_policy.json")
 MAX_PAGES = 10
 WORK_REF = re.compile(
-    r"(?i)\b(?:implements?|closes?|fixes?|resolves?|tracks?)\s+#([1-9][0-9]{0,5})(?![0-9])"
+    r"(?i)\b(?:implements?|closes?|fixes?|resolves?)\s+#([1-9][0-9]{0,5})(?![0-9])"
 )
 MANDATORY_BLOCKING_LABELS = {"l4-blocked", "human-only", "release-go-no-go"}
 
@@ -92,7 +92,7 @@ def quota_pr_rows(pulls: list[dict], *, count_drafts: bool) -> list[dict]:
 def represented_issue_numbers(pulls: list[dict], repo: str) -> set[int]:
     represented: set[int] = set()
     url_ref = re.compile(
-        rf"(?i)\b(?:implements?|closes?|fixes?|resolves?|tracks?)\s+"
+        rf"(?i)\b(?:implements?|closes?|fixes?|resolves?)\s+"
         rf"https://github\.com/{re.escape(repo)}/issues/([1-9][0-9]{{0,5}})(?![0-9])"
     )
     for pr in pulls:
@@ -167,7 +167,7 @@ def selftest() -> None:
             "draft": False,
             "base": {"ref": "main"},
             "head": {"repo": {"full_name": repo}},
-            "body": "Implements #3. Follow-up work remains in #9.",
+            "body": "Implements #3. Follow-up work remains in #9. Tracks #11.",
         },
         {
             "number": 8,
