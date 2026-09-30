@@ -41,6 +41,7 @@
     "@types/pg": "8.15.5",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
+    "brace-expansion": "1.1.21",
     "eslint": "9.35.0",
     "eslint-config-next": "16.3.4",
     "prettier": "3.6.2",
@@ -49,7 +50,6 @@
     "vitest": "4.1.11"
   },
   "overrides": {
-    "brace-expansion@1.1.20": "1.1.21",
     "@typescript-eslint/typescript-estree": {
       "brace-expansion": "5.0.12"
     }
