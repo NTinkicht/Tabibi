@@ -2,7 +2,7 @@ name: L5 Continuity Supervision
 
 on:
   schedule:
-    - cron: "11 * * * *"
+    - cron: '11 * * * *'
   workflow_dispatch:
   pull_request:
     types:
