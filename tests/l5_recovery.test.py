@@ -110,28 +110,56 @@ class L5RecoveryTest(unittest.TestCase):
         self.assertEqual(result["mutation"], "merge_expected_head")
         self.assertEqual(result["expected_head_sha"], "a" * 40)
 
-    def test_activation_replay_is_noop(self):
+    def test_activation_replay_is_event_independent(self):
         first = l5.authorize_mutation(self.base())
-        replay = l5.authorize_mutation(self.base(), prior_mutation_tokens={first["mutation_token"]})
+        changed_event = {**self.base(), "event_id":"fresh-poll-id"}
+        second = l5.authorize_mutation(changed_event)
+        self.assertEqual(first["mutation_token"], second["mutation_token"])
+        replay = l5.authorize_mutation(changed_event, prior_mutation_tokens={first["mutation_token"]})
         self.assertFalse(replay["mutation_allowed"])
         self.assertEqual(replay["reason"], "REPLAY_NOOP")
 
+    def test_activation_replay_history_is_strictly_validated(self):
+        with self.assertRaises(ValueError):
+            l5.authorize_mutation(self.base(), prior_mutation_tokens={"broken"})
+        with self.assertRaises(ValueError):
+            l5.plan_recovery(self.base(), prior_event_keys={"broken"})
+        with self.assertRaises(ValueError):
+            l5._prior_mutation_tokens({**self.base(), "prior_mutation_tokens":["broken"]})
+
     def test_activation_hard_boundaries_fail_closed(self):
+        invalids = ("true", 1, None)
         for field in l5.HARD_BOUNDARY_FIELDS:
-            sample = self.base()
-            sample[field] = True
+            sample = self.base(); sample[field] = True
             self.assertFalse(l5.authorize_mutation(sample)["mutation_allowed"], field)
-        for field in l5.HARD_BOUNDARY_FIELDS:
-            sample = self.base()
-            sample.pop(field)
-            with self.assertRaises(ValueError):
-                l5.authorize_mutation(sample)
+            missing = self.base(); missing.pop(field)
+            with self.assertRaises(ValueError): l5.authorize_mutation(missing)
+            for bad in invalids:
+                malformed = self.base(); malformed[field] = bad
+                with self.assertRaises(ValueError): l5.authorize_mutation(malformed)
 
     def test_activation_unresolved_threads_only_allow_same_pr_remediation(self):
         sample = {**self.base(), "unresolved_threads":True}
         result = l5.authorize_mutation(sample)
         self.assertEqual(result["mutation"], "remediate_review")
         self.assertNotEqual(result["mutation"], "merge_expected_head")
+
+    def test_activation_negative_merge_evidence_never_authorizes_merge(self):
+        cases = [
+            {"ci_head_sha":"c"*40},
+            {"review_head_sha":"c"*40},
+            {"reviewer_actor":"chatgpt"},
+            {"mergeable":False},
+        ]
+        for patch in cases:
+            result = l5.authorize_mutation({**self.base(), **patch})
+            self.assertFalse(result["mutation_allowed"] and result.get("mutation") == "merge_expected_head", patch)
+
+    def test_activation_exhausted_retry_budget_refuses_mutation(self):
+        snap = {**self.base(), "ci":"FAILURE", "review":"UNKNOWN", "retry_count":l5.MAX_RETRIES, "retry_action":"CI"}
+        result = l5.authorize_mutation(snap)
+        self.assertFalse(result["mutation_allowed"])
+        self.assertEqual(result["planned_action"], "RETRY_BUDGET_EXHAUSTED")
 
     def test_activation_replenishment_reserves_verified_candidate(self):
         sample = {**self.base(), "active_prs":[], "merged":True,"verified":True,
@@ -143,6 +171,13 @@ class L5RecoveryTest(unittest.TestCase):
         result = l5.authorize_mutation(sample)
         self.assertEqual(result["mutation"], "reserve_next_wu")
         self.assertEqual(result["selected_issue"], 701)
+
+    def test_activation_never_replenishes_with_active_pr(self):
+        sample = {**self.base(), "merged":True,"verified":True,
+                  "verified_head_sha":"a"*40,"verified_base_sha":"b"*40,
+                  "ready_candidates":[{"issue":701,"ready":True,"blocked":False,"human_only":False,"conflict_safe":True}]}
+        result = l5.authorize_mutation(sample)
+        self.assertFalse(result["mutation_allowed"] and result.get("mutation") == "reserve_next_wu")
 
     def test_activation_stale_refs_do_not_authorize(self):
         for field in ("head_current", "base_current"):
