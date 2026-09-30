@@ -37,6 +37,10 @@ class L5RecoveryTest(unittest.TestCase):
         failed = {**self.base(), "ci":"FAILURE", "retry_count":3, "retry_action":"CI"}
         self.assertEqual(l5.plan_recovery(failed)["next_action"], "RETRY_BUDGET_EXHAUSTED")
 
+    def test_unknown_retry_scope_fails_closed(self):
+        with self.assertRaises(ValueError):
+            l5.plan_recovery({**self.base(), "ci":"FAILURE", "retry_count":3, "retry_action":"garbage"})
+
     def test_review_failover_stays_same_stream(self):
         plan = l5.plan_recovery({**self.base(), "review":"OUTAGE"})
         self.assertEqual(plan["next_action"], "FAILOVER_TO_ELIGIBLE_NONAUTHOR_REVIEWER")
@@ -46,6 +50,13 @@ class L5RecoveryTest(unittest.TestCase):
         snap = {**self.base(), "ci":"FAILURE"}
         first = l5.plan_recovery(snap)
         self.assertEqual(l5.plan_recovery(snap, prior_event_keys={first["event_key"]})["status"], "REPLAY_NOOP")
+
+    def test_cli_replay_history_is_validated_and_consumable(self):
+        snap = {**self.base(), "ci":"FAILURE"}
+        first = l5.plan_recovery(snap)
+        self.assertEqual(l5._prior_event_keys({**snap, "prior_event_keys":[first["event_key"]]}), {first["event_key"]})
+        with self.assertRaises(ValueError):
+            l5._prior_event_keys({**snap, "prior_event_keys":["broken"]})
 
     def test_verification_scope_resets_ci_budget(self):
         snap = {**self.base(), "active_prs":[], "merged":True, "verified":False, "retry_count":3, "retry_action":"CI"}
