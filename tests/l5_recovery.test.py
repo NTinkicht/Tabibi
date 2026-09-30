@@ -110,6 +110,12 @@ class L5RecoveryTest(unittest.TestCase):
         self.assertEqual(result["mutation"], "merge_expected_head")
         self.assertEqual(result["expected_head_sha"], "a" * 40)
 
+    def test_activation_authorizes_canonical_minor_findings_review(self):
+        sample = {**self.base(), "review":"PASS_WITH_MINOR_FINDINGS"}
+        result = l5.authorize_mutation(sample)
+        self.assertTrue(result["authorized"])
+        self.assertEqual(result["mutation"], "merge_expected_head")
+
     def test_activation_replay_is_event_independent(self):
         first = l5.authorize_mutation(self.base())
         changed_event = {**self.base(), "event_id":"fresh-poll-id"}
@@ -162,12 +168,7 @@ class L5RecoveryTest(unittest.TestCase):
         self.assertNotEqual(result["mutation"], "merge_expected_head")
 
     def test_activation_negative_merge_evidence_never_authorizes_merge(self):
-        cases = [
-            {"ci_head_sha":"c"*40},
-            {"review_head_sha":"c"*40},
-            {"reviewer_actor":"chatgpt"},
-            {"mergeable":False},
-        ]
+        cases = [{"ci_head_sha":"c"*40},{"review_head_sha":"c"*40},{"reviewer_actor":"chatgpt"},{"mergeable":False}]
         for patch in cases:
             result = l5.authorize_mutation({**self.base(), **patch})
             self.assertFalse(result["mutation_allowed"] and result.get("mutation") == "merge_expected_head", patch)
