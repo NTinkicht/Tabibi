@@ -16,10 +16,11 @@ Client contract (all reads must be live, never cached):
 
 Store contract:
     get(token) -> record | None
-    begin(token, record, retry_count_after, retry_action_after) -> bool
-        atomic create-if-absent that also persists retry state; False if token exists
+    begin(token, record, stream, retry_count_after, retry_action_after) -> bool
+        atomic create-if-absent that also persists retry state for ``stream``; False if token exists
     set_status(token, status, detail=None)
-    retry_state() -> (count, action | None)
+    retry_state(stream) -> (count, action | None)
+Retry state is scoped per canonical work stream (see ``stream_key``), never shared across WUs.
 """
 from __future__ import annotations
 
@@ -51,6 +52,10 @@ class AlreadyExists(Exception):
 
 class WriteRejected(Exception):
     """Remote refused the write (e.g. expected-head merge race)."""
+
+
+def stream_key(auth: dict[str, Any], snapshot: dict[str, Any]) -> str:
+    return json.dumps([snapshot.get("repository"), auth["issue"], auth["canonical_pr"]], separators=(",", ":"))
 
 
 def _result(status: str, reason: str, token: Any = None) -> dict[str, Any]:
@@ -89,7 +94,7 @@ def _validate_authorization(auth: Any, snapshot: Any) -> str | None:
     return None
 
 
-def _live_gate(auth: dict[str, Any], client: Any, store: Any, *, check_retry: bool = True) -> str | None:
+def _live_gate(auth: dict[str, Any], stream: str, client: Any, store: Any, *, check_retry: bool = True) -> str | None:
     """Absolute recheck of hard boundaries + live CAS + stream/retry state. Returns block reason."""
     boundaries = client.fetch_boundaries()
     if not isinstance(boundaries, dict):
@@ -119,7 +124,7 @@ def _live_gate(auth: dict[str, Any], client: Any, store: Any, *, check_retry: bo
     if mutation == "dispatch_review" and live.get("review_eligible_nonauthor") is not True:
         return "REVIEWER_NOT_ELIGIBLE"
     if check_retry and mutation in RETRYABLE:  # begin() already advanced retry state on the final gate
-        count, action = store.retry_state()
+        count, action = store.retry_state(stream)
         scope = auth["retry_action_after"]
         if (count if action == scope else 0) + 1 != auth["retry_count_after"]:
             return "RETRY_STATE_STALE"
@@ -157,17 +162,18 @@ def execute_mutation(auth: dict[str, Any], snapshot: dict[str, Any], client: Any
             return _reconcile(auth, client, store, written=False)
         return _result("BLOCKED", f"PRIOR_{status}", token)
 
-    block = _live_gate(auth, client, store)
+    stream = stream_key(auth, snapshot)
+    block = _live_gate(auth, stream, client, store)
     if block:
         return _result("BLOCKED", block, token)
 
     record = {"mutation": auth["mutation"], "canonical_pr": auth["canonical_pr"], "status": "PENDING",
               "expected_head_sha": auth["expected_head_sha"], "expected_base_sha": auth["expected_base_sha"]}
-    if not store.begin(token, record, auth.get("retry_count_after"), auth.get("retry_action_after")):
+    if not store.begin(token, record, stream, auth.get("retry_count_after"), auth.get("retry_action_after")):
         return _result("REPLAY_NOOP", "TOKEN_ALREADY_PERSISTED", token)
 
     # Final gate immediately before the write, after the token is durable.
-    block = _live_gate(auth, client, store, check_retry=False)
+    block = _live_gate(auth, stream, client, store, check_retry=False)
     if block:
         store.set_status(token, "FAILED", block)
         return _result("BLOCKED", block, token)
@@ -185,25 +191,25 @@ def execute_mutation(auth: dict[str, Any], snapshot: dict[str, Any], client: Any
 class MemoryStore:
     def __init__(self) -> None:
         self.records: dict[str, dict[str, Any]] = {}
-        self.retry: tuple[int, str | None] = (0, None)
+        self.retry: dict[str, tuple[int, str | None]] = {}
 
     def get(self, token: str) -> dict[str, Any] | None:
         return dict(self.records[token]) if token in self.records else None
 
-    def begin(self, token: str, record: dict[str, Any], count: int | None, action: str | None) -> bool:
+    def begin(self, token: str, record: dict[str, Any], stream: str, count: int | None, action: str | None) -> bool:
         if token in self.records:
             return False
         self.records[token] = dict(record)
         if count is not None:
-            self.retry = (count, action)
+            self.retry[stream] = (count, action)
         return True
 
     def set_status(self, token: str, status: str, detail: Any = None) -> None:
         self.records[token]["status"] = status
         self.records[token]["detail"] = detail
 
-    def retry_state(self) -> tuple[int, str | None]:
-        return self.retry
+    def retry_state(self, stream: str) -> tuple[int, str | None]:
+        return self.retry.get(stream, (0, None))
 
 
 class JsonFileStore(MemoryStore):
@@ -219,26 +225,27 @@ class JsonFileStore(MemoryStore):
             fcntl.flock(lock, fcntl.LOCK_EX)
             if self.path.exists():
                 data = json.loads(self.path.read_text(encoding="utf-8"))
-                self.records, self.retry = data["records"], (data["retry"][0], data["retry"][1])
+                self.records = data["records"]
+                self.retry = {k: (v[0], v[1]) for k, v in data["retry"].items()}
             else:
-                self.records, self.retry = {}, (0, None)
+                self.records, self.retry = {}, {}
             out = fn()
             tmp = self.path.with_suffix(".tmp")
-            tmp.write_text(json.dumps({"records": self.records, "retry": list(self.retry)}, sort_keys=True), encoding="utf-8")
+            tmp.write_text(json.dumps({"records": self.records, "retry": {k: list(v) for k, v in self.retry.items()}}, sort_keys=True), encoding="utf-8")
             os.replace(tmp, self.path)
             return out
 
     def get(self, token: str) -> dict[str, Any] | None:
         return self._locked(lambda: MemoryStore.get(self, token))
 
-    def begin(self, token: str, record: dict[str, Any], count: int | None, action: str | None) -> bool:
-        return self._locked(lambda: MemoryStore.begin(self, token, record, count, action))
+    def begin(self, token: str, record: dict[str, Any], stream: str, count: int | None, action: str | None) -> bool:
+        return self._locked(lambda: MemoryStore.begin(self, token, record, stream, count, action))
 
     def set_status(self, token: str, status: str, detail: Any = None) -> None:
         self._locked(lambda: MemoryStore.set_status(self, token, status, detail))
 
-    def retry_state(self) -> tuple[int, str | None]:
-        return self._locked(lambda: MemoryStore.retry_state(self))
+    def retry_state(self, stream: str) -> tuple[int, str | None]:
+        return self._locked(lambda: MemoryStore.retry_state(self, stream))
 
 
 def selftest() -> None:

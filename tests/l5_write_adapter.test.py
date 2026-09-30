@@ -80,6 +80,10 @@ class FakeClient:
 
 
 class WriteAdapterTest(unittest.TestCase):
+    @staticmethod
+    def stream(auth, snap=None):
+        return wa.stream_key(auth, snap or snapshot())
+
     def run_it(self, snap, client, store=None):
         store = store or wa.MemoryStore()
         auth = rec.authorize_mutation(snap)
@@ -91,7 +95,7 @@ class WriteAdapterTest(unittest.TestCase):
         auth, store, out = self.run_it(snapshot(), client)
         self.assertEqual((out["status"], out["written"]), ("COMPLETE", True))
         self.assertEqual(store.records[auth["mutation_token"]]["status"], "COMPLETE")
-        self.assertEqual(store.retry_state(), (1, "CI"))
+        self.assertEqual(store.retry_state(self.stream(auth)), (1, "CI"))
         self.assertEqual(client.writes, [("retry_ci", auth["mutation_token"])])
 
     def test_each_safe_mutation_executes(self):
@@ -127,7 +131,7 @@ class WriteAdapterTest(unittest.TestCase):
     def test_crash_after_persist_replays_as_reconcile_not_rewrite(self):
         snap = snapshot(); auth = rec.authorize_mutation(snap)
         store = wa.MemoryStore()
-        store.begin(auth["mutation_token"], {"status": "PENDING"}, 1, "CI")
+        store.begin(auth["mutation_token"], {"status": "PENDING"}, self.stream(auth), 1, "CI")
         client = FakeClient(); client.effect = True  # write landed, process died before verify
         out = wa.execute_mutation(auth, snap, client, store)
         self.assertEqual(out["status"], "COMPLETE")
@@ -170,7 +174,7 @@ class WriteAdapterTest(unittest.TestCase):
         self.assertEqual(client.writes, [])
 
     def test_stale_persisted_retry_state_blocks(self):
-        snap = snapshot(); store = wa.MemoryStore(); store.retry = (2, "CI")
+        snap = snapshot(); store = wa.MemoryStore(); store.retry[self.stream(rec.authorize_mutation(snap), snap)] = (2, "CI")
         client = FakeClient()
         _, _, out = self.run_it(snap, client, store)
         self.assertEqual(out["reason"], "RETRY_STATE_STALE")
@@ -221,13 +225,65 @@ class WriteAdapterTest(unittest.TestCase):
         self.assertEqual(client.writes, [])
 
     def test_provider_availability_does_not_grant_reviewer_dispatch(self):
-        snap = snapshot(ci="SUCCESS")
+        snap = snapshot(ci="SUCCESS", review="UNKNOWN")
         auth = rec.authorize_mutation(snap)
-        if auth.get("mutation") != "dispatch_review":
-            self.skipTest("snapshot did not plan a review dispatch")
-        client = FakeClient(); client.live["review_eligible_nonauthor"] = False
-        out = wa.execute_mutation(auth, snap, client, wa.MemoryStore())
-        self.assertEqual(out["reason"], "REVIEWER_NOT_ELIGIBLE")
+        self.assertEqual(auth["mutation"], "dispatch_review")
+        # Provider is up, but no live eligible non-author reviewer: availability alone never grants eligibility.
+        for eligible in (False, None, "yes", 1):
+            client = FakeClient(); client.live["provider_available"] = True
+            client.live["review_eligible_nonauthor"] = eligible
+            store = wa.MemoryStore()
+            out = wa.execute_mutation(auth, snap, client, store)
+            self.assertEqual((out["status"], out["reason"]), ("BLOCKED", "REVIEWER_NOT_ELIGIBLE"))
+            self.assertEqual(client.writes, [])
+            self.assertEqual(store.records, {})
+        client = FakeClient(); client.live["provider_available"] = False  # eligibility, not provider state, decides
+        self.assertEqual(wa.execute_mutation(auth, snap, client, wa.MemoryStore())["status"], "COMPLETE")
+
+    def _assert_retry_isolation(self, store):
+        snap_a = snapshot()
+        snap_b = snapshot(issue=600, canonical_pr=601, active_prs=[601], event_id="evt-b")
+        ka = self.stream(rec.authorize_mutation(snap_a), snap_a)
+        kb = self.stream(rec.authorize_mutation(snap_b), snap_b)
+        self.assertNotEqual(ka, kb)
+        streams_b = {600: [601]}
+
+        def run(snap, streams=None):
+            auth = rec.authorize_mutation(snap)
+            return wa.execute_mutation(auth, snap, FakeClient(streams=streams), store)
+
+        self.assertEqual(run(snap_a)["status"], "COMPLETE")
+        self.assertEqual(run(snap_b, streams_b)["status"], "COMPLETE")
+        self.assertEqual((store.retry_state(ka), store.retry_state(kb)), ((1, "CI"), (1, "CI")))
+        # A takes a second CI retry; B's budget is untouched.
+        self.assertEqual(run(snapshot(retry_count=1, retry_action="CI", event_id="evt-a2"))["status"], "COMPLETE")
+        self.assertEqual((store.retry_state(ka), store.retry_state(kb)), ((2, "CI"), (1, "CI")))
+        # A moves to REVIEW scope (resetting only A); B's CI count survives.
+        snap_a3 = snapshot(ci="SUCCESS", retry_count=2, retry_action="CI", event_id="evt-a3")
+        self.assertEqual(run(snap_a3)["status"], "COMPLETE")
+        self.assertEqual((store.retry_state(ka), store.retry_state(kb)), ((1, "REVIEW"), (1, "CI")))
+        # B's second CI retry is still valid against its own state despite A's changes.
+        snap_b2 = snapshot(issue=600, canonical_pr=601, active_prs=[601], retry_count=1, retry_action="CI", event_id="evt-b2")
+        self.assertEqual(run(snap_b2, streams_b)["status"], "COMPLETE")
+        self.assertEqual((store.retry_state(ka), store.retry_state(kb)), ((1, "REVIEW"), (2, "CI")))
+        # Exhausting B never blocks A.
+        snap_b3 = snapshot(issue=600, canonical_pr=601, active_prs=[601], retry_count=2, retry_action="CI", event_id="evt-b3")
+        self.assertEqual(run(snap_b3, streams_b)["status"], "COMPLETE")
+        self.assertEqual(store.retry_state(kb), (3, "CI"))
+        self.assertEqual(run(snapshot(ci="SUCCESS", retry_count=1, retry_action="REVIEW", event_id="evt-a4"))["status"], "COMPLETE")
+        self.assertEqual(store.retry_state(ka), (2, "REVIEW"))
+
+    def test_retry_state_isolated_per_stream_memory_store(self):
+        self._assert_retry_isolation(wa.MemoryStore())
+
+    def test_retry_state_isolated_per_stream_json_file_store(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "s.json"
+            self._assert_retry_isolation(wa.JsonFileStore(path))
+            fresh = wa.JsonFileStore(path)
+            snap_b = snapshot(issue=600, canonical_pr=601)
+            kb = self.stream(rec.authorize_mutation(snap_b), snap_b)
+            self.assertEqual(fresh.retry_state(kb), (3, "CI"))
 
     def test_json_file_store_persists_across_instances(self):
         with tempfile.TemporaryDirectory() as d:
@@ -237,8 +293,8 @@ class WriteAdapterTest(unittest.TestCase):
             self.assertEqual(out["status"], "COMPLETE")
             fresh = wa.JsonFileStore(path)
             self.assertEqual(fresh.get(auth["mutation_token"])["status"], "COMPLETE")
-            self.assertEqual(fresh.retry_state(), (1, "CI"))
-            self.assertFalse(fresh.begin(auth["mutation_token"], {}, 1, "CI"))
+            self.assertEqual(fresh.retry_state(self.stream(auth)), (1, "CI"))
+            self.assertFalse(fresh.begin(auth["mutation_token"], {}, self.stream(auth), 1, "CI"))
 
 
 if __name__ == "__main__":
