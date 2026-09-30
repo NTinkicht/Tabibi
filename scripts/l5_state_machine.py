@@ -158,6 +158,8 @@ def _retry_state(snapshot: dict[str, Any], action: str) -> tuple[int, str | None
     if count > 0 and persisted is None:
         raise ValueError("L5_RECOVERY_RETRY_ACTION_REQUIRED")
     current = RECOVERY_ACTION_SCOPES.get(action)
+    if current is None:
+        return count, persisted
     return (count if persisted == current else 0), persisted
 
 
@@ -216,6 +218,11 @@ def selftest() -> None:
     first = plan_recovery(red)
     assert first["retry_action_after"] == "CI"
     assert plan_recovery(red, prior_event_keys={first["event_key"]})["status"] == "REPLAY_NOOP"
+    hold = {**red, "emergency_stop": True, "retry_count": 2, "retry_action": "CI"}
+    hold_plan = plan_recovery(hold)
+    assert hold_plan["status"] == "BLOCKED"
+    assert hold_plan["retry_count"] == 2
+    assert hold_plan["retry_action"] == "CI"
     try:
         plan_recovery({**red, "retry_count": 3, "retry_action": "garbage"})
         raise AssertionError("unknown retry scope accepted")
