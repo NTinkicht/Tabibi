@@ -99,11 +99,13 @@ class L5ActivationTest(unittest.TestCase):
         self.assertTrue(result["authorized"])
         self.assertEqual(result["mutation"], "dispatch_review")
 
-    def test_unresolved_threads_block_merge(self):
+    def test_unresolved_threads_allow_remediation_but_never_merge(self):
         sample = self.base()
         sample["unresolved_threads"] = True
         result = l5.authorize_mutation(sample)
-        self.assertFalse(result["mutation_allowed"])
+        self.assertTrue(result["mutation_allowed"])
+        self.assertEqual(result["mutation"], "remediate_review")
+        self.assertNotEqual(result["mutation"], "merge_expected_head")
 
     def test_replenishment_selects_only_recovery_verified_candidate(self):
         sample = self.base()
