@@ -46,8 +46,12 @@ TRUSTED_GATE_PATHS = frozenset({
     "coordination/AI_CAPACITY_POLICY.md",
     "coordination/ACTOR_REGISTRY.json",
     ".github/workflows/ci.yml",
+    ".github/workflows/l5-continuity-ci.yml",
+    ".github/workflows/l5-continuity-supervision.yml",
     ".github/workflows/mistral-vibe-wake.yml",
     ".github/workflows/native-factory-merge-controller.yml",
+    "scripts/l5_continuity.py",
+    "scripts/l5_continuity_policy.json",
     "scripts/mistral-review-target.py",
     "scripts/coordination/mistral-review-proof.py",
     "scripts/coordination/publish-mistral-review.py",
@@ -469,6 +473,14 @@ def gates(number, *, require_authorization=True):
 
 def selftest_authenticated_review_gate():
     """Exercise exact-body, workflow-ref and fail-closed proof authentication."""
+    required_l5_paths = {
+        ".github/workflows/l5-continuity-ci.yml",
+        ".github/workflows/l5-continuity-supervision.yml",
+        "scripts/l5_continuity.py",
+        "scripts/l5_continuity_policy.json",
+    }
+    assert required_l5_paths.issubset(TRUSTED_GATE_PATHS)
+
     sha = "a" * 40
     number = 7
     run_id = "123"

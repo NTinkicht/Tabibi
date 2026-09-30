@@ -1,0 +1,26 @@
+name: L5 Continuity Candidate CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/l5_continuity.py'
+      - 'scripts/l5_continuity_policy.json'
+      - '.github/workflows/l5-continuity-*.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  continuity-selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate deterministic L5 continuity invariants
+        run: python3 scripts/l5_continuity.py --selftest
+      - name: Validate candidate L5 continuity policy
+        env:
+          GITHUB_REPOSITORY: NTinkicht/Tabibi
+        run: python3 scripts/l5_continuity.py --validate-policy
