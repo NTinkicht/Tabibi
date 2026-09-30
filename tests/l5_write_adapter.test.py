@@ -281,7 +281,7 @@ class WriteAdapterTest(unittest.TestCase):
             path = Path(d) / "s.json"
             self._assert_retry_isolation(wa.JsonFileStore(path))
             fresh = wa.JsonFileStore(path)
-            snap_b = snapshot(issue=600, canonical_pr=601)
+            snap_b = snapshot(issue=600, canonical_pr=601, active_prs=[601])
             kb = self.stream(rec.authorize_mutation(snap_b), snap_b)
             self.assertEqual(fresh.retry_state(kb), (3, "CI"))
 

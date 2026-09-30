@@ -29,6 +29,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12'
+      # Owner-authored metadata touch after app-authored hardening; no behavior change.
       - name: Compile guarded adapter and tests
         run: python -m py_compile scripts/l5_write_adapter.py tests/l5_write_adapter.test.py scripts/l5_recovery.py scripts/native_factory_merge.py
       - name: Run guarded write adapter fault tests
