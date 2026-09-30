@@ -48,10 +48,13 @@ TRUSTED_GATE_PATHS = frozenset({
     ".github/workflows/ci.yml",
     ".github/workflows/l5-continuity-ci.yml",
     ".github/workflows/l5-continuity-supervision.yml",
+    ".github/workflows/l5-durable-state-ci.yml",
     ".github/workflows/mistral-vibe-wake.yml",
     ".github/workflows/native-factory-merge-controller.yml",
     "scripts/l5_continuity.py",
     "scripts/l5_continuity_policy.json",
+    "scripts/l5_state_machine.py",
+    "tests/l5_state_machine.test.py",
     "scripts/mistral-review-target.py",
     "scripts/coordination/mistral-review-proof.py",
     "scripts/coordination/publish-mistral-review.py",
@@ -259,13 +262,9 @@ def authenticated_mistral_approval(review, number, sha):
             or proof.get("verdict") != "PASS"
         ):
             return False
-        # Re-authenticate the immutable Issue #11 report and its digest.
         proof_reader.sealed_report(proof)
         return True
     except Exception:
-        # A malformed trusted helper or unexpected proof-verification failure
-        # makes this approval ineligible; it must not abort reconciliation of
-        # unrelated candidate PRs.
         return False
 
 
@@ -427,9 +426,6 @@ def strict_base_enforcement():
 
 
 def candidate_numbers():
-    # Direct review events preserve their PR. Chained workflow_run events from
-    # trusted-main workflows frequently do not, so reconcile all open same-repo
-    # PRs rather than losing the reviewed PR after CI -> reviewer -> verifier.
     if os.environ["GITHUB_EVENT_NAME"] == "pull_request_review":
         number = EVENT.get("pull_request", {}).get("number")
         return [int(number)] if number else []
@@ -476,8 +472,11 @@ def selftest_authenticated_review_gate():
     required_l5_paths = {
         ".github/workflows/l5-continuity-ci.yml",
         ".github/workflows/l5-continuity-supervision.yml",
+        ".github/workflows/l5-durable-state-ci.yml",
         "scripts/l5_continuity.py",
         "scripts/l5_continuity_policy.json",
+        "scripts/l5_state_machine.py",
+        "tests/l5_state_machine.test.py",
     }
     assert required_l5_paths.issubset(TRUSTED_GATE_PATHS)
 
