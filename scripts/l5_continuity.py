@@ -33,6 +33,30 @@ def paged(repo: str, path: str):
     raise RuntimeError("PAGINATION_BOUND_EXCEEDED")
 
 
+def validate_policy(policy: dict, repo: str) -> None:
+    if not isinstance(policy, dict):
+        raise RuntimeError("L5_POLICY_INVALID")
+    if policy.get("schema_version") != "1.0":
+        raise RuntimeError("L5_POLICY_SCHEMA_INVALID")
+    if policy.get("level") != "L5_CANDIDATE" or policy.get("phase") != "L4.1_CONTINUITY":
+        raise RuntimeError("L5_POLICY_PHASE_INVALID")
+    if policy.get("repository") != repo:
+        raise RuntimeError("POLICY_REPOSITORY_MISMATCH")
+    if policy.get("mutation_mode") != "PLAN_ONLY":
+        raise RuntimeError("UNREVIEWED_MUTATION_MODE")
+    if policy.get("base_branch") != "main" or type(policy.get("count_drafts")) is not bool:
+        raise RuntimeError("L5_POLICY_QUOTA_INVALID")
+    target = policy.get("target_open_prs")
+    if type(target) is not int or not 1 <= target <= 8:
+        raise RuntimeError("L5_POLICY_QUOTA_INVALID")
+    if policy.get("ready_labels") != ["l4-ready"]:
+        raise RuntimeError("L5_POLICY_READY_LABEL_INVALID")
+    if not isinstance(policy.get("blocking_labels"), list) or not all(
+        isinstance(value, str) and value for value in policy["blocking_labels"]
+    ):
+        raise RuntimeError("L5_POLICY_BLOCKING_LABELS_INVALID")
+
+
 def label_names(item: dict) -> set[str]:
     names = set()
     for label in item.get("labels") or []:
@@ -42,36 +66,32 @@ def label_names(item: dict) -> set[str]:
     return names
 
 
-def active_pr_rows(
-    pulls: list[dict], repo: str, base: str, *, count_drafts: bool
-) -> list[dict]:
+def internal_pr_rows(pulls: list[dict], repo: str, base: str) -> list[dict]:
     result = []
     for pr in pulls:
         head_repo = ((pr.get("head") or {}).get("repo") or {}).get("full_name")
         if (
             (pr.get("base") or {}).get("ref") == base
             and head_repo == repo
-            and (count_drafts or pr.get("draft") is not True)
             and isinstance(pr.get("number"), int)
         ):
             result.append(pr)
     return sorted(result, key=lambda row: row["number"])
 
 
-def active_prs(
-    pulls: list[dict], repo: str, base: str, *, count_drafts: bool
-) -> list[int]:
-    return [
-        row["number"]
-        for row in active_pr_rows(pulls, repo, base, count_drafts=count_drafts)
-    ]
+def quota_pr_rows(pulls: list[dict], *, count_drafts: bool) -> list[dict]:
+    return [row for row in pulls if count_drafts or row.get("draft") is not True]
 
 
-def represented_issue_numbers(pulls: list[dict]) -> set[int]:
+def represented_issue_numbers(pulls: list[dict], repo: str) -> set[int]:
     represented: set[int] = set()
+    url_ref = re.compile(
+        rf"https://github\.com/{re.escape(repo)}/issues/([1-9][0-9]{{0,5}})(?![0-9])"
+    )
     for pr in pulls:
         text = f"{pr.get('title') or ''}\n{pr.get('body') or ''}"
         represented.update(int(value) for value in ISSUE_REF.findall(text))
+        represented.update(int(value) for value in url_ref.findall(text))
     return represented
 
 
@@ -96,27 +116,19 @@ def ready_issues(
 
 
 def reconcile(policy: dict, repo: str) -> dict:
-    if policy.get("repository") != repo:
-        raise RuntimeError("POLICY_REPOSITORY_MISMATCH")
-    if policy.get("mutation_mode") != "PLAN_ONLY":
-        raise RuntimeError("UNREVIEWED_MUTATION_MODE")
+    validate_policy(policy, repo)
     target = int(policy["target_open_prs"])
-    base = str(policy.get("base_branch") or "main")
-    count_drafts = policy.get("count_drafts") is True
-    pull_rows = active_pr_rows(
-        paged(repo, "pulls?state=open"), repo, base, count_drafts=count_drafts
-    )
-    pulls = [row["number"] for row in pull_rows]
+    base = str(policy["base_branch"])
+    all_rows = internal_pr_rows(paged(repo, "pulls?state=open"), repo, base)
+    quota_rows = quota_pr_rows(all_rows, count_drafts=policy["count_drafts"])
+    pulls = [row["number"] for row in quota_rows]
     deficit = max(0, target - len(pulls))
-    issues = paged(repo, "issues?state=open")
     candidates = ready_issues(
-        issues,
-        {x.lower() for x in policy.get("ready_labels", [])},
-        {x.lower() for x in policy.get("blocking_labels", [])},
-        represented_issue_numbers(pull_rows),
+        paged(repo, "issues?state=open"),
+        {x.lower() for x in policy["ready_labels"]},
+        {x.lower() for x in policy["blocking_labels"]},
+        represented_issue_numbers(all_rows, repo),
     )
-    # L4.1 plans at most one new WU at a time. Additional parallel work needs
-    # explicit conflict proof in the next promotion stage.
     selected = candidates[:1] if deficit else []
     unfilled = max(0, deficit - len(selected))
     if deficit == 0:
@@ -141,27 +153,31 @@ def reconcile(policy: dict, repo: str) -> dict:
 
 
 def selftest() -> None:
+    repo = "NTinkicht/Tabibi"
     pulls = [
         {
             "number": 7,
             "draft": False,
             "base": {"ref": "main"},
-            "head": {"repo": {"full_name": "NTinkicht/Tabibi"}},
+            "head": {"repo": {"full_name": repo}},
             "body": "Implements #3",
         },
         {
             "number": 8,
             "draft": True,
             "base": {"ref": "main"},
-            "head": {"repo": {"full_name": "NTinkicht/Tabibi"}},
+            "head": {"repo": {"full_name": repo}},
+            "body": "Closes https://github.com/NTinkicht/Tabibi/issues/5",
         },
     ]
-    assert active_prs(pulls, "NTinkicht/Tabibi", "main", count_drafts=True) == [7, 8]
-    assert active_prs(pulls, "NTinkicht/Tabibi", "main", count_drafts=False) == [7]
-    assert represented_issue_numbers(pulls) == {3}
+    all_rows = internal_pr_rows(pulls, repo, "main")
+    assert [row["number"] for row in quota_pr_rows(all_rows, count_drafts=True)] == [7, 8]
+    assert [row["number"] for row in quota_pr_rows(all_rows, count_drafts=False)] == [7]
+    assert represented_issue_numbers(all_rows, repo) == {3, 5}
     issues = [
         {"number": 3, "state": "open", "labels": [{"name": "l4-ready"}]},
         {"number": 4, "state": "open", "labels": [{"name": "l4-ready"}]},
+        {"number": 5, "state": "open", "labels": [{"name": "l4-ready"}]},
         {
             "number": 2,
             "state": "open",
@@ -170,7 +186,7 @@ def selftest() -> None:
     ]
     assert [
         row["number"]
-        for row in ready_issues(issues, {"l4-ready"}, {"human-only"}, {3})
+        for row in ready_issues(issues, {"l4-ready"}, {"human-only"}, {3, 5})
     ] == [4]
     print("l5_continuity selftest PASS")
 
@@ -178,14 +194,19 @@ def selftest() -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--selftest", action="store_true")
+    parser.add_argument("--validate-policy", action="store_true")
     args = parser.parse_args()
+    repo = os.environ.get("GITHUB_REPOSITORY", "NTinkicht/Tabibi")
     if args.selftest:
         selftest()
         return 0
-    repo = os.environ.get("GITHUB_REPOSITORY")
-    if not repo:
-        raise SystemExit("L5_BLOCKED: GITHUB_REPOSITORY missing")
     policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+    if args.validate_policy:
+        validate_policy(policy, repo)
+        print("l5_continuity policy PASS")
+        return 0
+    if not os.environ.get("GITHUB_REPOSITORY"):
+        raise SystemExit("L5_BLOCKED: GITHUB_REPOSITORY missing")
     print(json.dumps(reconcile(policy, repo), indent=2, sort_keys=True))
     return 0
 
