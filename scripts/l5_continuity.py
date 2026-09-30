@@ -10,7 +10,10 @@ from pathlib import Path
 
 POLICY_PATH = Path("scripts/l5_continuity_policy.json")
 MAX_PAGES = 10
-ISSUE_REF = re.compile(r"(?<![A-Za-z0-9])#([1-9][0-9]{0,5})")
+WORK_REF = re.compile(
+    r"(?i)\b(?:implements?|closes?|fixes?|resolves?|tracks?)\s+#([1-9][0-9]{0,5})(?![0-9])"
+)
+MANDATORY_BLOCKING_LABELS = {"l4-blocked", "human-only", "release-go-no-go"}
 
 
 def gh(path: str):
@@ -51,10 +54,13 @@ def validate_policy(policy: dict, repo: str) -> None:
         raise RuntimeError("L5_POLICY_QUOTA_INVALID")
     if policy.get("ready_labels") != ["l4-ready"]:
         raise RuntimeError("L5_POLICY_READY_LABEL_INVALID")
-    if not isinstance(policy.get("blocking_labels"), list) or not all(
-        isinstance(value, str) and value for value in policy["blocking_labels"]
+    blocking = policy.get("blocking_labels")
+    if not isinstance(blocking, list) or not all(
+        isinstance(value, str) and value for value in blocking
     ):
         raise RuntimeError("L5_POLICY_BLOCKING_LABELS_INVALID")
+    if not MANDATORY_BLOCKING_LABELS.issubset({value.lower() for value in blocking}):
+        raise RuntimeError("L5_POLICY_MANDATORY_BLOCKING_LABELS_MISSING")
 
 
 def label_names(item: dict) -> set[str]:
@@ -86,11 +92,12 @@ def quota_pr_rows(pulls: list[dict], *, count_drafts: bool) -> list[dict]:
 def represented_issue_numbers(pulls: list[dict], repo: str) -> set[int]:
     represented: set[int] = set()
     url_ref = re.compile(
+        rf"(?i)\b(?:implements?|closes?|fixes?|resolves?|tracks?)\s+"
         rf"https://github\.com/{re.escape(repo)}/issues/([1-9][0-9]{{0,5}})(?![0-9])"
     )
     for pr in pulls:
         text = f"{pr.get('title') or ''}\n{pr.get('body') or ''}"
-        represented.update(int(value) for value in ISSUE_REF.findall(text))
+        represented.update(int(value) for value in WORK_REF.findall(text))
         represented.update(int(value) for value in url_ref.findall(text))
     return represented
 
@@ -160,7 +167,7 @@ def selftest() -> None:
             "draft": False,
             "base": {"ref": "main"},
             "head": {"repo": {"full_name": repo}},
-            "body": "Implements #3",
+            "body": "Implements #3. Follow-up work remains in #9.",
         },
         {
             "number": 8,
