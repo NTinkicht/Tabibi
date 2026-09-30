@@ -126,15 +126,16 @@ def reconcile(policy: dict, repo: str) -> dict:
     validate_policy(policy, repo)
     target = int(policy["target_open_prs"])
     base = str(policy["base_branch"])
-    all_rows = internal_pr_rows(paged(repo, "pulls?state=open"), repo, base)
-    quota_rows = quota_pr_rows(all_rows, count_drafts=policy["count_drafts"])
+    open_rows = internal_pr_rows(paged(repo, "pulls?state=open"), repo, base)
+    historical_rows = internal_pr_rows(paged(repo, "pulls?state=all"), repo, base)
+    quota_rows = quota_pr_rows(open_rows, count_drafts=policy["count_drafts"])
     pulls = [row["number"] for row in quota_rows]
     deficit = max(0, target - len(pulls))
     candidates = ready_issues(
         paged(repo, "issues?state=open"),
         {x.lower() for x in policy["ready_labels"]},
         {x.lower() for x in policy["blocking_labels"]},
-        represented_issue_numbers(all_rows, repo),
+        represented_issue_numbers(historical_rows, repo),
     )
     selected = candidates[:1] if deficit else []
     unfilled = max(0, deficit - len(selected))
@@ -176,15 +177,23 @@ def selftest() -> None:
             "head": {"repo": {"full_name": repo}},
             "body": "Closes https://github.com/NTinkicht/Tabibi/issues/5",
         },
+        {
+            "number": 9,
+            "draft": False,
+            "base": {"ref": "main"},
+            "head": {"repo": {"full_name": repo}},
+            "body": "Fixes #6",
+        },
     ]
     all_rows = internal_pr_rows(pulls, repo, "main")
-    assert [row["number"] for row in quota_pr_rows(all_rows, count_drafts=True)] == [7, 8]
-    assert [row["number"] for row in quota_pr_rows(all_rows, count_drafts=False)] == [7]
-    assert represented_issue_numbers(all_rows, repo) == {3, 5}
+    assert [row["number"] for row in quota_pr_rows(all_rows[:2], count_drafts=True)] == [7, 8]
+    assert [row["number"] for row in quota_pr_rows(all_rows[:2], count_drafts=False)] == [7]
+    assert represented_issue_numbers(all_rows, repo) == {3, 5, 6}
     issues = [
         {"number": 3, "state": "open", "labels": [{"name": "l4-ready"}]},
         {"number": 4, "state": "open", "labels": [{"name": "l4-ready"}]},
         {"number": 5, "state": "open", "labels": [{"name": "l4-ready"}]},
+        {"number": 6, "state": "open", "labels": [{"name": "l4-ready"}]},
         {
             "number": 2,
             "state": "open",
@@ -193,7 +202,7 @@ def selftest() -> None:
     ]
     assert [
         row["number"]
-        for row in ready_issues(issues, {"l4-ready"}, {"human-only"}, {3, 5})
+        for row in ready_issues(issues, {"l4-ready"}, {"human-only"}, {3, 5, 6})
     ] == [4]
     print("l5_continuity selftest PASS")
 
