@@ -22,9 +22,7 @@ TRUSTED_EXTERNAL_REVIEWERS = frozenset({
     "coderabbitai[bot]",
     "copilot-pull-request-reviewer[bot]",
 })
-MATERIAL_AUTHOR_TRAILER = re.compile(
-    r"(?im)^Material-Author:\s*([a-z0-9_-]+)\s*$"
-)
+MATERIAL_AUTHOR_TRAILER = re.compile(r"(?im)^Material-Author:\s*([a-z0-9_-]+)\s*$")
 REVIEWER_ACTORS = {
     "github-actions[bot]": "mistral-vibe",
     "coderabbitai[bot]": "coderabbit",
@@ -34,8 +32,8 @@ L4_AUTH_CHECK = "L4 review authorization"
 PLATFORM_CHECKS = CI_JOBS | frozenset({L4_AUTH_CHECK})
 RULESET_RESTRICTED_PATHS = frozenset()
 
-# Changes to the machinery that proves CI/review provenance are never auto-merged
-# by that same machinery. They require the normal external/manual merge path.
+# Authority-defining control-plane files cannot be auto-merged by the machinery
+# they define. They require the external/manual trusted-gate merge path.
 TRUSTED_GATE_PATHS = frozenset({
     "AGENTS.md",
     "coordination/AUTONOMY_PROTOCOL.md",
@@ -49,12 +47,18 @@ TRUSTED_GATE_PATHS = frozenset({
     ".github/workflows/l5-continuity-ci.yml",
     ".github/workflows/l5-continuity-supervision.yml",
     ".github/workflows/l5-durable-state-ci.yml",
+    ".github/workflows/l5-self-healing-ci.yml",
+    ".github/workflows/l5-certification-ci.yml",
     ".github/workflows/mistral-vibe-wake.yml",
     ".github/workflows/native-factory-merge-controller.yml",
     "scripts/l5_continuity.py",
     "scripts/l5_continuity_policy.json",
     "scripts/l5_state_machine.py",
     "tests/l5_state_machine.test.py",
+    "scripts/l5_recovery.py",
+    "tests/l5_recovery.test.py",
+    "scripts/l5_certification.py",
+    "tests/l5_certification.test.py",
     "scripts/mistral-review-target.py",
     "scripts/coordination/mistral-review-proof.py",
     "scripts/coordination/publish-mistral-review.py",
@@ -147,9 +151,7 @@ def unresolved_threads(number):
 
 
 def latest_ci_run(sha):
-    payload = gh(
-        f"repos/{REPO}/actions/runs?head_sha={sha}&event=pull_request&per_page=100"
-    )
+    payload = gh(f"repos/{REPO}/actions/runs?head_sha={sha}&event=pull_request&per_page=100")
     runs = [
         run for run in payload.get("workflow_runs", [])
         if run.get("head_sha") == sha
@@ -159,27 +161,14 @@ def latest_ci_run(sha):
     ]
     if not runs:
         return None
-    return max(
-        runs,
-        key=lambda run: (
-            run.get("run_number") or 0,
-            run.get("run_attempt") or 0,
-            run.get("id") or 0,
-        ),
-    )
+    return max(runs, key=lambda run: (run.get("run_number") or 0, run.get("run_attempt") or 0, run.get("id") or 0))
 
 
 def latest_ci_green(sha):
     run = latest_ci_run(sha)
-    if (
-        not run
-        or run.get("status") != "completed"
-        or run.get("conclusion") != "success"
-    ):
+    if not run or run.get("status") != "completed" or run.get("conclusion") != "success":
         return False
-    jobs = gh(
-        f"repos/{REPO}/actions/runs/{run['id']}/jobs?filter=latest&per_page=100"
-    ).get("jobs", [])
+    jobs = gh(f"repos/{REPO}/actions/runs/{run['id']}/jobs?filter=latest&per_page=100").get("jobs", [])
     latest_by_name = {}
     for job in jobs:
         name = job.get("name")
@@ -195,7 +184,6 @@ def latest_ci_green(sha):
 
 
 def mistral_proof_reader():
-    """Load the trusted run-sealed Mistral proof verifier from the repository."""
     path = Path("scripts/coordination/mistral-review-proof.py")
     spec = importlib.util.spec_from_file_location("trusted_mistral_proof", path)
     if spec is None or spec.loader is None:
@@ -206,7 +194,6 @@ def mistral_proof_reader():
 
 
 def expected_mistral_native_body(number, sha, run_id, report_id):
-    """Return the exact body emitted by the trusted Mistral review publisher."""
     marker = f"tabibi-mistral-native-v1 run={run_id} report={report_id} sha={sha}"
     return (
         "Authenticated independent Mistral Vibe exact-head technical PASS.\n\n"
@@ -221,21 +208,12 @@ def expected_mistral_native_body(number, sha, run_id, report_id):
 
 
 def authenticated_mistral_approval(review, number, sha):
-    """Verify the native approval against the trusted run-sealed Mistral proof.
-
-    This replaces the removed verifier check-run without trusting a generic
-    github-actions[bot] approval. The proof artifact, immutable Issue #11
-    report, workflow identity, PR number and exact head must all agree.
-    """
     body = review.get("body") or ""
     markers = MISTRAL_NATIVE_REVIEW.findall(body)
     if len(markers) != 1:
         return False
     run_id, report_id, marker_sha = markers[0]
-    if (
-        marker_sha != sha
-        or body != expected_mistral_native_body(number, sha, run_id, report_id)
-    ):
+    if marker_sha != sha or body != expected_mistral_native_body(number, sha, run_id, report_id):
         return False
     try:
         run = gh(f"repos/{REPO}/actions/runs/{run_id}")
@@ -272,19 +250,11 @@ def cumulative_material_authors(number, sha):
     pr = gh(f"repos/{REPO}/pulls/{number}")
     expected = pr.get("commits")
     commits = paged_rest(f"repos/{REPO}/pulls/{number}/commits")
-    if (
-        type(expected) is not int
-        or expected < 1
-        or expected > 250
-        or len(commits) != expected
-        or commits[-1].get("sha") != sha
-    ):
+    if type(expected) is not int or expected < 1 or expected > 250 or len(commits) != expected or commits[-1].get("sha") != sha:
         return set()
     actors = set()
     for commit in commits:
-        tags = MATERIAL_AUTHOR_TRAILER.findall(
-            (commit.get("commit") or {}).get("message", "")
-        )
+        tags = MATERIAL_AUTHOR_TRAILER.findall((commit.get("commit") or {}).get("message", ""))
         if len(tags) > 1:
             return set()
         if tags:
@@ -306,21 +276,15 @@ def l4_authorization_green(sha):
     payload = gh(f"repos/{REPO}/commits/{sha}/check-runs?per_page=100")
     candidates = [
         item for item in payload.get("check_runs", [])
-        if item.get("name") == L4_AUTH_CHECK
-        and (item.get("app") or {}).get("id") == 15368
+        if item.get("name") == L4_AUTH_CHECK and (item.get("app") or {}).get("id") == 15368
     ]
     if not candidates:
         return False
     latest = max(candidates, key=lambda item: item.get("id") or 0)
-    return (
-        latest.get("status") == "completed"
-        and latest.get("conclusion") == "success"
-        and latest.get("head_sha") == sha
-    )
+    return latest.get("status") == "completed" and latest.get("conclusion") == "success" and latest.get("head_sha") == sha
 
 
 def eligible_approval(review, number, sha, material_authors):
-    """Accept only exact-head approvals independent of every material author."""
     if review.get("state") != "APPROVED" or review.get("commit_id") != sha:
         return False
     user = review.get("user") or {}
@@ -336,20 +300,12 @@ def eligible_approval(review, number, sha, material_authors):
 
 
 def review_gate_clean(number, sha):
-    """Require one exact-head approval independent of cumulative material authors."""
     material_authors = cumulative_material_authors(number, sha)
     if not material_authors:
         return False
     reviews = all_reviews(number)
-    approvals = [
-        review for review in reviews
-        if eligible_approval(review, number, sha, material_authors)
-    ]
-    adverse = [
-        review for review in reviews
-        if review.get("state") == "CHANGES_REQUESTED"
-        and review.get("commit_id") == sha
-    ]
+    approvals = [review for review in reviews if eligible_approval(review, number, sha, material_authors)]
+    adverse = [review for review in reviews if review.get("state") == "CHANGES_REQUESTED" and review.get("commit_id") == sha]
     return bool(approvals) and not adverse and not unresolved_threads(number)
 
 
@@ -360,32 +316,20 @@ def _classic_protection_enforces(protection):
     force_pushes = protection.get("allow_force_pushes")
     deletions = protection.get("allow_deletions")
     if (
-        not isinstance(checks, dict)
-        or checks.get("strict") is not True
+        not isinstance(checks, dict) or checks.get("strict") is not True
         or not isinstance(reviews, dict)
         or int(reviews.get("required_approving_review_count") or 0) < 1
         or reviews.get("dismiss_stale_reviews") is not True
         or reviews.get("require_last_push_approval") is not True
-        or not isinstance(enforce_admins, dict)
-        or enforce_admins.get("enabled") is not True
-        or not isinstance(force_pushes, dict)
-        or force_pushes.get("enabled") is not False
-        or not isinstance(deletions, dict)
-        or deletions.get("enabled") is not False
+        or not isinstance(enforce_admins, dict) or enforce_admins.get("enabled") is not True
+        or not isinstance(force_pushes, dict) or force_pushes.get("enabled") is not False
+        or not isinstance(deletions, dict) or deletions.get("enabled") is not False
     ):
         return False
     configured = checks.get("checks")
     if not isinstance(configured, list):
         return False
-    if not all(
-        any(
-            isinstance(item, dict)
-            and item.get("context") == context
-            and item.get("app_id") == 15368
-            for item in configured
-        )
-        for context in CI_JOBS
-    ):
+    if not all(any(isinstance(item, dict) and item.get("context") == context and item.get("app_id") == 15368 for item in configured) for context in CI_JOBS):
         return False
     allowances = reviews.get("bypass_pull_request_allowances")
     if not isinstance(allowances, dict):
@@ -394,7 +338,6 @@ def _classic_protection_enforces(protection):
 
 
 def strict_base_enforcement():
-    """Require the active non-bypassable L4 branch ruleset; classic protection is insufficient."""
     try:
         repository = gh(f"repos/{REPO}")
         default_branch = repository.get("default_branch")
@@ -404,11 +347,7 @@ def strict_base_enforcement():
     except RuntimeError:
         return False
     for summary in summaries:
-        if (
-            not isinstance(summary, dict)
-            or summary.get("enforcement") != "active"
-            or not summary.get("id")
-        ):
+        if not isinstance(summary, dict) or summary.get("enforcement") != "active" or not summary.get("id"):
             continue
         try:
             detail = gh(f"repos/{REPO}/rulesets/{summary['id']}")
@@ -447,7 +386,6 @@ def gates(number, *, require_authorization=True):
         return None
     if pr.get("head", {}).get("repo", {}).get("full_name") != REPO:
         return None
-
     sha = pr["head"]["sha"]
     if changed_paths(number) & TRUSTED_GATE_PATHS:
         print(f"PR #{number}: TRUSTED_GATE_CHANGE_REQUIRES_EXTERNAL_MERGE")
@@ -468,15 +406,20 @@ def gates(number, *, require_authorization=True):
 
 
 def selftest_authenticated_review_gate():
-    """Exercise exact-body, workflow-ref and fail-closed proof authentication."""
     required_l5_paths = {
         ".github/workflows/l5-continuity-ci.yml",
         ".github/workflows/l5-continuity-supervision.yml",
         ".github/workflows/l5-durable-state-ci.yml",
+        ".github/workflows/l5-self-healing-ci.yml",
+        ".github/workflows/l5-certification-ci.yml",
         "scripts/l5_continuity.py",
         "scripts/l5_continuity_policy.json",
         "scripts/l5_state_machine.py",
         "tests/l5_state_machine.test.py",
+        "scripts/l5_recovery.py",
+        "tests/l5_recovery.test.py",
+        "scripts/l5_certification.py",
+        "tests/l5_certification.test.py",
     }
     assert required_l5_paths.issubset(TRUSTED_GATE_PATHS)
 
@@ -491,13 +434,7 @@ def selftest_authenticated_review_gate():
         "user": {"login": "github-actions[bot]", "type": "Bot"},
         "body": body,
     }
-    proof = {
-        "run_id": run_id,
-        "report_id": report_id,
-        "pr": str(number),
-        "sha": sha,
-        "verdict": "PASS",
-    }
+    proof = {"run_id": run_id, "report_id": report_id, "pr": str(number), "sha": sha, "verdict": "PASS"}
 
     class FakeProof:
         @staticmethod
@@ -529,10 +466,8 @@ def selftest_authenticated_review_gate():
         globals()["mistral_proof_reader"] = lambda: FakeProof
         assert authenticated_mistral_approval(review, number, sha)
         assert eligible_approval(review, number, sha, {"chatgpt"})
-
         forged = dict(review, body=body.replace("Immutable evidence:", "Evidence:"))
         assert not authenticated_mistral_approval(forged, number, sha)
-
         stale = dict(review, commit_id="b" * 40)
         assert not eligible_approval(stale, number, sha, {"chatgpt"})
 
@@ -540,19 +475,13 @@ def selftest_authenticated_review_gate():
             value = fake_gh(route, method, fields)
             value["path"] = ".github/workflows/mistral-vibe-wake.yml@feature"
             return value
+
         globals()["gh"] = wrong_ref_gh
         assert not authenticated_mistral_approval(review, number, sha)
-
         globals()["gh"] = fake_gh
-        globals()["mistral_proof_reader"] = lambda: (_ for _ in ()).throw(
-            Exception("malformed helper")
-        )
+        globals()["mistral_proof_reader"] = lambda: (_ for _ in ()).throw(Exception("malformed helper"))
         assert not authenticated_mistral_approval(review, number, sha)
-
-        untrusted_bot = dict(
-            review,
-            user={"login": "unknown-review-bot[bot]", "type": "Bot"},
-        )
+        untrusted_bot = dict(review, user={"login": "unknown-review-bot[bot]", "type": "Bot"})
         assert not eligible_approval(untrusted_bot, number, sha, {"chatgpt"})
     finally:
         globals()["gh"] = original_gh
@@ -561,7 +490,6 @@ def selftest_authenticated_review_gate():
 
 
 def main():
-    """Authorize exact-head review events or reconcile merge-ready PRs."""
     authorize_only = os.environ.get("L4_AUTHORIZE_ONLY") == "1"
     if authorize_only:
         if os.environ.get("GITHUB_EVENT_NAME") != "pull_request_review":
@@ -584,13 +512,8 @@ def main():
         if not first:
             continue
         _, sha = first
-
         pr = gh(f"repos/{REPO}/pulls/{number}")
-        if (
-            pr.get("state") != "open"
-            or pr.get("head", {}).get("sha") != sha
-            or pr.get("mergeable") is not True
-        ):
+        if pr.get("state") != "open" or pr.get("head", {}).get("sha") != sha or pr.get("mergeable") is not True:
             print(f"PR #{number}: HEAD_MOVED_OR_NOT_MERGEABLE")
             continue
         if not latest_ci_green(sha):
@@ -605,7 +528,6 @@ def main():
         if not strict_base_enforcement():
             print(f"PR #{number}: FINAL_PLATFORM_ENFORCEMENT_BLOCKED")
             continue
-
         merged = gh(
             f"repos/{REPO}/pulls/{number}/merge",
             method="PUT",
