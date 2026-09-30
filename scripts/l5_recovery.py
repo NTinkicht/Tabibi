@@ -121,7 +121,7 @@ def journal_record(snapshot: dict[str, Any], plan: dict[str, Any]) -> dict[str, 
 
 def selftest() -> None:
     h,b="a"*40,"b"*40
-    s={"repository":"NTinkicht/Tabibi","issue":559,"canonical_pr":562,"active_prs":[562],"head_sha":h,"base_sha":b,"head_current":True,"base_current":True,"implementation_complete":True,"emergency_stop":False,"human_only":False,"blocked":False,"merged":False,"verified":False,"verified_head_sha":None,"verified_base_sha":None,"ci":"FAILURE","ci_head_sha":h,"ci_base_sha":b,"review":"UNKNOWN","review_head_sha":None,"review_base_sha":None,"reviewer_actor":None,"material_authors":["chatgpt"],"review_eligible":False,"unresolved_threads":False,"mergeable":True,"retry_count":0,"retry_action":None,"event_id":"evt-1","ready_candidates":[]}
+    s={"repository":"NTinkicht/Tabibi","issue":559,"canonical_pr":562,"active_prs":[562],"head_sha":h,"base_sha":b,"head_current":True,"base_current":True,"implementation_complete":True,"emergency_stop":False,"human_only":False,"blocked":False,"merged":False,"verified":False,"verified_head_sha":None,"verified_base_sha":None,"ci":"FAILURE","ci_head_sha":h,"ci_base_sha":b,"review":"UNKNOWN","review_head_sha":None,"review_base_sha":None,"reviewer_actor":None,"material_authors":["chatgpt"],"material_authors_head_sha":h,"review_eligible":False,"unresolved_threads":False,"mergeable":True,"retry_count":0,"retry_action":None,"event_id":"evt-1","ready_candidates":[]}
     p=plan_recovery(s); assert p["next_action"]=="REMEDIATE_SAME_PR_CI" and p["retry_action_after"]=="CI"
     assert plan_recovery(s,prior_event_keys={p["event_key"]})["status"]=="REPLAY_NOOP"
     assert plan_recovery({**s,"retry_count":MAX_RETRIES,"retry_action":"CI"})["next_action"]=="RETRY_BUDGET_EXHAUSTED"
