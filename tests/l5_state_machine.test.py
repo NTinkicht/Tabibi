@@ -15,9 +15,9 @@ class L5StateMachineTest(unittest.TestCase):
         head, base = "a" * 40, "b" * 40
         return {
             "repository": "NTinkicht/Tabibi",
-            "issue": 558,
-            "canonical_pr": 561,
-            "active_prs": [561],
+            "issue": 559,
+            "canonical_pr": 562,
+            "active_prs": [562],
             "head_sha": head,
             "base_sha": base,
             "head_current": True,
@@ -38,6 +38,7 @@ class L5StateMachineTest(unittest.TestCase):
             "review_base_sha": base,
             "reviewer_actor": "mistral-vibe",
             "material_authors": ["chatgpt"],
+            "material_authors_head_sha": head,
             "review_eligible": True,
             "unresolved_threads": False,
             "mergeable": True,
@@ -55,43 +56,43 @@ class L5StateMachineTest(unittest.TestCase):
 
     def test_unknown_safety_fails_closed(self):
         for field in ("emergency_stop", "human_only", "blocked", "unresolved_threads"):
-            sample = self.base()
-            sample.pop(field)
+            sample = self.base(); sample.pop(field)
             with self.assertRaises(ValueError):
                 l5.reduce_evidence(sample)
 
     def test_missing_active_pr_inventory_fails_closed(self):
-        sample = self.base()
-        sample.pop("active_prs")
+        sample = self.base(); sample.pop("active_prs")
         with self.assertRaises(ValueError):
             l5.reduce_evidence(sample)
 
+    def test_merged_missing_canonical_identity_reconciles(self):
+        sample = self.base(); sample.update(canonical_pr=None, active_prs=[], merged=True)
+        self.assertEqual(l5.reduce_evidence(sample)["next_action"], "RECONCILE_CANONICAL_PR")
+
     def test_duplicate_stream_blocks(self):
-        sample = self.base()
-        sample["active_prs"] = [561, 562]
+        sample = self.base(); sample["active_prs"] = [562, 563]
         self.assertEqual(l5.reduce_evidence(sample)["next_action"], "DUPLICATE_STREAM_RECONCILIATION_REQUIRED")
 
     def test_exact_bound_evidence_required(self):
-        sample = self.base()
-        sample["ci_head_sha"] = "c" * 40
+        sample = self.base(); sample["ci_head_sha"] = "c" * 40
         self.assertEqual(l5.reduce_evidence(sample)["next_action"], "RECONCILE_EXACT_HEAD_CI_EVIDENCE")
-        sample = self.base()
-        sample["review_base_sha"] = "c" * 40
+        sample = self.base(); sample["review_base_sha"] = "c" * 40
         self.assertEqual(l5.reduce_evidence(sample)["next_action"], "RECONCILE_EXACT_HEAD_REVIEW_EVIDENCE")
 
+    def test_authorship_is_bound_to_exact_head(self):
+        sample = self.base(); sample["material_authors_head_sha"] = "c" * 40
+        self.assertEqual(l5.reduce_evidence(sample)["next_action"], "RECONCILE_MATERIAL_AUTHORSHIP")
+
     def test_empty_authorship_fails_closed(self):
-        sample = self.base()
-        sample["material_authors"] = []
+        sample = self.base(); sample["material_authors"] = []
         self.assertEqual(l5.reduce_evidence(sample)["next_action"], "RECONCILE_MATERIAL_AUTHORSHIP")
 
     def test_self_review_rejected(self):
-        sample = self.base()
-        sample["reviewer_actor"] = "chatgpt"
+        sample = self.base(); sample["reviewer_actor"] = "chatgpt"
         self.assertEqual(l5.reduce_evidence(sample)["next_action"], "DISPATCH_ELIGIBLE_NONAUTHOR_REVIEW")
 
     def test_post_merge_verification_before_replenishment(self):
-        sample = self.base()
-        sample.update(active_prs=[], merged=True, verified=False)
+        sample = self.base(); sample.update(active_prs=[], merged=True, verified=False)
         self.assertEqual(l5.reduce_evidence(sample)["next_action"], "VERIFY_MERGED_RESULT")
         sample["verified"] = True
         self.assertEqual(l5.reduce_evidence(sample)["next_action"], "RECONCILE_VERIFIED_MERGE_EVIDENCE")
