@@ -60,6 +60,8 @@ def _retry_state(snapshot: dict[str, Any], action: str) -> tuple[int, str | None
     if normalized is not None and normalized not in KNOWN_RETRY_SCOPES:
         raise ValueError("L5_RECOVERY_RETRY_ACTION_UNKNOWN")
     current = RETRY_SCOPES.get(action)
+    if current is None:
+        return count, normalized
     return (count if normalized == current else 0), normalized
 
 
@@ -140,6 +142,8 @@ def selftest() -> None:
     p=plan_recovery(s); assert p["next_action"]=="REMEDIATE_SAME_PR_CI" and p["retry_action_after"]=="CI"
     assert plan_recovery(s,prior_event_keys={p["event_key"]})["status"]=="REPLAY_NOOP"
     assert plan_recovery({**s,"retry_count":MAX_RETRIES,"retry_action":"CI"})["next_action"]=="RETRY_BUDGET_EXHAUSTED"
+    hold=plan_recovery({**s,"retry_count":2,"retry_action":"CI","emergency_stop":True})
+    assert hold["retry_count"]==2 and hold["retry_action"]=="CI"
     print("l5_recovery selftest PASS")
 
 
