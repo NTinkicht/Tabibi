@@ -31,6 +31,7 @@ RETRY_SCOPES = {
     "RECONCILE_MERGEABILITY":"MERGE_READY", "VERIFY_MERGED_RESULT":"VERIFY",
     "RECONCILE_VERIFIED_MERGE_EVIDENCE":"VERIFY", "RECONCILE_POST_MERGE_STREAM_STATE":"VERIFY",
 }
+KNOWN_RETRY_SCOPES = frozenset(RETRY_SCOPES.values())
 
 
 def _required_text(value: Any, name: str) -> str:
@@ -55,8 +56,10 @@ def _retry_state(snapshot: dict[str, Any], action: str) -> tuple[int, str | None
         raise ValueError("L5_RECOVERY_RETRY_ACTION_INVALID")
     if count > 0 and persisted is None:
         raise ValueError("L5_RECOVERY_RETRY_ACTION_REQUIRED")
-    current = RETRY_SCOPES.get(action)
     normalized = persisted.strip() if isinstance(persisted, str) else None
+    if normalized is not None and normalized not in KNOWN_RETRY_SCOPES:
+        raise ValueError("L5_RECOVERY_RETRY_ACTION_UNKNOWN")
+    current = RETRY_SCOPES.get(action)
     return (count if normalized == current else 0), normalized
 
 
@@ -71,6 +74,18 @@ def _normalized_sha(value: Any) -> str | None:
 
 def _normalized_pr(value: Any) -> int | None:
     return value if type(value) is int and value > 0 else None
+
+
+def _prior_event_keys(snapshot: dict[str, Any]) -> set[str]:
+    values = snapshot.get("prior_event_keys", [])
+    if not isinstance(values, list) or not all(
+        isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
+        for value in values
+    ):
+        raise ValueError("L5_RECOVERY_PRIOR_EVENT_KEYS_INVALID")
+    if len(set(values)) != len(values):
+        raise ValueError("L5_RECOVERY_PRIOR_EVENT_KEYS_DUPLICATE")
+    return set(values)
 
 
 def _eligible_ready_candidates(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
@@ -132,7 +147,7 @@ def main() -> int:
     p=argparse.ArgumentParser(); p.add_argument("--selftest",action="store_true"); p.add_argument("--input",type=Path); a=p.parse_args()
     if a.selftest: selftest(); return 0
     if a.input is None: raise SystemExit("--input is required unless --selftest is used")
-    s=json.loads(a.input.read_text(encoding="utf-8")); plan=plan_recovery(s)
+    s=json.loads(a.input.read_text(encoding="utf-8")); plan=plan_recovery(s, prior_event_keys=_prior_event_keys(s))
     print(json.dumps({"plan":plan,"journal":journal_record(s,plan)},indent=2,sort_keys=True)); return 0
 
 if __name__=="__main__": raise SystemExit(main())
