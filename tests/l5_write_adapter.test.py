@@ -296,6 +296,103 @@ class WriteAdapterTest(unittest.TestCase):
             self.assertEqual(fresh.retry_state(self.stream(auth)), (1, "CI"))
             self.assertFalse(fresh.begin(auth["mutation_token"], {}, self.stream(auth), 1, "CI"))
 
+    def test_cas_uses_gate_validated_retry_state_not_a_second_read(self):
+        class RacingStore(wa.MemoryStore):
+            def __init__(self):
+                super().__init__()
+                self.reads = 0
+                self.rival = None
+
+            def retry_state(self, stream):
+                value = super().retry_state(stream)
+                self.reads += 1
+                if self.reads == 1 and self.rival:  # rival worker lands right after the validated read
+                    self.rival(stream)
+                return value
+
+        snap = snapshot(); auth = rec.authorize_mutation(snap)
+        store = RacingStore()
+        store.rival = lambda stream: wa.MemoryStore.begin(store, "f" * 64, {"status": "PENDING"}, stream, 1, "REVIEW")
+        client = FakeClient()
+        out = wa.execute_mutation(auth, snap, client, store)
+        self.assertEqual((out["status"], out["reason"]), ("BLOCKED", "RETRY_STATE_STALE"))
+        self.assertEqual(client.writes, [])
+        self.assertIsNone(store.get(auth["mutation_token"]))
+        self.assertEqual(store.retry_state(self.stream(auth)), (1, "REVIEW"))
+
+    def _restore_case(self, store, client_setup):
+        snap = snapshot(); auth = rec.authorize_mutation(snap)
+        client = FakeClient(); client_setup(client)
+        out = wa.execute_mutation(auth, snap, client, store)
+        self.assertEqual(client.writes, [])
+        self.assertEqual(store.retry_state(self.stream(auth)), (0, None))
+        self.assertEqual(store.get(auth["mutation_token"])["status"], "FAILED")
+        return out
+
+    def _stores(self):
+        yield wa.MemoryStore()
+        with tempfile.TemporaryDirectory() as d:
+            yield wa.JsonFileStore(Path(d) / "s.json")
+
+    def test_final_gate_block_restores_prior_retry_state(self):
+        for store in self._stores():
+            def setup(c):
+                calls = {"n": 0}
+                orig = c.fetch_boundaries
+
+                def flip():
+                    calls["n"] += 1
+                    b = orig()
+                    if calls["n"] >= 2:
+                        b["emergency_stop"] = True
+                    return b
+                c.fetch_boundaries = flip
+            out = self._restore_case(store, setup)
+            self.assertEqual(out["reason"], "HARD_BOUNDARY")
+
+    def test_write_rejected_restores_prior_retry_state(self):
+        for store in self._stores():
+            def setup(c):
+                c.raise_on_write = wa.WriteRejected
+            out = self._restore_case(store, setup)
+            self.assertEqual(out["reason"], "WRITE_REJECTED")
+
+    def test_unexpected_perform_exception_reconciles_without_refund(self):
+        for store in self._stores():
+            snap = snapshot(); auth = rec.authorize_mutation(snap)
+            client = FakeClient(effect_on_write=False)
+
+            def boom(mutation, params):
+                raise RuntimeError("network down")
+            client.perform = boom
+            out = wa.execute_mutation(auth, snap, client, store)
+            self.assertEqual(out["status"], "VERIFICATION_FAILED")
+            self.assertFalse(out["written"])
+            self.assertEqual(store.get(auth["mutation_token"])["status"], "VERIFICATION_FAILED")
+            self.assertEqual(store.retry_state(self.stream(auth)), (auth["retry_count_after"], auth["retry_action_after"]))
+        for store in self._stores():  # write actually landed before the transport error
+            snap = snapshot(); auth = rec.authorize_mutation(snap)
+            client = FakeClient()
+            client.raise_on_write = RuntimeError
+            out = wa.execute_mutation(auth, snap, client, store)
+            self.assertEqual(out["status"], "COMPLETE")
+            self.assertEqual(len(client.writes), 1)
+            self.assertEqual(store.retry_state(self.stream(auth)), (auth["retry_count_after"], auth["retry_action_after"]))
+
+    def test_pre_write_final_gate_exception_restores_retry_state(self):
+        for store in self._stores():  # exception in the final gate itself
+            def setup(c):
+                calls = {"n": 0}
+
+                def fetch():
+                    calls["n"] += 1
+                    if calls["n"] >= 2:
+                        raise RuntimeError("boundary fetch failed")
+                    return {k: False for k in rec.HARD_BOUNDARY_FIELDS}
+                c.fetch_boundaries = fetch
+            out = self._restore_case(store, setup)
+            self.assertEqual(out["reason"], "UNEXPECTED_ERROR")
+
 
 if __name__ == "__main__":
     unittest.main()
