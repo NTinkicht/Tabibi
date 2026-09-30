@@ -1,0 +1,42 @@
+name: L5 Activation Candidate CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/l5_activation.py'
+      - 'tests/l5_activation.test.py'
+      - 'scripts/l5_recovery.py'
+      - 'scripts/l5_state_machine.py'
+      - '.github/workflows/l5-activation-ci.yml'
+      - 'scripts/native_factory_merge.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: l5-activation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  activation:
+    name: L5 guarded activation regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Compile activation kernel and tests
+        run: >-
+          python -m py_compile scripts/l5_activation.py
+          tests/l5_activation.test.py
+      - name: Run activation selftest
+        run: python -I scripts/l5_activation.py --selftest
+      - name: Run activation regression suite
+        run: python -I tests/l5_activation.test.py
+      - name: Re-run certified recovery model
+        run: python -I scripts/l5_recovery.py --selftest
