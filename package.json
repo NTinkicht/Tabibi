@@ -14,7 +14,7 @@
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --project unit --project api",
+    "test": "python3 scripts/l5_state_machine.py --selftest && python3 tests/l5_state_machine.test.py && vitest run --project unit --project api",
     "test:unit": "vitest run --project unit",
     "test:api": "vitest run --project api",
     "test:integration": "vitest run --project integration",
