@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import copy
 import json
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from l5_recovery import MAX_RETRIES, journal_record, plan_recovery
 
 
