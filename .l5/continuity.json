@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "level": "L5_CANDIDATE",
+  "phase": "L4.1_CONTINUITY",
+  "repository": "NTinkicht/Tabibi",
+  "target_open_prs": 3,
+  "ready_labels": ["l5-ready", "l4-ready"],
+  "blocking_labels": ["l5-blocked", "l4-blocked", "human-only", "release-go-no-go"],
+  "base_branch": "main",
+  "count_drafts": true,
+  "mutation_mode": "PLAN_ONLY",
+  "human_only_boundaries": [
+    "new_paid_vendor_or_spend",
+    "credential_or_secret_creation_rotation",
+    "destructive_production_or_database_operation",
+    "legal_or_compliance_commitment",
+    "irreversible_product_direction",
+    "weakening_l5_governance_or_emergency_stop"
+  ],
+  "promotion_requirements": [
+    "exact-head CI green",
+    "independent non-author review current on exact head/base",
+    "deterministic quota reconciliation selftest passes",
+    "no eligible work is silently invented",
+    "emergency stop remains authoritative"
+  ]
+}
