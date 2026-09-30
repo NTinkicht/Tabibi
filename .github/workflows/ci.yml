@@ -49,6 +49,9 @@ jobs:
       - name: L5 continuity planner regression checks
         run: python3 scripts/l5_continuity.py --selftest
 
+      - name: L5 continuity policy validation
+        run: python3 scripts/l5_continuity.py --validate-policy
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
