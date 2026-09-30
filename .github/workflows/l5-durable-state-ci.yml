@@ -28,7 +28,10 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile reducer and tests
-        run: python -m py_compile scripts/l5_state_machine.py tests/l5_state_machine.test.py
+        run: |
+          python -m py_compile \
+            scripts/l5_state_machine.py \
+            tests/l5_state_machine.test.py
       - name: Run reducer selftest
         run: python scripts/l5_state_machine.py --selftest
       - name: Run external regression tests
