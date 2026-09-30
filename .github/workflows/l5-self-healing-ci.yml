@@ -1,0 +1,37 @@
+name: L5 Self-Healing Candidate CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/l5_recovery.py'
+      - 'tests/l5_recovery.test.py'
+      - '.github/workflows/l5-self-healing-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: l5-self-healing-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  recovery:
+    name: L5 self-healing fail-closed regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Compile recovery planner and tests
+        run: >-
+          python -m py_compile scripts/l5_recovery.py
+          tests/l5_recovery.test.py
+      - name: Run recovery selftest
+        run: python scripts/l5_recovery.py --selftest
+      - name: Run recovery regression suite
+        run: python tests/l5_recovery.test.py
