@@ -8,6 +8,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 SPEC = importlib.util.spec_from_file_location("l5_certification", ROOT / "scripts" / "l5_certification.py")
 cert = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
+sys.modules[SPEC.name] = cert
 SPEC.loader.exec_module(cert)
 
 
