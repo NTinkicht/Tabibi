@@ -37,6 +37,13 @@ class L5RecoveryTest(unittest.TestCase):
         failed = {**self.base(), "ci":"FAILURE", "retry_count":3, "retry_action":"CI"}
         self.assertEqual(l5.plan_recovery(failed)["next_action"], "RETRY_BUDGET_EXHAUSTED")
 
+    def test_hold_preserves_retry_budget_and_scope(self):
+        hold = {**self.base(), "ci":"FAILURE", "retry_count":2, "retry_action":"CI", "emergency_stop":True}
+        plan = l5.plan_recovery(hold)
+        self.assertEqual(plan["status"], "BLOCKED")
+        self.assertEqual(plan["retry_count"], 2)
+        self.assertEqual(plan["retry_action"], "CI")
+
     def test_unknown_retry_scope_fails_closed(self):
         with self.assertRaises(ValueError):
             l5.plan_recovery({**self.base(), "ci":"FAILURE", "retry_count":3, "retry_action":"garbage"})
