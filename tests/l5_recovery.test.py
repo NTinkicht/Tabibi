@@ -21,7 +21,7 @@ class L5RecoveryTest(unittest.TestCase):
             "merged":False,"verified":False,"verified_head_sha":None,"verified_base_sha":None,
             "ci":"SUCCESS","ci_head_sha":h,"ci_base_sha":b,"review":"PASS","review_head_sha":h,
             "review_base_sha":b,"reviewer_actor":"mistral-vibe","material_authors":["chatgpt"],
-            "review_eligible":True,"unresolved_threads":False,"mergeable":True,
+            "material_authors_head_sha":h,"review_eligible":True,"unresolved_threads":False,"mergeable":True,
             "retry_count":0,"retry_action":None,"event_id":"evt-1","ready_candidates":[],
         }
 
@@ -70,7 +70,7 @@ class L5RecoveryTest(unittest.TestCase):
         self.assertEqual(plan["selected_issue"], 560)
 
     def test_empty_ready_queue_does_not_invent_work(self):
-        snap = {**self.base(), "active_prs":[], "merged":True, "verified":True,
+        snap = {**self.base(), "active_prs":[], "merged":True,"verified":True,
                 "verified_head_sha":"a"*40,"verified_base_sha":"b"*40}
         plan = l5.plan_recovery(snap)
         self.assertEqual(plan["status"], "IDLE")
