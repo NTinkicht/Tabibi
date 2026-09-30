@@ -26,6 +26,8 @@ jobs:
           python-version: "3.12"
       - name: Run L5 certification harness
         run: python -I scripts/l5_certification.py
+      - name: Prove certification checks survive optimized mode
+        run: python -O -I scripts/l5_certification.py
       - name: Run L5 certification tests
         run: python -I tests/l5_certification.test.py
       - name: Re-run underlying recovery selftests
