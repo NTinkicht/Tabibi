@@ -46,6 +46,9 @@ jobs:
       - name: Offline native authenticated-review gate regression checks
         run: python3 scripts/native_factory_merge.py selftest
 
+      - name: L5 continuity planner regression checks
+        run: python3 scripts/l5_continuity.py --selftest
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
