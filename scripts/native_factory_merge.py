@@ -59,6 +59,9 @@ TRUSTED_GATE_PATHS = frozenset({
     "tests/l5_recovery.test.py",
     "scripts/l5_certification.py",
     "tests/l5_certification.test.py",
+    "scripts/l5_write_adapter.py",
+    "tests/l5_write_adapter.test.py",
+    ".github/workflows/l5-write-adapter-ci.yml",
     "scripts/mistral-review-target.py",
     "scripts/coordination/mistral-review-proof.py",
     "scripts/coordination/publish-mistral-review.py",
@@ -420,6 +423,9 @@ def selftest_authenticated_review_gate():
         "tests/l5_recovery.test.py",
         "scripts/l5_certification.py",
         "tests/l5_certification.test.py",
+        "scripts/l5_write_adapter.py",
+        "tests/l5_write_adapter.test.py",
+        ".github/workflows/l5-write-adapter-ci.yml",
     }
     assert required_l5_paths.issubset(TRUSTED_GATE_PATHS)
 
