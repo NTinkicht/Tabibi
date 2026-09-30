@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from l5_state_machine import reduce_evidence
+from l5_state_machine import PASSING_REVIEWS, reduce_evidence
 
 MAX_RETRIES = 3
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -166,48 +166,34 @@ def journal_record(snapshot: dict[str, Any], plan: dict[str, Any]) -> dict[str, 
 
 
 def _mutation_token(plan: dict[str, Any], snapshot: dict[str, Any]) -> str:
-    material = {
-        "mutation": SAFE_MUTATIONS.get(plan.get("next_action")),
-        "next_action": plan.get("next_action"),
-        "repository": snapshot.get("repository"), "issue": snapshot.get("issue"),
-        "canonical_pr": snapshot.get("canonical_pr"), "head_sha": snapshot.get("head_sha"),
-        "base_sha": snapshot.get("base_sha"), "selected_issue": plan.get("selected_issue"),
-        "retry_action_after": plan.get("retry_action_after"),
-        "retry_count_after": plan.get("retry_count_after"),
-    }
-    return hashlib.sha256(json.dumps(material, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    material = {"mutation":SAFE_MUTATIONS.get(plan.get("next_action")),"next_action":plan.get("next_action"),"repository":snapshot.get("repository"),"issue":snapshot.get("issue"),"canonical_pr":snapshot.get("canonical_pr"),"head_sha":snapshot.get("head_sha"),"base_sha":snapshot.get("base_sha"),"selected_issue":plan.get("selected_issue"),"retry_action_after":plan.get("retry_action_after"),"retry_count_after":plan.get("retry_count_after")}
+    return hashlib.sha256(json.dumps(material,sort_keys=True,separators=(",",":")).encode()).hexdigest()
 
 
 def authorize_mutation(snapshot: dict[str, Any], *, prior_mutation_tokens: set[str] | None = None) -> dict[str, Any]:
-    if not isinstance(snapshot, dict):
-        raise ValueError("L5_ACTIVATION_SNAPSHOT_INVALID")
+    if not isinstance(snapshot, dict): raise ValueError("L5_ACTIVATION_SNAPSHOT_INVALID")
     history = _validated_token_set(prior_mutation_tokens or set(), "L5_ACTIVATION_PRIOR_MUTATION_TOKENS_INVALID")
-    boundaries = {key: _required_bool(snapshot, key) for key in HARD_BOUNDARY_FIELDS}
-    if any(boundaries.values()):
-        return {"authorized":False,"reason":"HARD_BOUNDARY","mutation_allowed":False}
-    head = _normalized_sha(snapshot.get("head_sha")); base = _normalized_sha(snapshot.get("base_sha"))
-    if head is None or base is None:
-        raise ValueError("L5_ACTIVATION_EXACT_REFS_INVALID")
+    boundaries = {key:_required_bool(snapshot,key) for key in HARD_BOUNDARY_FIELDS}
+    if any(boundaries.values()): return {"authorized":False,"reason":"HARD_BOUNDARY","mutation_allowed":False}
+    head=_normalized_sha(snapshot.get("head_sha")); base=_normalized_sha(snapshot.get("base_sha"))
+    if head is None or base is None: raise ValueError("L5_ACTIVATION_EXACT_REFS_INVALID")
     if _required_bool(snapshot,"head_current") is not True or _required_bool(snapshot,"base_current") is not True:
         return {"authorized":False,"reason":"STALE_HEAD_OR_BASE","mutation_allowed":False}
-    plan = plan_recovery(snapshot, prior_event_keys=_prior_event_keys(snapshot))
-    action = plan.get("next_action")
-    if action not in SAFE_MUTATIONS:
-        return {"authorized":False,"reason":"ACTION_NOT_MUTATION_WHITELISTED","planned_action":action,"mutation_allowed":False}
-    token = _mutation_token(plan, snapshot)
-    if token in history:
-        return {"authorized":False,"reason":"REPLAY_NOOP","mutation_token":token,"mutation_allowed":False}
-    mutation = SAFE_MUTATIONS[action]
-    result = {"authorized":True,"reason":"AUTHORIZED","mutation_allowed":True,"mutation":mutation,"mutation_token":token,"expected_head_sha":head,"expected_base_sha":base,"canonical_pr":snapshot.get("canonical_pr"),"issue":snapshot.get("issue"),"retry_count_after":plan.get("retry_count_after"),"retry_action_after":plan.get("retry_action_after")}
-    if mutation == "merge_expected_head":
-        if plan.get("status") != "READY": raise ValueError("L5_ACTIVATION_MERGE_PLAN_NOT_READY")
-        if snapshot.get("ci") != "SUCCESS" or snapshot.get("review") != "PASS": raise ValueError("L5_ACTIVATION_MERGE_EVIDENCE_NOT_PASS")
+    plan=plan_recovery(snapshot,prior_event_keys=_prior_event_keys(snapshot)); action=plan.get("next_action")
+    if action not in SAFE_MUTATIONS: return {"authorized":False,"reason":"ACTION_NOT_MUTATION_WHITELISTED","planned_action":action,"mutation_allowed":False}
+    token=_mutation_token(plan,snapshot)
+    if token in history: return {"authorized":False,"reason":"REPLAY_NOOP","mutation_token":token,"mutation_allowed":False}
+    mutation=SAFE_MUTATIONS[action]
+    result={"authorized":True,"reason":"AUTHORIZED","mutation_allowed":True,"mutation":mutation,"mutation_token":token,"expected_head_sha":head,"expected_base_sha":base,"canonical_pr":snapshot.get("canonical_pr"),"issue":snapshot.get("issue"),"retry_count_after":plan.get("retry_count_after"),"retry_action_after":plan.get("retry_action_after")}
+    if mutation=="merge_expected_head":
+        if plan.get("status")!="READY": raise ValueError("L5_ACTIVATION_MERGE_PLAN_NOT_READY")
+        if snapshot.get("ci")!="SUCCESS" or snapshot.get("review") not in PASSING_REVIEWS: raise ValueError("L5_ACTIVATION_MERGE_EVIDENCE_NOT_PASS")
         if _required_bool(snapshot,"unresolved_threads"): raise ValueError("L5_ACTIVATION_UNRESOLVED_THREADS")
         if _required_bool(snapshot,"mergeable") is not True: raise ValueError("L5_ACTIVATION_NOT_MERGEABLE")
-    if mutation == "reserve_next_wu":
-        selected = plan.get("selected_issue")
-        if type(selected) is not int or selected < 1: raise ValueError("L5_ACTIVATION_SELECTED_ISSUE_INVALID")
-        result["selected_issue"] = selected
+    if mutation=="reserve_next_wu":
+        selected=plan.get("selected_issue")
+        if type(selected) is not int or selected<1: raise ValueError("L5_ACTIVATION_SELECTED_ISSUE_INVALID")
+        result["selected_issue"]=selected
     return result
 
 
@@ -217,15 +203,11 @@ def selftest() -> None:
     p=plan_recovery(s); assert p["next_action"]=="REMEDIATE_SAME_PR_CI" and p["retry_action_after"]=="CI"
     assert plan_recovery(s,prior_event_keys={p["event_key"]})["status"]=="REPLAY_NOOP"
     assert plan_recovery({**s,"retry_count":MAX_RETRIES,"retry_action":"CI"})["next_action"]=="RETRY_BUDGET_EXHAUSTED"
-    hold=plan_recovery({**s,"retry_count":2,"retry_action":"CI","emergency_stop":True})
-    assert hold["retry_count"]==2 and hold["retry_action"]=="CI"
+    hold=plan_recovery({**s,"retry_count":2,"retry_action":"CI","emergency_stop":True}); assert hold["retry_count"]==2 and hold["retry_action"]=="CI"
     auth=authorize_mutation(s); assert auth["mutation"]=="retry_ci" and auth["mutation_allowed"] is True
-    changed_event={**s,"event_id":"evt-2"}
-    assert authorize_mutation(changed_event,prior_mutation_tokens={auth["mutation_token"]})["reason"]=="REPLAY_NOOP"
-    second={**s,"retry_count":1,"retry_action":"CI","event_id":"evt-3"}
-    second_auth=authorize_mutation(second)
-    assert second_auth["mutation_token"] != auth["mutation_token"]
-    assert second_auth["retry_count_after"] == 2 and second_auth["retry_action_after"] == "CI"
+    changed_event={**s,"event_id":"evt-2"}; assert authorize_mutation(changed_event,prior_mutation_tokens={auth["mutation_token"]})["reason"]=="REPLAY_NOOP"
+    second={**s,"retry_count":1,"retry_action":"CI","event_id":"evt-3"}; second_auth=authorize_mutation(second)
+    assert second_auth["mutation_token"]!=auth["mutation_token"] and second_auth["retry_count_after"]==2 and second_auth["retry_action_after"]=="CI"
     assert authorize_mutation({**s,"emergency_stop":True})["mutation_allowed"] is False
     print("l5_recovery selftest PASS")
 
@@ -237,7 +219,6 @@ def main() -> int:
     s=json.loads(a.input.read_text(encoding="utf-8"))
     if a.authorize:
         print(json.dumps(authorize_mutation(s,prior_mutation_tokens=_prior_mutation_tokens(s)),indent=2,sort_keys=True)); return 0
-    plan=plan_recovery(s, prior_event_keys=_prior_event_keys(s))
-    print(json.dumps({"plan":plan,"journal":journal_record(s,plan)},indent=2,sort_keys=True)); return 0
+    plan=plan_recovery(s,prior_event_keys=_prior_event_keys(s)); print(json.dumps({"plan":plan,"journal":journal_record(s,plan)},indent=2,sort_keys=True)); return 0
 
 if __name__=="__main__": raise SystemExit(main())
