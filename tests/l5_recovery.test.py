@@ -119,6 +119,22 @@ class L5RecoveryTest(unittest.TestCase):
         self.assertFalse(replay["mutation_allowed"])
         self.assertEqual(replay["reason"], "REPLAY_NOOP")
 
+    def test_activation_retry_attempts_have_distinct_tokens(self):
+        first_snapshot = {**self.base(), "ci":"FAILURE", "review":"UNKNOWN", "event_id":"retry-poll-a"}
+        first = l5.authorize_mutation(first_snapshot)
+        second_snapshot = {**first_snapshot, "retry_count":1, "retry_action":"CI", "event_id":"retry-poll-b"}
+        second = l5.authorize_mutation(second_snapshot)
+        second_same_attempt = l5.authorize_mutation({**second_snapshot, "event_id":"retry-poll-c"})
+        self.assertEqual(first["mutation"], "retry_ci")
+        self.assertEqual(second["mutation"], "retry_ci")
+        self.assertNotEqual(first["mutation_token"], second["mutation_token"])
+        self.assertEqual(second["mutation_token"], second_same_attempt["mutation_token"])
+        self.assertEqual(first["retry_count_after"], 1)
+        self.assertEqual(second["retry_count_after"], 2)
+        self.assertEqual(second["retry_action_after"], "CI")
+        replay = l5.authorize_mutation(second_same_attempt, prior_mutation_tokens={second["mutation_token"]})
+        self.assertEqual(replay["reason"], "REPLAY_NOOP")
+
     def test_activation_replay_history_is_strictly_validated(self):
         with self.assertRaises(ValueError):
             l5.authorize_mutation(self.base(), prior_mutation_tokens={"broken"})
