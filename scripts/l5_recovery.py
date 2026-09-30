@@ -14,6 +14,7 @@ from l5_state_machine import reduce_evidence
 
 MAX_RETRIES = 3
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
+TOKEN64 = re.compile(r"^[0-9a-f]{64}$")
 RECOVERY_ACTIONS = {
     "START_CANONICAL_STREAM", "RECONCILE_CANONICAL_PR", "CONTINUE_IMPLEMENTATION",
     "RUN_OR_RECONCILE_EXACT_HEAD_CI", "RECONCILE_EXACT_HEAD_CI_EVIDENCE", "REMEDIATE_SAME_PR_CI",
@@ -93,12 +94,15 @@ def _normalized_pr(value: Any) -> int | None:
     return value if type(value) is int and value > 0 else None
 
 
+def _validated_token_set(values: Any, error: str) -> set[str]:
+    if not isinstance(values, set) or not all(isinstance(value, str) and TOKEN64.fullmatch(value) for value in values):
+        raise ValueError(error)
+    return values
+
+
 def _prior_event_keys(snapshot: dict[str, Any]) -> set[str]:
     values = snapshot.get("prior_event_keys", [])
-    if not isinstance(values, list) or not all(
-        isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
-        for value in values
-    ):
+    if not isinstance(values, list) or not all(isinstance(value, str) and TOKEN64.fullmatch(value) for value in values):
         raise ValueError("L5_RECOVERY_PRIOR_EVENT_KEYS_INVALID")
     if len(set(values)) != len(values):
         raise ValueError("L5_RECOVERY_PRIOR_EVENT_KEYS_DUPLICATE")
@@ -107,10 +111,7 @@ def _prior_event_keys(snapshot: dict[str, Any]) -> set[str]:
 
 def _prior_mutation_tokens(snapshot: dict[str, Any]) -> set[str]:
     values = snapshot.get("prior_mutation_tokens", [])
-    if not isinstance(values, list) or not all(
-        isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
-        for value in values
-    ):
+    if not isinstance(values, list) or not all(isinstance(value, str) and TOKEN64.fullmatch(value) for value in values):
         raise ValueError("L5_ACTIVATION_PRIOR_MUTATION_TOKENS_INVALID")
     if len(set(values)) != len(values):
         raise ValueError("L5_ACTIVATION_PRIOR_MUTATION_TOKENS_DUPLICATE")
@@ -137,8 +138,9 @@ def _eligible_ready_candidates(snapshot: dict[str, Any]) -> list[dict[str, Any]]
 def plan_recovery(snapshot: dict[str, Any], *, prior_event_keys: set[str] | None = None) -> dict[str, Any]:
     if not isinstance(snapshot, dict):
         raise ValueError("L5_RECOVERY_SNAPSHOT_INVALID")
+    history = _validated_token_set(prior_event_keys or set(), "L5_RECOVERY_PRIOR_EVENT_KEYS_INVALID")
     event_key = _event_key(snapshot)
-    if event_key in (prior_event_keys or set()):
+    if event_key in history:
         return {"status":"REPLAY_NOOP","event_key":event_key,"mutation_allowed":False,"next_action":"NONE_ALREADY_RECORDED"}
     state = reduce_evidence(snapshot); action = state["next_action"]
     count, persisted = _retry_state(snapshot, action); scope = RETRY_SCOPES.get(action)
@@ -165,7 +167,8 @@ def journal_record(snapshot: dict[str, Any], plan: dict[str, Any]) -> dict[str, 
 
 def _mutation_token(plan: dict[str, Any], snapshot: dict[str, Any]) -> str:
     material = {
-        "event_key": plan.get("event_key"), "next_action": plan.get("next_action"),
+        "mutation": SAFE_MUTATIONS.get(plan.get("next_action")),
+        "next_action": plan.get("next_action"),
         "repository": snapshot.get("repository"), "issue": snapshot.get("issue"),
         "canonical_pr": snapshot.get("canonical_pr"), "head_sha": snapshot.get("head_sha"),
         "base_sha": snapshot.get("base_sha"), "selected_issue": plan.get("selected_issue"),
@@ -173,11 +176,10 @@ def _mutation_token(plan: dict[str, Any], snapshot: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(material, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def authorize_mutation(
-    snapshot: dict[str, Any], *, prior_mutation_tokens: set[str] | None = None
-) -> dict[str, Any]:
+def authorize_mutation(snapshot: dict[str, Any], *, prior_mutation_tokens: set[str] | None = None) -> dict[str, Any]:
     if not isinstance(snapshot, dict):
         raise ValueError("L5_ACTIVATION_SNAPSHOT_INVALID")
+    history = _validated_token_set(prior_mutation_tokens or set(), "L5_ACTIVATION_PRIOR_MUTATION_TOKENS_INVALID")
     boundaries = {key: _required_bool(snapshot, key) for key in HARD_BOUNDARY_FIELDS}
     if any(boundaries.values()):
         return {"authorized":False,"reason":"HARD_BOUNDARY","mutation_allowed":False}
@@ -194,15 +196,11 @@ def authorize_mutation(
         return {"authorized":False,"reason":"ACTION_NOT_MUTATION_WHITELISTED","planned_action":action,"mutation_allowed":False}
 
     token = _mutation_token(plan, snapshot)
-    if token in (prior_mutation_tokens or set()):
+    if token in history:
         return {"authorized":False,"reason":"REPLAY_NOOP","mutation_token":token,"mutation_allowed":False}
 
     mutation = SAFE_MUTATIONS[action]
-    result = {
-        "authorized":True,"reason":"AUTHORIZED","mutation_allowed":True,"mutation":mutation,
-        "mutation_token":token,"expected_head_sha":head,"expected_base_sha":base,
-        "canonical_pr":snapshot.get("canonical_pr"),"issue":snapshot.get("issue"),
-    }
+    result = {"authorized":True,"reason":"AUTHORIZED","mutation_allowed":True,"mutation":mutation,"mutation_token":token,"expected_head_sha":head,"expected_base_sha":base,"canonical_pr":snapshot.get("canonical_pr"),"issue":snapshot.get("issue")}
     if mutation == "merge_expected_head":
         if plan.get("status") != "READY": raise ValueError("L5_ACTIVATION_MERGE_PLAN_NOT_READY")
         if snapshot.get("ci") != "SUCCESS" or snapshot.get("review") != "PASS": raise ValueError("L5_ACTIVATION_MERGE_EVIDENCE_NOT_PASS")
@@ -224,7 +222,8 @@ def selftest() -> None:
     hold=plan_recovery({**s,"retry_count":2,"retry_action":"CI","emergency_stop":True})
     assert hold["retry_count"]==2 and hold["retry_action"]=="CI"
     auth=authorize_mutation(s); assert auth["mutation"]=="retry_ci" and auth["mutation_allowed"] is True
-    assert authorize_mutation(s,prior_mutation_tokens={auth["mutation_token"]})["reason"]=="REPLAY_NOOP"
+    changed_event={**s,"event_id":"evt-2"}
+    assert authorize_mutation(changed_event,prior_mutation_tokens={auth["mutation_token"]})["reason"]=="REPLAY_NOOP"
     assert authorize_mutation({**s,"emergency_stop":True})["mutation_allowed"] is False
     print("l5_recovery selftest PASS")
 
