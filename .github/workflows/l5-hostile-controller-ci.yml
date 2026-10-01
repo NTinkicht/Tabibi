@@ -3,8 +3,10 @@ on:
   pull_request:
     paths:
       - "scripts/l5_kernel.py"
+      - "scripts/l5_ledger.py"
       - "scripts/l5_hostile_sim.py"
       - "tests/test_l5_kernel.py"
+      - "tests/test_l5_ledger.py"
       - ".github/workflows/l5-hostile-controller-ci.yml"
 permissions:
   contents: read
@@ -19,5 +21,5 @@ jobs:
         with:
           python-version: "3.12"
       - run: python scripts/l5_kernel.py
-      - run: python -m unittest discover -s tests -p "test_l5_kernel.py"
+      - run: python -m unittest discover -s tests -p "test_l5_*.py"
       - run: python scripts/l5_hostile_sim.py
