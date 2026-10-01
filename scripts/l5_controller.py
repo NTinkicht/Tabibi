@@ -811,7 +811,7 @@ class GuardedWriteBridge:
         lease: Lease,
     ) -> Mapping[str, Any]:
         """Reproduce authorization and delegate to ``execute_mutation``."""
-        from l5_activation import authorize_mutation
+        from l5_recovery import authorize_mutation
         from l5_write_adapter import execute_mutation
 
         snapshot = item.get("activation_snapshot")
