@@ -27,7 +27,7 @@
     "db:clinic-day-load": "tsx scripts/load/clinic-day.ts"
   },
   "dependencies": {
-    "next": "16.3.4",
+    "next": "16.3.8",
     "pg": "8.16.3",
     "pino": "9.9.0",
     "react": "19.2.4",
