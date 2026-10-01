@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "control_repository": "NTinkicht/OneCompany",
+  "control_ref": "main",
+  "required_contract_files": [
+    "docs/L5-STATE-MACHINE-V1.md",
+    "docs/L5-POST-CLAUDE-CUTOVER.md",
+    ".l5/trust-policy.json",
+    "scripts/l5_post_claude.py"
+  ],
+  "execution_mode": "SHADOW",
+  "platform_enforcement": "DEFERRED_UNTIL_FINAL_CUTOVER",
+  "mutation_allowed": false,
+  "activation_requirements": [
+    "control_plane_reviewed_and_green",
+    "api_hostile_simulation_green",
+    "shadow_liveness_validated",
+    "platform_enforcement_verified",
+    "governance_drift_human_cleared"
+  ]
+}
