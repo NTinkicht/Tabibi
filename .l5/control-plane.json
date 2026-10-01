@@ -6,7 +6,11 @@
     "docs/L5-STATE-MACHINE-V1.md",
     "docs/L5-POST-CLAUDE-CUTOVER.md",
     ".l5/trust-policy.json",
-    "scripts/l5_post_claude.py"
+    "scripts/l5_trust_boundary.py",
+    "scripts/l5_shadow.py",
+    "scripts/l5_api_hostile_sim.py",
+    "scripts/l5_liveness.py",
+    "scripts/l5_activation.py"
   ],
   "execution_mode": "SHADOW",
   "platform_enforcement": "DEFERRED_UNTIL_FINAL_CUTOVER",
