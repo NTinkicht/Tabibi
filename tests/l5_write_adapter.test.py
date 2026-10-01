@@ -65,7 +65,7 @@ class FakeClient:
         self.fetches += 1
         return {k: (dict(v) if isinstance(v, dict) else v) for k, v in self.live.items()}
 
-    def perform(self, mutation, params):
+    def perform_cas(self, mutation, params):
         if self.before_write:
             self.before_write(self)
         if self.raise_on_write is wa.WriteRejected:
@@ -74,6 +74,7 @@ class FakeClient:
         self.effect = self.effect_on_write
         if self.raise_on_write:
             raise self.raise_on_write("boom")
+        return True
 
     def verify_effect(self, mutation, params):
         return self.effect
@@ -105,6 +106,18 @@ class WriteAdapterTest(unittest.TestCase):
         for snap, client in cases:
             _, _, out = self.run_it(snap, client)
             self.assertEqual(out["status"], "COMPLETE", snap)
+
+    def test_atomic_remote_cas_is_mandatory(self):
+        client = FakeClient(); client.perform_cas = None
+        _, _, out = self.run_it(snapshot(), client)
+        self.assertEqual(out["reason"], "ATOMIC_CAS_UNAVAILABLE")
+        self.assertEqual(client.writes, [])
+
+    def test_merge_rechecks_nonauthor_reviewer(self):
+        client = FakeClient(); client.live["review_eligible_nonauthor"] = False
+        _, _, out = self.run_it(merge_snapshot(), client)
+        self.assertEqual(out["reason"], "REVIEWER_NOT_ELIGIBLE")
+        self.assertEqual(client.writes, [])
 
     def test_stale_head_and_base_block_without_write(self):
         for key in ("head_sha", "base_sha"):
@@ -154,11 +167,22 @@ class WriteAdapterTest(unittest.TestCase):
         self.assertEqual(client.writes, [])
         self.assertFalse(client.effect)
 
+    def test_definitive_no_write_merge_rejection_can_retry_same_token(self):
+        client = FakeClient(); client.raise_on_write = wa.WriteRejected
+        snap = merge_snapshot(); auth = rec.authorize_mutation(snap); store = wa.MemoryStore()
+        out = wa.execute_mutation(auth, snap, client, store)
+        self.assertEqual(out["reason"], "WRITE_REJECTED")
+        self.assertEqual(store.get(auth["mutation_token"])["status"], "RETRYABLE")
+        client.raise_on_write = None
+        again = wa.execute_mutation(auth, snap, client, store)
+        self.assertEqual(again["status"], "COMPLETE")
+
     def test_branch_pr_creation_race_reserve(self):
         client = FakeClient(pr_state="merged", streams={})
         client.raise_on_write = wa.AlreadyExists; client.effect_on_write = False
-        _, _, out = self.run_it(reserve_snapshot(), client)
-        self.assertEqual(out["status"], "VERIFICATION_FAILED")
+        auth, store, out = self.run_it(reserve_snapshot(), client)
+        self.assertEqual(out["status"], "IN_PROGRESS")
+        self.assertEqual(store.get(auth["mutation_token"])["status"], "PENDING")
         live_dup = FakeClient(pr_state="merged", streams={701: [710]})
         _, _, out = self.run_it(reserve_snapshot(), live_dup)
         self.assertEqual(out["reason"], "DUPLICATE_STREAM")
@@ -200,20 +224,24 @@ class WriteAdapterTest(unittest.TestCase):
         auth, store, out = self.run_it(snapshot(), client)
         self.assertEqual(out["reason"], "HARD_BOUNDARY")
         self.assertEqual(client.writes, [])
-        self.assertEqual(store.records[auth["mutation_token"]]["status"], "FAILED")
+        self.assertEqual(store.records[auth["mutation_token"]]["status"], "RETRYABLE")
 
     def test_unknown_boundary_state_fails_closed(self):
         client = FakeClient(); del client.boundaries["human_only"]
         _, _, out = self.run_it(snapshot(), client)
         self.assertEqual(out["reason"], "BOUNDARY_STATE_UNKNOWN")
 
-    def test_post_write_verification_failure_is_not_complete(self):
+    def test_post_write_verification_failure_stays_reconcilable(self):
         client = FakeClient(effect_on_write=False)
         auth, store, out = self.run_it(snapshot(), client)
-        self.assertEqual(out["status"], "VERIFICATION_FAILED")
-        self.assertEqual(store.records[auth["mutation_token"]]["status"], "VERIFICATION_FAILED")
+        self.assertEqual(out["status"], "IN_PROGRESS")
+        self.assertEqual(store.records[auth["mutation_token"]]["status"], "PENDING")
         again = wa.execute_mutation(auth, snapshot(), client, store)
-        self.assertEqual(again["status"], "BLOCKED")
+        self.assertEqual(again["status"], "IN_PROGRESS")
+        self.assertEqual(len(client.writes), 1)
+        client.effect = True
+        final = wa.execute_mutation(auth, snapshot(), client, store)
+        self.assertEqual(final["status"], "COMPLETE")
         self.assertEqual(len(client.writes), 1)
 
     def test_non_whitelisted_or_forged_authorization_fails_closed(self):
@@ -294,6 +322,7 @@ class WriteAdapterTest(unittest.TestCase):
             fresh = wa.JsonFileStore(path)
             self.assertEqual(fresh.get(auth["mutation_token"])["status"], "COMPLETE")
             self.assertEqual(fresh.retry_state(self.stream(auth)), (1, "CI"))
+            self.assertEqual(fresh.retry_owner(self.stream(auth)), auth["mutation_token"])
             self.assertFalse(fresh.begin(auth["mutation_token"], {}, self.stream(auth), 1, "CI"))
 
     def test_cas_uses_gate_validated_retry_state_not_a_second_read(self):
@@ -320,13 +349,24 @@ class WriteAdapterTest(unittest.TestCase):
         self.assertIsNone(store.get(auth["mutation_token"]))
         self.assertEqual(store.retry_state(self.stream(auth)), (1, "REVIEW"))
 
+    def test_retry_owner_prevents_aba_restore(self):
+        store = wa.MemoryStore(); stream = "s"; old = "1" * 64; newer = "2" * 64
+        self.assertTrue(store.begin(old, {"status": "PENDING"}, stream, 1, "CI", expected_retry=(0, None), expected_owner=None))
+        self.assertTrue(store.begin(newer, {"status": "PENDING"}, stream, 1, "REVIEW", expected_retry=(1, "CI"), expected_owner=old))
+        store.fail_and_restore(newer, "newer failed", stream, (1, "CI"))
+        self.assertEqual(store.retry_state(stream), (1, "CI"))
+        self.assertEqual(store.retry_owner(stream), newer)
+        store.fail_and_restore(old, "old late", stream, (0, None))
+        self.assertEqual(store.retry_state(stream), (1, "CI"))
+        self.assertEqual(store.retry_owner(stream), newer)
+
     def _restore_case(self, store, client_setup):
         snap = snapshot(); auth = rec.authorize_mutation(snap)
         client = FakeClient(); client_setup(client)
         out = wa.execute_mutation(auth, snap, client, store)
         self.assertEqual(client.writes, [])
         self.assertEqual(store.retry_state(self.stream(auth)), (0, None))
-        self.assertEqual(store.get(auth["mutation_token"])["status"], "FAILED")
+        self.assertEqual(store.get(auth["mutation_token"])["status"], "RETRYABLE")
         return out
 
     def _stores(self):
@@ -364,11 +404,11 @@ class WriteAdapterTest(unittest.TestCase):
 
             def boom(mutation, params):
                 raise RuntimeError("network down")
-            client.perform = boom
+            client.perform_cas = boom
             out = wa.execute_mutation(auth, snap, client, store)
-            self.assertEqual(out["status"], "VERIFICATION_FAILED")
+            self.assertEqual(out["status"], "IN_PROGRESS")
             self.assertFalse(out["written"])
-            self.assertEqual(store.get(auth["mutation_token"])["status"], "VERIFICATION_FAILED")
+            self.assertEqual(store.get(auth["mutation_token"])["status"], "PENDING")
             self.assertEqual(store.retry_state(self.stream(auth)), (auth["retry_count_after"], auth["retry_action_after"]))
         for store in self._stores():  # write actually landed before the transport error
             snap = snapshot(); auth = rec.authorize_mutation(snap)
