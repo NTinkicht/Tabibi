@@ -7,6 +7,7 @@ on:
       - "scripts/l5_hostile_sim.py"
       - "tests/test_l5_kernel.py"
       - "tests/test_l5_ledger.py"
+      - "docs/L5-STATE-MACHINE-V1.md"
       - ".github/workflows/l5-hostile-controller-ci.yml"
 permissions:
   contents: read
