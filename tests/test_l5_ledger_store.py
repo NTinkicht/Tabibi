@@ -67,23 +67,64 @@ class DurableStoreTests(unittest.TestCase):
         backend = FakeBackend(empty_ledger())
         store = DurableLedgerCASStore("repo", backend)
         obs = Observation("a" * 40, "b" * 40, "wu", "t")
+
         lease = acquire(store, "repo:item:1:PUSH", "run-1", obs, now_srv=1)
         self.assertIsNotNone(lease)
-        intended = attach_intent(store, lease, "repo", "1", "push", now_srv=2)
+
+        intended = attach_intent(
+            store,
+            lease,
+            "repo",
+            "1",
+            "push",
+            now_srv=2,
+        )
         self.assertIsNotNone(intended)
+
         resolved = resolve_intent(store, intended, "DONE")
         self.assertIsNotNone(resolved)
+
         released = release(store, resolved, now_srv=3)
         self.assertIsNotNone(released)
+
         row = backend.doc["leases"]["repo:item:1:PUSH"]
         self.assertEqual(row["state"], "RELEASED")
         self.assertEqual(row["intent"]["state"], "DONE")
+
+    def test_release_after_ttl_is_still_a_released_tombstone(self):
+        """Late terminal release is explicitly persisted as RELEASED."""
+        backend = FakeBackend(empty_ledger())
+        store = DurableLedgerCASStore("repo", backend)
+        obs = Observation("a" * 40, "b" * 40)
+        lease = acquire(store, "k", "run-1", obs, now_srv=1, ttl=5)
+        intended = attach_intent(store, lease, "repo", "1", "push", now_srv=2)
+        done = resolve_intent(store, intended, "DONE")
+        released = release(store, done, now_srv=10)
+        self.assertIsNotNone(released)
+        self.assertEqual(backend.doc["leases"]["k"]["state"], "RELEASED")
+
+    def test_merge_locked_mode_exit_needs_verified_transition(self):
+        """The durable ledger refuses an unverified MERGE_LOCKED exit."""
+        doc = empty_ledger()
+        doc["mode"] = "MERGE_LOCKED"
+        backend = FakeBackend(doc)
+        store = DurableLedgerCASStore("repo", backend)
+        self.assertFalse(store.cas_repo_mode("repo", 1, RepoMode.NORMAL))
+        self.assertTrue(
+            store.cas_repo_mode(
+                "repo",
+                1,
+                RepoMode.NORMAL,
+                post_merge_verified=True,
+            )
+        )
 
     def test_blob_race_rejects_stale_write(self):
         """GitHub blob CAS conflict rejects a stale lease mutation."""
         backend = FakeBackend(empty_ledger())
         store = DurableLedgerCASStore("repo", backend)
         obs = Observation("a" * 40, "b" * 40)
+
         backend.fail_next = True
         lease = acquire(store, "k", "run-1", obs, now_srv=1)
         self.assertIsNone(lease)
@@ -94,11 +135,13 @@ class DurableStoreTests(unittest.TestCase):
         backend = FakeBackend(empty_ledger())
         store = DurableLedgerCASStore("repo", backend)
         obs = Observation("a" * 40, "b" * 40)
+
         first = acquire(store, "k", "run-1", obs, now_srv=1, ttl=5)
         intended = attach_intent(store, first, "repo", "1", "push", now_srv=2)
         done = resolve_intent(store, intended, "DONE")
         released = release(store, done, now_srv=3)
         self.assertIsNotNone(released)
+
         second = acquire(store, "k", "run-2", obs, now_srv=6, ttl=5)
         self.assertIsNotNone(second)
         self.assertEqual(second.epoch, first.epoch + 1)
@@ -111,8 +154,16 @@ class DurableStoreTests(unittest.TestCase):
         doc["human_clear_required"] = True
         backend = FakeBackend(doc)
         store = DurableLedgerCASStore("repo", backend)
+
         self.assertFalse(store.cas_repo_mode("repo", 1, RepoMode.NORMAL))
-        self.assertTrue(store.cas_repo_mode("repo", 1, RepoMode.NORMAL, human_clear=True))
+        self.assertTrue(
+            store.cas_repo_mode(
+                "repo",
+                1,
+                RepoMode.NORMAL,
+                human_clear=True,
+            )
+        )
         self.assertEqual(store.read_repo_mode("repo")[0], RepoMode.NORMAL)
 
     def test_repo_identity_mismatch_fails_closed(self):
