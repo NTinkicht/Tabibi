@@ -5,6 +5,7 @@ import fcntl, json, os, sys
 from pathlib import Path
 from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from l5_control_plane import mutation_policy
 from l5_recovery import HARD_BOUNDARY_FIELDS, KNOWN_RETRY_SCOPES, MAX_RETRIES, SAFE_MUTATIONS, SHA40, TOKEN64, _required_bool, authorize_mutation
 
 RETRYABLE=frozenset({"retry_ci","dispatch_review","remediate_review"})
@@ -67,6 +68,8 @@ def _reconcile(auth,client,store,written):
     return {**_result("IN_PROGRESS","EFFECT_NOT_YET_VERIFIED",token),"written":written}
 
 def execute_mutation(auth,snapshot,client,store):
+    control_allowed,control_reason=mutation_policy()
+    if not control_allowed:return _result("BLOCKED",control_reason,auth.get("mutation_token") if isinstance(auth,dict) else None)
     reason=_validate_authorization(auth,snapshot)
     if reason:return _result("BLOCKED",reason,auth.get("mutation_token") if isinstance(auth,dict) else None)
     token=auth["mutation_token"];stream=stream_key(auth,snapshot);prior=store.get(token)
