@@ -12,9 +12,9 @@
     "scripts/l5_liveness.py",
     "scripts/l5_activation.py"
   ],
-  "execution_mode": "SHADOW",
-  "platform_enforcement": "DEFERRED_UNTIL_FINAL_CUTOVER",
-  "mutation_allowed": false,
+  "execution_mode": "LIVE_SAFE",
+  "platform_enforcement": "DEFERRED_FOR_VALIDATION",
+  "mutation_allowed": true,
   "activation_requirements": [
     "control_plane_reviewed_and_green",
     "api_hostile_simulation_green",
