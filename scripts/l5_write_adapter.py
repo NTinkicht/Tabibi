@@ -68,9 +68,6 @@ def _reconcile(auth,client,store,written):
     return {**_result("IN_PROGRESS","EFFECT_NOT_YET_VERIFIED",token),"written":written}
 
 def execute_mutation(auth,snapshot,client,store):
-    operation=auth.get("mutation") if isinstance(auth,dict) else None
-    control_allowed,control_reason=mutation_policy(operation=operation)
-    if not control_allowed:return _result("BLOCKED",control_reason,auth.get("mutation_token") if isinstance(auth,dict) else None)
     reason=_validate_authorization(auth,snapshot)
     if reason:return _result("BLOCKED",reason,auth.get("mutation_token") if isinstance(auth,dict) else None)
     token=auth["mutation_token"];stream=stream_key(auth,snapshot);prior=store.get(token)
@@ -79,6 +76,8 @@ def execute_mutation(auth,snapshot,client,store):
         if status=="COMPLETE":return _result("REPLAY_NOOP","ALREADY_COMPLETE",token)
         if status=="PENDING":return _reconcile(auth,client,store,False)
         if status!="RETRYABLE":return _result("BLOCKED",f"PRIOR_{status}",token)
+    control_allowed,control_reason=mutation_policy(operation=auth["mutation"])
+    if not control_allowed:return _result("BLOCKED",control_reason,token)
     observed_retry=store.retry_state(stream) if auth["mutation"] in RETRYABLE else None
     observed_owner=store.retry_owner(stream) if auth["mutation"] in RETRYABLE else _UNSET
     block=_live_gate(auth,client,retry=observed_retry)
@@ -126,7 +125,6 @@ class MemoryStore:
         if self.retry.get(stream,(0,None))!=(written[0],written[1]) or self.retry_owners.get(stream)!=token:return
         if prior_retry==(0,None):self.retry.pop(stream,None)
         else:self.retry[stream]=prior_retry
-        # Keep retry_owners[stream]=token as a monotonic ownership/version tag.
     def set_status(self,token,status,detail=None):self.records[token]["status"]=status;self.records[token]["detail"]=detail
     def retry_state(self,stream):return self.retry.get(stream,(0,None))
     def retry_owner(self,stream):return self.retry_owners.get(stream)
