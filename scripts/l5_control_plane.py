@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Mapping
@@ -10,6 +11,7 @@ from typing import Any, Mapping
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / ".l5" / "control-plane.json"
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
+LIVE_SAFE_MAIN_CHANGING = frozenset({"merge_expected_head", "revert"})
 REQUIRED_ACTIVATION = frozenset({
     "control_plane_reviewed_and_green",
     "api_hostile_simulation_green",
@@ -19,9 +21,18 @@ REQUIRED_ACTIVATION = frozenset({
 })
 
 
-def load_manifest(path: Path = MANIFEST) -> Mapping[str, Any]:
+def _manifest_path(path: Path | None = None) -> Path:
+    """Resolve an explicit manifest or the test/operator override."""
+    if path is not None:
+        return path
+    override = os.environ.get("L5_CONTROL_PLANE_MANIFEST")
+    return Path(override) if override else MANIFEST
+
+
+def load_manifest(path: Path | None = None) -> Mapping[str, Any]:
+    """Load and structurally validate the local control-plane manifest."""
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = json.loads(_manifest_path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError("CONTROL_PLANE_UNAVAILABLE") from exc
     if not isinstance(value, Mapping) or value.get("schema_version") != "1.0":
@@ -34,14 +45,15 @@ def load_manifest(path: Path = MANIFEST) -> Mapping[str, Any]:
     return value
 
 
-def mutation_policy(path: Path = MANIFEST) -> tuple[bool, str]:
-    """Return the local mutation-mode decision.
+def mutation_policy(
+    operation: str | None = None,
+    path: Path | None = None,
+) -> tuple[bool, str]:
+    """Return the local mutation decision for one concrete operation.
 
-    LIVE_SAFE is an explicit validation mode: reversible feature-branch/PR/CI/
-    review mutations are enabled by the scheduled controller contract while
-    main-changing actions remain blocked by the controller's existing merge
-    governance predicates. ACTIVE still requires the complete final cutover
-    evidence, including platform enforcement.
+    ``LIVE_SAFE`` permits reversible validation work but explicitly denies
+    main-changing merge/revert operations. ``ACTIVE`` remains the only mode
+    that can pass those operations, and only with complete activation evidence.
     """
     try:
         value = load_manifest(path)
@@ -54,6 +66,8 @@ def mutation_policy(path: Path = MANIFEST) -> tuple[bool, str]:
             return False, "CONTROL_PLANE_MUTATIONS_DISABLED"
         if value.get("platform_enforcement") != "DEFERRED_FOR_VALIDATION":
             return False, "CONTROL_PLANE_LIVE_SAFE_INVALID"
+        if operation in LIVE_SAFE_MAIN_CHANGING:
+            return False, "CONTROL_PLANE_LIVE_SAFE_MAIN_CHANGE_BLOCKED"
         return True, "CONTROL_PLANE_LIVE_SAFE"
 
     if mode != "ACTIVE":
