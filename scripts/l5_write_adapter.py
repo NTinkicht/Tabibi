@@ -68,7 +68,8 @@ def _reconcile(auth,client,store,written):
     return {**_result("IN_PROGRESS","EFFECT_NOT_YET_VERIFIED",token),"written":written}
 
 def execute_mutation(auth,snapshot,client,store):
-    control_allowed,control_reason=mutation_policy()
+    operation=auth.get("mutation") if isinstance(auth,dict) else None
+    control_allowed,control_reason=mutation_policy(operation=operation)
     if not control_allowed:return _result("BLOCKED",control_reason,auth.get("mutation_token") if isinstance(auth,dict) else None)
     reason=_validate_authorization(auth,snapshot)
     if reason:return _result("BLOCKED",reason,auth.get("mutation_token") if isinstance(auth,dict) else None)
