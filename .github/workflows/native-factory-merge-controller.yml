@@ -64,11 +64,10 @@ jobs:
               "tests/fixtures/l5-control-plane-active.json",
           }
           result = subprocess.run(
-              ["gh", "api", f"repos/{repo}/pulls/{number}/files", "--paginate"],
+              ["gh", "api", "--paginate", f"repos/{repo}/pulls/{number}/files?per_page=100", "--jq", ".[ ].filename".replace(" ", "")],
               text=True, capture_output=True, check=True,
           )
-          rows = json.loads(result.stdout)
-          changed = {row.get("filename") for row in rows if isinstance(row, dict)}
+          changed = set(result.stdout.splitlines())
           if changed & protected:
               raise SystemExit("TRUSTED_GATE_CHANGE_REQUIRES_EXTERNAL_MERGE")
           PY
@@ -93,7 +92,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, os, subprocess
+          import os, subprocess
 
           repo = os.environ["GITHUB_REPOSITORY"]
           protected = {
@@ -103,19 +102,18 @@ jobs:
               "tests/test_l5_control_plane.py",
               "tests/fixtures/l5-control-plane-active.json",
           }
-          pulls = json.loads(subprocess.run(
-              ["gh", "api", f"repos/{repo}/pulls?state=open&per_page=100"],
+          pulls = subprocess.run(
+              ["gh", "api", "--paginate", f"repos/{repo}/pulls?state=open&per_page=100", "--jq", ".[ ].number".replace(" ", "")],
               text=True, capture_output=True, check=True,
-          ).stdout)
-          for pr in pulls:
-              number = pr.get("number")
-              if not number:
+          ).stdout.splitlines()
+          for raw_number in pulls:
+              if not raw_number.isdigit():
                   raise SystemExit("AUTHORITY_GUARD_PR_INVALID")
-              rows = json.loads(subprocess.run(
-                  ["gh", "api", f"repos/{repo}/pulls/{number}/files", "--paginate"],
+              number = int(raw_number)
+              changed = set(subprocess.run(
+                  ["gh", "api", "--paginate", f"repos/{repo}/pulls/{number}/files?per_page=100", "--jq", ".[ ].filename".replace(" ", "")],
                   text=True, capture_output=True, check=True,
-              ).stdout)
-              changed = {row.get("filename") for row in rows if isinstance(row, dict)}
+              ).stdout.splitlines())
               if changed & protected:
                   raise SystemExit(f"TRUSTED_GATE_CHANGE_REQUIRES_EXTERNAL_MERGE PR #{number}")
           PY
