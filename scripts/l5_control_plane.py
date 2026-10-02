@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed local control-plane switch for every L5 mutation."""
+"""Fail-closed local control-plane switch for L5 execution modes."""
 from __future__ import annotations
 
 import json
@@ -35,12 +35,28 @@ def load_manifest(path: Path = MANIFEST) -> Mapping[str, Any]:
 
 
 def mutation_policy(path: Path = MANIFEST) -> tuple[bool, str]:
-    """Return permission only after an immutable reviewed control plane is ACTIVE."""
+    """Return the local mutation-mode decision.
+
+    LIVE_SAFE is an explicit validation mode: reversible feature-branch/PR/CI/
+    review mutations are enabled by the scheduled controller contract while
+    main-changing actions remain blocked by the controller's existing merge
+    governance predicates. ACTIVE still requires the complete final cutover
+    evidence, including platform enforcement.
+    """
     try:
         value = load_manifest(path)
     except ValueError as exc:
         return False, str(exc)
-    if value.get("execution_mode") != "ACTIVE":
+
+    mode = value.get("execution_mode")
+    if mode == "LIVE_SAFE":
+        if value.get("mutation_allowed") is not True:
+            return False, "CONTROL_PLANE_MUTATIONS_DISABLED"
+        if value.get("platform_enforcement") != "DEFERRED_FOR_VALIDATION":
+            return False, "CONTROL_PLANE_LIVE_SAFE_INVALID"
+        return True, "CONTROL_PLANE_LIVE_SAFE"
+
+    if mode != "ACTIVE":
         return False, "CONTROL_PLANE_SHADOW"
     if value.get("mutation_allowed") is not True:
         return False, "CONTROL_PLANE_MUTATIONS_DISABLED"
