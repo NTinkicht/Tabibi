@@ -33,7 +33,7 @@ def load_manifest(path: Path | None = None) -> Mapping[str, Any]:
     """Load and structurally validate the local control-plane manifest."""
     try:
         value = json.loads(_manifest_path(path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ValueError("CONTROL_PLANE_UNAVAILABLE") from exc
     if not isinstance(value, Mapping) or value.get("schema_version") != "1.0":
         raise ValueError("CONTROL_PLANE_INVALID")
@@ -70,6 +70,8 @@ def mutation_policy(
             return False, "CONTROL_PLANE_MUTATIONS_DISABLED"
         if value.get("platform_enforcement") != "DEFERRED_FOR_VALIDATION":
             return False, "CONTROL_PLANE_LIVE_SAFE_INVALID"
+        if operation is not None and not isinstance(operation, str):
+            return False, "CONTROL_PLANE_INVALID_MUTATION"
         if operation in LIVE_SAFE_MAIN_CHANGING:
             return False, "CONTROL_PLANE_LIVE_SAFE_MAIN_CHANGE_BLOCKED"
         return True, "CONTROL_PLANE_LIVE_SAFE"
