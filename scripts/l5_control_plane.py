@@ -56,8 +56,8 @@ def mutation_policy(
     """Return the local mutation decision for one concrete operation.
 
     ``LIVE_SAFE`` permits reversible validation work but explicitly denies
-    main-changing merge/revert operations. ``ACTIVE`` remains the only mode
-    that can pass those operations, and only with complete activation evidence.
+    main-changing merge/revert operations. Both LIVE_SAFE and ACTIVE bind the
+    shared control-plane contract to an immutable full commit SHA.
     """
     try:
         value = load_manifest(path)
@@ -70,6 +70,9 @@ def mutation_policy(
             return False, "CONTROL_PLANE_MUTATIONS_DISABLED"
         if value.get("platform_enforcement") != "DEFERRED_FOR_VALIDATION":
             return False, "CONTROL_PLANE_LIVE_SAFE_INVALID"
+        control_ref = value.get("control_ref")
+        if not isinstance(control_ref, str) or not SHA40.fullmatch(control_ref):
+            return False, "CONTROL_PLANE_REF_NOT_PINNED"
         if operation is not None and not isinstance(operation, str):
             return False, "CONTROL_PLANE_INVALID_MUTATION"
         if operation in LIVE_SAFE_MAIN_CHANGING:
