@@ -64,7 +64,7 @@ jobs:
               "tests/fixtures/l5-control-plane-active.json",
           }
           result = subprocess.run(
-              ["gh", "api", "--paginate", f"repos/{repo}/pulls/{number}/files?per_page=100", "--jq", ".[ ].filename".replace(" ", "")],
+              ["gh", "api", "--paginate", f"repos/{repo}/pulls/{number}/files?per_page=100", "--jq", ".[] | .filename, (.previous_filename // empty)"],
               text=True, capture_output=True, check=True,
           )
           changed = set(result.stdout.splitlines())
@@ -111,7 +111,7 @@ jobs:
                   raise SystemExit("AUTHORITY_GUARD_PR_INVALID")
               number = int(raw_number)
               changed = set(subprocess.run(
-                  ["gh", "api", "--paginate", f"repos/{repo}/pulls/{number}/files?per_page=100", "--jq", ".[ ].filename".replace(" ", "")],
+                  ["gh", "api", "--paginate", f"repos/{repo}/pulls/{number}/files?per_page=100", "--jq", ".[] | .filename, (.previous_filename // empty)"],
                   text=True, capture_output=True, check=True,
               ).stdout.splitlines())
               if changed & protected:
