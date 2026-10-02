@@ -43,6 +43,35 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+      - name: Fail closed on L5 authority-path self-amendment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          event = json.loads(open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8").read())
+          number = event.get("pull_request", {}).get("number")
+          if not number:
+              raise SystemExit("AUTHORITY_GUARD_PR_UNAVAILABLE")
+          protected = {
+              ".l5/control-plane.json",
+              "docs/L5-POST-CLAUDE-CUTOVER.md",
+              "scripts/l5_control_plane.py",
+              "tests/test_l5_control_plane.py",
+              "tests/fixtures/l5-control-plane-active.json",
+          }
+          result = subprocess.run(
+              ["gh", "api", f"repos/{repo}/pulls/{number}/files", "--paginate"],
+              text=True, capture_output=True, check=True,
+          )
+          rows = json.loads(result.stdout)
+          changed = {row.get("filename") for row in rows if isinstance(row, dict)}
+          if changed & protected:
+              raise SystemExit("TRUSTED_GATE_CHANGE_REQUIRES_EXTERNAL_MERGE")
+          PY
       - name: Authorize exact-head review from trusted main
         env:
           GH_TOKEN: ${{ github.token }}
@@ -58,6 +87,38 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+      - name: Fail closed while any L5 authority-path PR is open
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          protected = {
+              ".l5/control-plane.json",
+              "docs/L5-POST-CLAUDE-CUTOVER.md",
+              "scripts/l5_control_plane.py",
+              "tests/test_l5_control_plane.py",
+              "tests/fixtures/l5-control-plane-active.json",
+          }
+          pulls = json.loads(subprocess.run(
+              ["gh", "api", f"repos/{repo}/pulls?state=open&per_page=100"],
+              text=True, capture_output=True, check=True,
+          ).stdout)
+          for pr in pulls:
+              number = pr.get("number")
+              if not number:
+                  raise SystemExit("AUTHORITY_GUARD_PR_INVALID")
+              rows = json.loads(subprocess.run(
+                  ["gh", "api", f"repos/{repo}/pulls/{number}/files", "--paginate"],
+                  text=True, capture_output=True, check=True,
+              ).stdout)
+              changed = {row.get("filename") for row in rows if isinstance(row, dict)}
+              if changed & protected:
+                  raise SystemExit(f"TRUSTED_GATE_CHANGE_REQUIRES_EXTERNAL_MERGE PR #{number}")
+          PY
       - name: Reconcile exact-head merge gates from trusted main
         env:
           GH_TOKEN: ${{ github.token }}
