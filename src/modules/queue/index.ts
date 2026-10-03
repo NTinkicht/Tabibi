@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
+import { queueOrderingAuditMetadata } from '@/modules/queue/ordering-contract';
 import { inTransaction } from '@/platform/database/transaction';
 
 export type QueueEntryState =
@@ -741,6 +742,7 @@ export class QueueService {
         metadata: {
           command: rawInput.command,
           outcome: 'applied',
+          ...queueOrderingAuditMetadata(rawInput.command),
           sessionId,
           from: prior,
           to: response.state,
