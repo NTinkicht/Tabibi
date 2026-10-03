@@ -7,6 +7,7 @@ on:
       - 'scripts/l5_control_plane.py'
       - 'scripts/l5_write_adapter.py'
       - 'tests/l5_write_adapter.test.py'
+      - 'tests/l5_live_safe_adapter.test.py'
       - 'tests/test_l5_control_plane.py'
       - 'tests/fixtures/l5-control-plane-active.json'
       - 'scripts/l5_recovery.py'
@@ -39,11 +40,16 @@ jobs:
           scripts/l5_control_plane.py
           scripts/l5_write_adapter.py
           tests/l5_write_adapter.test.py
+          tests/l5_live_safe_adapter.test.py
           tests/test_l5_control_plane.py
           scripts/l5_recovery.py
           scripts/native_factory_merge.py
       - name: Run control-plane mode tests
         run: python tests/test_l5_control_plane.py
+      - name: Run LIVE_SAFE adapter boundary tests
+        env:
+          L5_CONTROL_PLANE_MANIFEST: .l5/control-plane.json
+        run: python tests/l5_live_safe_adapter.test.py
       - name: Run guarded write adapter fault tests
         env:
           L5_CONTROL_PLANE_MANIFEST: tests/fixtures/l5-control-plane-active.json
