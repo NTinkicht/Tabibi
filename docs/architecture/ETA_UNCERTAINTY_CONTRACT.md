@@ -1,41 +1,83 @@
 # Deterministic ETA Uncertainty Contract
 
+Contract version: `eta-uncertainty/v1`
+
 Issue: #577, under Epic #5.
 
-ETA output must be deterministic for the same committed queue/session history and must expose uncertainty instead of false precision.
+ETA output must be deterministic for the same committed queue/session history and must expose uncertainty instead of false precision. This contract complements `queue-ordering/v1`; it does not redefine service order.
 
-## Inputs
+## Committed inputs and scope
 
-Only committed inputs may affect ETA: ordered eligible queue entries, active consultation state, historical consultation-duration priors, same-day completed consultation durations, pause/delay state, and explicit priority changes.
+Every estimate is scoped to one clinic, one consultation session, one target QueueEntry, one committed `queue_order_version`, and one immutable evaluation instant `evaluated_at` captured by the trusted server transaction. Ambient process time is not an input.
 
-## Output
+Only committed inputs may affect ETA:
 
-Each estimate is a versioned tuple:
+- ordered eligible `checked_in` entries ahead of the target under `queue-ordering/v1`;
+- any already `called` entry that still represents work ahead of the target;
+- active consultation state, including `started_at` and its deterministic remaining-minute contribution;
+- session status and schedule context (`starts_at`, `ends_at`, pause/resume state) plus committed declared delay;
+- historical consultation-duration priors and same-day completed consultation durations selected by the existing deterministic estimator policy;
+- explicit priority changes and the current committed queue revision;
+- the estimator/configuration version.
 
-- `earliest_minutes`
-- `expected_minutes`
-- `latest_minutes`
-- `estimate_version`
-- `queue_revision`
-- `explanation_codes`
+`waiting`, cancelled, completed, and no-show entries do not contribute merely by existing. A scheduled appointment contributes only after its canonical queue state makes it service work ahead of the target. Unknown, cross-clinic, malformed, or uncommitted inputs fail closed rather than being silently guessed.
 
-The range must satisfy `0 <= earliest <= expected <= latest`. A single-point estimate is allowed only when all three values are equal by rule, never by rounding convenience.
+## Versioned calculation
 
-## Recompute triggers
+`eta-uncertainty/v1` uses the deterministic consultation-duration estimate already selected by the estimator (`observed_median`, then `historical_median`, then the documented fallback). Let:
+
+- `D` = committed non-negative declared delay minutes;
+- `A` = deterministic remaining minutes for an active consultation at `evaluated_at`, or `0` when none is active;
+- `N` = number of queued service slots ahead after accounting for the separately represented active consultation;
+- `M` = selected estimated consultation minutes;
+- `MIN = 0.75` and `MAX = 1.5`, matching the existing bounded uncertainty policy.
+
+The normalized minute outputs are:
+
+- `earliest_minutes = round(D + A + N * M * MIN)`;
+- `expected_minutes = round(D + A + N * M)`;
+- `latest_minutes = round(D + A + N * M * MAX)`.
+
+All inputs must be finite and physically valid. The range must satisfy `0 <= earliest_minutes <= expected_minutes <= latest_minutes`. A single-point estimate is allowed only when all three values are equal by rule, never by rounding convenience or by dropping uncertainty evidence.
+
+A `called` entry that is not yet the active consultation counts as one queued service slot ahead. Once that entry becomes the active consultation, it is represented by `A` and must not also be counted in `N`.
+
+## Output and field semantics
+
+Each estimate is an immutable versioned tuple:
+
+- `earliest_minutes`, `expected_minutes`, `latest_minutes`: normalized whole-minute range at `evaluated_at`;
+- `estimate_version`: exactly `eta-uncertainty/v1` for this algorithm and multiplier policy;
+- `queue_revision`: the committed session `queue_order_version` used to build the snapshot;
+- `evaluated_at`: absolute timestamp used for active-consultation remaining-time calculation;
+- `explanation_codes`: deterministic reason codes for material range/position inputs.
+
+A stored or published estimate is valid only for the exact tuple `(clinic, session, target_entry, queue_revision, estimate_version, evaluated_at)`. Retrying the same request with the same tuple returns byte-equivalent normalized estimate data. A retry that observes a different queue revision must recompute rather than overwrite or relabel the older estimate.
+
+## Recompute and refresh policy
 
 Recompute after every committed mutation that can affect service order or service velocity: check-in, call-next, consultation start/end, priority change, cancellation, no-show, pause/resume, doctor/session delay, and queue closure/reopen.
 
-## Determinism
+Time passage alone may change active-consultation remaining time. A refresh therefore captures a new committed `evaluated_at` and produces a new estimate snapshot; replay of an older snapshot always uses its original `evaluated_at`. No test or recovery path may call the ambient clock while replaying historical input.
 
-No random sampling, process-local clock drift, unordered collection traversal, or hidden model state may influence the result. The same committed history and configuration version must yield identical output.
+If the session is paused or otherwise not currently advancing, explanation codes must expose that state and consumers must not present a falsely precise countdown. If required schedule/evaluation inputs are absent or invalid, the estimate is ineligible for publication until a valid committed snapshot exists.
+
+## Determinism and concurrency
+
+No random sampling, process-local clock drift, unordered collection traversal, or hidden model state may influence the result. The same committed history, configuration version, queue revision, and evaluation instant must yield identical output.
+
+Computation may occur outside the mutation transaction, but publication must compare-and-swap against the exact `queue_revision` used to compute it. If the revision changed before publication, discard the stale candidate and recompute from the new committed state. Concurrent retries for the same immutable input tuple must converge on the same result.
 
 ## Explainability
 
-Every estimate must retain explanation codes sufficient to show whether the range widened or moved because of queue depth, priority changes, observed same-day duration, historical prior, pause/delay, or active-consultation overrun.
+Every estimate must retain explanation codes sufficient to show whether the range widened or moved because of queue depth, a called-but-not-started slot, active-consultation remaining time, priority changes, observed same-day duration, historical prior, fallback prior, pause/delay, or active-consultation overrun. Codes describe committed facts; they must not reveal patient identity.
 
 ## Acceptance examples
 
 - Adding an eligible patient increments the queue revision and deterministically recomputes affected estimates.
+- A `called` patient ahead contributes one service slot until consultation starts; after start, the same work is represented only by active-consultation remaining time.
 - Cancelling an entry removes its contribution without changing unrelated historical priors.
-- A same-day observed slowdown may move expected/latest while preserving the explicit range.
-- Replaying the same committed history produces byte-equivalent normalized estimate data for the same configuration version.
+- A same-day observed slowdown changes `M` and may move all three range values while preserving `earliest <= expected <= latest`.
+- Replaying the same committed history with the same `evaluated_at` produces byte-equivalent normalized estimate data for the same configuration version.
+- A retry computed from queue revision 41 cannot be published as revision 42; it must be discarded and recomputed.
+- Missing or invalid `evaluated_at`, source policy, queue revision, or session scope fails closed rather than using process-local defaults.
