@@ -38,7 +38,6 @@ def base_ruleset():
                         {"context":"Quality and build","integration_id":15368},
                         {"context":"PostgreSQL integration","integration_id":15368},
                         {"context":"Browser smoke","integration_id":15368},
-                        {"context":"L4 review authorization","integration_id":15368},
                     ],
                 },
             },
@@ -66,13 +65,13 @@ class RulesetPolicyTests(unittest.TestCase):
     def test_strict_non_bypassable_default_branch_ruleset_passes(self):
         self.assert_policy(base_ruleset(),True)
 
-    def test_authorization_context_remains_platform_required(self):
+    def test_controller_local_authorization_is_not_a_platform_prerequisite(self):
         r=base_ruleset()
         configured={
             item["context"]
             for item in rule(r,"required_status_checks")["parameters"]["required_status_checks"]
         }
-        self.assertIn("L4 review authorization",configured)
+        self.assertNotIn("L4 review authorization",configured)
         self.assert_policy(r,True)
 
     def test_default_branch_selector_fails_if_repository_default_moved(self):
