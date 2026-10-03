@@ -56,7 +56,7 @@ A stored or published estimate is valid only for the exact tuple `(clinic, sessi
 
 ## Recompute and refresh policy
 
-Recompute after every committed mutation that can affect service order or service velocity: check-in, call-next, consultation start/end, priority change, cancellation, no-show, pause/resume, doctor/session delay, and queue closure/reopen.
+Recompute after every committed mutation that can affect service order or service velocity: check-in, call-next, consultation start/end, priority change, cancellation, no-show, pause/resume, doctor/session delay, session close, and queue-entry transfer. A transfer recomputes both affected sessions from their newly committed queue revisions: the source session after removal and the target session after insertion. `closed` and `cancelled` sessions are terminal; there is no post-close `reopen` trigger. The only transition back to `open` covered here is the existing non-terminal `paused -> open` resume operation already listed above.
 
 Time passage alone may change active-consultation remaining time. A refresh therefore captures a new committed `evaluated_at` and produces a new estimate snapshot; replay of an older snapshot always uses its original `evaluated_at`. No test or recovery path may call the ambient clock while replaying historical input.
 
@@ -77,6 +77,8 @@ Every estimate must retain explanation codes sufficient to show whether the rang
 - Adding an eligible patient increments the queue revision and deterministically recomputes affected estimates.
 - A `called` patient ahead contributes one service slot until consultation starts; after start, the same work is represented only by active-consultation remaining time.
 - Cancelling an entry removes its contribution without changing unrelated historical priors.
+- Transferring an eligible entry from session A to session B increments/recomputes both affected queue snapshots; neither session may retain an ETA derived from its pre-transfer revision.
+- Closing a session may trigger its final recomputation/invalidations, but no subsequent `reopen` transition exists; `resume` applies only to a paused non-terminal session.
 - A same-day observed slowdown changes `M` and may move all three range values while preserving `earliest <= expected <= latest`.
 - Replaying the same committed history with the same `evaluated_at` produces byte-equivalent normalized estimate data for the same configuration version.
 - A retry computed from queue revision 41 cannot be published as revision 42; it must be discarded and recomputed.
