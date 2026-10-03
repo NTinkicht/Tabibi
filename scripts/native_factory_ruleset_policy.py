@@ -6,9 +6,6 @@ import re
 from typing import Iterable
 
 
-CONTROLLER_LOCAL_CHECKS = frozenset({"L4 review authorization"})
-
-
 def _pattern_regex(pattern: str) -> re.Pattern[str] | None:
     if any(ch in pattern for ch in "[]{}"):
         return None
@@ -78,13 +75,7 @@ def strict_ruleset_enforces(
     required_integration_id: int = 15368,
     required_restricted_paths: Iterable[str] = (),
 ) -> bool:
-    """Require active, non-bypassable branch enforcement from one trusted ruleset.
-
-    Controller-local authorization checks are deliberately excluded from the
-    platform status-check requirement because making the authorization job a
-    prerequisite of its own platform-verification step is circular. They are
-    enforced separately by the native merge controller after this check.
-    """
+    """Require active, non-bypassable L4 branch enforcement from one ruleset."""
     if (
         not isinstance(ruleset, dict)
         or ruleset.get("enforcement") != "active"
@@ -140,8 +131,7 @@ def strict_ruleset_enforces(
     specs = status_params.get("required_status_checks")
     if not isinstance(specs, list):
         return False
-    platform_checks = set(required_checks) - CONTROLLER_LOCAL_CHECKS
-    for context in platform_checks:
+    for context in set(required_checks):
         if not any(
             isinstance(item, dict)
             and item.get("context") == context
