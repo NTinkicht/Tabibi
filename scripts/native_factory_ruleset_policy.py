@@ -123,7 +123,7 @@ def strict_ruleset_enforces(
     if (
         int(pr_params.get("required_approving_review_count") or 0) < 1
         or pr_params.get("dismiss_stale_reviews_on_push") is not True
-        or pr_params.get("require_last_push_approval") is not True
+        or pr_params.get("require_extra_approval_for_unattributed_changes") is not True
         or pr_params.get("required_review_thread_resolution") is not True
     ):
         return False
@@ -153,4 +153,3 @@ def strict_ruleset_enforces(
     if required_paths:
         required_types.add("file_path_restriction")
     return required_types.issubset(rule_types)
-
