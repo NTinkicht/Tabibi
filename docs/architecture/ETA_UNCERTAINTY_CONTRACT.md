@@ -24,7 +24,9 @@ Only committed inputs may affect ETA:
 
 ## Versioned calculation
 
-`eta-uncertainty/v1` uses the deterministic consultation-duration estimate already selected by the estimator (`observed_median`, then `historical_median`, then the documented fallback). Let:
+`eta-uncertainty/v1` defines the target behavior for the next versioned ETA output. It uses the deterministic consultation-duration estimate already selected by the estimator (`observed_median`, then `historical_median`, then the documented fallback). At this revision, production still reports active-consultation remaining time separately and publishes ETA bounds without adding that remainder into the range and without an `expected_minutes` field; adopting this contract therefore requires an explicit versioned implementation change rather than relabeling current output.
+
+Let:
 
 - `D` = committed non-negative declared delay minutes;
 - `A` = deterministic remaining minutes for an active consultation at `evaluated_at`, or `0` when none is active;
@@ -32,13 +34,19 @@ Only committed inputs may affect ETA:
 - `M` = selected estimated consultation minutes;
 - `MIN = 0.75` and `MAX = 1.5`, matching the existing bounded uncertainty policy.
 
-The normalized minute outputs are:
+First compute the exact, unrounded values:
 
-- `earliest_minutes = round(D + A + N * M * MIN)`;
-- `expected_minutes = round(D + A + N * M)`;
-- `latest_minutes = round(D + A + N * M * MAX)`.
+- `raw_earliest = D + A + N * M * MIN`;
+- `raw_expected = D + A + N * M`;
+- `raw_latest = D + A + N * M * MAX`.
 
-All inputs must be finite and physically valid. The range must satisfy `0 <= earliest_minutes <= expected_minutes <= latest_minutes`. A single-point estimate is allowed only when all three values are equal by rule, never by rounding convenience or by dropping uncertainty evidence.
+Normalization must preserve real uncertainty. If `raw_earliest == raw_expected == raw_latest`, normalize all three fields to `round(raw_expected)`. Otherwise normalize outward around the expected value:
+
+- `earliest_minutes = floor(raw_earliest)`;
+- `expected_minutes = round(raw_expected)`;
+- `latest_minutes = ceil(raw_latest)`.
+
+All inputs must be finite and physically valid. The normalized range must satisfy `0 <= earliest_minutes <= expected_minutes <= latest_minutes`. When the unrounded bounds differ, normalization must also satisfy `earliest_minutes < latest_minutes`; rounding may never collapse a genuine uncertainty interval into a point estimate. A single-point estimate is allowed only when all three raw values are equal by rule, never by rounding convenience or by dropping uncertainty evidence.
 
 A `called` entry that is not yet the active consultation counts as one queued service slot ahead. Once that entry becomes the active consultation, it is represented by `A` and must not also be counted in `N`.
 
@@ -79,6 +87,7 @@ Every estimate must retain explanation codes sufficient to show whether the rang
 - Cancelling an entry removes its contribution without changing unrelated historical priors.
 - Transferring an eligible entry from session A to session B increments/recomputes both affected queue snapshots; neither session may retain an ETA derived from its pre-transfer revision.
 - Closing a session may trigger its final recomputation/invalidations, but no subsequent `reopen` transition exists; `resume` applies only to a paused non-terminal session.
+- With `D=0.8`, `A=0`, `N=1`, and `M=1`, the distinct raw bounds are normalized outward rather than collapsed to one point.
 - A same-day observed slowdown changes `M` and may move all three range values while preserving `earliest <= expected <= latest`.
 - Replaying the same committed history with the same `evaluated_at` produces byte-equivalent normalized estimate data for the same configuration version.
 - A retry computed from queue revision 41 cannot be published as revision 42; it must be discarded and recomputed.
