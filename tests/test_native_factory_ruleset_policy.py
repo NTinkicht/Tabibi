@@ -8,7 +8,7 @@ sys.path.insert(0,str(ROOT/"scripts"))
 import native_factory_ruleset_policy as p
 
 
-REQUIRED={"Quality and build","PostgreSQL integration","Browser smoke","L4 review authorization"}
+REQUIRED={"Quality and build","PostgreSQL integration","Browser smoke"}
 RESTRICTED={".github/workflows/**","scripts/**","coordination/**"}
 
 
@@ -24,7 +24,8 @@ def base_ruleset():
                 "parameters":{
                     "required_approving_review_count":1,
                     "dismiss_stale_reviews_on_push":True,
-                    "require_last_push_approval":True,
+                    "require_last_push_approval":False,
+                    "require_extra_approval_for_unattributed_changes":True,
                     "required_review_thread_resolution":True,
                 },
             },
@@ -38,7 +39,6 @@ def base_ruleset():
                         {"context":"Quality and build","integration_id":15368},
                         {"context":"PostgreSQL integration","integration_id":15368},
                         {"context":"Browser smoke","integration_id":15368},
-                        {"context":"L4 review authorization","integration_id":15368},
                     ],
                 },
             },
@@ -48,6 +48,10 @@ def base_ruleset():
             },
         ],
     }
+
+
+def rule(r, kind):
+    return next(item for item in r["rules"] if item["type"] == kind)
 
 
 class RulesetPolicyTests(unittest.TestCase):
@@ -73,30 +77,35 @@ class RulesetPolicyTests(unittest.TestCase):
 
     def test_non_strict_status_checks_fail(self):
         r=base_ruleset()
-        r["rules"][-1]["parameters"]["strict_required_status_checks_policy"]=False
+        rule(r,"required_status_checks")["parameters"]["strict_required_status_checks_policy"]=False
         self.assert_policy(r,False)
 
     def test_missing_required_check_fails(self):
         r=base_ruleset()
-        r["rules"][-1]["parameters"]["required_status_checks"].pop()
+        rule(r,"required_status_checks")["parameters"]["required_status_checks"].pop()
         self.assert_policy(r,False)
 
     def test_wrong_check_publisher_fails(self):
         r=base_ruleset()
-        r["rules"][-1]["parameters"]["required_status_checks"][0]["integration_id"]=999
+        rule(r,"required_status_checks")["parameters"]["required_status_checks"][0]["integration_id"]=999
         self.assert_policy(r,False)
 
     def test_fresh_non_author_review_is_required(self):
         for field,value in (
             ("required_approving_review_count",0),
             ("dismiss_stale_reviews_on_push",False),
-            ("require_last_push_approval",False),
+            ("require_extra_approval_for_unattributed_changes",False),
             ("required_review_thread_resolution",False),
         ):
             with self.subTest(field=field):
                 r=base_ruleset()
-                r["rules"][0]["parameters"][field]=value
+                rule(r,"pull_request")["parameters"][field]=value
                 self.assert_policy(r,False)
+
+    def test_last_push_approval_is_not_required_when_stale_reviews_are_dismissed(self):
+        r=base_ruleset()
+        self.assertFalse(rule(r,"pull_request")["parameters"]["require_last_push_approval"])
+        self.assert_policy(r,True)
 
     def test_missing_pr_or_force_push_protection_fails(self):
         for missing in ("pull_request","deletion","non_fast_forward"):
@@ -111,9 +120,7 @@ class RulesetPolicyTests(unittest.TestCase):
             r, branch="main", required_checks=REQUIRED, default_branch="main",
             required_restricted_paths=RESTRICTED,
         ))
-        for rule in r["rules"]:
-            if rule["type"] == "file_path_restriction":
-                rule["parameters"]["restricted_file_paths"].remove("scripts/**")
+        rule(r,"file_path_restriction")["parameters"]["restricted_file_paths"].remove("scripts/**")
         self.assertFalse(p.strict_ruleset_enforces(
             r, branch="main", required_checks=REQUIRED, default_branch="main",
             required_restricted_paths=RESTRICTED,
