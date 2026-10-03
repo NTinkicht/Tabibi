@@ -12,8 +12,8 @@
     "scripts/l5_liveness.py",
     "scripts/l5_activation.py"
   ],
-  "execution_mode": "LIVE_SAFE",
-  "platform_enforcement": "DEFERRED_FOR_VALIDATION",
+  "execution_mode": "ACTIVE",
+  "platform_enforcement": "VERIFIED",
   "mutation_allowed": true,
   "activation_requirements": [
     "control_plane_reviewed_and_green",
@@ -21,5 +21,12 @@
     "shadow_liveness_validated",
     "platform_enforcement_verified",
     "governance_drift_human_cleared"
-  ]
+  ],
+  "activation_evidence": {
+    "control_plane_reviewed_and_green": true,
+    "api_hostile_simulation_green": true,
+    "shadow_liveness_validated": true,
+    "platform_enforcement_verified": true,
+    "governance_drift_human_cleared": true
+  }
 }
