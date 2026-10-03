@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "control_repository": "NTinkicht/OneCompany",
-  "control_ref": "25ab53e71cc79cb5a77448f07fcb92427b952a84",
+  "control_ref": "88d2c6632543d937add00e1e9da493a260638057",
   "required_contract_files": [
     "docs/L5-STATE-MACHINE-V1.md",
     "docs/L5-POST-CLAUDE-CUTOVER.md",
