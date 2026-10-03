@@ -1,4 +1,3 @@
-import copy
 import unittest
 import sys
 from pathlib import Path
@@ -8,7 +7,7 @@ sys.path.insert(0,str(ROOT/"scripts"))
 import native_factory_ruleset_policy as p
 
 
-REQUIRED={"Quality and build","PostgreSQL integration","Browser smoke"}
+REQUIRED={"Quality and build","PostgreSQL integration","Browser smoke","L4 review authorization"}
 RESTRICTED={".github/workflows/**","scripts/**","coordination/**"}
 
 
@@ -39,6 +38,7 @@ def base_ruleset():
                         {"context":"Quality and build","integration_id":15368},
                         {"context":"PostgreSQL integration","integration_id":15368},
                         {"context":"Browser smoke","integration_id":15368},
+                        {"context":"L4 review authorization","integration_id":15368},
                     ],
                 },
             },
@@ -65,6 +65,15 @@ class RulesetPolicyTests(unittest.TestCase):
 
     def test_strict_non_bypassable_default_branch_ruleset_passes(self):
         self.assert_policy(base_ruleset(),True)
+
+    def test_authorization_context_remains_platform_required(self):
+        r=base_ruleset()
+        configured={
+            item["context"]
+            for item in rule(r,"required_status_checks")["parameters"]["required_status_checks"]
+        }
+        self.assertIn("L4 review authorization",configured)
+        self.assert_policy(r,True)
 
     def test_default_branch_selector_fails_if_repository_default_moved(self):
         self.assertFalse(p.strict_ruleset_enforces(
