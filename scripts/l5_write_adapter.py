@@ -5,6 +5,7 @@ import fcntl, json, os, sys
 from pathlib import Path
 from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from l5_control_plane import mutation_policy
 from l5_recovery import HARD_BOUNDARY_FIELDS, KNOWN_RETRY_SCOPES, MAX_RETRIES, SAFE_MUTATIONS, SHA40, TOKEN64, _required_bool, authorize_mutation
 
 RETRYABLE=frozenset({"retry_ci","dispatch_review","remediate_review"})
@@ -75,6 +76,8 @@ def execute_mutation(auth,snapshot,client,store):
         if status=="COMPLETE":return _result("REPLAY_NOOP","ALREADY_COMPLETE",token)
         if status=="PENDING":return _reconcile(auth,client,store,False)
         if status!="RETRYABLE":return _result("BLOCKED",f"PRIOR_{status}",token)
+    control_allowed,control_reason=mutation_policy(operation=auth["mutation"])
+    if not control_allowed:return _result("BLOCKED",control_reason,token)
     observed_retry=store.retry_state(stream) if auth["mutation"] in RETRYABLE else None
     observed_owner=store.retry_owner(stream) if auth["mutation"] in RETRYABLE else _UNSET
     block=_live_gate(auth,client,retry=observed_retry)
@@ -122,7 +125,6 @@ class MemoryStore:
         if self.retry.get(stream,(0,None))!=(written[0],written[1]) or self.retry_owners.get(stream)!=token:return
         if prior_retry==(0,None):self.retry.pop(stream,None)
         else:self.retry[stream]=prior_retry
-        # Keep retry_owners[stream]=token as a monotonic ownership/version tag.
     def set_status(self,token,status,detail=None):self.records[token]["status"]=status;self.records[token]["detail"]=detail
     def retry_state(self,stream):return self.retry.get(stream,(0,None))
     def retry_owner(self,stream):return self.retry_owners.get(stream)
