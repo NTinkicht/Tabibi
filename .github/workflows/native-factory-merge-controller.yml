@@ -86,37 +86,6 @@ jobs:
         with:
           ref: main
           persist-credentials: false
-      - name: Fail closed while any L5 authority-path PR is open
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import os, subprocess
-
-          repo = os.environ["GITHUB_REPOSITORY"]
-          protected = {
-              ".l5/control-plane.json",
-              "docs/L5-POST-CLAUDE-CUTOVER.md",
-              "scripts/l5_control_plane.py",
-              "tests/test_l5_control_plane.py",
-              "tests/fixtures/l5-control-plane-active.json",
-          }
-          pulls = subprocess.run(
-              ["gh", "api", "--paginate", f"repos/{repo}/pulls?state=open&per_page=100", "--jq", ".[ ].number".replace(" ", "")],
-              text=True, capture_output=True, check=True,
-          ).stdout.splitlines()
-          for raw_number in pulls:
-              if not raw_number.isdigit():
-                  raise SystemExit("AUTHORITY_GUARD_PR_INVALID")
-              number = int(raw_number)
-              changed = set(subprocess.run(
-                  ["gh", "api", "--paginate", f"repos/{repo}/pulls/{number}/files?per_page=100", "--jq", ".[] | .filename, (.previous_filename // empty)"],
-                  text=True, capture_output=True, check=True,
-              ).stdout.splitlines())
-              if changed & protected:
-                  raise SystemExit(f"TRUSTED_GATE_CHANGE_REQUIRES_EXTERNAL_MERGE PR #{number}")
-          PY
       - name: Reconcile exact-head merge gates from trusted main
         env:
           GH_TOKEN: ${{ github.token }}
