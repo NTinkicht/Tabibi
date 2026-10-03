@@ -51,11 +51,6 @@ TRUSTED_GATE_PATHS = frozenset({
     ".github/workflows/l5-certification-ci.yml",
     ".github/workflows/mistral-vibe-wake.yml",
     ".github/workflows/native-factory-merge-controller.yml",
-    ".github/workflows/l5-write-adapter-ci.yml",
-    ".github/workflows/l5-hostile-controller-ci.yml",
-    ".l5/control-plane.json",
-    "docs/L5-POST-CLAUDE-CUTOVER.md",
-    "scripts/l5_control_plane.py",
     "scripts/l5_continuity.py",
     "scripts/l5_continuity_policy.json",
     "scripts/l5_state_machine.py",
@@ -66,8 +61,8 @@ TRUSTED_GATE_PATHS = frozenset({
     "tests/l5_certification.test.py",
     "scripts/l5_write_adapter.py",
     "tests/l5_write_adapter.test.py",
-    "tests/test_l5_control_plane.py",
-    "tests/fixtures/l5-control-plane-active.json",
+    ".github/workflows/l5-write-adapter-ci.yml",
+    ".github/workflows/l5-hostile-controller-ci.yml",
     "scripts/l5_kernel.py",
     "scripts/l5_ledger.py",
     "scripts/l5_ledger_store.py",
@@ -184,42 +179,406 @@ def latest_ci_run(sha):
     ]
     if not runs:
         return None
-    return max(runs, key=lambda run: run.get("run_number", 0))
+    return max(runs, key=lambda run: (run.get("run_number") or 0, run.get("run_attempt") or 0, run.get("id") or 0))
 
 
-def ci_is_green(sha):
+def latest_ci_green(sha):
     run = latest_ci_run(sha)
     if not run or run.get("status") != "completed" or run.get("conclusion") != "success":
         return False
-    jobs = gh(f"repos/{REPO}/actions/runs/{run['id']}/jobs?per_page=100").get("jobs", [])
-    conclusions = {job.get("name"): job.get("conclusion") for job in jobs}
-    return all(conclusions.get(name) == "success" for name in CI_JOBS)
+    jobs = gh(f"repos/{REPO}/actions/runs/{run['id']}/jobs?filter=latest&per_page=100").get("jobs", [])
+    latest_by_name = {}
+    for job in jobs:
+        name = job.get("name")
+        if name in CI_JOBS:
+            previous = latest_by_name.get(name)
+            if previous is None or (job.get("id") or 0) > (previous.get("id") or 0):
+                latest_by_name[name] = job
+    return all(
+        latest_by_name.get(name, {}).get("status") == "completed"
+        and latest_by_name.get(name, {}).get("conclusion") == "success"
+        for name in CI_JOBS
+    )
 
 
-def main():
-    pr = EVENT.get("pull_request") or {}
-    number = pr.get("number") or EVENT.get("number")
-    if not number:
-        raise RuntimeError("PR_NUMBER_MISSING")
+def mistral_proof_reader():
+    path = Path("scripts/coordination/mistral-review-proof.py")
+    spec = importlib.util.spec_from_file_location("trusted_mistral_proof", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("MISTRAL_REVIEW_PROOF_HELPER_UNAVAILABLE")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def expected_mistral_native_body(number, sha, run_id, report_id):
+    marker = f"tabibi-mistral-native-v1 run={run_id} report={report_id} sha={sha}"
+    return (
+        "Authenticated independent Mistral Vibe exact-head technical PASS.\n\n"
+        f"PR #{number}; exact head {sha}.\n"
+        f"Run: https://github.com/{REPO}/actions/runs/{run_id}\n"
+        f"Immutable evidence: https://github.com/{REPO}/issues/11#issuecomment-{report_id}\n\n"
+        "A run-sealed, independently executed, non-material-author PASS was verified "
+        "against the unchanged current PR and green 3/3 CI by the trusted parent. "
+        "This native review does not authorize merge without all other Tabibi gates.\n\n"
+        f"<!-- {marker} -->"
+    )
+
+
+def authenticated_mistral_approval(review, number, sha):
+    body = review.get("body") or ""
+    markers = MISTRAL_NATIVE_REVIEW.findall(body)
+    if len(markers) != 1:
+        return False
+    run_id, report_id, marker_sha = markers[0]
+    if marker_sha != sha or body != expected_mistral_native_body(number, sha, run_id, report_id):
+        return False
+    try:
+        run = gh(f"repos/{REPO}/actions/runs/{run_id}")
+        workflow_path = run.get("path") or ""
+        workflow_file, separator, workflow_ref = workflow_path.partition("@")
+        if (
+            run.get("name") != "Mistral Vibe Wake"
+            or workflow_file != ".github/workflows/mistral-vibe-wake.yml"
+            or (separator and workflow_ref != "main")
+            or run.get("head_branch") != "main"
+            or run.get("event") not in {"issue_comment", "workflow_run"}
+            or run.get("status") != "completed"
+            or run.get("conclusion") != "success"
+            or run.get("head_repository", {}).get("full_name") != REPO
+        ):
+            return False
+        proof_reader = mistral_proof_reader()
+        proof = proof_reader.read_run_proof(run_id)
+        if (
+            str(proof.get("run_id")) != run_id
+            or str(proof.get("report_id")) != report_id
+            or str(proof.get("pr")) != str(number)
+            or proof.get("sha") != sha
+            or proof.get("verdict") != "PASS"
+        ):
+            return False
+        proof_reader.sealed_report(proof)
+        return True
+    except Exception:
+        return False
+
+
+def cumulative_material_authors(number, sha):
     pr = gh(f"repos/{REPO}/pulls/{number}")
+    expected = pr.get("commits")
+    commits = paged_rest(f"repos/{REPO}/pulls/{number}/commits")
+    if type(expected) is not int or expected < 1 or expected > 250 or len(commits) != expected or commits[-1].get("sha") != sha:
+        return set()
+    actors = set()
+    for commit in commits:
+        tags = MATERIAL_AUTHOR_TRAILER.findall((commit.get("commit") or {}).get("message", ""))
+        if len(tags) > 1:
+            return set()
+        if tags:
+            actors.add(tags[0].lower())
+            continue
+        login = ((commit.get("author") or {}).get("login") or "").lower()
+        if not login:
+            return set()
+        actors.add(f"github:{login}")
+    return actors
+
+
+def reviewer_actor(review):
+    login = ((review.get("user") or {}).get("login") or "").lower()
+    return REVIEWER_ACTORS.get(login, f"github:{login}" if login else "")
+
+
+def l4_authorization_green(sha):
+    payload = gh(f"repos/{REPO}/commits/{sha}/check-runs?per_page=100")
+    candidates = [
+        item for item in payload.get("check_runs", [])
+        if item.get("name") == L4_AUTH_CHECK and (item.get("app") or {}).get("id") == 15368
+    ]
+    if not candidates:
+        return False
+    latest = max(candidates, key=lambda item: item.get("id") or 0)
+    return latest.get("status") == "completed" and latest.get("conclusion") == "success" and latest.get("head_sha") == sha
+
+
+def eligible_approval(review, number, sha, material_authors):
+    if review.get("state") != "APPROVED" or review.get("commit_id") != sha:
+        return False
+    user = review.get("user") or {}
+    login = user.get("login", "").lower()
+    actor = reviewer_actor(review)
+    if not login or not actor or actor in material_authors:
+        return False
+    if login == "github-actions[bot]":
+        return authenticated_mistral_approval(review, number, sha)
+    if user.get("type") != "Bot":
+        return True
+    return login in TRUSTED_EXTERNAL_REVIEWERS
+
+
+def review_gate_clean(number, sha):
+    material_authors = cumulative_material_authors(number, sha)
+    if not material_authors:
+        return False
+    reviews = all_reviews(number)
+    approvals = [review for review in reviews if eligible_approval(review, number, sha, material_authors)]
+    adverse = [review for review in reviews if review.get("state") == "CHANGES_REQUESTED" and review.get("commit_id") == sha]
+    return bool(approvals) and not adverse and not unresolved_threads(number)
+
+
+def _classic_protection_enforces(protection):
+    checks = protection.get("required_status_checks")
+    reviews = protection.get("required_pull_request_reviews")
+    enforce_admins = protection.get("enforce_admins")
+    force_pushes = protection.get("allow_force_pushes")
+    deletions = protection.get("allow_deletions")
+    if (
+        not isinstance(checks, dict) or checks.get("strict") is not True
+        or not isinstance(reviews, dict)
+        or int(reviews.get("required_approving_review_count") or 0) < 1
+        or reviews.get("dismiss_stale_reviews") is not True
+        or reviews.get("require_last_push_approval") is not True
+        or not isinstance(enforce_admins, dict) or enforce_admins.get("enabled") is not True
+        or not isinstance(force_pushes, dict) or force_pushes.get("enabled") is not False
+        or not isinstance(deletions, dict) or deletions.get("enabled") is not False
+    ):
+        return False
+    configured = checks.get("checks")
+    if not isinstance(configured, list):
+        return False
+    if not all(any(isinstance(item, dict) and item.get("context") == context and item.get("app_id") == 15368 for item in configured) for context in CI_JOBS):
+        return False
+    allowances = reviews.get("bypass_pull_request_allowances")
+    if not isinstance(allowances, dict):
+        return False
+    return not any(allowances.get(key) for key in ("users", "teams", "apps"))
+
+
+def strict_base_enforcement():
+    try:
+        repository = gh(f"repos/{REPO}")
+        default_branch = repository.get("default_branch")
+        if default_branch != "main":
+            return False
+        summaries = paged_rest(f"repos/{REPO}/rulesets")
+    except RuntimeError:
+        return False
+    for summary in summaries:
+        if not isinstance(summary, dict) or summary.get("enforcement") != "active" or not summary.get("id"):
+            continue
+        try:
+            detail = gh(f"repos/{REPO}/rulesets/{summary['id']}")
+        except RuntimeError:
+            continue
+        if strict_ruleset_enforces(
+            detail,
+            branch="main",
+            required_checks=PLATFORM_CHECKS,
+            default_branch=default_branch,
+            required_restricted_paths=RULESET_RESTRICTED_PATHS,
+        ):
+            return True
+    return False
+
+
+def candidate_numbers():
+    if os.environ["GITHUB_EVENT_NAME"] == "pull_request_review":
+        number = EVENT.get("pull_request", {}).get("number")
+        return [int(number)] if number else []
+    pulls = paged_rest(f"repos/{REPO}/pulls?state=open")
+    return [
+        int(pr["number"])
+        for pr in pulls
+        if not pr.get("draft")
+        and pr.get("base", {}).get("ref") == "main"
+        and pr.get("head", {}).get("repo", {}).get("full_name") == REPO
+    ]
+
+
+def gates(number, *, require_authorization=True):
+    pr = gh(f"repos/{REPO}/pulls/{number}")
+    if pr.get("state") != "open" or pr.get("draft"):
+        return None
+    if pr.get("base", {}).get("ref") != "main":
+        return None
+    if pr.get("head", {}).get("repo", {}).get("full_name") != REPO:
+        return None
     sha = pr["head"]["sha"]
     if changed_paths(number) & TRUSTED_GATE_PATHS:
         print(f"PR #{number}: TRUSTED_GATE_CHANGE_REQUIRES_EXTERNAL_MERGE")
-        return
-    if pr.get("draft"):
-        print(f"PR #{number}: DRAFT")
-        return
-    if pr.get("mergeable") is not True:
-        print(f"PR #{number}: NOT_CURRENTLY_MERGEABLE")
-        return
-    if unresolved_threads(number):
-        print(f"PR #{number}: UNRESOLVED_REVIEW_THREADS")
-        return
-    if not ci_is_green(sha):
-        print(f"PR #{number}: CI_NOT_GREEN")
-        return
-    print(f"PR #{number}: READY_FOR_EXTERNAL_MERGE head={sha}")
+        return None
+    if not strict_base_enforcement():
+        print(f"PR #{number}: PLATFORM_ENFORCEMENT_BLOCKED")
+        return None
+    if not latest_ci_green(sha):
+        print(f"PR #{number}: LATEST_EXACT_HEAD_CI_NOT_GREEN")
+        return None
+    if not review_gate_clean(number, sha):
+        print(f"PR #{number}: INDEPENDENT_REVIEW_OR_THREADS_NOT_CLEAN")
+        return None
+    if require_authorization and not l4_authorization_green(sha):
+        print(f"PR #{number}: L4_REVIEW_AUTHORIZATION_NOT_GREEN")
+        return None
+    return pr, sha
+
+
+def selftest_authenticated_review_gate():
+    required_l5_paths = {
+        ".github/workflows/l5-continuity-ci.yml",
+        ".github/workflows/l5-continuity-supervision.yml",
+        ".github/workflows/l5-durable-state-ci.yml",
+        ".github/workflows/l5-self-healing-ci.yml",
+        ".github/workflows/l5-certification-ci.yml",
+        "scripts/l5_continuity.py",
+        "scripts/l5_continuity_policy.json",
+        "scripts/l5_state_machine.py",
+        "tests/l5_state_machine.test.py",
+        "scripts/l5_recovery.py",
+        "tests/l5_recovery.test.py",
+        "scripts/l5_certification.py",
+        "tests/l5_certification.test.py",
+        "scripts/l5_write_adapter.py",
+        "tests/l5_write_adapter.test.py",
+        ".github/workflows/l5-write-adapter-ci.yml",
+        ".github/workflows/l5-hostile-controller-ci.yml",
+        "scripts/l5_kernel.py",
+        "scripts/l5_ledger.py",
+        "scripts/l5_ledger_store.py",
+        "scripts/l5_controller.py",
+        "scripts/l5_hostile_sim.py",
+        "scripts/l5_intent_hostile_sim.py",
+        "tests/test_l5_kernel.py",
+        "tests/test_l5_ledger.py",
+        "tests/test_l5_ledger_store.py",
+        "tests/test_l5_controller.py",
+        "tests/test_l5_intent_restraint.py",
+        "tests/test_l5_ledger_takeover.py",
+        "docs/L5-STATE-MACHINE-V1.md",
+        "docs/L5-INTENT-RESTRAINT-V1.1.md",
+    }
+    assert required_l5_paths.issubset(TRUSTED_GATE_PATHS)
+
+    sha = "a" * 40
+    number = 7
+    run_id = "123"
+    report_id = "456"
+    body = expected_mistral_native_body(number, sha, run_id, report_id)
+    review = {
+        "state": "APPROVED",
+        "commit_id": sha,
+        "user": {"login": "github-actions[bot]", "type": "Bot"},
+        "body": body,
+    }
+    proof = {"run_id": run_id, "report_id": report_id, "pr": str(number), "sha": sha, "verdict": "PASS"}
+
+    class FakeProof:
+        @staticmethod
+        def read_run_proof(_run_id):
+            assert str(_run_id) == run_id
+            return dict(proof)
+
+        @staticmethod
+        def sealed_report(candidate):
+            assert candidate == proof
+            return {"id": int(report_id)}
+
+    original_gh = globals()["gh"]
+    original_reader = globals()["mistral_proof_reader"]
+    try:
+        def fake_gh(route, method=None, fields=None):
+            assert route == f"repos/{REPO}/actions/runs/{run_id}"
+            return {
+                "name": "Mistral Vibe Wake",
+                "path": ".github/workflows/mistral-vibe-wake.yml@main",
+                "head_branch": "main",
+                "event": "issue_comment",
+                "status": "completed",
+                "conclusion": "success",
+                "head_repository": {"full_name": REPO},
+            }
+
+        globals()["gh"] = fake_gh
+        globals()["mistral_proof_reader"] = lambda: FakeProof
+        assert authenticated_mistral_approval(review, number, sha)
+        assert eligible_approval(review, number, sha, {"chatgpt"})
+        forged = dict(review, body=body.replace("Immutable evidence:", "Evidence:"))
+        assert not authenticated_mistral_approval(forged, number, sha)
+        stale = dict(review, commit_id="b" * 40)
+        assert not eligible_approval(stale, number, sha, {"chatgpt"})
+
+        def wrong_ref_gh(route, method=None, fields=None):
+            value = fake_gh(route, method, fields)
+            value["path"] = ".github/workflows/mistral-vibe-wake.yml@feature"
+            return value
+
+        globals()["gh"] = wrong_ref_gh
+        assert not authenticated_mistral_approval(review, number, sha)
+        globals()["gh"] = fake_gh
+        globals()["mistral_proof_reader"] = lambda: (_ for _ in ()).throw(Exception("malformed helper"))
+        assert not authenticated_mistral_approval(review, number, sha)
+        untrusted_bot = dict(review, user={"login": "unknown-review-bot[bot]", "type": "Bot"})
+        assert not eligible_approval(untrusted_bot, number, sha, {"chatgpt"})
+    finally:
+        globals()["gh"] = original_gh
+        globals()["mistral_proof_reader"] = original_reader
+    print("Authenticated native review gate selftest passed")
+
+
+def main():
+    authorize_only = os.environ.get("L4_AUTHORIZE_ONLY") == "1"
+    if authorize_only:
+        if os.environ.get("GITHUB_EVENT_NAME") != "pull_request_review":
+            print("L4_AUTHORIZATION_BLOCKED: review event required")
+            return 2
+        numbers = candidate_numbers()
+        if len(numbers) != 1:
+            print("L4_AUTHORIZATION_BLOCKED: exact PR unavailable")
+            return 2
+        first = gates(numbers[0], require_authorization=False)
+        if not first:
+            print("L4_AUTHORIZATION_BLOCKED")
+            return 2
+        _, sha = first
+        print(f"L4_REVIEW_AUTHORIZED PR #{numbers[0]} exact head {sha}")
+        return 0
+
+    for number in candidate_numbers():
+        first = gates(number)
+        if not first:
+            continue
+        _, sha = first
+        pr = gh(f"repos/{REPO}/pulls/{number}")
+        if pr.get("state") != "open" or pr.get("head", {}).get("sha") != sha or pr.get("mergeable") is not True:
+            print(f"PR #{number}: HEAD_MOVED_OR_NOT_MERGEABLE")
+            continue
+        if not latest_ci_green(sha):
+            print(f"PR #{number}: FINAL_CI_CHANGED")
+            continue
+        if not review_gate_clean(number, sha):
+            print(f"PR #{number}: FINAL_REVIEW_RECHECK_BLOCKED")
+            continue
+        if not l4_authorization_green(sha):
+            print(f"PR #{number}: FINAL_L4_AUTHORIZATION_NOT_GREEN")
+            continue
+        if not strict_base_enforcement():
+            print(f"PR #{number}: FINAL_PLATFORM_ENFORCEMENT_BLOCKED")
+            continue
+        merged = gh(
+            f"repos/{REPO}/pulls/{number}/merge",
+            method="PUT",
+            fields={"sha": sha, "merge_method": "squash"},
+        )
+        if not merged.get("merged"):
+            raise RuntimeError(f"MERGE_REJECTED PR #{number}")
+        print(f"NATIVE_FACTORY_MERGED PR #{number} exact head {sha}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    if len(__import__("sys").argv) == 2 and __import__("sys").argv[1] == "selftest":
+        selftest_authenticated_review_gate()
+    elif len(__import__("sys").argv) == 1:
+        raise SystemExit(main())
+    else:
+        raise SystemExit("usage: native_factory_merge.py [selftest]")
