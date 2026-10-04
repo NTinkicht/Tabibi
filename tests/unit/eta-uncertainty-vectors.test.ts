@@ -58,6 +58,9 @@ function calculate(input: EstimateInput, _entryType: EntryType) {
     input.declaredDelay +
     input.activeRemaining +
     input.slotsAhead * input.estimatedConsultation * 1.5;
+  // The v1 contract explicitly permits a point estimate only when all three
+  // raw values are equal by rule. In that case there is no uncertainty
+  // interval to preserve, so one normalized whole-minute value is correct.
   const point = rawEarliest === rawExpected && rawExpected === rawLatest;
   return {
     earliestMinutes: point ? Math.round(rawExpected) : Math.floor(rawEarliest),
@@ -99,6 +102,27 @@ describe('eta-uncertainty/v1 executable vectors', () => {
       expect(first!.expectedMinutes).toBeLessThanOrEqual(first!.latestMinutes);
     });
   }
+
+  it('allows a point estimate only when all raw bounds are equal by rule', () => {
+    const input: EstimateInput = {
+      declaredDelay: 0,
+      activeRemaining: 4.4,
+      slotsAhead: 0,
+      estimatedConsultation: 10,
+      queueRevision: 91,
+      evaluatedAt: '2026-10-04T12:00:00Z',
+    };
+    const estimate = calculate(input, 'scheduled');
+    // slotsAhead=0 removes the multiplier-dependent term entirely, so raw
+    // earliest/expected/latest are all exactly 4.4. The contract therefore
+    // allows one normalized whole-minute point, rather than manufacturing an
+    // uncertainty interval with floor/ceil when none exists in the raw model.
+    expect(estimate).toMatchObject({
+      earliestMinutes: 4,
+      expectedMinutes: 4,
+      latestMinutes: 4,
+    });
+  });
 
   it('produces identical evidence for identical inputs across entry types', () => {
     const vector = fixture.entryTypeEquivalence;
