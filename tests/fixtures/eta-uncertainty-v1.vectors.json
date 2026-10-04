@@ -1,0 +1,127 @@
+{
+  "contractVersion": "eta-uncertainty/v1",
+  "cases": [
+    {
+      "id": "scheduled-adopted-v1",
+      "kind": "estimate",
+      "entryType": "scheduled",
+      "adoptedV1": true,
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": 0,
+        "slotsAhead": 2,
+        "estimatedConsultation": 10,
+        "queueRevision": 41,
+        "evaluatedAt": "2026-10-04T10:00:00Z"
+      },
+      "expected": {
+        "earliestMinutes": 15,
+        "expectedMinutes": 20,
+        "latestMinutes": 30,
+        "estimateVersion": "eta-uncertainty/v1",
+        "queueRevision": 41
+      }
+    },
+    {
+      "id": "walk-in-outward-rounding",
+      "kind": "estimate",
+      "entryType": "walk-in",
+      "adoptedV1": true,
+      "input": {
+        "declaredDelay": 0.8,
+        "activeRemaining": 0,
+        "slotsAhead": 1,
+        "estimatedConsultation": 1,
+        "queueRevision": 7,
+        "evaluatedAt": "2026-10-04T10:05:00Z"
+      },
+      "expected": {
+        "earliestMinutes": 1,
+        "expectedMinutes": 2,
+        "latestMinutes": 3,
+        "estimateVersion": "eta-uncertainty/v1",
+        "queueRevision": 7
+      }
+    },
+    {
+      "id": "guest-same-input-retry",
+      "kind": "retry",
+      "entryType": "guest",
+      "adoptedV1": true,
+      "input": {
+        "declaredDelay": 5,
+        "activeRemaining": 4,
+        "slotsAhead": 1,
+        "estimatedConsultation": 12,
+        "queueRevision": 12,
+        "evaluatedAt": "2026-10-04T10:10:00Z"
+      },
+      "expected": {
+        "earliestMinutes": 18,
+        "expectedMinutes": 21,
+        "latestMinutes": 27,
+        "estimateVersion": "eta-uncertainty/v1",
+        "queueRevision": 12,
+        "byteEquivalentOnRetry": true
+      }
+    },
+    {
+      "id": "stale-revision-recompute",
+      "kind": "stale-revision",
+      "entryType": "scheduled",
+      "adoptedV1": true,
+      "input": {
+        "computedQueueRevision": 41,
+        "currentQueueRevision": 42
+      },
+      "expected": {
+        "publish": false,
+        "recompute": true
+      }
+    },
+    {
+      "id": "legacy-does-not-claim-v1",
+      "kind": "legacy",
+      "entryType": "walk-in",
+      "adoptedV1": false,
+      "input": {
+        "queueRevision": 9
+      },
+      "expected": {
+        "estimateVersionPresent": false
+      }
+    },
+    {
+      "id": "missing-evaluated-at-fails-closed",
+      "kind": "invalid",
+      "entryType": "guest",
+      "adoptedV1": true,
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": 0,
+        "slotsAhead": 1,
+        "estimatedConsultation": 10,
+        "queueRevision": 3
+      },
+      "expected": {
+        "accepted": false
+      }
+    }
+  ],
+  "recomputeTriggers": [
+    "check-in",
+    "call-next",
+    "consultation-start",
+    "consultation-end",
+    "priority-change",
+    "cancellation",
+    "no-show",
+    "pause",
+    "resume",
+    "doctor-delay",
+    "session-delay",
+    "session-close",
+    "queue-entry-transfer"
+  ],
+  "nonTriggers": ["unrelated-profile-update", "ambient-time-without-refresh"]
+}
