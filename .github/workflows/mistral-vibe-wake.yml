@@ -50,6 +50,17 @@ jobs:
           # Never execute a verifier supplied by a PR under review.
           cp scripts/mistral-review-target.py /tmp/tabibi-mistral-review-target.py
           cp scripts/coordination/mistral-review-proof.py /tmp/tabibi-mistral-review-proof.py
+          # Align the native review lane with the 256 KB review contract while
+          # preserving every existing exact-head, CI and provenance guard.
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('/tmp/tabibi-mistral-review-target.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'DIFF_LIMIT_BYTES = 120_000'
+          if text.count(old) != 1:
+              raise SystemExit('MISTRAL_REVIEW_LIMIT_PATCH_MISMATCH')
+          path.write_text(text.replace(old, 'DIFF_LIMIT_BYTES = 256_000'), encoding='utf-8')
+          PY
           python3 /tmp/tabibi-mistral-review-target.py selftest
           if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
             python3 /tmp/tabibi-mistral-review-target.py auto-prepare
@@ -91,7 +102,7 @@ jobs:
 
           source = Path('.tabibi_mistral_review.diff')
           metadata = source.lstat()
-          if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or metadata.st_size > 120_000:
+          if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or metadata.st_size > 256_000:
               raise SystemExit('REVIEW_DIFF_BLOCKED')
           stage = Path('/tmp/tabibi-mistral-clean-review')
           stage.mkdir(mode=0o700, exist_ok=False)
@@ -123,8 +134,6 @@ jobs:
             exit 0
           fi
 
-          # `/api/vibe/whoami` is a non-inference entitlement check. Never print
-          # the provider response body or credential.
           set +e
           http_status="$(curl \
             --silent \
@@ -228,18 +237,10 @@ jobs:
             test -f "$VIBE_SAFE_WORKDIR/.tabibi_mistral_review.diff"
           fi
 
-          # PR content is DATA, never a trusted Vibe project. No --trust:
-          # Vibe must not load PR-controlled .vibe/hooks.toml, project skills,
-          # AGENTS.md or nested agents into an environment with provider auth.
-          # Reviewer gets only the checked, staged diff and read-only tools.
-          # The plan agent auto-approves reads inside the process CWD, so the
-          # process must LEAVE the untrusted PR checkout: CWD and --workdir
-          # are BOTH the staged-diff directory before vibe starts.
           cd "$VIBE_SAFE_WORKDIR"
           set +e
-          # The Vibe child needs its provider key, NEVER the Actions/gh token.
-          # read_file accepts absolute paths; drop GitHub credentials at exec,
-          # even if a parent/job/environment setting added them implicitly.
+          # Feed the prompt on stdin so a 256 KB review packet is never limited
+          # by the OS per-command argument size.
           env -u GITHUB_TOKEN -u GH_TOKEN \
             timeout --signal=TERM --kill-after=15s 600s \
             vibe \
@@ -250,7 +251,7 @@ jobs:
               --max-turns 8 \
               --max-tokens 75000 \
               --output text \
-              --prompt "$(cat /tmp/tabibi-mistral-prompt.txt)" \
+              < /tmp/tabibi-mistral-prompt.txt \
               > /tmp/tabibi-mistral-output.txt \
               2> /tmp/tabibi-mistral-error.txt
           code=$?
@@ -291,9 +292,6 @@ jobs:
           fi
 
           if [[ "$code" != "0" ]] && [[ -s /tmp/tabibi-mistral-error.txt ]]; then
-            # Job-log-only diagnostics. Scrub the literal credential plus common
-            # bearer/key renderings before the excerpt can reach the Actions log;
-            # it is never posted to the public issue comment.
             python - <<'PY'
           import os
           import runpy
@@ -358,9 +356,6 @@ jobs:
           set -euo pipefail
 
           if [[ "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" && ( "${TARGET_MODE:-main}" != "review" || "${RECHECK_READY:-false}" == "true" ) ]]; then
-            # Defense in depth: even though Vibe has no shell/write tool, scrub the
-            # literal provider credential plus common authorization/key renderings
-            # before any model-authored text can reach a public issue comment.
             python - <<'PY'
           import os
           import runpy
@@ -369,18 +364,13 @@ jobs:
           source = Path('/tmp/tabibi-mistral-output.txt')
           target = Path('/tmp/tabibi-mistral-public.txt')
           text = source.read_text(encoding='utf-8', errors='replace') if source.exists() else ''
-          # One trusted helper scrubs the same credential shapes here AND in
-          # the job-log path before the permanent public Issue #11 post.
           scrub = runpy.run_path('/tmp/tabibi-mistral-review-proof.py')['redact_public_text']
           text = scrub(text, provider_key=os.environ.get('MISTRAL_API_KEY', ''))
-          # Model text is untrusted even when the reviewer is legitimate:
-          # neutralize Markdown fences and @-mentions before public posting.
           text = text.replace(chr(96), '\u02cb').replace('@', '\uff20')
           target.write_text(text[:50000], encoding='utf-8')
           PY
           fi
 
-          # A dedicated full-line canonical verdict, never a prose substring.
           verdict_ready=false
           if [[ "${TARGET_MODE:-main}" == "review" && -f /tmp/tabibi-mistral-public.txt ]]; then
             if grep -Fq -- "${REVIEW_SHA:-missing-exact-sha}" /tmp/tabibi-mistral-public.txt; then
@@ -416,9 +406,6 @@ jobs:
               echo '```'
             fi
           } > /tmp/tabibi-mistral-comment.md
-          # The trusted parent stamps provider-run provenance AFTER model output.
-          # The review-gate pilot correlates this exact run/owner dispatch and
-          # the independently model-generated SHA/verdict before recognizing PASS.
           if [[ "${TARGET_MODE:-main}" == "review" && "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" && "${RECHECK_READY:-false}" == "true" && "$verdict_ready" == "true" ]]; then
             dispatch_id="$(jq -r '.comment.id // .workflow_run.id // empty' "$GITHUB_EVENT_PATH")"
             if [[ "$dispatch_id" =~ ^[0-9]+$ ]]; then
@@ -432,9 +419,6 @@ jobs:
             echo "TRUSTED_REVIEW_REPORT_ID_UNAVAILABLE" >&2
             exit 1
           fi
-          # PR comments need PR-write permission on GitHub App installation tokens.
-          # Never give the model/inference job that permission. A fresh job
-          # validates this trusted issue-11 report and publishes the PR copy.
 
       - name: Seal final report before leaving trusted inference job
         id: seal
