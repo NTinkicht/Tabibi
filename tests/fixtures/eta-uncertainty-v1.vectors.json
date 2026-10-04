@@ -1,0 +1,229 @@
+{
+  "contractVersion": "eta-uncertainty/v1",
+  "cases": [
+    {
+      "id": "scheduled-adopted-v1",
+      "kind": "estimate",
+      "entryType": "scheduled",
+      "adoptedV1": true,
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": 0,
+        "slotsAhead": 2,
+        "estimatedConsultation": 10,
+        "queueRevision": 41,
+        "evaluatedAt": "2026-10-04T10:00:00Z"
+      },
+      "expected": {
+        "earliestMinutes": 15,
+        "expectedMinutes": 20,
+        "latestMinutes": 30,
+        "estimateVersion": "eta-uncertainty/v1",
+        "queueRevision": 41,
+        "evaluatedAt": "2026-10-04T10:00:00Z",
+        "explanationCodes": ["queue-depth"]
+      }
+    },
+    {
+      "id": "walk-in-outward-rounding",
+      "kind": "estimate",
+      "entryType": "walk-in",
+      "adoptedV1": true,
+      "input": {
+        "declaredDelay": 0.8,
+        "activeRemaining": 0,
+        "slotsAhead": 1,
+        "estimatedConsultation": 1,
+        "queueRevision": 7,
+        "evaluatedAt": "2026-10-04T10:05:00Z"
+      },
+      "expected": {
+        "earliestMinutes": 1,
+        "expectedMinutes": 2,
+        "latestMinutes": 3,
+        "estimateVersion": "eta-uncertainty/v1",
+        "queueRevision": 7,
+        "evaluatedAt": "2026-10-04T10:05:00Z",
+        "explanationCodes": ["queue-depth", "declared-delay"]
+      }
+    },
+    {
+      "id": "guest-same-input-retry",
+      "kind": "retry",
+      "entryType": "guest",
+      "adoptedV1": true,
+      "input": {
+        "declaredDelay": 5,
+        "activeRemaining": 4,
+        "slotsAhead": 1,
+        "estimatedConsultation": 12,
+        "queueRevision": 12,
+        "evaluatedAt": "2026-10-04T10:10:00Z"
+      },
+      "expected": {
+        "earliestMinutes": 18,
+        "expectedMinutes": 21,
+        "latestMinutes": 27,
+        "estimateVersion": "eta-uncertainty/v1",
+        "queueRevision": 12,
+        "evaluatedAt": "2026-10-04T10:10:00Z",
+        "explanationCodes": [
+          "queue-depth",
+          "active-consultation-remaining",
+          "declared-delay"
+        ],
+        "byteEquivalentOnRetry": true
+      }
+    },
+    {
+      "id": "stale-revision-recompute",
+      "kind": "stale-revision",
+      "entryType": "scheduled",
+      "adoptedV1": true,
+      "input": {
+        "computedQueueRevision": 41,
+        "currentQueueRevision": 42
+      },
+      "expected": {
+        "publish": false,
+        "recompute": true
+      }
+    },
+    {
+      "id": "legacy-does-not-claim-v1",
+      "kind": "legacy",
+      "entryType": "walk-in",
+      "adoptedV1": false,
+      "input": {
+        "queueRevision": 9
+      },
+      "expected": {
+        "estimateVersionPresent": false
+      }
+    }
+  ],
+  "entryTypeEquivalence": {
+    "input": {
+      "declaredDelay": 2,
+      "activeRemaining": 3,
+      "slotsAhead": 2,
+      "estimatedConsultation": 8,
+      "queueRevision": 77,
+      "evaluatedAt": "2026-10-04T11:00:00Z"
+    },
+    "expected": {
+      "earliestMinutes": 17,
+      "expectedMinutes": 21,
+      "latestMinutes": 29,
+      "estimateVersion": "eta-uncertainty/v1",
+      "queueRevision": 77,
+      "evaluatedAt": "2026-10-04T11:00:00Z",
+      "explanationCodes": [
+        "queue-depth",
+        "active-consultation-remaining",
+        "declared-delay"
+      ]
+    }
+  },
+  "invalidInputs": [
+    {
+      "id": "missing-evaluated-at",
+      "entryType": "guest",
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": 0,
+        "slotsAhead": 1,
+        "estimatedConsultation": 10,
+        "queueRevision": 3
+      }
+    },
+    {
+      "id": "malformed-evaluated-at",
+      "entryType": "scheduled",
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": 0,
+        "slotsAhead": 1,
+        "estimatedConsultation": 10,
+        "queueRevision": 3,
+        "evaluatedAt": "not-a-timestamp"
+      }
+    },
+    {
+      "id": "negative-delay",
+      "entryType": "walk-in",
+      "input": {
+        "declaredDelay": -1,
+        "activeRemaining": 0,
+        "slotsAhead": 1,
+        "estimatedConsultation": 10,
+        "queueRevision": 3,
+        "evaluatedAt": "2026-10-04T11:00:00Z"
+      }
+    },
+    {
+      "id": "negative-active-remaining",
+      "entryType": "scheduled",
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": -1,
+        "slotsAhead": 1,
+        "estimatedConsultation": 10,
+        "queueRevision": 3,
+        "evaluatedAt": "2026-10-04T11:00:00Z"
+      }
+    },
+    {
+      "id": "fractional-slot-count",
+      "entryType": "guest",
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": 0,
+        "slotsAhead": 1.5,
+        "estimatedConsultation": 10,
+        "queueRevision": 3,
+        "evaluatedAt": "2026-10-04T11:00:00Z"
+      }
+    },
+    {
+      "id": "non-positive-consultation-duration",
+      "entryType": "scheduled",
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": 0,
+        "slotsAhead": 1,
+        "estimatedConsultation": 0,
+        "queueRevision": 3,
+        "evaluatedAt": "2026-10-04T11:00:00Z"
+      }
+    },
+    {
+      "id": "negative-revision",
+      "entryType": "walk-in",
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": 0,
+        "slotsAhead": 1,
+        "estimatedConsultation": 10,
+        "queueRevision": -1,
+        "evaluatedAt": "2026-10-04T11:00:00Z"
+      }
+    }
+  ],
+  "recomputeTriggers": [
+    "check-in",
+    "call-next",
+    "consultation-start",
+    "consultation-end",
+    "priority-change",
+    "cancellation",
+    "no-show",
+    "pause",
+    "resume",
+    "doctor-delay",
+    "session-delay",
+    "session-close",
+    "queue-entry-transfer"
+  ],
+  "nonTriggers": ["unrelated-profile-update", "ambient-time-without-refresh"]
+}
