@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+// Executable contract vectors are intentionally consumed from the checked-in fixture.
 type EstimateInput = {
   declaredDelay: number;
   activeRemaining: number;
