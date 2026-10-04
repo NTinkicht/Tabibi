@@ -19,7 +19,9 @@
         "expectedMinutes": 20,
         "latestMinutes": 30,
         "estimateVersion": "eta-uncertainty/v1",
-        "queueRevision": 41
+        "queueRevision": 41,
+        "evaluatedAt": "2026-10-04T10:00:00Z",
+        "explanationCodes": ["queue-depth"]
       }
     },
     {
@@ -40,7 +42,9 @@
         "expectedMinutes": 2,
         "latestMinutes": 3,
         "estimateVersion": "eta-uncertainty/v1",
-        "queueRevision": 7
+        "queueRevision": 7,
+        "evaluatedAt": "2026-10-04T10:05:00Z",
+        "explanationCodes": ["queue-depth", "declared-delay"]
       }
     },
     {
@@ -62,6 +66,12 @@
         "latestMinutes": 27,
         "estimateVersion": "eta-uncertainty/v1",
         "queueRevision": 12,
+        "evaluatedAt": "2026-10-04T10:10:00Z",
+        "explanationCodes": [
+          "queue-depth",
+          "active-consultation-remaining",
+          "declared-delay"
+        ],
         "byteEquivalentOnRetry": true
       }
     },
@@ -90,21 +100,113 @@
       "expected": {
         "estimateVersionPresent": false
       }
+    }
+  ],
+  "entryTypeEquivalence": {
+    "input": {
+      "declaredDelay": 2,
+      "activeRemaining": 3,
+      "slotsAhead": 2,
+      "estimatedConsultation": 8,
+      "queueRevision": 77,
+      "evaluatedAt": "2026-10-04T11:00:00Z"
     },
+    "expected": {
+      "earliestMinutes": 17,
+      "expectedMinutes": 21,
+      "latestMinutes": 29,
+      "estimateVersion": "eta-uncertainty/v1",
+      "queueRevision": 77,
+      "evaluatedAt": "2026-10-04T11:00:00Z",
+      "explanationCodes": [
+        "queue-depth",
+        "active-consultation-remaining",
+        "declared-delay"
+      ]
+    }
+  },
+  "invalidInputs": [
     {
-      "id": "missing-evaluated-at-fails-closed",
-      "kind": "invalid",
+      "id": "missing-evaluated-at",
       "entryType": "guest",
-      "adoptedV1": true,
       "input": {
         "declaredDelay": 0,
         "activeRemaining": 0,
         "slotsAhead": 1,
         "estimatedConsultation": 10,
         "queueRevision": 3
-      },
-      "expected": {
-        "accepted": false
+      }
+    },
+    {
+      "id": "malformed-evaluated-at",
+      "entryType": "scheduled",
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": 0,
+        "slotsAhead": 1,
+        "estimatedConsultation": 10,
+        "queueRevision": 3,
+        "evaluatedAt": "not-a-timestamp"
+      }
+    },
+    {
+      "id": "negative-delay",
+      "entryType": "walk-in",
+      "input": {
+        "declaredDelay": -1,
+        "activeRemaining": 0,
+        "slotsAhead": 1,
+        "estimatedConsultation": 10,
+        "queueRevision": 3,
+        "evaluatedAt": "2026-10-04T11:00:00Z"
+      }
+    },
+    {
+      "id": "negative-active-remaining",
+      "entryType": "scheduled",
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": -1,
+        "slotsAhead": 1,
+        "estimatedConsultation": 10,
+        "queueRevision": 3,
+        "evaluatedAt": "2026-10-04T11:00:00Z"
+      }
+    },
+    {
+      "id": "fractional-slot-count",
+      "entryType": "guest",
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": 0,
+        "slotsAhead": 1.5,
+        "estimatedConsultation": 10,
+        "queueRevision": 3,
+        "evaluatedAt": "2026-10-04T11:00:00Z"
+      }
+    },
+    {
+      "id": "non-positive-consultation-duration",
+      "entryType": "scheduled",
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": 0,
+        "slotsAhead": 1,
+        "estimatedConsultation": 0,
+        "queueRevision": 3,
+        "evaluatedAt": "2026-10-04T11:00:00Z"
+      }
+    },
+    {
+      "id": "negative-revision",
+      "entryType": "walk-in",
+      "input": {
+        "declaredDelay": 0,
+        "activeRemaining": 0,
+        "slotsAhead": 1,
+        "estimatedConsultation": 10,
+        "queueRevision": -1,
+        "evaluatedAt": "2026-10-04T11:00:00Z"
       }
     }
   ],
