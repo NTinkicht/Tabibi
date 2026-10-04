@@ -1,0 +1,85 @@
+{
+  "contractVersion": "queue-lifecycle/v1",
+  "transitions": [
+    {
+      "id": "check-in",
+      "command": "check_in",
+      "from": "waiting",
+      "to": "checked_in"
+    },
+    {
+      "id": "call-next",
+      "command": "call",
+      "from": "checked_in",
+      "to": "called"
+    },
+    {
+      "id": "start-consultation",
+      "command": "start_consultation",
+      "from": "called",
+      "to": "in_consultation"
+    },
+    {
+      "id": "complete-consultation",
+      "command": "complete_consultation",
+      "from": "in_consultation",
+      "to": "completed"
+    },
+    {
+      "id": "no-show-checked-in",
+      "command": "no_show",
+      "from": "checked_in",
+      "to": "no_show"
+    },
+    {
+      "id": "no-show-called",
+      "command": "no_show",
+      "from": "called",
+      "to": "no_show"
+    },
+    {
+      "id": "cancel-waiting",
+      "command": "cancel",
+      "from": "waiting",
+      "to": "cancelled"
+    },
+    {
+      "id": "cancel-checked-in",
+      "command": "cancel",
+      "from": "checked_in",
+      "to": "cancelled"
+    },
+    {
+      "id": "cancel-called",
+      "command": "cancel",
+      "from": "called",
+      "to": "cancelled"
+    }
+  ],
+  "invalidTransitions": [
+    { "command": "call", "from": "waiting" },
+    { "command": "check_in", "from": "checked_in" },
+    { "command": "start_consultation", "from": "checked_in" },
+    { "command": "complete_consultation", "from": "called" },
+    { "command": "check_in", "from": "completed" },
+    { "command": "call", "from": "cancelled" },
+    { "command": "start_consultation", "from": "no_show" }
+  ],
+  "idempotency": [
+    {
+      "id": "exact-replay",
+      "sameKey": true,
+      "samePayload": true,
+      "expected": "stored_receipt",
+      "secondLifecycleEvent": false
+    },
+    {
+      "id": "changed-payload-reuse",
+      "sameKey": true,
+      "samePayload": false,
+      "expected": "conflict",
+      "secondLifecycleEvent": false
+    }
+  ],
+  "terminalStates": ["completed", "cancelled", "no_show"]
+}
