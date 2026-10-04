@@ -91,11 +91,30 @@ describe('receptionist queue lifecycle', () => {
     expect((await command('call')).state).toBe('called');
     expect((await command('start_consultation')).state).toBe('in_consultation');
     expect((await command('complete_consultation')).state).toBe('completed');
-    const audits = await pool.query<{ metadata: Record<string, unknown> }>(
-      `SELECT metadata FROM audit_events WHERE entity_id=$1 AND action LIKE 'queue_entry.%' ORDER BY occurred_at`,
+    const audits = await pool.query<{
+      action: string;
+      metadata: Record<string, unknown>;
+    }>(
+      `SELECT action,metadata FROM audit_events WHERE entity_id=$1 AND action LIKE 'queue_entry.%' ORDER BY occurred_at`,
       [entries[0]],
     );
     expect(audits.rows).toHaveLength(4);
+    expect(audits.rows.map(({ action }) => action)).toEqual([
+      'queue_entry.check_in',
+      'queue_entry.call',
+      'queue_entry.start_consultation',
+      'queue_entry.complete_consultation',
+    ]);
+    expect(audits.rows[1]!.metadata).toMatchObject({
+      from: 'checked_in',
+      to: 'called',
+      sessionId: ids.session,
+      queueOrderingContractVersion: 'queue-ordering/v1',
+    });
+    for (const index of [0, 2, 3])
+      expect(audits.rows[index]!.metadata).not.toHaveProperty(
+        'queueOrderingContractVersion',
+      );
     expect(audits.rows[3]!.metadata).toMatchObject({
       from: 'in_consultation',
       to: 'completed',
