@@ -67,16 +67,6 @@ beforeEach(async () => {
 });
 afterAll(() => pool.end());
 
-function reorder(entryId: string, expectedVersion: number, key: string) {
-  return new QueueService(pool).reorder(scope, ids.session, entryId, {
-    targetPosition: 1,
-    expectedVersion,
-    idempotencyKey: key,
-    reason: 'Deterministic race regression',
-    correlationId: key,
-  });
-}
-
 async function version(): Promise<number> {
   const row = await pool.query<{ queue_order_version: string }>(
     'SELECT queue_order_version FROM consultation_sessions WHERE id=$1',
@@ -93,28 +83,93 @@ async function auditCount(action: string): Promise<number> {
   return Number(result.rows[0]!.count);
 }
 
+async function waitForLockWaiters(
+  applicationName: string,
+  expected: number,
+): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const result = await pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+         FROM pg_stat_activity
+        WHERE datname=current_database()
+          AND application_name=$1
+          AND wait_event_type='Lock'`,
+      [applicationName],
+    );
+    if (Number(result.rows[0]?.count ?? 0) >= expected) return;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  throw new Error(`Expected ${expected} blocked queue mutation(s)`);
+}
+
+async function withSessionLockRace<T>(
+  run: (
+    racePool: Pool,
+    queued: (expected: number) => Promise<void>,
+    release: () => Promise<void>,
+  ) => Promise<T>,
+): Promise<T> {
+  const applicationName = `queue-race-${randomUUID()}`;
+  const racePool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    application_name: applicationName,
+    max: 4,
+  });
+  const blocker = await racePool.connect();
+  let released = false;
+  try {
+    await blocker.query('BEGIN');
+    await blocker.query(
+      `SELECT id FROM consultation_sessions
+        WHERE id=$1 AND clinic_id=$2 FOR UPDATE`,
+      [ids.session, ids.clinic],
+    );
+    return await run(
+      racePool,
+      (expected) => waitForLockWaiters(applicationName, expected),
+      async () => {
+        await blocker.query('COMMIT');
+        released = true;
+      },
+    );
+  } catch (error) {
+    if (!released) await blocker.query('ROLLBACK');
+    throw error;
+  } finally {
+    blocker.release();
+    await racePool.end();
+  }
+}
+
 describe('deterministic queue concurrency regressions', () => {
   it('serializes same-entry concurrent call-next attempts into one called slot', async () => {
-    const queue = new QueueService(pool);
-    const results = await Promise.allSettled([
-      queue.command(scope, ids.session, entries[0]!, {
-        command: 'call',
-        idempotencyKey: 'call-race-a',
-        correlationId: 'call-race-a',
-      }),
-      queue.command(scope, ids.session, entries[0]!, {
-        command: 'call',
-        idempotencyKey: 'call-race-b',
-        correlationId: 'call-race-b',
-      }),
-    ]);
+    const results = await withSessionLockRace(
+      async (racePool, queued, release) => {
+        const queue = new QueueService(racePool);
+        const first = queue.command(scope, ids.session, entries[0]!, {
+          command: 'call',
+          idempotencyKey: 'call-race-a',
+          correlationId: 'call-race-a',
+        });
+        await queued(1);
+        const second = queue.command(scope, ids.session, entries[0]!, {
+          command: 'call',
+          idempotencyKey: 'call-race-b',
+          correlationId: 'call-race-b',
+        });
+        await queued(2);
+        await release();
+        return Promise.allSettled([first, second]);
+      },
+    );
 
-    expect(
-      results.filter((result) => result.status === 'fulfilled'),
-    ).toHaveLength(1);
-    expect(
-      results.filter((result) => result.status === 'rejected'),
-    ).toHaveLength(1);
+    expect(results[0]!.status).toBe('fulfilled');
+    expect(results[1]!.status).toBe('rejected');
+    expect(results[1]).toMatchObject({
+      reason: expect.objectContaining({
+        message: expect.stringMatching(/Cannot apply call.*called/),
+      }),
+    });
 
     const called = await pool.query<{ id: string }>(
       `SELECT id FROM queue_entries WHERE session_id=$1 AND state='called'`,
@@ -126,17 +181,46 @@ describe('deterministic queue concurrency regressions', () => {
   });
 
   it('allows only one same-version priority override to commit', async () => {
-    const results = await Promise.allSettled([
-      reorder(entries[1]!, 3, 'priority-race-a'),
-      reorder(entries[2]!, 3, 'priority-race-b'),
-    ]);
+    const results = await withSessionLockRace(
+      async (racePool, queued, release) => {
+        const first = new QueueService(racePool).reorder(
+          scope,
+          ids.session,
+          entries[1]!,
+          {
+            targetPosition: 1,
+            expectedVersion: 3,
+            idempotencyKey: 'priority-race-a',
+            reason: 'Deterministic race regression',
+            correlationId: 'priority-race-a',
+          },
+        );
+        await queued(1);
+        const second = new QueueService(racePool).reorder(
+          scope,
+          ids.session,
+          entries[2]!,
+          {
+            targetPosition: 1,
+            expectedVersion: 3,
+            idempotencyKey: 'priority-race-b',
+            reason: 'Deterministic race regression',
+            correlationId: 'priority-race-b',
+          },
+        );
+        await queued(2);
+        await release();
+        return Promise.allSettled([first, second]);
+      },
+    );
 
-    expect(
-      results.filter((result) => result.status === 'fulfilled'),
-    ).toHaveLength(1);
-    expect(
-      results.filter((result) => result.status === 'rejected'),
-    ).toHaveLength(1);
+    expect(results[0]!.status).toBe('fulfilled');
+    expect(results[1]!.status).toBe('rejected');
+    expect(results[1]).toMatchObject({
+      reason: expect.objectContaining({
+        message: expect.stringMatching(/Stale queue order version/),
+      }),
+    });
     expect(await version()).toBe(4);
     expect(await auditCount('queue_entry.reordered')).toBe(1);
 
@@ -149,81 +233,88 @@ describe('deterministic queue concurrency regressions', () => {
         ORDER BY priority_order,registration_order`,
       [ids.session],
     );
-    expect(priority.rows).toHaveLength(1);
-    expect([entries[1], entries[2]]).toContain(priority.rows[0]!.id);
-    expect(Number(priority.rows[0]!.priority_order)).toBe(1);
+    expect(priority.rows).toEqual([{ id: entries[1], priority_order: '1' }]);
   });
 
-  it('serializes call-next against a same-version priority override and rejects the stale loser', async () => {
-    const queue = new QueueService(pool);
-    const results = await Promise.allSettled([
-      queue.command(scope, ids.session, entries[0]!, {
-        command: 'call',
-        idempotencyKey: 'call-versus-priority-call',
-        correlationId: 'call-versus-priority-call',
+  it('commits call-next before rejecting the queued stale priority override', async () => {
+    const results = await withSessionLockRace(
+      async (racePool, queued, release) => {
+        const queue = new QueueService(racePool);
+        const call = queue.command(scope, ids.session, entries[0]!, {
+          command: 'call',
+          idempotencyKey: 'call-versus-priority-call',
+          correlationId: 'call-versus-priority-call',
+        });
+        await queued(1);
+        const override = new QueueService(racePool).reorder(
+          scope,
+          ids.session,
+          entries[2]!,
+          {
+            targetPosition: 1,
+            expectedVersion: 3,
+            idempotencyKey: 'call-versus-priority-reorder',
+            reason: 'Deterministic race regression',
+            correlationId: 'call-versus-priority-reorder',
+          },
+        );
+        await queued(2);
+        await release();
+        return Promise.allSettled([call, override]);
+      },
+    );
+
+    expect(results[0]!.status).toBe('fulfilled');
+    expect(results[1]!.status).toBe('rejected');
+    expect(results[1]).toMatchObject({
+      reason: expect.objectContaining({
+        message: expect.stringMatching(/Stale queue order version/),
       }),
-      reorder(entries[2]!, 3, 'call-versus-priority-reorder'),
-    ]);
-
-    expect(
-      results.filter((result) => result.status === 'fulfilled'),
-    ).toHaveLength(1);
-    expect(
-      results.filter((result) => result.status === 'rejected'),
-    ).toHaveLength(1);
+    });
     expect(await version()).toBe(4);
-
-    const durable = await pool.query<{
-      id: string;
-      state: string;
-      priority_order: string | null;
-    }>(
-      `SELECT id,state,priority_order FROM queue_entries
-        WHERE session_id=$1 AND (state='called' OR priority_order IS NOT NULL)
-        ORDER BY registration_order`,
+    expect(await auditCount('queue_entry.call')).toBe(1);
+    expect(await auditCount('queue_entry.reordered')).toBe(0);
+    const called = await pool.query<{ id: string }>(
+      `SELECT id FROM queue_entries WHERE session_id=$1 AND state='called'`,
       [ids.session],
     );
-    expect(durable.rows).toHaveLength(1);
-
-    if (durable.rows[0]!.state === 'called') {
-      expect(durable.rows[0]!.id).toBe(entries[0]);
-      await expect(reorder(entries[2]!, 3, 'stale-after-call-race')).rejects.toThrow(
-        /Stale queue order version/,
-      );
-    } else {
-      expect(durable.rows[0]!.id).toBe(entries[2]);
-      expect(Number(durable.rows[0]!.priority_order)).toBe(1);
-      const called = await queue.command(scope, ids.session, entries[2]!, {
-        command: 'call',
-        idempotencyKey: 'call-after-priority-race',
-        correlationId: 'call-after-priority-race',
-      });
-      expect(called.state).toBe('called');
-      expect(await version()).toBe(5);
-    }
+    expect(called.rows).toEqual([{ id: entries[0] }]);
   });
 
-  it('applies an override-first commit before selecting call-next', async () => {
-    const overridden = await reorder(entries[2]!, 3, 'override-first');
-    expect(overridden.queueOrderVersion).toBe(4);
-    expect(overridden.orderedEntryIds).toEqual([entries[2]]);
+  it('commits a queued priority override before call-next selects its entry', async () => {
+    const results = await withSessionLockRace(
+      async (racePool, queued, release) => {
+        const queue = new QueueService(racePool);
+        const override = queue.reorder(scope, ids.session, entries[2]!, {
+          targetPosition: 1,
+          expectedVersion: 3,
+          idempotencyKey: 'override-first',
+          reason: 'Deterministic race regression',
+          correlationId: 'override-first',
+        });
+        await queued(1);
+        const call = queue.command(scope, ids.session, entries[2]!, {
+          command: 'call',
+          idempotencyKey: 'override-first-call',
+          correlationId: 'override-first-call',
+        });
+        await queued(2);
+        await release();
+        return Promise.allSettled([override, call]);
+      },
+    );
 
-    const queue = new QueueService(pool);
-    await expect(
-      queue.command(scope, ids.session, entries[0]!, {
-        command: 'call',
-        idempotencyKey: 'override-first-wrong-call',
-        correlationId: 'override-first-wrong-call',
-      }),
-    ).rejects.toThrow(/not next/);
-
-    const called = await queue.command(scope, ids.session, entries[2]!, {
-      command: 'call',
-      idempotencyKey: 'override-first-right-call',
-      correlationId: 'override-first-right-call',
-    });
-    expect(called.state).toBe('called');
+    expect(results[0]!.status).toBe('fulfilled');
+    expect(results[1]!.status).toBe('fulfilled');
     expect(await version()).toBe(5);
+    expect(await auditCount('queue_entry.reordered')).toBe(1);
+    expect(await auditCount('queue_entry.call')).toBe(1);
+
+    const called = await pool.query<{ id: string }>(
+      `SELECT id FROM queue_entries WHERE session_id=$1 AND state='called'`,
+      [ids.session],
+    );
+    expect(called.rows).toEqual([{ id: entries[2] }]);
 
     const audit = await pool.query<{ metadata: Record<string, unknown> }>(
       `SELECT metadata FROM audit_events

@@ -19,6 +19,6 @@ WU #590 converts the merged adversarial concurrency contract from #578/#582 into
 - prove retries are explicit and version-bound;
 - leave ETA, authorization, deployment, and production behavior unchanged.
 
-The canonical branch now contains focused PostgreSQL integration regressions for all four oracles. Source changes remain unnecessary because the existing session-row locking and queue-version seam is sufficient to drive the races deterministically at the service/database boundary.
+The canonical branch now contains focused PostgreSQL integration regressions for all four oracles. Each race holds the session row lock, queues contenders on dedicated PostgreSQL connections, verifies their lock waits through `pg_stat_activity`, and releases them in the required serialization order. Source changes remain unnecessary because the existing session-row locking and queue-version seam is sufficient to drive the races deterministically at the service/database boundary.
 
 Material-Author: chatgpt
