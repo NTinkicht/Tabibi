@@ -47,11 +47,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Never execute a verifier supplied by a PR under review.
           cp scripts/mistral-review-target.py /tmp/tabibi-mistral-review-target.py
           cp scripts/coordination/mistral-review-proof.py /tmp/tabibi-mistral-review-proof.py
-          # Align the native review lane with the 256 KB review contract while
-          # preserving every existing exact-head, CI and provenance guard.
           python3 - <<'PY'
           from pathlib import Path
           path = Path('/tmp/tabibi-mistral-review-target.py')
@@ -92,8 +89,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Vibe must never trust or execute PR-controlled .vibe hooks/agents,
-          # AGENTS.md, skills, tools, plugins or scripts with provider secrets.
           python3 - <<'PY'
           import os
           import stat
@@ -133,20 +128,10 @@ jobs:
             echo "reason=Mistral credential is not configured" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
           set +e
-          http_status="$(curl \
-            --silent \
-            --show-error \
-            --connect-timeout 10 \
-            --max-time 20 \
-            --output /dev/null \
-            --write-out '%{http_code}' \
-            --header "Authorization: Bearer ${PROVIDER_KEY}" \
-            'https://console.mistral.ai/api/vibe/whoami')"
+          http_status="$(curl --silent --show-error --connect-timeout 10 --max-time 20 --output /dev/null --write-out '%{http_code}' --header "Authorization: Bearer ${PROVIDER_KEY}" 'https://console.mistral.ai/api/vibe/whoami')"
           curl_code=$?
           set -e
-
           if [[ "$curl_code" != "0" ]]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "status=PREFLIGHT_UNAVAILABLE" >> "$GITHUB_OUTPUT"
@@ -239,8 +224,6 @@ jobs:
 
           cd "$VIBE_SAFE_WORKDIR"
           set +e
-          # Feed the prompt on stdin so a 256 KB review packet is never limited
-          # by the OS per-command argument size.
           env -u GITHUB_TOKEN -u GH_TOKEN \
             timeout --signal=TERM --kill-after=15s 600s \
             vibe \
@@ -250,6 +233,7 @@ jobs:
               --enabled-tools read_file \
               --max-turns 8 \
               --max-tokens 75000 \
+              --prompt '' \
               --output text \
               < /tmp/tabibi-mistral-prompt.txt \
               > /tmp/tabibi-mistral-output.txt \
@@ -300,10 +284,7 @@ jobs:
           source = Path('/tmp/tabibi-mistral-error.txt')
           target = Path('/tmp/tabibi-mistral-error-scrubbed.txt')
           scrub = runpy.run_path('/tmp/tabibi-mistral-review-proof.py')['redact_public_text']
-          text = scrub(
-              source.read_text(encoding='utf-8', errors='replace'),
-              provider_key=os.environ.get('MISTRAL_API_KEY', ''),
-          )
+          text = scrub(source.read_text(encoding='utf-8', errors='replace'), provider_key=os.environ.get('MISTRAL_API_KEY', ''))
           lines = text.splitlines()
           target.write_text('\n'.join(lines[-20:]) + '\n', encoding='utf-8')
           PY
@@ -354,7 +335,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           if [[ "${READY:-false}" == "true" && "${ACTOR_EXIT:-1}" == "0" && ( "${TARGET_MODE:-main}" != "review" || "${RECHECK_READY:-false}" == "true" ) ]]; then
             python - <<'PY'
           import os
