@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// Executable contract vectors are intentionally consumed from the checked-in fixture.
+type EntryType = 'scheduled' | 'walk-in' | 'guest';
 type EstimateInput = {
   declaredDelay: number;
   activeRemaining: number;
@@ -19,8 +19,33 @@ const fixture = JSON.parse(
   ),
 );
 
-function calculate(input: EstimateInput) {
-  if (!input.evaluatedAt || !Number.isFinite(input.queueRevision)) return null;
+function physicallyValid(input: EstimateInput): boolean {
+  const timestamp = input.evaluatedAt ? Date.parse(input.evaluatedAt) : NaN;
+  return (
+    Number.isFinite(input.declaredDelay) &&
+    input.declaredDelay >= 0 &&
+    Number.isFinite(input.activeRemaining) &&
+    input.activeRemaining >= 0 &&
+    Number.isInteger(input.slotsAhead) &&
+    input.slotsAhead >= 0 &&
+    Number.isFinite(input.estimatedConsultation) &&
+    input.estimatedConsultation > 0 &&
+    Number.isInteger(input.queueRevision) &&
+    input.queueRevision >= 0 &&
+    Number.isFinite(timestamp)
+  );
+}
+
+function explanationCodes(input: EstimateInput): string[] {
+  const codes: string[] = [];
+  if (input.slotsAhead > 0) codes.push('queue-depth');
+  if (input.activeRemaining > 0) codes.push('active-consultation-remaining');
+  if (input.declaredDelay > 0) codes.push('declared-delay');
+  return codes;
+}
+
+function calculate(input: EstimateInput, _entryType: EntryType) {
+  if (!physicallyValid(input)) return null;
   const rawEarliest =
     input.declaredDelay +
     input.activeRemaining +
@@ -40,7 +65,21 @@ function calculate(input: EstimateInput) {
     latestMinutes: point ? Math.round(rawExpected) : Math.ceil(rawLatest),
     estimateVersion: 'eta-uncertainty/v1',
     queueRevision: input.queueRevision,
+    evaluatedAt: input.evaluatedAt,
+    explanationCodes: explanationCodes(input),
   };
+}
+
+function publicationDecision(
+  computedQueueRevision: number,
+  currentQueueRevision: number,
+) {
+  const publish = computedQueueRevision === currentQueueRevision;
+  return { publish, recompute: !publish };
+}
+
+function legacyCalculate(queueRevision: number) {
+  return { queueRevision, expectedMinutes: 20 };
 }
 
 describe('eta-uncertainty/v1 executable vectors', () => {
@@ -48,13 +87,11 @@ describe('eta-uncertainty/v1 executable vectors', () => {
     ['estimate', 'retry'].includes(item.kind),
   )) {
     it(`${vector.id} is deterministic`, () => {
-      const first = calculate(vector.input);
-      const second = calculate(vector.input);
-      expect(first).toEqual(
-        vector.expected.byteEquivalentOnRetry
-          ? { ...vector.expected, byteEquivalentOnRetry: undefined }
-          : vector.expected,
-      );
+      const first = calculate(vector.input, vector.entryType);
+      const second = calculate(vector.input, vector.entryType);
+      const expected = { ...vector.expected };
+      delete expected.byteEquivalentOnRetry;
+      expect(first).toEqual(expected);
       expect(JSON.stringify(first)).toBe(JSON.stringify(second));
       expect(first!.earliestMinutes).toBeLessThanOrEqual(
         first!.expectedMinutes,
@@ -63,31 +100,47 @@ describe('eta-uncertainty/v1 executable vectors', () => {
     });
   }
 
+  it('produces identical evidence for identical inputs across entry types', () => {
+    const vector = fixture.entryTypeEquivalence;
+    const outputs = (['scheduled', 'walk-in', 'guest'] as EntryType[]).map(
+      (entryType) => calculate(vector.input, entryType),
+    );
+    expect(outputs[0]).toEqual(vector.expected);
+    expect(outputs[1]).toEqual(outputs[0]);
+    expect(outputs[2]).toEqual(outputs[0]);
+  });
+
   it('rejects stale publication and requires recomputation', () => {
     const vector = fixture.cases.find(
       (item: { kind: string }) => item.kind === 'stale-revision',
     );
-    expect(vector.input.computedQueueRevision).not.toBe(
-      vector.input.currentQueueRevision,
-    );
-    expect(vector.expected).toEqual({ publish: false, recompute: true });
+    expect(
+      publicationDecision(
+        vector.input.computedQueueRevision,
+        vector.input.currentQueueRevision,
+      ),
+    ).toEqual(vector.expected);
+    expect(publicationDecision(42, 42)).toEqual({
+      publish: true,
+      recompute: false,
+    });
   });
 
   it('does not claim v1 evidence on a legacy estimator path', () => {
     const vector = fixture.cases.find(
       (item: { kind: string }) => item.kind === 'legacy',
     );
+    const legacy = legacyCalculate(vector.input.queueRevision);
     expect(vector.adoptedV1).toBe(false);
+    expect(Object.hasOwn(legacy, 'estimateVersion')).toBe(false);
     expect(vector.expected.estimateVersionPresent).toBe(false);
   });
 
-  it('fails closed when required evaluation input is absent', () => {
-    const vector = fixture.cases.find(
-      (item: { kind: string }) => item.kind === 'invalid',
-    );
-    expect(calculate(vector.input)).toBeNull();
-    expect(vector.expected.accepted).toBe(false);
-  });
+  for (const vector of fixture.invalidInputs) {
+    it(`fails closed for invalid input: ${vector.id}`, () => {
+      expect(calculate(vector.input, vector.entryType)).toBeNull();
+    });
+  }
 
   it('covers contract recomputation triggers without treating unrelated changes as triggers', () => {
     expect(fixture.recomputeTriggers).toContain('queue-entry-transfer');
