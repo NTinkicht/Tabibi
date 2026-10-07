@@ -949,3 +949,19 @@ Deliberately not proposing a frontend/RTL/localization specialist yet — there 
 **CHANGES_REQUIRED**
 
 Rationale per severity discipline: five MAJOR findings (CLAUDE-001 through CLAUDE-005) each represent a concrete gap likely to cause either a real security exposure (CLAUDE-001) or costly rework (CLAUDE-002, CLAUDE-003, CLAUDE-004) or a silent reliability failure of the product's core promise (CLAUDE-005) if implementation starts before they're addressed. None require re-architecting what's already there — each has a bounded, stated resolution path. No BLOCKER-severity findings: nothing here reflects unsafe-to-merge content for a documentation-only PR, and the overall design quality (see Strengths) is genuinely strong. Per `AGENTS.md`'s resolution protocol, I expect ChatGPT to either resolve or technically rebut each MAJOR with evidence; MINOR/NOTE items are recorded for tracking and do not block acceptance.
+
+---
+
+## PR #604 — "Add deterministic concurrent call-next race regression" — exact head `41c421370a4ef7d43e4730c64f4fdd77e22e68ea`
+
+Material-Author: chatgpt. First executable regression slice for #590 (ADVERSARIAL_CONCURRENCY_MATRIX.md / #578 contract). Reviewed independently; posted full findings as a PR comment (https://github.com/NTinkicht/Tabibi/pull/604#issuecomment-6032613768).
+
+**CLAUDE-043** — BLOCKER — `npm run format` (Prettier) fails CI on this PR's own changed file, `tests/integration/queue-adversarial.test.ts` (check run 112667398245, "Quality and build"). Root-caused from the actual job log, not assumed from a red badge. Required: `npx prettier --write` + push.
+
+**CLAUDE-044** — MAJOR — The new test proves the one-called-per-session mutex is real (traced it to `FOR UPDATE` on `consultation_sessions` plus the partial unique index `queue_entries_one_called_per_session_uq`), but it discovers the winner after the fact (`results.findIndex`) instead of asserting the canonically-correct winner (`entryIds[0]`, lower `eligibility_order`, deterministically guaranteed by the implementation's own "next in committed service order" check). This means the test would NOT catch a regression that let the wrong (second-registered) entry win the race — exactly the queue-ordering-under-concurrency class of bug the matrix's "two call-next attempts" row and cross-cutting rule 1 ("tests must control serialization order... not scheduler luck") require. Required: assert `winnerId === entryIds[0]` directly.
+
+**CLAUDE-045** — MINOR — the rejected-promise assertion doesn't check the rejection is actually `QueueConflictError` (inconsistent with the established pattern one test above it in the same file). A connection drop or unrelated exception would also satisfy "rejected."
+
+Non-blocking scope note recorded in the PR comment: #604 doesn't restore the previously-deleted `tests/integration/queue-race.test.ts` / `docs/queue/QUEUE_RACE_TEST_PLAN.md`, and doesn't touch the still-reverted `.github/workflows/mistral-vibe-wake.yml` hardening (both tracked separately from the PR #600 regression on that PR's thread and Team Room Issue #21). Not a knock against #604, which is explicitly scoped as a first partial slice.
+
+**Verdict:** CHANGES_REQUIRED. No @claude Action verdict existed yet on this head at review time (only CodeRabbit skip + Codex "Running"); nothing to reconcile against yet.
