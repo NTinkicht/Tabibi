@@ -6,19 +6,20 @@ Controller rule: while a production PR is active, finish that canonical stream f
 
 ## ACTIVE
 
-- **#590 / PR #604 - WU-L5-QUEUE-RACE-TESTS** - active production PR; continue CI -> exact-head review -> fix -> merge.
+_None._
 
 ## NEXT
 
 1. **#606 - WU-L5-ETA-ESTIMATOR-ADOPTION** - implement the already-approved `eta-uncertainty/v1` output contract from merged PR #580 before persisting its audit version.
 
-## BLOCKED / INFRA GATES
+## BLOCKED
 
-- **#607 - WU-L5-DEPENDENCY-AUDIT-REMEDIATION** - repository-wide high-severity production dependency audit gate currently blocks otherwise-valid PRs, including #604/#605. Keep this as a separate bounded security remediation stream rather than expanding product WUs.
 - **#587 - WU-L5-ETA-VERSION** - blocked on #606. Do not persist `etaContractVersion` against the legacy min/max estimator output.
 
 ## DONE / RECONCILED
 
+- **#590 / PR #604 - WU-L5-QUEUE-RACE-TESTS** - deterministic concurrent call-next regression merged; issue closed completed.
+- **#607 / PR #608 - WU-L5-DEPENDENCY-AUDIT-REMEDIATION** - high-severity production dependency audit gate remediated; issue closed completed.
 - **#592 WU-L5-QUEUE-ORDERING-VECTORS** - ordering vector artifacts are already present on main; issue closed completed.
 - **#594 WU-L5-QUEUE-AUDIT-VECTORS** - queue mutation audit vectors are already present on main; issue closed completed.
 - **#597 WU-L5-ETA-VECTORS** - ETA executable vectors and focused tests are already present on main; issue closed completed.
