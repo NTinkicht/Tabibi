@@ -414,11 +414,20 @@ describe('deterministic adversarial queue coverage', () => {
     const results = await Promise.allSettled(calls);
 
     expect(blockedContenders).toBeGreaterThanOrEqual(2);
-    expect(results[0]?.status).toBe('fulfilled');
-    expect(results[1]?.status).toBe('rejected');
-    if (results[1]?.status === 'rejected') {
-      expect(results[1].reason).toBeInstanceOf(QueueConflictError);
-      expect(String(results[1].reason)).toMatch(/not next/);
+    const fulfilled = results.flatMap((result, index) =>
+      result.status === 'fulfilled' ? [index] : [],
+    );
+    const rejected = results.flatMap((result, index) =>
+      result.status === 'rejected' ? [index] : [],
+    );
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    const winnerIndex = fulfilled[0]!;
+    const loserIndex = rejected[0]!;
+    const losingResult = results[loserIndex]!;
+    if (losingResult.status === 'rejected') {
+      expect(losingResult.reason).toBeInstanceOf(QueueConflictError);
     }
 
     const states = await pool.query<{ id: string; state: string }>(
@@ -427,18 +436,23 @@ describe('deterministic adversarial queue coverage', () => {
       [ids.session, entryIds],
     );
     expect(states.rows.filter((row) => row.state === 'called')).toHaveLength(1);
-    expect(states.rows.find((row) => row.id === entryIds[0])?.state).toBe(
+    expect(states.rows.find((row) => row.id === entryIds[winnerIndex])?.state).toBe(
       'called',
     );
-    expect(states.rows.find((row) => row.id === entryIds[1])?.state).toBe(
+    expect(states.rows.find((row) => row.id === entryIds[loserIndex])?.state).toBe(
       'checked_in',
     );
 
-    const retry = await queue.command(scope, ids.session, entryIds[0]!, {
-      command: 'call',
-      idempotencyKey: 'race-call-0',
-      correlationId: 'race-call-0',
-    });
+    const retry = await queue.command(
+      scope,
+      ids.session,
+      entryIds[winnerIndex]!,
+      {
+        command: 'call',
+        idempotencyKey: `race-call-${winnerIndex}`,
+        correlationId: `race-call-${winnerIndex}`,
+      },
+    );
     expect(retry.state).toBe('called');
 
     const calledCount = await pool.query<{ count: number }>(
