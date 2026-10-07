@@ -45,6 +45,13 @@ export interface ReceptionistDashboardEntry {
     patientsAhead: number;
     minWaitMinutes: number;
     maxWaitMinutes: number;
+    earliestMinutes: number;
+    expectedMinutes: number;
+    latestMinutes: number;
+    estimateVersion: 'eta-uncertainty/v1';
+    queueRevision: number;
+    evaluatedAt: string;
+    explanationCodes: readonly string[];
     revision: string;
     estimatedConsultationMinutes: number;
     estimateSource: QueueEtaEstimateSource;
@@ -181,22 +188,59 @@ export class ReceptionistDashboardService {
       );
       const declaredDelayMinutes = first.declared_delay_minutes ?? 0;
       const snapshotNow = this.now();
+      const operationalRows = result.rows.filter(
+        (row) =>
+          row.entry_id !== null &&
+          row.entry_state !== null &&
+          OPERATIONAL_STATE_RANK[row.entry_state] < TERMINAL_STATE_RANK,
+      );
+      const activeIndex = operationalRows.findIndex(
+        (row) => row.entry_state === 'in_consultation',
+      );
+      const activeRow = activeIndex >= 0 ? operationalRows[activeIndex]! : null;
+      const activeRemainingMinutes =
+        activeRow?.in_consultation_started_at
+          ? computeActiveConsultationRemainingMinutes({
+              startedAt: activeRow.in_consultation_started_at,
+              now: snapshotNow,
+              estimatedConsultationMinutes:
+                estimate.estimatedConsultationMinutes,
+            })
+          : 0;
       let patientsAhead = 0;
 
       const entries = result.rows.flatMap((row) => {
         if (!row.entry_id) return [];
         const state = row.entry_state!;
         const eligible = OPERATIONAL_STATE_RANK[state] < TERMINAL_STATE_RANK;
+        const operationalIndex = eligible ? patientsAhead : -1;
+        const activeAhead =
+          eligible && activeIndex >= 0 && activeIndex < operationalIndex;
+        const queuedSlotsAhead = eligible
+          ? Math.max(0, patientsAhead - (activeAhead ? 1 : 0))
+          : 0;
+        const calledSlotsAhead = eligible
+          ? operationalRows
+              .slice(0, operationalIndex)
+              .filter((entry) => entry.entry_state === 'called').length
+          : 0;
         const range = eligible
           ? createEtaSnapshot({
-              patientsAhead,
+              patientsAhead: queuedSlotsAhead,
               declaredDelayMinutes,
+              activeConsultationRemainingMinutes: activeAhead
+                ? activeRemainingMinutes
+                : 0,
+              activeConsultationPresent: activeAhead,
+              calledSlotsAhead,
+              priorityApplied: row.priority_order !== null,
               estimatedConsultationMinutes:
                 estimate.estimatedConsultationMinutes,
               estimateSource: estimate.estimateSource,
               observedSampleCount: estimate.observedSampleCount,
               queueOrderVersion: Number(first.queue_order_version),
               delayVersion: first.delay_version,
+              evaluatedAt: snapshotNow,
             })
           : null;
         const eta =
@@ -205,6 +249,13 @@ export class ReceptionistDashboardService {
                 patientsAhead,
                 minWaitMinutes: range.minWaitMinutes,
                 maxWaitMinutes: range.maxWaitMinutes,
+                earliestMinutes: range.earliestMinutes,
+                expectedMinutes: range.expectedMinutes,
+                latestMinutes: range.latestMinutes,
+                estimateVersion: range.estimateVersion,
+                queueRevision: range.queueRevision,
+                evaluatedAt: range.evaluatedAt,
+                explanationCodes: range.explanationCodes,
                 revision: range.revision,
                 estimatedConsultationMinutes:
                   estimate.estimatedConsultationMinutes,
