@@ -20,6 +20,13 @@ export interface PublicGuestLiveQueueEta {
   patientsAhead: number;
   minWaitMinutes: number;
   maxWaitMinutes: number;
+  earliestMinutes: number;
+  expectedMinutes: number;
+  latestMinutes: number;
+  estimateVersion: 'eta-uncertainty/v1';
+  queueRevision: number;
+  evaluatedAt: string;
+  explanationCodes: readonly string[];
   revision: string;
   estimateSource: QueueEtaEstimateSource;
   delayStatus: 'declared' | null;
@@ -54,6 +61,10 @@ type StatusRow = {
   declared_delay_minutes: number | null;
   queue_order_version: string;
   delay_version: number;
+  priority_order: string | null;
+  active_consultation_started_at: Date | null;
+  active_consultation_position: string | null;
+  called_slots_ahead: string;
   duration_samples: Array<number | string> | null;
   historical_duration_samples: Array<number | string> | null;
 };
@@ -96,6 +107,9 @@ export class PublicGuestLiveQueueStatusService {
        ),
        ordered AS (
          SELECT entry.id,
+                entry.state::text AS state,
+                entry.in_consultation_started_at,
+                entry.priority_order,
                 row_number() OVER (
                   ORDER BY
                     CASE entry.state
@@ -115,6 +129,13 @@ export class PublicGuestLiveQueueStatusService {
           WHERE entry.clinic_id = target.clinic_id
             AND entry.session_id = target.session_id
             AND entry.state IN ('waiting', 'checked_in', 'called', 'in_consultation')
+       ),
+       active_consultation AS (
+         SELECT service_position, in_consultation_started_at
+           FROM ordered
+          WHERE state = 'in_consultation'
+          ORDER BY service_position
+          LIMIT 1
        ),
        durations AS (
          SELECT EXTRACT(EPOCH FROM (duration_entry.completed_at - duration_entry.in_consultation_started_at)) / 60 AS duration_minutes
@@ -157,6 +178,15 @@ export class PublicGuestLiveQueueStatusService {
               session.declared_delay_minutes,
               session.queue_order_version,
               session.delay_version,
+              entry.priority_order::text AS priority_order,
+              active.in_consultation_started_at AS active_consultation_started_at,
+              active.service_position::text AS active_consultation_position,
+              COALESCE((
+                SELECT count(*)
+                  FROM ordered prior
+                 WHERE prior.state = 'called'
+                   AND prior.service_position < ordered.service_position
+              ), 0)::text AS called_slots_ahead,
               (SELECT array_agg(duration_minutes) FROM durations) AS duration_samples,
               (SELECT array_agg(duration_minutes) FROM historical_durations) AS historical_duration_samples
          FROM guest_credentials credential
@@ -181,6 +211,7 @@ export class PublicGuestLiveQueueStatusService {
            ON session.id = entry.session_id
           AND session.clinic_id = entry.clinic_id
          LEFT JOIN ordered ON ordered.id = entry.id
+         LEFT JOIN active_consultation active ON true
         WHERE credential.id = $1`,
       [credentialId],
       signal,
@@ -234,13 +265,14 @@ export class PublicGuestLiveQueueStatusService {
       pauseStatus: isPaused ? 'paused' : null,
       closureStatus: isClosed ? 'closed' : null,
       activeConsultationRemainingMinutes,
-      eta: this.computeEta(row, estimate),
+      eta: this.computeEta(row, estimate, snapshotNow),
     };
   }
 
   private computeEta(
     row: StatusRow,
     estimate: ReturnType<typeof selectConsultationEstimate>,
+    evaluatedAt: Date,
   ): PublicGuestLiveQueueEta | null {
     if (
       TERMINAL_BOOKING_STATES.has(row.appointment_status) ||
@@ -253,20 +285,49 @@ export class PublicGuestLiveQueueStatusService {
 
     const declaredDelayMinutes = row.declared_delay_minutes ?? 0;
     const patientsAhead = Math.max(0, Number(row.service_position) - 1);
+    const activePosition =
+      row.active_consultation_position === null
+        ? null
+        : Number(row.active_consultation_position);
+    const activeAhead =
+      activePosition !== null &&
+      Number.isFinite(activePosition) &&
+      activePosition < Number(row.service_position);
+    const activeConsultationRemainingMinutes =
+      activeAhead && row.active_consultation_started_at
+        ? computeActiveConsultationRemainingMinutes({
+            startedAt: row.active_consultation_started_at,
+            now: evaluatedAt,
+            estimatedConsultationMinutes: estimate.estimatedConsultationMinutes,
+          })
+        : 0;
+    const queuedSlotsAhead = Math.max(0, patientsAhead - (activeAhead ? 1 : 0));
     const range = createEtaSnapshot({
-      patientsAhead,
+      patientsAhead: queuedSlotsAhead,
       declaredDelayMinutes,
+      activeConsultationRemainingMinutes,
+      activeConsultationPresent: activeAhead,
+      calledSlotsAhead: Number(row.called_slots_ahead),
+      priorityApplied: row.priority_order !== null,
       estimatedConsultationMinutes: estimate.estimatedConsultationMinutes,
       estimateSource: estimate.estimateSource,
       observedSampleCount: estimate.observedSampleCount,
       queueOrderVersion: Number(row.queue_order_version),
       delayVersion: row.delay_version,
+      evaluatedAt,
     });
 
     return {
       patientsAhead,
       minWaitMinutes: range.minWaitMinutes,
       maxWaitMinutes: range.maxWaitMinutes,
+      earliestMinutes: range.earliestMinutes,
+      expectedMinutes: range.expectedMinutes,
+      latestMinutes: range.latestMinutes,
+      estimateVersion: range.estimateVersion,
+      queueRevision: range.queueRevision,
+      evaluatedAt: range.evaluatedAt,
+      explanationCodes: range.explanationCodes,
       revision: range.revision,
       estimateSource: estimate.estimateSource,
       delayStatus: range.delayStatus,
