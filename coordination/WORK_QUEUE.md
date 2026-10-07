@@ -12,8 +12,9 @@ Controller rule: while a production PR is active, finish that canonical stream f
 
 1. **#606 - WU-L5-ETA-ESTIMATOR-ADOPTION** - implement the already-approved `eta-uncertainty/v1` output contract from merged PR #580 before persisting its audit version.
 
-## BLOCKED
+## BLOCKED / INFRA GATES
 
+- **#607 - WU-L5-DEPENDENCY-AUDIT-REMEDIATION** - repository-wide high-severity production dependency audit gate currently blocks otherwise-valid PRs, including #604/#605. Keep this as a separate bounded security remediation stream rather than expanding product WUs.
 - **#587 - WU-L5-ETA-VERSION** - blocked on #606. Do not persist `etaContractVersion` against the legacy min/max estimator output.
 
 ## DONE / RECONCILED
