@@ -436,12 +436,12 @@ describe('deterministic adversarial queue coverage', () => {
       [ids.session, entryIds],
     );
     expect(states.rows.filter((row) => row.state === 'called')).toHaveLength(1);
-    expect(states.rows.find((row) => row.id === entryIds[winnerIndex])?.state).toBe(
-      'called',
-    );
-    expect(states.rows.find((row) => row.id === entryIds[loserIndex])?.state).toBe(
-      'checked_in',
-    );
+    expect(
+      states.rows.find((row) => row.id === entryIds[winnerIndex])?.state,
+    ).toBe('called');
+    expect(
+      states.rows.find((row) => row.id === entryIds[loserIndex])?.state,
+    ).toBe('checked_in');
 
     const retry = await queue.command(
       scope,
