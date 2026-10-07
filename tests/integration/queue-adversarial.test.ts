@@ -449,5 +449,4 @@ describe('deterministic adversarial queue coverage', () => {
     expect(calledCount.rows[0]!.count).toBe(1);
     await assertQueueInvariants();
   });
-
 });
