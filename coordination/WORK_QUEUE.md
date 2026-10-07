@@ -1,5 +1,32 @@
 # Tabibi Work Queue
 
+GitHub Issues and live PR/CI/review state are authoritative. This file is the canonical ordered backlog snapshot for L5 replenishment.
+
+Controller rule: when there is no open production PR, take the first dependency-ready item in **NEXT**, verify it is not already satisfied on `main`, and implement it. If it is already satisfied, move/reconcile it under **DONE / RECONCILED** and continue to the next item in the same run.
+
+## ACTIVE
+
+- **#590 / PR #604 - WU-L5-QUEUE-RACE-TESTS** - active production PR; continue CI -> exact-head review -> fix -> merge.
+
+## NEXT
+
+1. **#587 - WU-L5-ETA-VERSION: persist deterministic ETA contract version in estimate audits**
+
+## DONE / RECONCILED
+
+- **#592 WU-L5-QUEUE-ORDERING-VECTORS** - ordering vector artifacts are already present on main.
+- **#594 WU-L5-QUEUE-AUDIT-VECTORS** - queue mutation audit vectors are already present on main.
+- **#597 WU-L5-ETA-VECTORS** - ETA executable vectors and focused tests are already present on main.
+- **#599 WU-L5-QUEUE-LIFECYCLE-VECTORS** - lifecycle executable vectors and focused tests are already present on main.
+
+Epic **#5** remains parent context and is not itself an executable NEXT item.
+
+Snapshot refreshed: 2026-10-07.
+
+---
+
+## Historical snapshot retained below
+
 GitHub is authoritative for live PRs, CI, reviews and leases; this is a dated snapshot, NOT permission to merge.
 
 Status values: `ACTIVE`, `READY`, `BLOCKED`, `DONE`, `CANCELLED`.
