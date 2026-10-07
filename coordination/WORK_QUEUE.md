@@ -2,7 +2,7 @@
 
 GitHub Issues and live PR/CI/review state are authoritative. This file is the canonical ordered backlog snapshot for L5 replenishment.
 
-Controller rule: when there is no open production PR, take the first dependency-ready item in **NEXT**, verify it is not already satisfied on `main`, and implement it. If it is already satisfied, move/reconcile it under **DONE / RECONCILED** and continue to the next item in the same run.
+Controller rule: while a production PR is active, finish that canonical stream first. When there is no open production PR, take the first dependency-ready item in **NEXT**, verify it is not already satisfied on `main`, and implement it. If it is already satisfied, reconcile it under **DONE / RECONCILED** and continue in the same run. **BLOCKED** items are never selected as NEXT.
 
 ## ACTIVE
 
@@ -10,14 +10,18 @@ Controller rule: when there is no open production PR, take the first dependency-
 
 ## NEXT
 
-1. **#587 - WU-L5-ETA-VERSION: persist deterministic ETA contract version in estimate audits**
+1. **#606 - WU-L5-ETA-ESTIMATOR-ADOPTION** - implement the already-approved `eta-uncertainty/v1` output contract from merged PR #580 before persisting its audit version.
+
+## BLOCKED
+
+- **#587 - WU-L5-ETA-VERSION** - blocked on #606. Do not persist `etaContractVersion` against the legacy min/max estimator output.
 
 ## DONE / RECONCILED
 
-- **#592 WU-L5-QUEUE-ORDERING-VECTORS** - ordering vector artifacts are already present on main.
-- **#594 WU-L5-QUEUE-AUDIT-VECTORS** - queue mutation audit vectors are already present on main.
-- **#597 WU-L5-ETA-VECTORS** - ETA executable vectors and focused tests are already present on main.
-- **#599 WU-L5-QUEUE-LIFECYCLE-VECTORS** - lifecycle executable vectors and focused tests are already present on main.
+- **#592 WU-L5-QUEUE-ORDERING-VECTORS** - ordering vector artifacts are already present on main; issue closed completed.
+- **#594 WU-L5-QUEUE-AUDIT-VECTORS** - queue mutation audit vectors are already present on main; issue closed completed.
+- **#597 WU-L5-ETA-VECTORS** - ETA executable vectors and focused tests are already present on main; issue closed completed.
+- **#599 WU-L5-QUEUE-LIFECYCLE-VECTORS** - lifecycle executable vectors and focused tests are already present on main; issue closed completed.
 
 Epic **#5** remains parent context and is not itself an executable NEXT item.
 
