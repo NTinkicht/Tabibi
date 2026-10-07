@@ -347,4 +347,105 @@ describe('deterministic adversarial queue coverage', () => {
       }),
     ).rejects.toBeInstanceOf(QueueConflictError);
   });
+
+  it('serializes concurrent call attempts into exactly one called slot', async () => {
+    const queue = new QueueService(pool);
+    const entryIds: string[] = [];
+
+    for (let index = 0; index < 2; index++) {
+      const registration = await queue.registerWalkIn(scope, ids.session, {
+        privateDisplayName: `Concurrent Call Patient ${index}`,
+        preferredLocale: 'ar',
+        idempotencyKey: `race-register-${index}`,
+        correlationId: `race-register-${index}`,
+      });
+      entryIds.push(registration.entry.id);
+      await queue.command(scope, ids.session, registration.entry.id, {
+        command: 'check_in',
+        idempotencyKey: `race-check-in-${index}`,
+        correlationId: `race-check-in-${index}`,
+      });
+    }
+
+    const blocker = await pool.connect();
+    let transactionOpen = false;
+    let blockedContenders = 0;
+    let calls: ReturnType<QueueService['command']>[] = [];
+
+    try {
+      await blocker.query('BEGIN');
+      transactionOpen = true;
+      await blocker.query(
+        `SELECT id FROM consultation_sessions
+          WHERE id=$1 AND clinic_id=$2 FOR UPDATE`,
+        [ids.session, ids.clinic],
+      );
+
+      calls = entryIds.map((entryId, index) =>
+        new QueueService(pool).command(scope, ids.session, entryId, {
+          command: 'call',
+          idempotencyKey: `race-call-${index}`,
+          correlationId: `race-call-${index}`,
+        }),
+      );
+
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const waiting = await pool.query<{ count: number }>(
+          `SELECT count(*)::int AS count
+             FROM pg_stat_activity
+            WHERE datname=current_database()
+              AND state='active'
+              AND wait_event_type='Lock'
+              AND query LIKE '%consultation_sessions%'
+              AND query LIKE '%FOR UPDATE%'`,
+        );
+        blockedContenders = waiting.rows[0]!.count;
+        if (blockedContenders >= 2) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      await blocker.query('COMMIT');
+      transactionOpen = false;
+    } finally {
+      if (transactionOpen) await blocker.query('ROLLBACK');
+      blocker.release();
+    }
+
+    const results = await Promise.allSettled(calls);
+
+    expect(blockedContenders).toBeGreaterThanOrEqual(2);
+    expect(results[0]?.status).toBe('fulfilled');
+    expect(results[1]?.status).toBe('rejected');
+    if (results[1]?.status === 'rejected') {
+      expect(results[1].reason).toBeInstanceOf(QueueConflictError);
+    }
+
+    const states = await pool.query<{ id: string; state: string }>(
+      `SELECT id,state FROM queue_entries
+        WHERE session_id=$1 AND id = ANY($2::uuid[]) ORDER BY id`,
+      [ids.session, entryIds],
+    );
+    expect(states.rows.filter((row) => row.state === 'called')).toHaveLength(1);
+    expect(states.rows.find((row) => row.id === entryIds[0])?.state).toBe(
+      'called',
+    );
+    expect(states.rows.find((row) => row.id === entryIds[1])?.state).toBe(
+      'checked_in',
+    );
+
+    const retry = await queue.command(scope, ids.session, entryIds[0]!, {
+      command: 'call',
+      idempotencyKey: 'race-call-0',
+      correlationId: 'race-call-0',
+    });
+    expect(retry.state).toBe('called');
+
+    const calledCount = await pool.query<{ count: number }>(
+      `SELECT count(*)::int count FROM queue_entries
+        WHERE session_id=$1 AND state='called'`,
+      [ids.session],
+    );
+    expect(calledCount.rows[0]!.count).toBe(1);
+    await assertQueueInvariants();
+  });
 });
