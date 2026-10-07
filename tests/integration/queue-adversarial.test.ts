@@ -367,40 +367,83 @@ describe('deterministic adversarial queue coverage', () => {
       });
     }
 
-    const calls = entryIds.map((entryId, index) =>
-      new QueueService(pool).command(scope, ids.session, entryId, {
-        command: 'call',
-        idempotencyKey: `race-call-${index}`,
-        correlationId: `race-call-${index}`,
-      }),
-    );
+    const blocker = await pool.connect();
+    let transactionOpen = false;
+    let blockedContenders = 0;
+    let calls: ReturnType<QueueService['command']>[] = [];
+
+    try {
+      await blocker.query('BEGIN');
+      transactionOpen = true;
+      await blocker.query(
+        `SELECT id FROM consultation_sessions
+          WHERE id=$1 AND clinic_id=$2 FOR UPDATE`,
+        [ids.session, ids.clinic],
+      );
+
+      calls = entryIds.map((entryId, index) =>
+        new QueueService(pool).command(scope, ids.session, entryId, {
+          command: 'call',
+          idempotencyKey: `race-call-${index}`,
+          correlationId: `race-call-${index}`,
+        }),
+      );
+
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const waiting = await pool.query<{ count: number }>(
+          `SELECT count(*)::int AS count
+             FROM pg_stat_activity
+            WHERE datname=current_database()
+              AND state='active'
+              AND wait_event_type='Lock'
+              AND query LIKE '%consultation_sessions%'
+              AND query LIKE '%FOR UPDATE%'`,
+        );
+        blockedContenders = waiting.rows[0]!.count;
+        if (blockedContenders >= 2) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      await blocker.query('COMMIT');
+      transactionOpen = false;
+    } finally {
+      if (transactionOpen) await blocker.query('ROLLBACK');
+      blocker.release();
+    }
+
     const results = await Promise.allSettled(calls);
 
-    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
-    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
-
-    const winnerIndex = results.findIndex((result) => result.status === 'fulfilled');
-    expect(winnerIndex).toBeGreaterThanOrEqual(0);
-    const winnerId = entryIds[winnerIndex]!;
-    const loserId = entryIds[1 - winnerIndex]!;
+    expect(blockedContenders).toBeGreaterThanOrEqual(2);
+    expect(results[0]?.status).toBe('fulfilled');
+    expect(results[1]?.status).toBe('rejected');
+    if (results[1]?.status === 'rejected') {
+      expect(results[1].reason).toBeInstanceOf(QueueConflictError);
+      expect(String(results[1].reason)).toMatch(/not next/);
+    }
 
     const states = await pool.query<{ id: string; state: string }>(
-      `SELECT id,state FROM queue_entries WHERE session_id=$1 AND id = ANY($2::uuid[]) ORDER BY id`,
+      `SELECT id,state FROM queue_entries
+        WHERE session_id=$1 AND id = ANY($2::uuid[]) ORDER BY id`,
       [ids.session, entryIds],
     );
     expect(states.rows.filter((row) => row.state === 'called')).toHaveLength(1);
-    expect(states.rows.find((row) => row.id === winnerId)?.state).toBe('called');
-    expect(states.rows.find((row) => row.id === loserId)?.state).toBe('checked_in');
+    expect(states.rows.find((row) => row.id === entryIds[0])?.state).toBe(
+      'called',
+    );
+    expect(states.rows.find((row) => row.id === entryIds[1])?.state).toBe(
+      'checked_in',
+    );
 
-    const retry = await queue.command(scope, ids.session, winnerId, {
+    const retry = await queue.command(scope, ids.session, entryIds[0]!, {
       command: 'call',
-      idempotencyKey: `race-call-${winnerIndex}`,
-      correlationId: `race-call-${winnerIndex}`,
+      idempotencyKey: 'race-call-0',
+      correlationId: 'race-call-0',
     });
     expect(retry.state).toBe('called');
 
     const calledCount = await pool.query<{ count: number }>(
-      `SELECT count(*)::int count FROM queue_entries WHERE session_id=$1 AND state='called'`,
+      `SELECT count(*)::int count FROM queue_entries
+        WHERE session_id=$1 AND state='called'`,
       [ids.session],
     );
     expect(calledCount.rows[0]!.count).toBe(1);
