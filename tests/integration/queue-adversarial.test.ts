@@ -347,4 +347,64 @@ describe('deterministic adversarial queue coverage', () => {
       }),
     ).rejects.toBeInstanceOf(QueueConflictError);
   });
+
+  it('serializes concurrent call attempts into exactly one called slot', async () => {
+    const queue = new QueueService(pool);
+    const entryIds: string[] = [];
+
+    for (let index = 0; index < 2; index++) {
+      const registration = await queue.registerWalkIn(scope, ids.session, {
+        privateDisplayName: `Concurrent Call Patient ${index}`,
+        preferredLocale: 'ar',
+        idempotencyKey: `race-register-${index}`,
+        correlationId: `race-register-${index}`,
+      });
+      entryIds.push(registration.entry.id);
+      await queue.command(scope, ids.session, registration.entry.id, {
+        command: 'check_in',
+        idempotencyKey: `race-check-in-${index}`,
+        correlationId: `race-check-in-${index}`,
+      });
+    }
+
+    const calls = entryIds.map((entryId, index) =>
+      new QueueService(pool).command(scope, ids.session, entryId, {
+        command: 'call',
+        idempotencyKey: `race-call-${index}`,
+        correlationId: `race-call-${index}`,
+      }),
+    );
+    const results = await Promise.allSettled(calls);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+
+    const winnerIndex = results.findIndex((result) => result.status === 'fulfilled');
+    expect(winnerIndex).toBeGreaterThanOrEqual(0);
+    const winnerId = entryIds[winnerIndex]!;
+    const loserId = entryIds[1 - winnerIndex]!;
+
+    const states = await pool.query<{ id: string; state: string }>(
+      `SELECT id,state FROM queue_entries WHERE session_id=$1 AND id = ANY($2::uuid[]) ORDER BY id`,
+      [ids.session, entryIds],
+    );
+    expect(states.rows.filter((row) => row.state === 'called')).toHaveLength(1);
+    expect(states.rows.find((row) => row.id === winnerId)?.state).toBe('called');
+    expect(states.rows.find((row) => row.id === loserId)?.state).toBe('checked_in');
+
+    const retry = await queue.command(scope, ids.session, winnerId, {
+      command: 'call',
+      idempotencyKey: `race-call-${winnerIndex}`,
+      correlationId: `race-call-${winnerIndex}`,
+    });
+    expect(retry.state).toBe('called');
+
+    const calledCount = await pool.query<{ count: number }>(
+      `SELECT count(*)::int count FROM queue_entries WHERE session_id=$1 AND state='called'`,
+      [ids.session],
+    );
+    expect(calledCount.rows[0]!.count).toBe(1);
+    await assertQueueInvariants();
+  });
+
 });
