@@ -14,6 +14,13 @@ type LiveQueueEta = {
   patientsAhead: number;
   minWaitMinutes: number;
   maxWaitMinutes: number;
+  earliestMinutes?: number;
+  expectedMinutes?: number;
+  latestMinutes?: number;
+  estimateVersion?: 'eta-uncertainty/v1';
+  queueRevision?: number;
+  evaluatedAt?: string;
+  explanationCodes?: readonly string[];
   estimateSource: 'fallback' | 'historical_median' | 'observed_median';
   delayStatus?: 'declared' | null;
   summary?: {
