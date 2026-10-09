@@ -10,6 +10,7 @@ import {
   PublicGuestLiveQueueStatusRejectedError,
   PublicGuestLiveQueueStatusService,
 } from '@/modules/public-guest-live-queue-status';
+import { QueueService } from '@/modules/queue';
 import { SessionService } from '@/modules/session';
 import { migrate } from '../../scripts/db/lib';
 
@@ -888,6 +889,50 @@ describe('WU67 public guest deterministic ETA projection', () => {
     );
     expect(overrun.eta?.uncertainty?.explanationCodes).not.toContain(
       'active-consultation-remaining',
+    );
+  });
+
+  it('explains a committed priority reorder in the capability-scoped guest snapshot', async () => {
+    const target = await createBooking('7086');
+    const moved = await createBooking('7087', target);
+    await openSession(target);
+    const checkIn = new PublicGuestBookingCheckInService(pool, () => now);
+    await checkIn.checkIn(target.bearer, 'wu606-priority-target-checkin');
+    await checkIn.checkIn(moved.bearer, 'wu606-priority-moved-checkin');
+
+    const service = new PublicGuestLiveQueueStatusService(pool, () => now);
+    const baseline = await service.get(target.bearer);
+    expect(baseline.eta?.uncertainty?.explanationCodes).not.toContain(
+      'priority-change',
+    );
+
+    // Guest credentials never grant a reorder capability. Only an authorized
+    // receptionist can create the separately committed reorder audit fact.
+    await pool.query(
+      "UPDATE clinic_memberships SET role='receptionist' WHERE clinic_id=$1 AND user_id=$2",
+      [target.clinicId, target.actorUserId],
+    );
+    const queue = new QueueService(pool);
+    await queue.reorder(
+      { clinicId: target.clinicId, actorUserId: target.actorUserId },
+      target.sessionId,
+      moved.queueEntryId,
+      {
+        targetPosition: 1,
+        expectedVersion: Number((await state(target)).queue_order_version),
+        idempotencyKey: 'wu606-priority-reorder',
+        reason: 'Operational accommodation',
+        correlationId: 'wu606-priority-reorder',
+      },
+    );
+
+    const after = await service.get(target.bearer);
+    expect(after.eta?.uncertainty?.explanationCodes).toContain(
+      'priority-change',
+    );
+    expect(after.eta?.uncertainty?.explanationCodes).toContain('queue-depth');
+    expect(after.eta?.uncertainty?.queueRevision).toBe(
+      Number((await state(target)).queue_order_version),
     );
   });
 
