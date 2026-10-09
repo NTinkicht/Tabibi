@@ -846,6 +846,39 @@ describe('WU67 public guest deterministic ETA projection', () => {
     });
   });
 
+  it('counts a committed active consultation before newly called guest work', async () => {
+    const booking = await createBooking('7057');
+    await openSession(booking);
+    await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
+      booking.bearer,
+      'wu606-precedence-7057',
+    );
+    await pool.query("UPDATE queue_entries SET state='called' WHERE id=$1", [
+      booking.queueEntryId,
+    ]);
+    // The called target retains its early eligibility position; the active
+    // filler has none. Legacy ordering places the called target first.
+    await insertQueueEntry(booking, 'in_consultation', '7058', {
+      inConsultationStartedAt: new Date(now.getTime() - 2 * 60_000),
+    });
+
+    const status = await new PublicGuestLiveQueueStatusService(
+      pool,
+      () => now,
+    ).get(booking.bearer);
+    expect(status.eta?.patientsAhead).toBe(0);
+    expect(status.eta?.uncertainty?.estimateVersion).toBe(
+      'eta-uncertainty/v1',
+    );
+    expect(status.eta?.uncertainty?.explanationCodes).toContain(
+      'active-consultation-remaining',
+    );
+    expect(status.eta?.uncertainty?.explanationCodes).not.toContain(
+      'called-not-started',
+    );
+    expect(status.eta?.uncertainty?.expectedMinutes).toBe(13);
+  });
+
   it('computes a live ETA for a called-state guest, not only a checked-in one', async () => {
     const booking = await createBooking('7061');
     await openSession(booking);
