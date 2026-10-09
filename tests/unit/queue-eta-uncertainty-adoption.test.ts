@@ -120,6 +120,26 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
     },
   );
 
+  it('rejects calendar-normalized evaluation timestamps', () => {
+    const input = adapt({
+      declaredDelay: 0,
+      activeRemaining: 0,
+      slotsAhead: 1,
+      estimatedConsultation: 10,
+      queueRevision: 41,
+      evaluatedAt: '2026-10-04T10:00:00Z',
+    });
+    for (const malformed of [
+      '2026-02-31T10:00:00Z',
+      '2026-04-31T10:00:00Z',
+      '2026-13-01T10:00:00Z',
+    ]) {
+      expect(() =>
+        computeEtaUncertaintyV1({ ...input, evaluatedAt: malformed }),
+      ).toThrow(RangeError);
+    }
+  });
+
   it('fails closed for every invalid committed-input vector', () => {
     for (const vector of fixture.invalidInputs) {
       expect(() => computeEtaUncertaintyV1(adapt(vector.input))).toThrow(
