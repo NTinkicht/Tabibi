@@ -10,6 +10,11 @@ import {
   selectConsultationEstimate,
 } from '@/modules/queue-eta-estimator';
 import { createEtaSnapshot } from '@/modules/queue-eta-estimator/snapshot';
+import {
+  computeEtaUncertaintyV1,
+  mayPublishEtaUncertaintyV1,
+  type EtaUncertaintySnapshot,
+} from '@/modules/queue-eta-estimator/uncertainty-v1';
 import { abortableQuery } from '@/platform/database/abortable-query';
 
 const LIVE_QUEUE_STATES = new Set(['checked_in', 'called', 'in_consultation']);
@@ -23,6 +28,7 @@ export interface PublicGuestLiveQueueEta {
   revision: string;
   estimateSource: QueueEtaEstimateSource;
   delayStatus: 'declared' | null;
+  uncertainty?: EtaUncertaintySnapshot;
 }
 
 export interface PublicGuestLiveQueueStatusResult {
@@ -51,6 +57,13 @@ type StatusRow = {
   session_closed_at: Date | null;
   in_consultation_started_at: Date | null;
   service_position: string | null;
+  target_entry_id: string;
+  clinic_id: string;
+  session_id: string;
+  committed_slots_ahead: string;
+  called_slots_ahead: string;
+  active_slots_ahead: string;
+  active_ahead_started_at: Date | null;
   declared_delay_minutes: number | null;
   queue_order_version: string;
   delay_version: number;
@@ -96,6 +109,8 @@ export class PublicGuestLiveQueueStatusService {
        ),
        ordered AS (
          SELECT entry.id,
+                entry.state,
+                entry.in_consultation_started_at,
                 row_number() OVER (
                   ORDER BY
                     CASE entry.state
@@ -154,6 +169,24 @@ export class PublicGuestLiveQueueStatusService {
               session.closed_at AS session_closed_at,
               entry.in_consultation_started_at,
               ordered.service_position::text AS service_position,
+              entry.id AS target_entry_id,
+              entry.clinic_id,
+              entry.session_id,
+              (SELECT count(*) FROM ordered preceding
+                WHERE preceding.service_position < ordered.service_position
+                  AND preceding.state IN ('checked_in','called','in_consultation'))::text
+                AS committed_slots_ahead,
+              (SELECT count(*) FROM ordered preceding
+                WHERE preceding.service_position < ordered.service_position
+                  AND preceding.state = 'called')::text AS called_slots_ahead,
+              (SELECT count(*) FROM ordered preceding
+                WHERE preceding.service_position < ordered.service_position
+                  AND preceding.state = 'in_consultation')::text AS active_slots_ahead,
+              (SELECT preceding.in_consultation_started_at
+                 FROM ordered preceding
+                WHERE preceding.service_position < ordered.service_position
+                  AND preceding.state = 'in_consultation'
+                ORDER BY preceding.service_position LIMIT 1) AS active_ahead_started_at,
               session.declared_delay_minutes,
               session.queue_order_version,
               session.delay_version,
@@ -234,13 +267,14 @@ export class PublicGuestLiveQueueStatusService {
       pauseStatus: isPaused ? 'paused' : null,
       closureStatus: isClosed ? 'closed' : null,
       activeConsultationRemainingMinutes,
-      eta: this.computeEta(row, estimate),
+      eta: this.computeEta(row, estimate, snapshotNow),
     };
   }
 
   private computeEta(
     row: StatusRow,
     estimate: ReturnType<typeof selectConsultationEstimate>,
+    snapshotNow: Date,
   ): PublicGuestLiveQueueEta | null {
     if (
       TERMINAL_BOOKING_STATES.has(row.appointment_status) ||
@@ -263,6 +297,53 @@ export class PublicGuestLiveQueueStatusService {
       delayVersion: row.delay_version,
     });
 
+    // All v1 inputs come from the same capability-scoped SELECT snapshot.
+    // Missing or contradictory committed state never produces v1 evidence.
+    let uncertainty: EtaUncertaintySnapshot | null = null;
+    const activeAhead = Number(row.active_slots_ahead);
+    if (
+      row.session_status === 'open' &&
+      Number.isSafeInteger(activeAhead) &&
+      activeAhead <= 1 &&
+      (activeAhead === 0 ||
+        (row.active_ahead_started_at instanceof Date &&
+          Number.isFinite(row.active_ahead_started_at.getTime()) &&
+          row.active_ahead_started_at <= snapshotNow))
+    ) {
+      const queueRevision = Number(row.queue_order_version);
+      try {
+        const candidate = computeEtaUncertaintyV1({
+          clinicId: row.clinic_id,
+          sessionId: row.session_id,
+          targetEntryId: row.target_entry_id,
+          queueRevision,
+          evaluatedAt: snapshotNow.toISOString(),
+          declaredDelayMinutes,
+          activeConsultationRemainingMinutes:
+            activeAhead === 1
+              ? computeActiveConsultationRemainingMinutes({
+                  startedAt: row.active_ahead_started_at!,
+                  now: snapshotNow,
+                  estimatedConsultationMinutes:
+                    estimate.estimatedConsultationMinutes,
+                })
+              : 0,
+          slotsAhead: Number(row.committed_slots_ahead),
+          calledNotStartedAhead: Number(row.called_slots_ahead),
+          activeSlotIncludedInAhead: activeAhead === 1,
+          estimatedConsultationMinutes:
+            estimate.estimatedConsultationMinutes,
+          estimateSource: estimate.estimateSource,
+          sessionStatus: 'open',
+        });
+        if (mayPublishEtaUncertaintyV1(candidate, queueRevision)) {
+          uncertainty = candidate;
+        }
+      } catch (error) {
+        if (!(error instanceof RangeError)) throw error;
+      }
+    }
+
     return {
       patientsAhead,
       minWaitMinutes: range.minWaitMinutes,
@@ -270,6 +351,7 @@ export class PublicGuestLiveQueueStatusService {
       revision: range.revision,
       estimateSource: estimate.estimateSource,
       delayStatus: range.delayStatus,
+      ...(uncertainty ? { uncertainty } : {}),
     };
   }
 }
