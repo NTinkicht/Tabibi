@@ -140,13 +140,11 @@ export class EtaUncertaintyClaimService {
       throw new RangeError('Invalid versioned ETA claim input');
     }
 
-    try {
-      return await inTransaction(this.pool, async (client) => {
-        await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
-        await requireClinicRole(client, scope, [
-          'receptionist',
-          'clinic_admin',
-        ]);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await inTransaction(this.pool, async (client) => {
+          await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+          await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
         const payload = JSON.stringify(snapshot);
         const args = [
           scope.clinicId,
@@ -251,17 +249,21 @@ export class EtaUncertaintyClaimService {
           claimId: existing.rows[0].id,
           snapshot,
         };
-      });
-    } catch (error) {
-      if (
-        error &&
-        typeof error === 'object' &&
-        'code' in error &&
-        error.code === '40001'
-      ) {
-        throw new EtaPublicationStaleError();
+        });
+      } catch (error) {
+        const serializationFailure =
+          error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          error.code === '40001';
+        // A concurrent identical INSERT can cause a REPEATABLE READ
+        // serialization failure. A new transaction may now observe and
+        // replay its immutable row, but a changed epoch stays stale.
+        if (serializationFailure && attempt < 2) continue;
+        if (serializationFailure) throw new EtaPublicationStaleError();
+        throw error;
       }
-      throw error;
     }
+    throw new EtaPublicationStaleError();
   }
 }
