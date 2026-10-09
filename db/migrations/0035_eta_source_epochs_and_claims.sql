@@ -358,7 +358,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END
-$;
+$$;
 
 CREATE TRIGGER eta_guard_claim_publication_insert
 BEFORE INSERT ON eta_uncertainty_claims
