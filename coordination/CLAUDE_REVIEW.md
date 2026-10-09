@@ -1247,3 +1247,14 @@ Posted a status comment: this is real progress (four engineering findings resolv
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — self-correction: pause-state gap was already fixed, I was wrong (2026-10-09)
+
+Error caught and retracted on the PR: I had listed the receptionist-dashboard pause-state gap (legacy `eta` not nulled while paused) as still open in my last two comments. Re-checked directly: `5d2a06b` (`fix(eta): suppress staff countdowns while session is paused`) already gates the legacy `range` and `activeConsultationRemainingMinutes` on `first.session_status === 'open'`, and `git merge-base --is-ancestor 5d2a06b 97880c0` confirms that commit predates every head I reviewed in this entire session. I was carrying forward a stale note from earlier review instead of re-verifying it against the code actually in front of me each time — a real process failure, not just an unlucky timing gap. Posted a correction on the PR.
+
+Owner (`NTinkicht`) has requested a fresh hostile exact-head Codex review at `e39f8ce`, which is now running, and posted inline confirmations (consistent with my own independent verification) that the migration-restartability, replay-convergence, and pause-suppression fixes are all present at that head. `L4 review authorization` check is failing repeatedly at `e39f8ce` — expected/correct, since no qualifying non-author review has landed at this exact head yet; not a defect.
+
+With the pause-state item retracted, by my own independent reading every engineering finding I've raised on this batch is now resolved and CI-green at `e39f8ce`. Remaining blocker to MERGE_READY is procedural: draft status + the pending fresh independent review.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
