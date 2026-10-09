@@ -96,7 +96,9 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
       expect(called.expectedMinutes).toBe(20);
       expect(called.explanationCodes).toContain('called-not-started');
       expect(active.expectedMinutes).toBe(14);
-      expect(active.explanationCodes).toContain('active-consultation-remaining');
+      expect(active.explanationCodes).toContain(
+        'active-consultation-remaining',
+      );
     },
   );
 
