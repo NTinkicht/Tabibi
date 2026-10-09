@@ -26,6 +26,7 @@ const ids = {
 };
 const scope = { clinicId: ids.clinic, actorUserId: ids.actor };
 const evaluatedAt = '2026-09-08T10:05:30.000Z';
+type EpochRow = { session_id: string; source_epoch: string };
 
 beforeAll(migrate);
 beforeEach(async () => {
@@ -294,7 +295,7 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
 
   it('invalidates both source sessions on direct queue transfer', async () => {
     const entryId = await checkedIn('eta-claim-transfer');
-    const before = await pool.query<{ session_id: string; source_epoch: string }>(
+    const before = await pool.query<EpochRow>(
       `SELECT session_id,source_epoch FROM eta_session_source_epochs
         WHERE clinic_id=$1 AND session_id IN ($2,$3) ORDER BY session_id`,
       [ids.clinic, ids.session, ids.historicSession],
@@ -308,7 +309,7 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
       [entryId, ids.historicSession],
     );
 
-    const after = await pool.query<{ session_id: string; source_epoch: string }>(
+    const after = await pool.query<EpochRow>(
       `SELECT session_id,source_epoch FROM eta_session_source_epochs
         WHERE clinic_id=$1 AND session_id IN ($2,$3) ORDER BY session_id`,
       [ids.clinic, ids.session, ids.historicSession],
@@ -325,13 +326,13 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     ).rejects.toBeInstanceOf(EtaPublicationStaleError);
   });
 
-  it('rejects direct SQL stale, private or non-normalized claim payloads', async () => {
+  it('rejects stale and unsafe direct SQL claims', async () => {
     const entryId = await checkedIn('eta-claim-direct');
     const service = new EtaUncertaintyClaimService(pool);
     const source = await service.readSourceTuple(scope, ids.session, entryId);
     const snapshot = estimate(entryId, source);
-    const writeRaw = (epoch: EtaSourceTuple, value: object) =>
-      pool.query(
+    const writeRaw = (epoch: EtaSourceTuple, value: object) => {
+      return pool.query(
         `INSERT INTO eta_uncertainty_claims (
            clinic_id,session_id,queue_entry_id,source_epoch,
            clinic_prior_epoch,queue_revision,estimate_version,
@@ -348,6 +349,7 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
           JSON.stringify(value),
         ],
       );
+    };
 
     await expect(
       writeRaw(source, { ...snapshot, privateDisplayName: 'DO NOT STORE' }),
