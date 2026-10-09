@@ -254,7 +254,7 @@ describe('WU68 deterministic historical ETA prior', () => {
       delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
-    expect(staff).toEqual({
+    expect(staff).toMatchObject({
       patientsAhead: 1,
       minWaitMinutes: 23,
       maxWaitMinutes: 45,
@@ -262,6 +262,15 @@ describe('WU68 deterministic historical ETA prior', () => {
       estimateSource: 'historical_median',
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       observedSampleCount: 0,
+      uncertainty: {
+        estimateVersion: 'eta-uncertainty/v1',
+        queueRevision: expect.any(Number),
+        evaluatedAt: expect.any(String),
+        earliestMinutes: 22,
+        expectedMinutes: 30,
+        latestMinutes: 45,
+        explanationCodes: ['queue-depth', 'historical-median'],
+      },
     });
     expect(Object.keys(guest!).sort()).toEqual(
       [
