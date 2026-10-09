@@ -297,21 +297,30 @@ export class PublicGuestLiveQueueStatusService {
       delayVersion: row.delay_version,
     });
 
-    // All v1 inputs come from the same capability-scoped SELECT snapshot.
-    // Missing or contradictory committed state never produces v1 evidence.
+    // The guest v1 candidate is derived solely from one scoped SQL snapshot.
+    // An active slot without a valid committed start is not publishable.
     let uncertainty: EtaUncertaintySnapshot | null = null;
     const activeAhead = Number(row.active_slots_ahead);
-    if (
-      row.session_status === 'open' &&
-      Number.isSafeInteger(activeAhead) &&
-      activeAhead <= 1 &&
-      (activeAhead === 0 ||
-        (row.active_ahead_started_at instanceof Date &&
-          Number.isFinite(row.active_ahead_started_at.getTime()) &&
-          row.active_ahead_started_at <= snapshotNow))
-    ) {
+    const start = row.active_ahead_started_at;
+    const validActiveSlot =
+      activeAhead === 0 ||
+      (activeAhead === 1 &&
+        start instanceof Date &&
+        Number.isFinite(start.getTime()) &&
+        start <= snapshotNow);
+
+    if (row.session_status === 'open' && validActiveSlot) {
       const queueRevision = Number(row.queue_order_version);
       try {
+        const activeRemaining =
+          activeAhead === 1 && start
+            ? computeActiveConsultationRemainingMinutes({
+                startedAt: start,
+                now: snapshotNow,
+                estimatedConsultationMinutes:
+                  estimate.estimatedConsultationMinutes,
+              })
+            : 0;
         const candidate = computeEtaUncertaintyV1({
           clinicId: row.clinic_id,
           sessionId: row.session_id,
@@ -319,15 +328,7 @@ export class PublicGuestLiveQueueStatusService {
           queueRevision,
           evaluatedAt: snapshotNow.toISOString(),
           declaredDelayMinutes,
-          activeConsultationRemainingMinutes:
-            activeAhead === 1
-              ? computeActiveConsultationRemainingMinutes({
-                  startedAt: row.active_ahead_started_at!,
-                  now: snapshotNow,
-                  estimatedConsultationMinutes:
-                    estimate.estimatedConsultationMinutes,
-                })
-              : 0,
+          activeConsultationRemainingMinutes: activeRemaining,
           slotsAhead: Number(row.committed_slots_ahead),
           calledNotStartedAhead: Number(row.called_slots_ahead),
           activeSlotIncludedInAhead: activeAhead === 1,
