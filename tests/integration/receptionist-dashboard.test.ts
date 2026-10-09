@@ -450,6 +450,18 @@ describe('receptionist dashboard read model', () => {
       before.session.queueOrderVersion + 1,
     );
     expect(afterEta?.revision).not.toBe(beforeEta?.revision);
+    expect(beforeEta?.uncertainty?.estimateVersion).toBe(
+      'eta-uncertainty/v1',
+    );
+    expect(beforeEta?.uncertainty?.explanationCodes).toContain(
+      'called-not-started',
+    );
+    expect(afterEta?.uncertainty?.queueRevision).toBe(
+      after.session.queueOrderVersion,
+    );
+    expect(afterEta?.uncertainty?.explanationCodes).toContain(
+      'active-consultation-remaining',
+    );
 
     await command(first.entry.id, 'start_consultation', 'wu192-first-start');
     const retry = await dashboard.getSnapshot(scope, ids.sessionA);
