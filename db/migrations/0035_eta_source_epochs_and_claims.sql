@@ -190,12 +190,8 @@ CREATE TRIGGER eta_queue_source_changed_delete
 AFTER DELETE ON queue_entries
 FOR EACH ROW EXECUTE FUNCTION eta_queue_source_changed();
 
--- Explainable priority revisions must not scan unrelated historic clinic
--- audit events during every polling request.
-CREATE INDEX audit_events_eta_reorder_session_idx
-  ON audit_events (clinic_id, (metadata->>'sessionId'))
-  WHERE action = 'queue_entry.reordered';
-
+-- The session-scoped reorder-audit index is installed online by the
+-- separate non-transactional migration 0036, after this schema transaction.
 CREATE FUNCTION eta_audit_source_changed() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
