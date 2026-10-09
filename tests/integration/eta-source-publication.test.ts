@@ -164,6 +164,72 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     expect(newer.snapshot.expectedMinutes).toBe(25);
   });
 
+  it('rejects a stale candidate stamped with newer source epochs', async () => {
+    const entryId = await checkedIn('eta-claim-provenance');
+    const service = new EtaUncertaintyClaimService(pool);
+    const oldSource = await service.readSourceTuple(scope, ids.session, entryId);
+    const oldEstimate = estimate(entryId, oldSource);
+    await pool.query(
+      `UPDATE consultation_sessions
+          SET declared_delay_minutes=30,delay_version=delay_version+1,
+              delay_updated_at=now()
+        WHERE id=$1 AND clinic_id=$2`,
+      [ids.session, ids.clinic],
+    );
+    const freshSource = await service.readSourceTuple(
+      scope,
+      ids.session,
+      entryId,
+    );
+    expect(freshSource.queueRevision).toBe(oldSource.queueRevision);
+    expect(freshSource.sourceEpoch).toBeGreaterThan(oldSource.sourceEpoch);
+    await expect(
+      service.claim(scope, ids.session, entryId, freshSource, oldEstimate),
+    ).rejects.toBeInstanceOf(EtaPublicationStaleError);
+    const valid = await service.claim(
+      scope,
+      ids.session,
+      entryId,
+      freshSource,
+      estimate(entryId, freshSource, 30),
+    );
+    expect(valid.snapshot.expectedMinutes).toBe(30);
+  });
+
+  it('replays a previously committed claim after source epochs advance', async () => {
+    const entryId = await checkedIn('eta-claim-lost-response');
+    const service = new EtaUncertaintyClaimService(pool);
+    const oldSource = await service.readSourceTuple(scope, ids.session, entryId);
+    const oldEstimate = estimate(entryId, oldSource);
+    const first = await service.claim(
+      scope,
+      ids.session,
+      entryId,
+      oldSource,
+      oldEstimate,
+    );
+    await pool.query(
+      `UPDATE consultation_sessions
+          SET declared_delay_minutes=9,delay_version=delay_version+1,
+              delay_updated_at=now()
+        WHERE id=$1 AND clinic_id=$2`,
+      [ids.session, ids.clinic],
+    );
+    const replay = await service.claim(
+      scope,
+      ids.session,
+      entryId,
+      oldSource,
+      oldEstimate,
+    );
+    expect(replay).toEqual(first);
+    const count = await pool.query<{ count: string }>(
+      'SELECT count(*)::text AS count FROM eta_uncertainty_claims WHERE queue_entry_id=$1',
+      [entryId],
+    );
+    expect(count.rows[0]?.count).toBe('1');
+  });
+
   it('invalidates a current session claim when another session changes the clinic prior', async () => {
     const entryId = await checkedIn('eta-claim-prior');
     const service = new EtaUncertaintyClaimService(pool);
