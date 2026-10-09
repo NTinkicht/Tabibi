@@ -73,15 +73,18 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
     ]).toEqual([1, 2, 3]);
   });
 
-  it('counts called service work once and replaces an active slot with remaining time', () => {
-    const input = adapt({
-      declaredDelay: 0,
-      activeRemaining: 0,
-      slotsAhead: 2,
-      estimatedConsultation: 10,
-      queueRevision: 41,
-      evaluatedAt: '2026-10-04T10:00:00Z',
-    });
+  it(
+    'counts called service work once and replaces an active slot with remaining time',
+    () => {
+      const input = adapt({
+        declaredDelay: 0,
+        activeRemaining: 0,
+        slotsAhead: 2,
+        estimatedConsultation: 10,
+        queueRevision: 41,
+        evaluatedAt: '2026-10-04T10:00:00Z',
+      },
+  );
     const called = computeEtaUncertaintyV1({
       ...input,
       calledNotStartedAhead: 1,
@@ -97,20 +100,23 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
     expect(active.explanationCodes).toContain('active-consultation-remaining');
   });
 
-  it('rejects stale CAS publication and accepts exact committed revision', () => {
-    const estimate = computeEtaUncertaintyV1(
-      adapt({
-        declaredDelay: 0,
-        activeRemaining: 0,
-        slotsAhead: 1,
-        estimatedConsultation: 10,
-        queueRevision: 41,
-        evaluatedAt: '2026-10-04T10:00:00Z',
-      }),
-    );
-    expect(mayPublishEtaUncertaintyV1(estimate, 42)).toBe(false);
-    expect(mayPublishEtaUncertaintyV1(estimate, 41)).toBe(true);
-  });
+  it(
+    'rejects stale CAS publication and accepts exact committed revision',
+    () => {
+      const estimate = computeEtaUncertaintyV1(
+        adapt({
+          declaredDelay: 0,
+          activeRemaining: 0,
+          slotsAhead: 1,
+          estimatedConsultation: 10,
+          queueRevision: 41,
+          evaluatedAt: '2026-10-04T10:00:00Z',
+        }),
+      );
+      expect(mayPublishEtaUncertaintyV1(estimate, 42)).toBe(false);
+      expect(mayPublishEtaUncertaintyV1(estimate, 41)).toBe(true);
+    },
+  );
 
   it('fails closed for every invalid committed-input vector', () => {
     for (const vector of fixture.invalidInputs) {
@@ -120,15 +126,18 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
     }
   });
 
-  it('rejects paused sessions, missing scope, and contradictory active/called counts', () => {
-    const input = adapt({
-      declaredDelay: 0,
-      activeRemaining: 0,
-      slotsAhead: 1,
-      estimatedConsultation: 10,
-      queueRevision: 41,
-      evaluatedAt: '2026-10-04T10:00:00Z',
-    });
+  it(
+    'rejects paused sessions, missing scope, and contradictory active/called counts',
+    () => {
+      const input = adapt({
+        declaredDelay: 0,
+        activeRemaining: 0,
+        slotsAhead: 1,
+        estimatedConsultation: 10,
+        queueRevision: 41,
+        evaluatedAt: '2026-10-04T10:00:00Z',
+      },
+  );
     expect(() =>
       computeEtaUncertaintyV1({ ...input, sessionStatus: 'paused' }),
     ).toThrow();
