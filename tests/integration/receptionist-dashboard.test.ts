@@ -96,7 +96,7 @@ describe('receptionist dashboard read model', () => {
       checked.entry.id,
       waiting.entry.id,
     ]);
-    expect(snapshot.entries[0]!.eta).toEqual({
+    expect(snapshot.entries[0]!.eta).toMatchObject({
       patientsAhead: 0,
       minWaitMinutes: 20,
       maxWaitMinutes: 20,
@@ -113,6 +113,15 @@ describe('receptionist dashboard read model', () => {
       estimateSource: 'fallback',
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
+    expect(snapshot.entries[0]!.eta?.uncertainty).toMatchObject({
+      estimateVersion: 'eta-uncertainty/v1',
+      queueRevision: snapshot.session.queueOrderVersion,
+      earliestMinutes: 20,
+      expectedMinutes: 20,
+      latestMinutes: 20,
+      explanationCodes: ['declared-delay', 'fallback'],
+    });
+    expect(snapshot.entries[1]!.eta?.uncertainty).toBeUndefined();
     expect(snapshot.refreshAfterSeconds).toBe(30);
     expect(JSON.stringify(snapshot)).not.toContain('0555000000');
     expect(Object.keys(snapshot.entries[0]!)).not.toContain('diagnosis');
@@ -172,7 +181,7 @@ describe('receptionist dashboard read model', () => {
     const secondEntry = firstRead.entries.find(
       (entry) => entry.id === second.entry.id,
     )!;
-    expect(secondEntry.eta).toEqual({
+    expect(secondEntry.eta).toMatchObject({
       patientsAhead: 1,
       minWaitMinutes: 28,
       maxWaitMinutes: 35,
