@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
+import { ReceptionistDashboardService } from '@/modules/receptionist-dashboard';
 import {
   ETA_UNCERTAINTY_VERSION,
   type EtaUncertaintySnapshot,
@@ -141,6 +142,7 @@ export class EtaUncertaintyClaimService {
 
     try {
       return await inTransaction(this.pool, async (client) => {
+        await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
         await requireClinicRole(client, scope, [
           'receptionist',
           'clinic_admin',
@@ -156,6 +158,65 @@ export class EtaUncertaintyClaimService {
           snapshot.evaluatedAt,
           payload,
         ];
+        // A lost INSERT response must replay the original immutable claim,
+        // even if its source has since changed. Authorization is checked first.
+        const lookupSql = `SELECT id::text, snapshot=$8::jsonb AS same_payload
+             FROM eta_uncertainty_claims
+            WHERE clinic_id=$1 AND session_id=$2 AND queue_entry_id=$3
+              AND source_epoch=$4 AND clinic_prior_epoch=$5
+              AND queue_revision=$6 AND estimate_version='eta-uncertainty/v1'
+              AND evaluated_at=$7`;
+        const previous = await client.query<{
+          id: string;
+          same_payload: boolean;
+        }>(lookupSql, args);
+        if (previous.rows[0]) {
+          if (!previous.rows[0].same_payload) {
+            throw new EtaPublicationConflictError();
+          }
+          return { claimId: previous.rows[0].id, snapshot };
+        }
+
+        // New claims prove numerical provenance from the SAME committed
+        // database snapshot as their source epochs. An old candidate cannot
+        // be relabeled with a newer source tuple, even by a trusted caller.
+        const current = await client.query<{
+          source_epoch: string;
+          prior_epoch: string;
+          queue_order_version: string;
+        }>(
+          `SELECT source.source_epoch, prior.prior_epoch,
+                  session.queue_order_version
+             FROM eta_session_source_epochs source
+             JOIN eta_clinic_prior_epochs prior
+               ON prior.clinic_id=source.clinic_id
+             JOIN consultation_sessions session
+               ON session.clinic_id=source.clinic_id
+              AND session.id=source.session_id
+            WHERE source.clinic_id=$1 AND source.session_id=$2
+              AND session.status='open'`,
+          [scope.clinicId, sessionId],
+        );
+        const versions = current.rows[0];
+        if (
+          !versions ||
+          asSafeEpoch(versions.source_epoch) !== source.sourceEpoch ||
+          asSafeEpoch(versions.prior_epoch) !== source.clinicPriorEpoch ||
+          asSafeEpoch(versions.queue_order_version) !== source.queueRevision
+        ) {
+          throw new EtaPublicationStaleError();
+        }
+        const readModel = await new ReceptionistDashboardService(
+          this.pool,
+          () => new Date(snapshot.evaluatedAt),
+        ).getSnapshot(scope, sessionId, client);
+        const computed = readModel.entries.find(
+          (entry) => entry.id === entryId,
+        )?.eta?.uncertainty;
+        if (!computed || JSON.stringify(computed) !== payload) {
+          throw new EtaPublicationStaleError();
+        }
+
         const inserted = await client.query<{ id: string; snapshot: object }>(
           `INSERT INTO eta_uncertainty_claims (
              clinic_id,session_id,queue_entry_id,
@@ -181,15 +242,7 @@ export class EtaUncertaintyClaimService {
         const existing = await client.query<{
           id: string;
           same_payload: boolean;
-        }>(
-          `SELECT id::text, snapshot=$8::jsonb AS same_payload
-             FROM eta_uncertainty_claims
-            WHERE clinic_id=$1 AND session_id=$2 AND queue_entry_id=$3
-              AND source_epoch=$4 AND clinic_prior_epoch=$5
-              AND queue_revision=$6 AND estimate_version='eta-uncertainty/v1'
-              AND evaluated_at=$7`,
-          args,
-        );
+        }>(lookupSql, args);
         if (!existing.rows[0]) throw new EtaPublicationStaleError();
         if (!existing.rows[0].same_payload) {
           throw new EtaPublicationConflictError();
