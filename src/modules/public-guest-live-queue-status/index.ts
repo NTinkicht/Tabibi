@@ -125,7 +125,22 @@ export class PublicGuestLiveQueueStatusService {
                     entry.eligibility_order NULLS LAST,
                     entry.registration_order,
                     entry.id
-                ) AS service_position
+                ) AS service_position,
+                row_number() OVER (
+                  ORDER BY
+                    CASE entry.state
+                      WHEN 'in_consultation' THEN 0
+                      WHEN 'called' THEN 1
+                      WHEN 'checked_in' THEN 2
+                      WHEN 'waiting' THEN 3
+                      ELSE 4
+                    END,
+                    CASE WHEN entry.priority_order IS NULL THEN 1 ELSE 0 END,
+                    entry.priority_order NULLS LAST,
+                    entry.eligibility_order NULLS LAST,
+                    entry.registration_order,
+                    entry.id
+                ) AS v1_service_position
            FROM queue_entries entry, target
           WHERE entry.clinic_id = target.clinic_id
             AND entry.session_id = target.session_id
@@ -173,18 +188,18 @@ export class PublicGuestLiveQueueStatusService {
               entry.clinic_id,
               entry.session_id,
               (SELECT count(*) FROM ordered preceding
-                WHERE preceding.service_position < ordered.service_position
+                WHERE preceding.v1_service_position < ordered.v1_service_position
                   AND preceding.state IN ('checked_in','called','in_consultation'))::text
                 AS committed_slots_ahead,
               (SELECT count(*) FROM ordered preceding
-                WHERE preceding.service_position < ordered.service_position
+                WHERE preceding.v1_service_position < ordered.v1_service_position
                   AND preceding.state = 'called')::text AS called_slots_ahead,
               (SELECT count(*) FROM ordered preceding
-                WHERE preceding.service_position < ordered.service_position
+                WHERE preceding.v1_service_position < ordered.v1_service_position
                   AND preceding.state = 'in_consultation')::text AS active_slots_ahead,
               (SELECT preceding.in_consultation_started_at
                  FROM ordered preceding
-                WHERE preceding.service_position < ordered.service_position
+                WHERE preceding.v1_service_position < ordered.v1_service_position
                   AND preceding.state = 'in_consultation'
                 ORDER BY preceding.service_position LIMIT 1) AS active_ahead_started_at,
               session.declared_delay_minutes,
