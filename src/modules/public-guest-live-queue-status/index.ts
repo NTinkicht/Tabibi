@@ -12,7 +12,7 @@ import {
 import { createEtaSnapshot } from '@/modules/queue-eta-estimator/snapshot';
 import {
   computeEtaUncertaintyV1,
-  mayPublishEtaUncertaintyV1,
+  isEtaUncertaintySnapshotForRevision,
   type EtaUncertaintySnapshot,
 } from '@/modules/queue-eta-estimator/uncertainty-v1';
 import { abortableQuery } from '@/platform/database/abortable-query';
@@ -313,7 +313,7 @@ export class PublicGuestLiveQueueStatusService {
     });
 
     // The guest v1 candidate is derived solely from one scoped SQL snapshot.
-    // An active slot without a valid committed start is not publishable.
+    // An active slot without a valid committed start cannot produce v1 evidence.
     let uncertainty: EtaUncertaintySnapshot | null = null;
     const activeAhead = Number(row.active_slots_ahead);
     const start = row.active_ahead_started_at;
@@ -354,7 +354,7 @@ export class PublicGuestLiveQueueStatusService {
           estimateSource: estimate.estimateSource,
           sessionStatus: 'open',
         });
-        if (mayPublishEtaUncertaintyV1(candidate, queueRevision)) {
+        if (isEtaUncertaintySnapshotForRevision(candidate, queueRevision)) {
           uncertainty = candidate;
         }
       } catch (error) {
