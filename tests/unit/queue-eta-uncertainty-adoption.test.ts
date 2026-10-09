@@ -95,10 +95,18 @@ describe('ETA uncertainty-v1 adoption', () => {
     expect(active.explanationCodes).toContain('active-consultation-remaining');
   });
 
-  it('rejects stale publication against a changed revision', () => {
+  it('validates read-only snapshot revisions without claiming atomic publication', () => {
     const estimate = computeEtaUncertaintyV1(valid);
     expect(isEtaUncertaintySnapshotForRevision(estimate, 42)).toBe(false);
     expect(isEtaUncertaintySnapshotForRevision(estimate, 41)).toBe(true);
+    expect(isEtaUncertaintySnapshotForRevision(estimate, -1)).toBe(false);
+    expect(isEtaUncertaintySnapshotForRevision(estimate, 41.1)).toBe(false);
+    expect(isEtaUncertaintySnapshotForRevision(estimate, Number.NaN)).toBe(
+      false,
+    );
+    // No persistence or fresh source-epoch read occurs in this pure helper.
+    // A matching number is necessary for internal consistency but cannot
+    // prove that delay, completion, or other ETA sources have not advanced.
   });
 
   it('rejects impossible calendar dates', () => {
