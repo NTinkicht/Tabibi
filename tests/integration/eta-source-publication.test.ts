@@ -167,7 +167,11 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
   it('rejects a stale candidate stamped with newer source epochs', async () => {
     const entryId = await checkedIn('eta-claim-provenance');
     const service = new EtaUncertaintyClaimService(pool);
-    const oldSource = await service.readSourceTuple(scope, ids.session, entryId);
+    const oldSource = await service.readSourceTuple(
+      scope,
+      ids.session,
+      entryId,
+    );
     const oldEstimate = estimate(entryId, oldSource);
     await pool.query(
       `UPDATE consultation_sessions
@@ -199,7 +203,11 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
   it('replays a previously committed claim after source epochs advance', async () => {
     const entryId = await checkedIn('eta-claim-lost-response');
     const service = new EtaUncertaintyClaimService(pool);
-    const oldSource = await service.readSourceTuple(scope, ids.session, entryId);
+    const oldSource = await service.readSourceTuple(
+      scope,
+      ids.session,
+      entryId,
+    );
     const oldEstimate = estimate(entryId, oldSource);
     const first = await service.claim(
       scope,
