@@ -73,9 +73,7 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
     ]).toEqual([1, 2, 3]);
   });
 
-  it(
-    'counts called service work once and replaces an active slot with remaining time',
-    () => {
+  it('counts called and active service slots once', () => {
       const input = adapt({
         declaredDelay: 0,
         activeRemaining: 0,
@@ -99,12 +97,9 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
       expect(active.explanationCodes).toContain(
         'active-consultation-remaining',
       );
-    },
-  );
+  });
 
-  it(
-    'rejects stale CAS publication and accepts exact committed revision',
-    () => {
+  it('rejects stale queue revisions', () => {
       const estimate = computeEtaUncertaintyV1(
         adapt({
           declaredDelay: 0,
@@ -117,8 +112,7 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
       );
       expect(mayPublishEtaUncertaintyV1(estimate, 42)).toBe(false);
       expect(mayPublishEtaUncertaintyV1(estimate, 41)).toBe(true);
-    },
-  );
+  });
 
   it('rejects calendar-normalized evaluation timestamps', () => {
     const input = adapt({
@@ -148,9 +142,7 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
     }
   });
 
-  it(
-    'rejects paused sessions, missing scope, and contradictory active/called counts',
-    () => {
+  it('rejects paused sessions and contradictory inputs', () => {
       const input = adapt({
         declaredDelay: 0,
         activeRemaining: 0,
@@ -172,6 +164,5 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
           calledNotStartedAhead: 1,
         }),
       ).toThrow();
-    },
-  );
+  });
 });
