@@ -260,6 +260,11 @@ describe('WU63 public guest live queue status', () => {
         estimateSource: 'fallback',
         delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
       },
     });
   });
@@ -288,6 +293,11 @@ describe('WU63 public guest live queue status', () => {
         estimateSource: 'fallback',
         delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
       },
     });
     await expect(service.get(second.bearer)).resolves.toEqual({
@@ -652,6 +662,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         estimateSource: 'fallback',
         delayStatus: 'declared',
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
       },
     });
   });
@@ -691,6 +706,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         estimateSource: 'fallback',
         delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
       },
     });
   });
@@ -734,6 +754,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         estimateSource: 'observed_median',
         delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
       },
     });
   });
@@ -780,6 +805,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         estimateSource: 'observed_median',
         delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
       },
     });
   });
@@ -811,6 +841,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         estimateSource: 'fallback',
         delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
       },
     });
   });
@@ -840,6 +875,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         estimateSource: 'fallback',
         delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
       },
     });
   });
@@ -871,6 +911,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         estimateSource: 'fallback',
         delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
       },
     });
     await expect(service.get(second.bearer)).resolves.toEqual({
@@ -886,6 +931,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         estimateSource: 'fallback',
         delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
       },
     });
   });
@@ -917,6 +967,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         estimateSource: 'fallback',
         delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
         summary: {
           midpointMinutes: 0,
           uncertaintyWidthMinutes: 0,
@@ -975,6 +1030,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         estimateSource: 'fallback' as const,
         delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
       },
     };
     await expect(service.get(booking.bearer)).resolves.toEqual(baseline);
@@ -1062,6 +1122,11 @@ describe('WU67 public guest deterministic ETA projection', () => {
         estimateSource: 'observed_median',
         delayStatus: 'declared',
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+        uncertainty: expect.objectContaining({
+          estimateVersion: 'eta-uncertainty/v1',
+          queueRevision: expect.any(Number),
+          evaluatedAt: expect.any(String),
+        }),
       },
     });
   });
