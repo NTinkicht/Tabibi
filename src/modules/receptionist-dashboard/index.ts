@@ -10,7 +10,7 @@ import {
 import { createEtaSnapshot } from '@/modules/queue-eta-estimator/snapshot';
 import {
   computeEtaUncertaintyV1,
-  mayPublishEtaUncertaintyV1,
+  isEtaUncertaintySnapshotForRevision,
   type EtaUncertaintySnapshot,
 } from '@/modules/queue-eta-estimator/uncertainty-v1';
 import type { SessionStatus } from '@/modules/session';
@@ -274,12 +274,12 @@ export class ReceptionistDashboardService {
               estimateSource: estimate.estimateSource,
               sessionStatus: 'open',
             });
-            if (mayPublishEtaUncertaintyV1(candidate, queueRevision)) {
+            if (isEtaUncertaintySnapshotForRevision(candidate, queueRevision)) {
               uncertainty = candidate;
             }
           } catch (error) {
             if (!(error instanceof RangeError)) throw error;
-            // Invalid committed metadata cannot publish a v1 estimate.
+            // Invalid committed metadata cannot produce a v1 snapshot estimate.
           }
         }
         const eta =
