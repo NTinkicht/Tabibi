@@ -181,6 +181,23 @@ export class ReceptionistDashboardService {
            ) historical`,
         [scope.clinicId, sessionId, first.doctor_id, first.starts_at],
       );
+      // Priority decisions are durable audit facts; a current priority_order
+      // alone cannot identify an earlier mutation after a patient was called.
+      // Read them under the same REPEATABLE READ snapshot as queue positions.
+      const priorityResult = await client.query<{ entry_id: string }>(
+        `SELECT DISTINCT affected->>'entryId' AS entry_id
+           FROM audit_events audit
+           CROSS JOIN LATERAL jsonb_array_elements(
+             CASE WHEN jsonb_typeof(audit.metadata->'resultingOrder')='array'
+               THEN audit.metadata->'resultingOrder' ELSE '[]'::jsonb END
+           ) affected
+          WHERE audit.clinic_id=$1 AND audit.action='queue_entry.reordered'
+            AND audit.metadata->>'sessionId'=$2`,
+        [scope.clinicId, sessionId],
+      );
+      const priorityAffectedEntries = new Set(
+        priorityResult.rows.map((row) => row.entry_id),
+      );
       const estimate = selectConsultationEstimate(
         durationResult.rows.map((row) => row.duration_minutes),
         historicalDurationResult.rows.map((row) => row.duration_minutes),
@@ -269,6 +286,13 @@ export class ReceptionistDashboardService {
               calledNotStartedAhead: committedServiceAhead.filter(
                 (prior) => prior.entry_state === 'called',
               ).length,
+              priorityChanged:
+                priorityAffectedEntries.has(row.entry_id) ||
+                committedServiceAhead.some(
+                  (prior) =>
+                    prior.entry_id !== null &&
+                    priorityAffectedEntries.has(prior.entry_id),
+                ),
               estimatedConsultationMinutes:
                 estimate.estimatedConsultationMinutes,
               estimateSource: estimate.estimateSource,
