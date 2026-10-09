@@ -292,6 +292,86 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     expect(records.rows).toHaveLength(0);
   });
 
+  it('invalidates both source sessions on direct queue transfer', async () => {
+    const entryId = await checkedIn('eta-claim-transfer');
+    const before = await pool.query<{ session_id: string; source_epoch: string }>(
+      `SELECT session_id,source_epoch FROM eta_session_source_epochs
+        WHERE clinic_id=$1 AND session_id IN ($2,$3) ORDER BY session_id`,
+      [ids.clinic, ids.session, ids.historicSession],
+    );
+    expect(before.rows).toHaveLength(2);
+
+    // Service-level transfers obey additional lifecycle constraints. This
+    // direct-SQL vector proves DB fencing even for a future writer path.
+    await pool.query(
+      'UPDATE queue_entries SET session_id=$2 WHERE id=$1',
+      [entryId, ids.historicSession],
+    );
+
+    const after = await pool.query<{ session_id: string; source_epoch: string }>(
+      `SELECT session_id,source_epoch FROM eta_session_source_epochs
+        WHERE clinic_id=$1 AND session_id IN ($2,$3) ORDER BY session_id`,
+      [ids.clinic, ids.session, ids.historicSession],
+    );
+    expect(after.rows).toHaveLength(2);
+    for (let index = 0; index < after.rows.length; index++) {
+      expect(Number(after.rows[index]!.source_epoch)).toBeGreaterThan(
+        Number(before.rows[index]!.source_epoch),
+      );
+    }
+    const service = new EtaUncertaintyClaimService(pool);
+    await expect(
+      service.readSourceTuple(scope, ids.session, entryId),
+    ).rejects.toBeInstanceOf(EtaPublicationStaleError);
+  });
+
+  it('rejects direct SQL stale, private or non-normalized claim payloads', async () => {
+    const entryId = await checkedIn('eta-claim-direct');
+    const service = new EtaUncertaintyClaimService(pool);
+    const source = await service.readSourceTuple(scope, ids.session, entryId);
+    const snapshot = estimate(entryId, source);
+    const writeRaw = (epoch: EtaSourceTuple, value: object) =>
+      pool.query(
+        `INSERT INTO eta_uncertainty_claims (
+           clinic_id,session_id,queue_entry_id,source_epoch,
+           clinic_prior_epoch,queue_revision,estimate_version,
+           evaluated_at,snapshot
+         ) VALUES($1,$2,$3,$4,$5,$6,'eta-uncertainty/v1',$7,$8::jsonb)`,
+        [
+          ids.clinic,
+          ids.session,
+          entryId,
+          epoch.sourceEpoch,
+          epoch.clinicPriorEpoch,
+          epoch.queueRevision,
+          snapshot.evaluatedAt,
+          JSON.stringify(value),
+        ],
+      );
+
+    await expect(
+      writeRaw(source, { ...snapshot, privateDisplayName: 'DO NOT STORE' }),
+    ).rejects.toMatchObject({ code: '22023' });
+    await expect(
+      writeRaw(source, { ...snapshot, earliestMinutes: -1 }),
+    ).rejects.toMatchObject({ code: '22023' });
+    await expect(
+      writeRaw(source, {
+        ...snapshot,
+        explanationCodes: ['hidden-clinic-data'],
+      }),
+    ).rejects.toMatchObject({ code: '22023' });
+    await pool.query(
+      `UPDATE consultation_sessions SET delay_version=delay_version+1,
+          declared_delay_minutes=9,delay_updated_at=now()
+        WHERE id=$1`,
+      [ids.session],
+    );
+    await expect(writeRaw(source, snapshot)).rejects.toMatchObject({
+      code: '40001',
+    });
+  });
+
   it('keeps committed source epochs across identical read-only observations', async () => {
     const entryId = await checkedIn('eta-claim-stable');
     const service = new EtaUncertaintyClaimService(pool);
