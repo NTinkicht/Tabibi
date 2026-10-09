@@ -253,6 +253,11 @@ describe('WU68 deterministic historical ETA prior', () => {
       estimateSource: 'historical_median',
       delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+      uncertainty: expect.objectContaining({
+        estimateVersion: 'eta-uncertainty/v1',
+        queueRevision: expect.any(Number),
+        evaluatedAt: expect.any(String),
+      }),
     });
     expect(staff).toMatchObject({
       patientsAhead: 1,
@@ -280,6 +285,7 @@ describe('WU68 deterministic historical ETA prior', () => {
         'estimateSource',
         'delayStatus',
         'revision',
+        'uncertainty',
       ].sort(),
     );
     expect(JSON.stringify(guest)).not.toContain(booking.doctorId);
@@ -319,6 +325,11 @@ describe('WU68 deterministic historical ETA prior', () => {
       estimateSource: 'observed_median',
       delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+      uncertainty: expect.objectContaining({
+        estimateVersion: 'eta-uncertainty/v1',
+        queueRevision: expect.any(Number),
+        evaluatedAt: expect.any(String),
+      }),
     });
     expect(staff).toMatchObject({
       estimatedConsultationMinutes: 10,
@@ -412,6 +423,11 @@ describe('WU68 deterministic historical ETA prior', () => {
       estimateSource: 'fallback',
       delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+      uncertainty: expect.objectContaining({
+        estimateVersion: 'eta-uncertainty/v1',
+        queueRevision: expect.any(Number),
+        evaluatedAt: expect.any(String),
+      }),
     });
     expect(staff).toMatchObject({
       estimatedConsultationMinutes: 15,
@@ -454,6 +470,11 @@ describe('WU68 deterministic historical ETA prior', () => {
       estimateSource: 'historical_median',
       delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+      uncertainty: expect.objectContaining({
+        estimateVersion: 'eta-uncertainty/v1',
+        queueRevision: expect.any(Number),
+        evaluatedAt: expect.any(String),
+      }),
     });
     expect(staff).toMatchObject({
       estimatedConsultationMinutes: 15,
