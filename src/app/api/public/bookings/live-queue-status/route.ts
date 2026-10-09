@@ -54,6 +54,19 @@ export async function GET(request: Request): Promise<Response> {
                 estimateSource: result.eta.estimateSource,
                 revision: result.eta.revision,
                 delayStatus: result.eta.delayStatus,
+                ...(result.eta.uncertainty
+                  ? {
+                      uncertainty: {
+                        estimateVersion: result.eta.uncertainty.estimateVersion,
+                        queueRevision: result.eta.uncertainty.queueRevision,
+                        evaluatedAt: result.eta.uncertainty.evaluatedAt,
+                        earliestMinutes: result.eta.uncertainty.earliestMinutes,
+                        expectedMinutes: result.eta.uncertainty.expectedMinutes,
+                        latestMinutes: result.eta.uncertainty.latestMinutes,
+                        explanationCodes: [...result.eta.uncertainty.explanationCodes],
+                      },
+                    }
+                  : {}),
                 summary: formatWaitRangeSummary(
                   summarizeWaitRange(
                     {
