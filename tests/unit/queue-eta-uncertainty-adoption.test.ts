@@ -7,12 +7,12 @@ import {
   type EtaUncertaintyInput,
 } from '@/modules/queue-eta-estimator/uncertainty-v1';
 
-const fixture = JSON.parse(
-  readFileSync(
-    resolve(process.cwd(), 'tests/fixtures/eta-uncertainty-v1.vectors.json'),
-    'utf8',
-  ),
+const fixturePath = resolve(
+  process.cwd(),
+  'tests/fixtures/eta-uncertainty-v1.vectors.json',
 );
+const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+
 const scope = {
   clinicId: 'clinic-1',
   sessionId: 'session-1',
@@ -33,136 +33,103 @@ function adapt(input: Record<string, unknown>): EtaUncertaintyInput {
   };
 }
 
-describe('WU #606 production eta-uncertainty/v1 estimator', () => {
-  for (const vector of fixture.cases.filter((item: { kind: string }) =>
-    ['estimate', 'retry'].includes(item.kind),
-  )) {
-    it(`${vector.id}: matches the committed acceptance vector`, () => {
+const valid = adapt({
+  declaredDelay: 0,
+  activeRemaining: 0,
+  slotsAhead: 1,
+  estimatedConsultation: 10,
+  queueRevision: 41,
+  evaluatedAt: '2026-10-04T10:00:00Z',
+});
+
+describe('ETA uncertainty-v1 adoption', () => {
+  for (const vector of fixture.cases) {
+    if (vector.kind !== 'estimate' && vector.kind !== 'retry') continue;
+
+    it(vector.id + ': follows committed acceptance vectors', () => {
       const input = adapt(vector.input);
       const first = computeEtaUncertaintyV1(input);
       const second = computeEtaUncertaintyV1({ ...input });
       const expected = { ...vector.expected };
       delete expected.byteEquivalentOnRetry;
       delete expected.explanationCodes;
+      const codes = [...vector.expected.explanationCodes, 'fallback'];
+
       expect(first).toMatchObject(expected);
-      expect(first.explanationCodes).toEqual([
-        ...vector.expected.explanationCodes,
-        'fallback',
-      ]);
+      expect(first.explanationCodes).toEqual(codes);
       expect(JSON.stringify(first)).toBe(JSON.stringify(second));
       expect(Object.isFrozen(first)).toBe(true);
       expect(Object.isFrozen(first.explanationCodes)).toBe(true);
     });
   }
 
-  it('never collapses real uncertainty after rounding', () => {
-    const result = computeEtaUncertaintyV1(
-      adapt({
-        declaredDelay: 0.8,
-        activeRemaining: 0,
-        slotsAhead: 1,
-        estimatedConsultation: 1,
-        queueRevision: 7,
-        evaluatedAt: '2026-10-04T10:05:00Z',
-      }),
-    );
-    expect([
-      result.earliestMinutes,
-      result.expectedMinutes,
-      result.latestMinutes,
-    ]).toEqual([1, 2, 3]);
+  it('preserves uncertainty through outward rounding', () => {
+    const estimate = computeEtaUncertaintyV1({
+      ...valid,
+      declaredDelayMinutes: 0.8,
+      estimatedConsultationMinutes: 1,
+    });
+    const bounds = [
+      estimate.earliestMinutes,
+      estimate.expectedMinutes,
+      estimate.latestMinutes,
+    ];
+    expect(bounds).toEqual([1, 2, 3]);
   });
 
-  it('counts called and active service slots once', () => {
-    const input = adapt({
-      declaredDelay: 0,
-      activeRemaining: 0,
-      slotsAhead: 2,
-      estimatedConsultation: 10,
-      queueRevision: 41,
-      evaluatedAt: '2026-10-04T10:00:00Z',
-    });
+  it('counts called and active work exactly once', () => {
     const called = computeEtaUncertaintyV1({
-      ...input,
+      ...valid,
+      slotsAhead: 2,
       calledNotStartedAhead: 1,
     });
     const active = computeEtaUncertaintyV1({
-      ...input,
+      ...valid,
+      slotsAhead: 2,
       activeSlotIncludedInAhead: true,
       activeConsultationRemainingMinutes: 4,
     });
     expect(called.expectedMinutes).toBe(20);
     expect(called.explanationCodes).toContain('called-not-started');
     expect(active.expectedMinutes).toBe(14);
-    expect(active.explanationCodes).toContain(
-      'active-consultation-remaining',
-    );
+    expect(active.explanationCodes).toContain('active-consultation-remaining');
   });
 
-  it('rejects stale queue revisions', () => {
-    const estimate = computeEtaUncertaintyV1(
-      adapt({
-        declaredDelay: 0,
-        activeRemaining: 0,
-        slotsAhead: 1,
-        estimatedConsultation: 10,
-        queueRevision: 41,
-        evaluatedAt: '2026-10-04T10:00:00Z',
-      }),
-    );
+  it('rejects stale publication against a changed revision', () => {
+    const estimate = computeEtaUncertaintyV1(valid);
     expect(mayPublishEtaUncertaintyV1(estimate, 42)).toBe(false);
     expect(mayPublishEtaUncertaintyV1(estimate, 41)).toBe(true);
   });
 
-  it('rejects calendar-normalized evaluation timestamps', () => {
-    const input = adapt({
-      declaredDelay: 0,
-      activeRemaining: 0,
-      slotsAhead: 1,
-      estimatedConsultation: 10,
-      queueRevision: 41,
-      evaluatedAt: '2026-10-04T10:00:00Z',
-    });
-    for (const malformed of [
+  it('rejects impossible calendar dates', () => {
+    const malformed = [
       '2026-02-31T10:00:00Z',
       '2026-04-31T10:00:00Z',
       '2026-13-01T10:00:00Z',
-    ]) {
-      expect(() =>
-        computeEtaUncertaintyV1({ ...input, evaluatedAt: malformed }),
-      ).toThrow(RangeError);
+    ];
+    for (const evaluatedAt of malformed) {
+      const input = { ...valid, evaluatedAt };
+      expect(() => computeEtaUncertaintyV1(input)).toThrow(RangeError);
     }
   });
 
-  it('fails closed for every invalid committed-input vector', () => {
+  it('rejects all invalid committed vectors', () => {
     for (const vector of fixture.invalidInputs) {
-      expect(() => computeEtaUncertaintyV1(adapt(vector.input))).toThrow(
-        RangeError,
-      );
+      const input = adapt(vector.input);
+      expect(() => computeEtaUncertaintyV1(input)).toThrow(RangeError);
     }
   });
 
-  it('rejects paused sessions and contradictory inputs', () => {
-    const input = adapt({
-      declaredDelay: 0,
-      activeRemaining: 0,
-      slotsAhead: 1,
-      estimatedConsultation: 10,
-      queueRevision: 41,
-      evaluatedAt: '2026-10-04T10:00:00Z',
-    });
-    expect(() =>
-      computeEtaUncertaintyV1({ ...input, sessionStatus: 'paused' }),
-    ).toThrow();
-    expect(() =>
-      computeEtaUncertaintyV1({ ...input, clinicId: '' }),
-    ).toThrow();
-    expect(() =>
-      computeEtaUncertaintyV1({
-        ...input,
-        activeSlotIncludedInAhead: true,
-        calledNotStartedAhead: 1,
-      }),
-    ).toThrow();
+  it('rejects paused, missing-scope and contradictory inputs', () => {
+    const paused = { ...valid, sessionStatus: 'paused' as const };
+    const unscoped = { ...valid, clinicId: '' };
+    const duplicated = {
+      ...valid,
+      activeSlotIncludedInAhead: true,
+      calledNotStartedAhead: 1,
+    };
+    expect(() => computeEtaUncertaintyV1(paused)).toThrow(RangeError);
+    expect(() => computeEtaUncertaintyV1(unscoped)).toThrow(RangeError);
+    expect(() => computeEtaUncertaintyV1(duplicated)).toThrow(RangeError);
   });
 });
