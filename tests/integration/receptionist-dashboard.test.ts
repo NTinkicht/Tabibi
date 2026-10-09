@@ -450,9 +450,7 @@ describe('receptionist dashboard read model', () => {
       before.session.queueOrderVersion + 1,
     );
     expect(afterEta?.revision).not.toBe(beforeEta?.revision);
-    expect(beforeEta?.uncertainty?.estimateVersion).toBe(
-      'eta-uncertainty/v1',
-    );
+    expect(beforeEta?.uncertainty?.estimateVersion).toBe('eta-uncertainty/v1');
     expect(beforeEta?.uncertainty?.explanationCodes).toContain(
       'called-not-started',
     );
