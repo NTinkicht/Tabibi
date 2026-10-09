@@ -62,7 +62,12 @@ jobs:
         run: npm ci
 
       - name: Formatting
-        run: npm run format
+        run: |
+          if ! npm run format; then
+            npx prettier --write src/modules/queue-eta-estimator/claim-publication.ts tests/integration/eta-source-publication.test.ts
+            git diff -- src/modules/queue-eta-estimator/claim-publication.ts tests/integration/eta-source-publication.test.ts
+            exit 1
+          fi
 
       - name: Lint
         run: npm run lint
