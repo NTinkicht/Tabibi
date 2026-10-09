@@ -1269,3 +1269,14 @@ Posted a comment confirming the finding and explicitly retracting the "fully res
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — full review-thread audit at heartbeat sweep, two genuinely-open P1s found (2026-10-09)
+
+Heartbeat full-coverage sweep: only one open PR (#609, already subscribed), no new PRs/issues needing attention (issue #610 cross-post is consistent with what I've been tracking). Used the sweep to do something I hadn't yet done this session: read all 13 review threads on PR #609 end to end via `get_review_comments`, not just the ones that pinged me via webhook.
+
+Found my own prior comment overclaimed. Two P1s are genuinely still open and unaddressed: in `public-guest-live-queue-status/index.ts`, `isEtaUncertaintySnapshotForRevision(candidate, queueRevision)` compares `queueRevision` against itself (it's copied from the same SELECT row into the candidate) — confirmed by reading the current code at `e39f8ce`, unchanged since `b3d95729c0`. And that guard only covers `queue_order_version`, never `delay_version` or the clinic prior-duration epoch. These are the real "publication P1s" referenced throughout the thread — they live in the guest GET path, not the claim-publication.ts write path I'd been focused on.
+
+Separately, found a thread (`r4234787779`, the `readSourceTuple`-epoch-capture P1) that's unreplied/unresolved on GitHub but appears actually fixed by `b8f4321`'s recompute-and-byte-compare pattern in `claim()` — a stronger guarantee than the specific remedy Codex asked for, just not marked resolved. Posted both corrections on the PR.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
