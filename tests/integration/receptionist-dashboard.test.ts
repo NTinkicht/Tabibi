@@ -471,6 +471,59 @@ describe('receptionist dashboard read model', () => {
     ).toBe(afterEta?.revision);
   });
 
+  it('ranks an active consultation ahead of newly called service in v1 only', async () => {
+    const queue = new QueueService(pool);
+    const first = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Active service',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu606-active-register',
+      correlationId: 'wu606-active-register',
+    });
+    const second = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Called service',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu606-called-register',
+      correlationId: 'wu606-called-register',
+    });
+    const command = async (
+      id: string,
+      action: 'check_in' | 'call' | 'start_consultation',
+      key: string,
+    ) =>
+      queue.command(scope, ids.sessionA, id, {
+        command: action,
+        idempotencyKey: key,
+        correlationId: 'wu606-precedence',
+      });
+    await command(first.entry.id, 'check_in', 'wu606-active-checkin');
+    await command(second.entry.id, 'check_in', 'wu606-called-checkin');
+    await command(first.entry.id, 'call', 'wu606-active-call');
+    await command(first.entry.id, 'start_consultation', 'wu606-active-start');
+    await command(second.entry.id, 'call', 'wu606-second-call');
+    // Force historical eligibility order to prefer the called entry,
+    // without changing the already committed actual active consultation.
+    await pool.query(
+      'UPDATE queue_entries SET eligibility_order=999 WHERE id=$1',
+      [first.entry.id],
+    );
+
+    const snapshot = await new ReceptionistDashboardService(pool).getSnapshot(
+      scope,
+      ids.sessionA,
+    );
+    const active = snapshot.entries.find((row) => row.id === first.entry.id);
+    const called = snapshot.entries.find((row) => row.id === second.entry.id);
+    expect(called?.eta?.uncertainty?.estimateVersion).toBe(
+      'eta-uncertainty/v1',
+    );
+    expect(called?.eta?.uncertainty?.explanationCodes).toContain(
+      'active-consultation-remaining',
+    );
+    expect(active?.eta?.uncertainty?.explanationCodes).not.toContain(
+      'called-not-started',
+    );
+  });
+
   it('denies wrong roles and treats a cross-clinic session as absent', async () => {
     await pool.query(
       `UPDATE clinic_memberships SET role='doctor' WHERE clinic_id=$1 AND user_id=$2`,
