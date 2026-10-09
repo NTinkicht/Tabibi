@@ -378,10 +378,10 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
 
     // Service-level transfers obey additional lifecycle constraints. This
     // direct-SQL vector proves DB fencing even for a future writer path.
-    await pool.query(
-      'UPDATE queue_entries SET session_id=$2 WHERE id=$1',
-      [entryId, ids.historicSession],
-    );
+    await pool.query('UPDATE queue_entries SET session_id=$2 WHERE id=$1', [
+      entryId,
+      ids.historicSession,
+    ]);
 
     const after = await pool.query<EpochRow>(
       `SELECT session_id,source_epoch FROM eta_session_source_epochs
