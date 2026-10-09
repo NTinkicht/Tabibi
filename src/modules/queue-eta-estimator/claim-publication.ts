@@ -140,11 +140,13 @@ export class EtaUncertaintyClaimService {
       throw new RangeError('Invalid versioned ETA claim input');
     }
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        return await inTransaction(this.pool, async (client) => {
-          await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
-          await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
+    const attemptClaim = () =>
+      inTransaction(this.pool, async (client) => {
+        await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+        await requireClinicRole(client, scope, [
+          'receptionist',
+          'clinic_admin',
+        ]);
         const payload = JSON.stringify(snapshot);
         const args = [
           scope.clinicId,
@@ -249,7 +251,10 @@ export class EtaUncertaintyClaimService {
           claimId: existing.rows[0].id,
           snapshot,
         };
-        });
+      });
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await attemptClaim();
       } catch (error) {
         const serializationFailure =
           error &&
