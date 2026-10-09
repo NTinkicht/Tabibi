@@ -40,6 +40,7 @@ const committedMigrations = [
   '0032_doctor_global_consultation_open_guard.sql',
   '0033_doctor_global_consultation_insert_guard.sql',
   '0034_doctor_global_active_consultation_guard.sql',
+  '0035_eta_source_epochs_and_claims.sql',
 ];
 
 beforeAll(async () => {
