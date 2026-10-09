@@ -92,7 +92,7 @@ jobs:
     timeout-minutes: 25
     services:
       postgres:
-        image: postgres:16.4-alpine
+        image: public.ecr.aws/docker/library/postgres:16.4-alpine
         env:
           POSTGRES_DB: tabibi_test
           POSTGRES_USER: tabibi
@@ -149,7 +149,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:16.4-alpine
+        image: public.ecr.aws/docker/library/postgres:16.4-alpine
         env:
           POSTGRES_DB: tabibi_test
           POSTGRES_USER: tabibi
