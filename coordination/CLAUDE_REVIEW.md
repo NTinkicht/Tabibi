@@ -1258,3 +1258,14 @@ With the pause-state item retracted, by my own independent reading every enginee
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — Codex's fresh exact-head review landed, one new confirmed P2 (2026-10-09)
+
+Codex's hostile exact-head review at `e39f8ce` (requested by the owner) surfaced a new finding: `eta_audit_source_changed()` in migration 0035 locks `old_session` then `new_session` in literal order rather than canonical `(clinic_id, session_id)` order, unlike the sibling `eta_queue_source_changed()` trigger in the same file which explicitly sorts before locking both sides of a transfer. Two concurrent opposite-direction audit corrections (A→B and B→A) would deadlock.
+
+Verified independently by reading both trigger functions side by side and confirming via `git grep` that no application code currently issues UPDATE/DELETE on `audit_events` (append-only in practice) — so today's blast radius is the "direct SQL mutation" threat model this migration explicitly designs against elsewhere, not a live hot path. Still a real, correctly-identified inconsistency given the file's own established pattern solves exactly this class of problem one function over.
+
+Posted a comment confirming the finding and explicitly retracting the "fully resolved" status from my immediately preceding comment — this is the one new open item, Codex's find, not mine independently. Continuing to watch for a fix.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
