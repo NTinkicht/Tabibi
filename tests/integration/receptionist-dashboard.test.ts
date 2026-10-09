@@ -127,6 +127,43 @@ describe('receptionist dashboard read model', () => {
     expect(Object.keys(snapshot.entries[0]!)).not.toContain('diagnosis');
   });
 
+  it('suppresses staff countdowns while the session is paused', async () => {
+    const queue = new QueueService(pool);
+    const entry = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Paused service candidate',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu610-paused-register',
+      correlationId: 'wu610-paused-register',
+    });
+    await queue.command(scope, ids.sessionA, entry.entry.id, {
+      command: 'check_in',
+      idempotencyKey: 'wu610-paused-checkin',
+      correlationId: 'wu610-paused-checkin',
+    });
+    const dashboard = new ReceptionistDashboardService(pool);
+    const before = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(before.entries[0]?.eta?.uncertainty?.estimateVersion).toBe(
+      'eta-uncertainty/v1',
+    );
+    await pool.query(
+      "UPDATE consultation_sessions SET status='paused' WHERE id=$1",
+      [ids.sessionA],
+    );
+    const paused = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(paused.session.status).toBe('paused');
+    expect(paused.entries[0]?.eta).toBeNull();
+    expect(paused.entries[0]?.activeConsultationRemainingMinutes).toBeNull();
+    await pool.query(
+      "UPDATE consultation_sessions SET status='open' WHERE id=$1",
+      [ids.sessionA],
+    );
+    const resumed = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(resumed.session.status).toBe('open');
+    expect(resumed.entries[0]?.eta?.uncertainty?.estimateVersion).toBe(
+      'eta-uncertainty/v1',
+    );
+  });
+
   it('uses a clamped same-session observed median only after three completed samples and stays deterministic', async () => {
     const queue = new QueueService(pool);
     const durations = [8, 10, 12];
