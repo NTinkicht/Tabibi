@@ -524,6 +524,52 @@ describe('receptionist dashboard read model', () => {
     );
   });
 
+  it('explains committed priority reorders affecting a target or earlier service', async () => {
+    const queue = new QueueService(pool);
+    const first = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'First non-priority patient',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu606-audit-priority-first',
+      correlationId: 'wu606-audit-priority-first',
+    });
+    const second = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Second prioritized patient',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu606-audit-priority-second',
+      correlationId: 'wu606-audit-priority-second',
+    });
+    for (const [index, entry] of [first.entry, second.entry].entries()) {
+      await queue.command(scope, ids.sessionA, entry.id, {
+        command: 'check_in',
+        idempotencyKey: `wu606-audit-checkin-${index}`,
+        correlationId: `wu606-audit-checkin-${index}`,
+      });
+    }
+    const dashboard = new ReceptionistDashboardService(pool);
+    const before = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(
+      before.entries.find((row) => row.id === first.entry.id)?.eta
+        ?.uncertainty?.explanationCodes,
+    ).not.toContain('priority-change');
+
+    await queue.reorder(scope, ids.sessionA, second.entry.id, {
+      targetPosition: 1,
+      expectedVersion: before.session.queueOrderVersion,
+      idempotencyKey: 'wu606-audit-reorder',
+      reason: 'Operational accommodation',
+      correlationId: 'wu606-audit-reorder',
+    });
+    const after = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(
+      after.entries.find((row) => row.id === first.entry.id)?.eta?.uncertainty
+        ?.explanationCodes,
+    ).toContain('priority-change');
+    expect(
+      after.entries.find((row) => row.id === second.entry.id)?.eta?.uncertainty
+        ?.explanationCodes,
+    ).toContain('priority-change');
+  });
+
   it('denies wrong roles and treats a cross-clinic session as absent', async () => {
     await pool.query(
       `UPDATE clinic_memberships SET role='doctor' WHERE clinic_id=$1 AND user_id=$2`,
