@@ -309,6 +309,8 @@ export class PublicGuestLiveQueueStatusService {
         Number.isFinite(start.getTime()) &&
         start <= snapshotNow);
 
+    // Keep the atomic-snapshot computation block together as a single review unit.
+    // prettier-ignore
     if (row.session_status === 'open' && validActiveSlot) {
       const queueRevision = Number(row.queue_order_version);
       try {
