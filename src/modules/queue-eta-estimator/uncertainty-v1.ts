@@ -135,15 +135,23 @@ export function computeEtaUncertaintyV1(
   });
 }
 
-/** Only the exact committed revision may publish this immutable candidate. */
-export function mayPublishEtaUncertaintyV1(
+/**
+ * Checks that a read-only candidate carries the expected snapshot revision.
+ *
+ * This is NOT an atomic publication compare-and-swap. Both revisions may be
+ * values from the same database snapshot, and neither proves that the queue,
+ * declared delay, session state or duration priors remain unchanged now.
+ * Persisting/publishing ETA evidence requires a separate transactionally
+ * fenced source-epoch protocol (owner-gated WU #610).
+ */
+export function isEtaUncertaintySnapshotForRevision(
   snapshot: EtaUncertaintySnapshot,
-  currentQueueRevision: number,
+  sourceQueueRevision: number,
 ): boolean {
   return (
-    Number.isSafeInteger(currentQueueRevision) &&
-    currentQueueRevision >= 0 &&
+    Number.isSafeInteger(sourceQueueRevision) &&
+    sourceQueueRevision >= 0 &&
     snapshot.estimateVersion === ETA_UNCERTAINTY_VERSION &&
-    snapshot.queueRevision === currentQueueRevision
+    snapshot.queueRevision === sourceQueueRevision
   );
 }
