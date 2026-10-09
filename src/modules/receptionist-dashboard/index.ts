@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
 import type { QueueEntryState } from '@/modules/queue';
 import {
@@ -108,15 +108,18 @@ export class ReceptionistDashboardService {
   async getSnapshot(
     scope: ClinicScope,
     sessionId: string,
+    existingClient?: PoolClient,
   ): Promise<ReceptionistDashboardSnapshot> {
-    return inTransaction(this.pool, async (client) => {
-      // getSnapshot performs multiple SELECTs that must observe one committed state.
-      // PostgreSQL READ COMMITTED takes a fresh snapshot per statement, which can mix
-      // queue/session rows from one version with duration samples from a later commit.
-      // This read-only REPEATABLE READ transaction fixes one snapshot for the whole read.
-      await client.query(
-        'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
-      );
+    // An internally supplied transaction is required to have established its
+    // own REPEATABLE READ isolation BEFORE the first statement. This lets the
+    // claim publisher read both provenance epochs and ETA inputs atomically.
+    const build = async (client: PoolClient) => {
+      // Existing public/staff display remains READ ONLY REPEATABLE READ.
+      if (!existingClient) {
+        await client.query(
+          'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
+        );
+      }
       await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
       const result = await client.query<Row>(
         `SELECT session.id AS session_id,
@@ -372,7 +375,10 @@ export class ReceptionistDashboardService {
         },
         entries,
       };
-    });
+    };
+    return existingClient
+      ? build(existingClient)
+      : inTransaction(this.pool, build);
   }
 }
 
