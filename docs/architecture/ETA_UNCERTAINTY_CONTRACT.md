@@ -60,7 +60,7 @@ Each estimate is an immutable versioned tuple:
 - `evaluated_at`: absolute timestamp used for active-consultation remaining-time calculation;
 - `explanation_codes`: deterministic reason codes for material range/position inputs.
 
-A stored or published estimate is valid only for the exact tuple `(clinic, session, target_entry, queue_revision, estimate_version, evaluated_at)`. Retrying the same request with the same tuple returns byte-equivalent normalized estimate data. A retry that observes a different queue revision must recompute rather than overwrite or relabel the older estimate.
+A read-only display estimate is identified by `(clinic, session, target_entry, queue_revision, estimate_version, evaluated_at)`. **Persisted claim evidence additionally requires the committed session source epoch and clinic prior epoch**, described below. A changed epoch requires recomputation even when queue order is unchanged; an identical tuple must never overwrite different evidence.
 
 ## Recompute and refresh policy
 
@@ -68,13 +68,13 @@ Recompute after every committed mutation that can affect service order or servic
 
 Time passage alone may change active-consultation remaining time. A refresh therefore captures a new committed `evaluated_at` and produces a new estimate snapshot; replay of an older snapshot always uses its original `evaluated_at`. No test or recovery path may call the ambient clock while replaying historical input.
 
-If the session is paused or otherwise not currently advancing, explanation codes must expose that state and consumers must not present a falsely precise countdown. If required schedule/evaluation inputs are absent or invalid, the estimate is ineligible for publication until a valid committed snapshot exists.
+If a session is paused or otherwise not currently advancing, consumers must not present a precise-looking countdown. The receptionist and guest read-only projections suppress ETA while paused and expose the existing explicit session status. If required schedule/evaluation inputs are absent or invalid, no persisted claim may be created until a valid committed snapshot exists.
 
 ## Determinism and concurrency
 
 No random sampling, process-local clock drift, unordered collection traversal, or hidden model state may influence the result. The same committed history, configuration version, queue revision, and evaluation instant must yield identical output.
 
-Computation may occur outside the mutation transaction, but publication must compare-and-swap against the exact `queue_revision` used to compute it. If the revision changed before publication, discard the stale candidate and recompute from the new committed state. Concurrent retries for the same immutable input tuple must converge on the same result.
+The read-only receptionist and guest GET projections are **not** atomic database publication claims. A same-snapshot queue revision check never qualifies as CAS. Persisted publication must use the database-bound exact-source claim procedure described below; a changed session or clinic-prior epoch rejects the stale candidate, and the caller must recompute from a fresh committed snapshot. Concurrent identical claims for one immutable input tuple must converge on the same row and payload.
 
 ## Explainability
 
@@ -92,3 +92,13 @@ Every estimate must retain explanation codes sufficient to show whether the rang
 - Replaying the same committed history with the same `evaluated_at` produces byte-equivalent normalized estimate data for the same configuration version.
 - A retry computed from queue revision 41 cannot be published as revision 42; it must be discarded and recomputed.
 - Missing or invalid `evaluated_at`, source policy, queue revision, or session scope fails closed rather than using process-local defaults.
+
+## Owner-approved source-epoch and claim protocol (#610)
+
+The additive 0035/0036 migrations introduce a **canonical session ETA source epoch** and a **clinic prior epoch**. Both are internal, non-negative bigint counters, *not* `queue_order_version`. The latter retains `queue-ordering/v1` semantics and remains the revision displayed to existing clients. A source epoch changes transactionally for relevant session status/delay/schedule mutations, queue insertion/transition/timing/reorder/transfer, and committed reorder audit evidence. A queue transfer advances both source and destination sessions. A newly completed or edited consultation-duration sample also advances the clinic prior epoch, so a different session cannot publish against a stale historical-duration prior. Existing records are backfilled with epoch zero on deployment; no historic queue order or ETA data is rewritten.
+
+The internal claim-only service `EtaUncertaintyClaimService` requires an authorized clinic receptionist or administrator. It stores the normalized public-safe fields, immutable evaluation time, queue revision and both source epochs in `eta_uncertainty_claims`. The publication guard runs inside the **same database transaction** as `INSERT`: it locks the session source row, then the clinic prior row, verifies the full epoch tuple, validates a current eligible target and open session, and refuses stale or malformed evidence. The trigger also protects direct SQL writers. Replaying an identical committed tuple returns the existing claim; conflicting payloads never overwrite it. Claims are immutable, even if sources subsequently advance.
+
+Read-only guest polling never creates a claim, mutates source epochs or exposes the private clinic-prior epoch, claim ID, internal patient identity or raw reorder audit metadata. A response generated before a newer committed mutation is a historical read-only snapshot, not a claim that remains current indefinitely. The existing refresh interval and public capability allowlist remain unchanged.
+
+The reorder explanation lookup uses an online partial index on `(clinic_id, metadata->>'sessionId')` for `queue_entry.reordered` facts. Migration 0036 creates that index **concurrently** to avoid a blocking build across the entire append-only audit history. Neither the index nor a successful snapshot read alone authorizes a claim or production deployment.
