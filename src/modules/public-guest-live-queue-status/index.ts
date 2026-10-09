@@ -64,6 +64,7 @@ type StatusRow = {
   called_slots_ahead: string;
   active_slots_ahead: string;
   active_ahead_started_at: Date | null;
+  priority_changed: boolean;
   declared_delay_minutes: number | null;
   queue_order_version: string;
   delay_version: number;
@@ -202,6 +203,23 @@ export class PublicGuestLiveQueueStatusService {
                 WHERE preceding.v1_service_position < ordered.v1_service_position
                   AND preceding.state = 'in_consultation'
                 ORDER BY preceding.service_position LIMIT 1) AS active_ahead_started_at,
+              EXISTS (
+                SELECT 1 FROM audit_events priority_audit
+                CROSS JOIN LATERAL jsonb_array_elements(
+                  CASE
+                    WHEN jsonb_typeof(priority_audit.metadata->'resultingOrder')='array'
+                    THEN priority_audit.metadata->'resultingOrder'
+                    ELSE '[]'::jsonb
+                  END
+                ) priority_item
+                JOIN ordered priority_slot
+                  ON priority_slot.id::text = priority_item->>'entryId'
+                WHERE priority_audit.clinic_id=entry.clinic_id
+                  AND priority_audit.action='queue_entry.reordered'
+                  AND priority_audit.metadata->>'sessionId'=entry.session_id::text
+                  AND priority_slot.v1_service_position <= ordered.v1_service_position
+                  AND priority_slot.state IN ('checked_in','called','in_consultation')
+              ) AS priority_changed,
               session.declared_delay_minutes,
               session.queue_order_version,
               session.delay_version,
@@ -349,6 +367,7 @@ export class PublicGuestLiveQueueStatusService {
           slotsAhead: Number(row.committed_slots_ahead),
           calledNotStartedAhead: Number(row.called_slots_ahead),
           activeSlotIncludedInAhead: activeAhead === 1,
+          priorityChanged: row.priority_changed,
           estimatedConsultationMinutes:
             estimate.estimatedConsultationMinutes,
           estimateSource: estimate.estimateSource,
