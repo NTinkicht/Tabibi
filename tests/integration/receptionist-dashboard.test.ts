@@ -547,12 +547,9 @@ describe('receptionist dashboard read model', () => {
     }
     const dashboard = new ReceptionistDashboardService(pool);
     const before = await dashboard.getSnapshot(scope, ids.sessionA);
-    const beforeFirst = before.entries.find(
-      (row) => row.id === first.entry.id,
-    );
-    expect(beforeFirst?.eta?.uncertainty?.explanationCodes).not.toContain(
-      'priority-change',
-    );
+    const beforeFirst = before.entries.find((row) => row.id === first.entry.id);
+    const beforeCodes = beforeFirst?.eta?.uncertainty?.explanationCodes;
+    expect(beforeCodes).not.toContain('priority-change');
 
     await queue.reorder(scope, ids.sessionA, second.entry.id, {
       targetPosition: 1,
@@ -562,14 +559,12 @@ describe('receptionist dashboard read model', () => {
       correlationId: 'wu606-audit-reorder',
     });
     const after = await dashboard.getSnapshot(scope, ids.sessionA);
-    const firstEta = after.entries.find(
-      (row) => row.id === first.entry.id,
-    )?.eta?.uncertainty;
-    const secondEta = after.entries.find(
-      (row) => row.id === second.entry.id,
-    )?.eta?.uncertainty;
-    expect(firstEta?.explanationCodes).toContain('priority-change');
-    expect(secondEta?.explanationCodes).toContain('priority-change');
+    const firstRow = after.entries.find((row) => row.id === first.entry.id);
+    const secondRow = after.entries.find((row) => row.id === second.entry.id);
+    const firstCodes = firstRow?.eta?.uncertainty?.explanationCodes;
+    const secondCodes = secondRow?.eta?.uncertainty?.explanationCodes;
+    expect(firstCodes).toContain('priority-change');
+    expect(secondCodes).toContain('priority-change');
   });
 
   it('denies wrong roles and treats a cross-clinic session as absent', async () => {
