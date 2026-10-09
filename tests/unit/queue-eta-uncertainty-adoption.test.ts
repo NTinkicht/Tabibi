@@ -83,22 +83,22 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
         estimatedConsultation: 10,
         queueRevision: 41,
         evaluatedAt: '2026-10-04T10:00:00Z',
-      },
+      });
+      const called = computeEtaUncertaintyV1({
+        ...input,
+        calledNotStartedAhead: 1,
+      });
+      const active = computeEtaUncertaintyV1({
+        ...input,
+        activeSlotIncludedInAhead: true,
+        activeConsultationRemainingMinutes: 4,
+      });
+      expect(called.expectedMinutes).toBe(20);
+      expect(called.explanationCodes).toContain('called-not-started');
+      expect(active.expectedMinutes).toBe(14);
+      expect(active.explanationCodes).toContain('active-consultation-remaining');
+    },
   );
-    const called = computeEtaUncertaintyV1({
-      ...input,
-      calledNotStartedAhead: 1,
-    });
-    const active = computeEtaUncertaintyV1({
-      ...input,
-      activeSlotIncludedInAhead: true,
-      activeConsultationRemainingMinutes: 4,
-    });
-    expect(called.expectedMinutes).toBe(20);
-    expect(called.explanationCodes).toContain('called-not-started');
-    expect(active.expectedMinutes).toBe(14);
-    expect(active.explanationCodes).toContain('active-consultation-remaining');
-  });
 
   it(
     'rejects stale CAS publication and accepts exact committed revision',
@@ -136,20 +136,20 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
         estimatedConsultation: 10,
         queueRevision: 41,
         evaluatedAt: '2026-10-04T10:00:00Z',
-      },
+      });
+      expect(() =>
+        computeEtaUncertaintyV1({ ...input, sessionStatus: 'paused' }),
+      ).toThrow();
+      expect(() =>
+        computeEtaUncertaintyV1({ ...input, clinicId: '' }),
+      ).toThrow();
+      expect(() =>
+        computeEtaUncertaintyV1({
+          ...input,
+          activeSlotIncludedInAhead: true,
+          calledNotStartedAhead: 1,
+        }),
+      ).toThrow();
+    },
   );
-    expect(() =>
-      computeEtaUncertaintyV1({ ...input, sessionStatus: 'paused' }),
-    ).toThrow();
-    expect(() =>
-      computeEtaUncertaintyV1({ ...input, clinicId: '' }),
-    ).toThrow();
-    expect(() =>
-      computeEtaUncertaintyV1({
-        ...input,
-        activeSlotIncludedInAhead: true,
-        calledNotStartedAhead: 1,
-      }),
-    ).toThrow();
-  });
 });
