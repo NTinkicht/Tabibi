@@ -1236,3 +1236,14 @@ Still open, unaddressed in this batch: receptionist-dashboard pause-state gap in
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — CI green for the first time on exact head e39f8ce (2026-10-09)
+
+Watched the rapid-fire fix cadence from `97880c0` through to `e39f8ce` in near-real-time: migration restartability + semicolon-comment fix (`3174d1a`), epoch-capture-in-same-transaction fix (`da4d74d`/`b8f4321`), bounded-retry replay fix (`dcf6cf1`/`274deb7`), a temporary diagnostic workflow that itself briefly broke on a Node 20/22 engine-strict mismatch (caught and fixed within two commits), and finally two formatting commits (`baef4d5`, `8e6262f`) plus cleanup (`e39f8ce`) removing the temporary workflow.
+
+Verified independently rather than trusting job logs or commit messages alone: ran `npx prettier --check .` myself in a scratch worktree at each disputed head, confirmed the exact remaining diff each time, and confirmed the final head is clean repo-wide. Checked the Checks API directly at `e39f8ce`: `Quality and build`, `PostgreSQL integration`, `Browser smoke` all `success`.
+
+Posted a status comment: this is real progress (four engineering findings resolved, verified by hand-tracing the concurrent-claim scenarios, not just reading diffs), but not MERGE_READY — the receptionist-dashboard pause-state gap (Codex P2) is still open and unaddressed, the PR is still draft, and no independent non-author review exists yet at this exact head (most recent Codex review is several commits stale).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
