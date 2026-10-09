@@ -188,7 +188,25 @@ export class ReceptionistDashboardService {
       const declaredDelayMinutes = first.declared_delay_minutes ?? 0;
       const snapshotNow = this.now();
       let patientsAhead = 0;
-      const committedServiceAhead: Row[] = [];
+      // Retain the existing dashboard order and legacy range semantics.
+      // v1 alone ranks the active consultation strictly ahead of called work,
+      // keeping existing order stable within each state group.
+      const v1ServiceRows = result.rows
+        .filter(
+          (row) =>
+            row.entry_id &&
+            (row.entry_state === 'in_consultation' ||
+              row.entry_state === 'called' ||
+              row.entry_state === 'checked_in'),
+        )
+        .sort((left, right) => {
+          const rank = (state: QueueEntryState | null) =>
+            state === 'in_consultation' ? 0 : state === 'called' ? 1 : 2;
+          return rank(left.entry_state) - rank(right.entry_state);
+        });
+      const v1Positions = new Map(
+        v1ServiceRows.map((row, index) => [row.entry_id, index]),
+      );
 
       const entries = result.rows.flatMap((row) => {
         if (!row.entry_id) return [];
@@ -206,8 +224,12 @@ export class ReceptionistDashboardService {
               delayVersion: first.delay_version,
             })
           : null;
-        // A v1 candidate uses only rows from this REPEATABLE READ snapshot.
-        // Waiting rows never count as committed service work ahead.
+        // Count only committed v1 service slots preceding this target.
+        // An active consultation precedes newly called work regardless of
+        // historical eligibility/priority ordering.
+        const v1Index = v1Positions.get(row.entry_id);
+        const committedServiceAhead =
+          v1Index === undefined ? [] : v1ServiceRows.slice(0, v1Index);
         const activeAhead = committedServiceAhead.filter(
           (prior) => prior.entry_state === 'in_consultation',
         );
@@ -275,7 +297,6 @@ export class ReceptionistDashboardService {
               }
             : null;
         if (eligible) patientsAhead += 1;
-        if (eligible && state !== 'waiting') committedServiceAhead.push(row);
         return [
           {
             id: row.entry_id,
