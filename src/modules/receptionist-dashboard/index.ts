@@ -231,8 +231,9 @@ export class ReceptionistDashboardService {
         const eligible = OPERATIONAL_STATE_RANK[state] < TERMINAL_STATE_RANK;
         // A paused session is not advancing. Keep its committed state and
         // queue entries visible, but never display a precise-looking ETA.
-        const range = eligible && first.session_status === 'open'
-          ? createEtaSnapshot({
+        const range =
+          eligible && first.session_status === 'open'
+            ? createEtaSnapshot({
               patientsAhead,
               declaredDelayMinutes,
               estimatedConsultationMinutes:
@@ -241,8 +242,8 @@ export class ReceptionistDashboardService {
               observedSampleCount: estimate.observedSampleCount,
               queueOrderVersion: Number(first.queue_order_version),
               delayVersion: first.delay_version,
-            })
-          : null;
+              })
+            : null;
         // Count only committed v1 service slots preceding this target.
         // An active consultation precedes newly called work regardless of
         // historical eligibility/priority ordering.
