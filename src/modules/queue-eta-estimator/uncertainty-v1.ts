@@ -94,7 +94,9 @@ export function computeEtaUncertaintyV1(
     !validSource ||
     input.sessionStatus !== 'open'
   ) {
-    throw new RangeError('Incomplete or invalid committed ETA uncertainty input');
+    throw new RangeError(
+      'Incomplete or invalid committed ETA uncertainty input',
+    );
   }
 
   const queuedSlots = slotsAhead - activeSlot;
@@ -106,7 +108,9 @@ export function computeEtaUncertaintyV1(
     throw new RangeError('ETA uncertainty overflow');
   }
   const point = rawEarliest === rawExpected && rawExpected === rawLatest;
-  const earliestMinutes = point ? Math.round(rawExpected) : Math.floor(rawEarliest);
+  const earliestMinutes = point
+    ? Math.round(rawExpected)
+    : Math.floor(rawEarliest);
   const expectedMinutes = Math.round(rawExpected);
   const latestMinutes = point ? Math.round(rawExpected) : Math.ceil(rawLatest);
   if (
