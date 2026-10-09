@@ -106,7 +106,9 @@ describe('ETA uncertainty-v1 adoption', () => {
     expect(overrun.expectedMinutes).toBe(0);
     expect(overrun.latestMinutes).toBe(0);
     expect(overrun.explanationCodes).toContain('active-consultation-overrun');
-    expect(overrun.explanationCodes).not.toContain('active-consultation-remaining');
+    expect(overrun.explanationCodes).not.toContain(
+      'active-consultation-remaining',
+    );
     expect(overrun.explanationCodes).not.toContain('queue-depth');
     const replay = computeEtaUncertaintyV1({
       ...valid,
