@@ -210,9 +210,8 @@ export class EtaUncertaintyClaimService {
           this.pool,
           () => new Date(snapshot.evaluatedAt),
         ).getSnapshot(scope, sessionId, client);
-        const computed = readModel.entries.find(
-          (entry) => entry.id === entryId,
-        )?.eta?.uncertainty;
+        const computed = readModel.entries.find((entry) => entry.id === entryId)
+          ?.eta?.uncertainty;
         if (!computed || JSON.stringify(computed) !== payload) {
           throw new EtaPublicationStaleError();
         }
