@@ -8,6 +8,11 @@ import {
   selectConsultationEstimate,
 } from '@/modules/queue-eta-estimator';
 import { createEtaSnapshot } from '@/modules/queue-eta-estimator/snapshot';
+import {
+  computeEtaUncertaintyV1,
+  mayPublishEtaUncertaintyV1,
+  type EtaUncertaintySnapshot,
+} from '@/modules/queue-eta-estimator/uncertainty-v1';
 import type { SessionStatus } from '@/modules/session';
 import { inTransaction } from '@/platform/database/transaction';
 
@@ -49,6 +54,7 @@ export interface ReceptionistDashboardEntry {
     estimatedConsultationMinutes: number;
     estimateSource: QueueEtaEstimateSource;
     observedSampleCount: number;
+    uncertainty?: EtaUncertaintySnapshot;
   } | null;
 }
 
@@ -182,6 +188,7 @@ export class ReceptionistDashboardService {
       const declaredDelayMinutes = first.declared_delay_minutes ?? 0;
       const snapshotNow = this.now();
       let patientsAhead = 0;
+      const committedServiceAhead: Row[] = [];
 
       const entries = result.rows.flatMap((row) => {
         if (!row.entry_id) return [];
@@ -199,6 +206,60 @@ export class ReceptionistDashboardService {
               delayVersion: first.delay_version,
             })
           : null;
+        // A v1 candidate uses only rows from this REPEATABLE READ snapshot.
+        // Waiting rows never count as committed service work ahead.
+        const activeAhead = committedServiceAhead.filter(
+          (prior) => prior.entry_state === 'in_consultation',
+        );
+        const activeStartedAt = activeAhead[0]?.in_consultation_started_at;
+        let uncertainty: EtaUncertaintySnapshot | null = null;
+        if (
+          eligible &&
+          state !== 'waiting' &&
+          first.session_status === 'open' &&
+          row.entry_id &&
+          activeAhead.length <= 1 &&
+          (activeAhead.length === 0 ||
+            (activeStartedAt instanceof Date &&
+              Number.isFinite(activeStartedAt.getTime()) &&
+              activeStartedAt <= snapshotNow))
+        ) {
+          const queueRevision = Number(first.queue_order_version);
+          try {
+            const candidate = computeEtaUncertaintyV1({
+              clinicId: scope.clinicId,
+              sessionId,
+              targetEntryId: row.entry_id,
+              queueRevision,
+              evaluatedAt: snapshotNow.toISOString(),
+              declaredDelayMinutes,
+              activeConsultationRemainingMinutes:
+                activeStartedAt instanceof Date
+                  ? computeActiveConsultationRemainingMinutes({
+                      startedAt: activeStartedAt,
+                      now: snapshotNow,
+                      estimatedConsultationMinutes:
+                        estimate.estimatedConsultationMinutes,
+                    })
+                  : 0,
+              slotsAhead: committedServiceAhead.length,
+              activeSlotIncludedInAhead: activeAhead.length === 1,
+              calledNotStartedAhead: committedServiceAhead.filter(
+                (prior) => prior.entry_state === 'called',
+              ).length,
+              estimatedConsultationMinutes:
+                estimate.estimatedConsultationMinutes,
+              estimateSource: estimate.estimateSource,
+              sessionStatus: 'open',
+            });
+            if (mayPublishEtaUncertaintyV1(candidate, queueRevision)) {
+              uncertainty = candidate;
+            }
+          } catch (error) {
+            if (!(error instanceof RangeError)) throw error;
+            // Invalid committed metadata cannot publish a v1 estimate.
+          }
+        }
         const eta =
           eligible && range
             ? {
@@ -210,9 +271,11 @@ export class ReceptionistDashboardService {
                   estimate.estimatedConsultationMinutes,
                 estimateSource: estimate.estimateSource,
                 observedSampleCount: estimate.observedSampleCount,
+                ...(uncertainty ? { uncertainty } : {}),
               }
             : null;
         if (eligible) patientsAhead += 1;
+        if (eligible && state !== 'waiting') committedServiceAhead.push(row);
         return [
           {
             id: row.entry_id,
