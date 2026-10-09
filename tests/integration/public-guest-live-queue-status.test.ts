@@ -865,9 +865,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     const service = new PublicGuestLiveQueueStatusService(pool, () => now);
     const status = await service.get(booking.bearer);
     expect(status.eta?.patientsAhead).toBe(0);
-    expect(status.eta?.uncertainty?.estimateVersion).toBe(
-      'eta-uncertainty/v1',
-    );
+    expect(status.eta?.uncertainty?.estimateVersion).toBe('eta-uncertainty/v1');
     expect(status.eta?.uncertainty?.explanationCodes).toContain(
       'active-consultation-remaining',
     );
