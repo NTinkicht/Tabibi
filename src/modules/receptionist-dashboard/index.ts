@@ -229,7 +229,9 @@ export class ReceptionistDashboardService {
         if (!row.entry_id) return [];
         const state = row.entry_state!;
         const eligible = OPERATIONAL_STATE_RANK[state] < TERMINAL_STATE_RANK;
-        const range = eligible
+        // A paused session is not advancing. Keep its committed state and
+        // queue entries visible, but never display a precise-looking ETA.
+        const range = eligible && first.session_status === 'open'
           ? createEtaSnapshot({
               patientsAhead,
               declaredDelayMinutes,
@@ -338,7 +340,9 @@ export class ReceptionistDashboardService {
             preferredLocale: row.preferred_locale!,
             hasContact: row.has_contact!,
             activeConsultationRemainingMinutes:
-              state === 'in_consultation' && row.in_consultation_started_at
+              first.session_status === 'open' &&
+              state === 'in_consultation' &&
+              row.in_consultation_started_at
                 ? computeActiveConsultationRemainingMinutes({
                     startedAt: row.in_consultation_started_at,
                     now: snapshotNow,
