@@ -327,9 +327,38 @@ BEGIN
     RAISE EXCEPTION 'ETA publication payload is not the versioned public-safe tuple'
       USING ERRCODE = '22023';
   END IF;
+
+  -- The database is the last line of defense even for direct SQL writers.
+  -- Accept only bounded normalized whole-minute values and public-safe codes.
+  IF (NEW.snapshot->>'earliestMinutes')::numeric < 0
+     OR (NEW.snapshot->>'latestMinutes')::numeric > 9007199254740991
+     OR (NEW.snapshot->>'earliestMinutes')::numeric >
+        (NEW.snapshot->>'expectedMinutes')::numeric
+     OR (NEW.snapshot->>'expectedMinutes')::numeric >
+        (NEW.snapshot->>'latestMinutes')::numeric
+     OR (NEW.snapshot->>'earliestMinutes')::numeric <> trunc(
+        (NEW.snapshot->>'earliestMinutes')::numeric)
+     OR (NEW.snapshot->>'expectedMinutes')::numeric <> trunc(
+        (NEW.snapshot->>'expectedMinutes')::numeric)
+     OR (NEW.snapshot->>'latestMinutes')::numeric <> trunc(
+        (NEW.snapshot->>'latestMinutes')::numeric)
+     OR EXISTS (
+       SELECT 1
+         FROM jsonb_array_elements_text(NEW.snapshot->'explanationCodes')
+              AS reason(code)
+        WHERE code NOT IN (
+          'queue-depth','called-not-started',
+          'active-consultation-remaining','active-consultation-overrun',
+          'declared-delay','priority-change','fallback',
+          'observed-median','historical-median','paused-state'
+        )
+     ) THEN
+    RAISE EXCEPTION 'ETA publication evidence is not normalized or public-safe'
+      USING ERRCODE = '22023';
+  END IF;
   RETURN NEW;
 END
-$$;
+$;
 
 CREATE TRIGGER eta_guard_claim_publication_insert
 BEFORE INSERT ON eta_uncertainty_claims
