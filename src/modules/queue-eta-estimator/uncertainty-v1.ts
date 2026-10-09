@@ -1,6 +1,7 @@
 import {
   ETA_MAX_MULTIPLIER,
   ETA_MIN_MULTIPLIER,
+  absoluteTimestampMs,
   type QueueEtaEstimateSource,
 } from './index';
 
@@ -35,15 +36,7 @@ export interface EtaUncertaintySnapshot {
 }
 
 function absoluteInstant(value: string): boolean {
-  if (
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(
-      value,
-    )
-  ) {
-    return false;
-  }
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed);
+  return Number.isFinite(absoluteTimestampMs(value));
 }
 
 /**
