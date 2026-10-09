@@ -853,7 +853,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
       booking.bearer,
       'wu606-precedence-7057',
     );
-    await pool.query("UPDATE queue_entries SET state='called' WHERE id=$1", [
+    await pool.query(`UPDATE queue_entries SET state='called' WHERE id=$1`, [
       booking.queueEntryId,
     ]);
     // The called target retains its early eligibility position; the active
@@ -862,10 +862,8 @@ describe('WU67 public guest deterministic ETA projection', () => {
       inConsultationStartedAt: new Date(now.getTime() - 2 * 60_000),
     });
 
-    const status = await new PublicGuestLiveQueueStatusService(
-      pool,
-      () => now,
-    ).get(booking.bearer);
+    const service = new PublicGuestLiveQueueStatusService(pool, () => now);
+    const status = await service.get(booking.bearer);
     expect(status.eta?.patientsAhead).toBe(0);
     expect(status.eta?.uncertainty?.estimateVersion).toBe(
       'eta-uncertainty/v1',
