@@ -95,6 +95,28 @@ describe('ETA uncertainty-v1 adoption', () => {
     expect(active.explanationCodes).toContain('active-consultation-remaining');
   });
 
+  it('explains a completed-or-overrun active slot even with zero remaining', () => {
+    const overrun = computeEtaUncertaintyV1({
+      ...valid,
+      slotsAhead: 1,
+      activeSlotIncludedInAhead: true,
+      activeConsultationRemainingMinutes: 0,
+    });
+    expect(overrun.earliestMinutes).toBe(0);
+    expect(overrun.expectedMinutes).toBe(0);
+    expect(overrun.latestMinutes).toBe(0);
+    expect(overrun.explanationCodes).toContain('active-consultation-overrun');
+    expect(overrun.explanationCodes).not.toContain('active-consultation-remaining');
+    expect(overrun.explanationCodes).not.toContain('queue-depth');
+    const replay = computeEtaUncertaintyV1({
+      ...valid,
+      slotsAhead: 1,
+      activeSlotIncludedInAhead: true,
+      activeConsultationRemainingMinutes: 0,
+    });
+    expect(JSON.stringify(replay)).toBe(JSON.stringify(overrun));
+  });
+
   it('validates read-only snapshot revisions without claiming atomic publication', () => {
     const estimate = computeEtaUncertaintyV1(valid);
     expect(isEtaUncertaintySnapshotForRevision(estimate, 42)).toBe(false);
