@@ -311,6 +311,33 @@ describe('committed migration chain', () => {
     }
   });
 
+  it('rebuilds the ETA reorder index safely after an interrupted attempt', async () => {
+    const migration = await readFile(
+      resolve(
+        process.cwd(),
+        'db/migrations/0036_eta_reorder_audit_lookup_index.sql',
+      ),
+      'utf8',
+    );
+    expect(migration.startsWith('-- tabibi:no-transaction\n')).toBe(true);
+    const drop = migration.indexOf(
+      'DROP INDEX CONCURRENTLY IF EXISTS audit_events_eta_reorder_session_idx;',
+    );
+    const create = migration.indexOf(
+      'CREATE INDEX CONCURRENTLY audit_events_eta_reorder_session_idx',
+    );
+    expect(drop).toBeGreaterThan(0);
+    expect(create).toBeGreaterThan(drop);
+    // Existing migrator runs each semicolon-delimited statement separately.
+    // No SQL comment within this non-transactional migration may contain
+    // an extra semicolon, which would make the following fragment invalid.
+    const uncommented = migration
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('--'))
+      .join('\n');
+    expect(uncommented.split(';').filter((sql) => sql.trim())).toHaveLength(2);
+  });
+
   it('runs the retry claim index replacement outside a migration transaction', async () => {
     const migration = await readFile(
       resolve(
