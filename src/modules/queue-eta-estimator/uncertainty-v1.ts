@@ -120,7 +120,13 @@ export function computeEtaUncertaintyV1(
   const codes: string[] = [];
   if (queuedSlots > 0) codes.push('queue-depth');
   if (called > 0) codes.push('called-not-started');
-  if (active > 0) codes.push('active-consultation-remaining');
+  if (activeSlot === 1) {
+    codes.push(
+      active > 0
+        ? 'active-consultation-remaining'
+        : 'active-consultation-overrun',
+    );
+  }
   if (delay > 0) codes.push('declared-delay');
   if (input.priorityChanged) codes.push('priority-change');
   codes.push(estimateSource.replace('_', '-'));
