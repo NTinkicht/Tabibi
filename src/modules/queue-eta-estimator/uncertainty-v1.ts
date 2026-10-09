@@ -1,4 +1,8 @@
-import { ETA_MAX_MULTIPLIER, ETA_MIN_MULTIPLIER, type QueueEtaEstimateSource } from './index';
+import {
+  ETA_MAX_MULTIPLIER,
+  ETA_MIN_MULTIPLIER,
+  type QueueEtaEstimateSource,
+} from './index';
 
 export const ETA_UNCERTAINTY_VERSION = 'eta-uncertainty/v1' as const;
 
@@ -32,8 +36,12 @@ export interface EtaUncertaintySnapshot {
 
 function absoluteInstant(value: string): boolean {
   if (
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
-  ) return false;
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(
+      value,
+    )
+  ) {
+    return false;
+  }
   const parsed = Date.parse(value);
   return Number.isFinite(parsed);
 }
@@ -43,25 +51,48 @@ function absoluteInstant(value: string): boolean {
  * Never uses ambient time, silently substitutes a missing revision, or counts
  * the active consultation as both a service slot and remaining time.
  */
-export function computeEtaUncertaintyV1(input: EtaUncertaintyInput): EtaUncertaintySnapshot {
+export function computeEtaUncertaintyV1(
+  input: EtaUncertaintyInput,
+): EtaUncertaintySnapshot {
   const {
-    clinicId, sessionId, targetEntryId, queueRevision, evaluatedAt,
-    declaredDelayMinutes: delay, activeConsultationRemainingMinutes: active,
-    slotsAhead, estimatedConsultationMinutes: duration, estimateSource,
+    clinicId,
+    sessionId,
+    targetEntryId,
+    queueRevision,
+    evaluatedAt,
+    declaredDelayMinutes: delay,
+    activeConsultationRemainingMinutes: active,
+    slotsAhead,
+    estimatedConsultationMinutes: duration,
+    estimateSource,
   } = input;
   const called = input.calledNotStartedAhead ?? 0;
   const activeSlot = input.activeSlotIncludedInAhead === true ? 1 : 0;
-  const validSource = ['fallback', 'historical_median', 'observed_median'].includes(estimateSource);
+  const validSource = [
+    'fallback',
+    'historical_median',
+    'observed_median',
+  ].includes(estimateSource);
   if (
-    !clinicId?.trim() || !sessionId?.trim() || !targetEntryId?.trim() ||
-    !Number.isSafeInteger(queueRevision) || queueRevision < 0 ||
+    !clinicId?.trim() ||
+    !sessionId?.trim() ||
+    !targetEntryId?.trim() ||
+    !Number.isSafeInteger(queueRevision) ||
+    queueRevision < 0 ||
     !absoluteInstant(evaluatedAt) ||
-    !Number.isSafeInteger(slotsAhead) || slotsAhead < activeSlot ||
-    !Number.isSafeInteger(called) || called < 0 || called > slotsAhead - activeSlot ||
-    !Number.isFinite(delay) || delay < 0 ||
-    !Number.isFinite(active) || active < 0 ||
-    !Number.isFinite(duration) || duration <= 0 ||
-    !validSource || input.sessionStatus !== 'open'
+    !Number.isSafeInteger(slotsAhead) ||
+    slotsAhead < activeSlot ||
+    !Number.isSafeInteger(called) ||
+    called < 0 ||
+    called > slotsAhead - activeSlot ||
+    !Number.isFinite(delay) ||
+    delay < 0 ||
+    !Number.isFinite(active) ||
+    active < 0 ||
+    !Number.isFinite(duration) ||
+    duration <= 0 ||
+    !validSource ||
+    input.sessionStatus !== 'open'
   ) {
     throw new RangeError('Incomplete or invalid committed ETA uncertainty input');
   }
@@ -79,9 +110,12 @@ export function computeEtaUncertaintyV1(input: EtaUncertaintyInput): EtaUncertai
   const expectedMinutes = Math.round(rawExpected);
   const latestMinutes = point ? Math.round(rawExpected) : Math.ceil(rawLatest);
   if (
-    !Number.isSafeInteger(earliestMinutes) || !Number.isSafeInteger(expectedMinutes) ||
-    !Number.isSafeInteger(latestMinutes) || earliestMinutes < 0 ||
-    earliestMinutes > expectedMinutes || expectedMinutes > latestMinutes ||
+    !Number.isSafeInteger(earliestMinutes) ||
+    !Number.isSafeInteger(expectedMinutes) ||
+    !Number.isSafeInteger(latestMinutes) ||
+    earliestMinutes < 0 ||
+    earliestMinutes > expectedMinutes ||
+    expectedMinutes > latestMinutes ||
     (!point && earliestMinutes >= latestMinutes)
   ) {
     throw new RangeError('Invalid normalized ETA uncertainty bounds');
@@ -94,9 +128,12 @@ export function computeEtaUncertaintyV1(input: EtaUncertaintyInput): EtaUncertai
   if (input.priorityChanged) codes.push('priority-change');
   codes.push(estimateSource.replace('_', '-'));
   return Object.freeze({
-    earliestMinutes, expectedMinutes, latestMinutes,
+    earliestMinutes,
+    expectedMinutes,
+    latestMinutes,
     estimateVersion: ETA_UNCERTAINTY_VERSION,
-    queueRevision, evaluatedAt,
+    queueRevision,
+    evaluatedAt,
     explanationCodes: Object.freeze(codes),
   });
 }
@@ -106,8 +143,10 @@ export function mayPublishEtaUncertaintyV1(
   snapshot: EtaUncertaintySnapshot,
   currentQueueRevision: number,
 ): boolean {
-  return Number.isSafeInteger(currentQueueRevision) &&
+  return (
+    Number.isSafeInteger(currentQueueRevision) &&
     currentQueueRevision >= 0 &&
     snapshot.estimateVersion === ETA_UNCERTAINTY_VERSION &&
-    snapshot.queueRevision === currentQueueRevision;
+    snapshot.queueRevision === currentQueueRevision
+  );
 }
