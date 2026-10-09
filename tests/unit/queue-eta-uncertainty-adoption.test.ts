@@ -74,44 +74,44 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
   });
 
   it('counts called and active service slots once', () => {
-      const input = adapt({
-        declaredDelay: 0,
-        activeRemaining: 0,
-        slotsAhead: 2,
-        estimatedConsultation: 10,
-        queueRevision: 41,
-        evaluatedAt: '2026-10-04T10:00:00Z',
-      });
-      const called = computeEtaUncertaintyV1({
-        ...input,
-        calledNotStartedAhead: 1,
-      });
-      const active = computeEtaUncertaintyV1({
-        ...input,
-        activeSlotIncludedInAhead: true,
-        activeConsultationRemainingMinutes: 4,
-      });
-      expect(called.expectedMinutes).toBe(20);
-      expect(called.explanationCodes).toContain('called-not-started');
-      expect(active.expectedMinutes).toBe(14);
-      expect(active.explanationCodes).toContain(
-        'active-consultation-remaining',
-      );
+    const input = adapt({
+      declaredDelay: 0,
+      activeRemaining: 0,
+      slotsAhead: 2,
+      estimatedConsultation: 10,
+      queueRevision: 41,
+      evaluatedAt: '2026-10-04T10:00:00Z',
+    });
+    const called = computeEtaUncertaintyV1({
+      ...input,
+      calledNotStartedAhead: 1,
+    });
+    const active = computeEtaUncertaintyV1({
+      ...input,
+      activeSlotIncludedInAhead: true,
+      activeConsultationRemainingMinutes: 4,
+    });
+    expect(called.expectedMinutes).toBe(20);
+    expect(called.explanationCodes).toContain('called-not-started');
+    expect(active.expectedMinutes).toBe(14);
+    expect(active.explanationCodes).toContain(
+      'active-consultation-remaining',
+    );
   });
 
   it('rejects stale queue revisions', () => {
-      const estimate = computeEtaUncertaintyV1(
-        adapt({
-          declaredDelay: 0,
-          activeRemaining: 0,
-          slotsAhead: 1,
-          estimatedConsultation: 10,
-          queueRevision: 41,
-          evaluatedAt: '2026-10-04T10:00:00Z',
-        }),
-      );
-      expect(mayPublishEtaUncertaintyV1(estimate, 42)).toBe(false);
-      expect(mayPublishEtaUncertaintyV1(estimate, 41)).toBe(true);
+    const estimate = computeEtaUncertaintyV1(
+      adapt({
+        declaredDelay: 0,
+        activeRemaining: 0,
+        slotsAhead: 1,
+        estimatedConsultation: 10,
+        queueRevision: 41,
+        evaluatedAt: '2026-10-04T10:00:00Z',
+      }),
+    );
+    expect(mayPublishEtaUncertaintyV1(estimate, 42)).toBe(false);
+    expect(mayPublishEtaUncertaintyV1(estimate, 41)).toBe(true);
   });
 
   it('rejects calendar-normalized evaluation timestamps', () => {
@@ -143,26 +143,26 @@ describe('WU #606 production eta-uncertainty/v1 estimator', () => {
   });
 
   it('rejects paused sessions and contradictory inputs', () => {
-      const input = adapt({
-        declaredDelay: 0,
-        activeRemaining: 0,
-        slotsAhead: 1,
-        estimatedConsultation: 10,
-        queueRevision: 41,
-        evaluatedAt: '2026-10-04T10:00:00Z',
-      });
-      expect(() =>
-        computeEtaUncertaintyV1({ ...input, sessionStatus: 'paused' }),
-      ).toThrow();
-      expect(() =>
-        computeEtaUncertaintyV1({ ...input, clinicId: '' }),
-      ).toThrow();
-      expect(() =>
-        computeEtaUncertaintyV1({
-          ...input,
-          activeSlotIncludedInAhead: true,
-          calledNotStartedAhead: 1,
-        }),
-      ).toThrow();
+    const input = adapt({
+      declaredDelay: 0,
+      activeRemaining: 0,
+      slotsAhead: 1,
+      estimatedConsultation: 10,
+      queueRevision: 41,
+      evaluatedAt: '2026-10-04T10:00:00Z',
+    });
+    expect(() =>
+      computeEtaUncertaintyV1({ ...input, sessionStatus: 'paused' }),
+    ).toThrow();
+    expect(() =>
+      computeEtaUncertaintyV1({ ...input, clinicId: '' }),
+    ).toThrow();
+    expect(() =>
+      computeEtaUncertaintyV1({
+        ...input,
+        activeSlotIncludedInAhead: true,
+        calledNotStartedAhead: 1,
+      }),
+    ).toThrow();
   });
 });
