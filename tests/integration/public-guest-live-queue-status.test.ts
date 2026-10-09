@@ -827,6 +827,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
     await insertQueueEntry(booking, 'waiting', '7055');
     await insertQueueEntry(booking, 'no_show', '7056');
 
+    // Synthetic in_consultation row has no committed start timestamp. v1 must fail closed.
     const service = new PublicGuestLiveQueueStatusService(pool, () => now);
     await expect(service.get(booking.bearer)).resolves.toEqual({
       bookingState: 'checked_in',
@@ -841,11 +842,6 @@ describe('WU67 public guest deterministic ETA projection', () => {
         estimateSource: 'fallback',
         delayStatus: null,
         revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
-        uncertainty: expect.objectContaining({
-          estimateVersion: 'eta-uncertainty/v1',
-          queueRevision: expect.any(Number),
-          evaluatedAt: expect.any(String),
-        }),
       },
     });
   });
@@ -979,6 +975,17 @@ describe('WU67 public guest deterministic ETA projection', () => {
         },
       },
     });
+    expect(Object.keys(body.eta.uncertainty).sort()).toEqual(
+      [
+        'estimateVersion',
+        'queueRevision',
+        'evaluatedAt',
+        'earliestMinutes',
+        'expectedMinutes',
+        'latestMinutes',
+        'explanationCodes',
+      ].sort(),
+    );
     expect(Object.keys(body.eta).sort()).toEqual(
       [
         'patientsAhead',
@@ -988,6 +995,7 @@ describe('WU67 public guest deterministic ETA projection', () => {
         'delayStatus',
         'revision',
         'summary',
+        'uncertainty',
       ].sort(),
     );
     expect(Object.keys(body.eta.summary).sort()).toEqual(
