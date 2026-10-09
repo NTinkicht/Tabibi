@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   computeEtaUncertaintyV1,
-  mayPublishEtaUncertaintyV1,
+  isEtaUncertaintySnapshotForRevision,
   type EtaUncertaintyInput,
 } from '@/modules/queue-eta-estimator/uncertainty-v1';
 
@@ -97,8 +97,8 @@ describe('ETA uncertainty-v1 adoption', () => {
 
   it('rejects stale publication against a changed revision', () => {
     const estimate = computeEtaUncertaintyV1(valid);
-    expect(mayPublishEtaUncertaintyV1(estimate, 42)).toBe(false);
-    expect(mayPublishEtaUncertaintyV1(estimate, 41)).toBe(true);
+    expect(isEtaUncertaintySnapshotForRevision(estimate, 42)).toBe(false);
+    expect(isEtaUncertaintySnapshotForRevision(estimate, 41)).toBe(true);
   });
 
   it('rejects impossible calendar dates', () => {
