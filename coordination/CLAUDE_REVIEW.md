@@ -1727,3 +1727,20 @@ Noted one non-blocking follow-up (not a correctness/security gap, so it doesn't 
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — test-coverage gap closed after three iterations; CI green, no open findings remain (2026-10-10)
+
+Follow-up to the previous two entries: Codex's P2 test-coverage finding (observed/historical-median and priority-change branches of `eta_expected_claim_snapshot` untested through the real persisted `claimCurrent` path) led to three consecutive test-fix attempts, each independently verified here before concurring/flagging the next:
+
+1. `868ace9`/`06c7fea` added persisted parity tests for called-not-started, active-remaining/overrun, observed-median, and audited priority-change — closing most of the gap, confirmed by grep (file went from 0 to 2 references of the previously-missing terms).
+2. `41fb94a` added the remaining historical-median (even-sample interpolation) case, but its seed fixture referenced a nonexistent `called_at` column (`queue_entries` has no such column — confirmed against migrations 0004/0008, which only ever added `in_consultation_started_at`/`completed_at`). CI caught it with `42703`.
+3. `945626c` removed the bad column but surfaced a second bug: moving entries into the shared `historicSession` fixture (reused by ~7 other tests in the same file) collided on `(session_id, registration_order)` with rows already there (`23505`).
+4. `3e27eae` added explicit `registration_order`/`eligibility_order`/`priority_order`/`public_display_label` values to the move, but reusing the same bound parameter (`$5`) as both an implicit-`bigint` column assignment and an explicit-`::text` cast triggered Postgres's single-type-per-parameter rule (`42P08`, "text versus bigint").
+5. `de338c3` added explicit `::bigint` casts to both occurrences of `$5`, matching the fix I'd already proposed — all three required CI jobs are green at this head.
+
+None of these three bugs were logic, security, or concurrency defects — purely SQL mistakes in test fixture code, each independently verified against the actual schema/error before concurring. Worth a passing note for future similar fixture work: "move an existing row between sessions while reusing a shared fixture session" needs to account for the destination's existing unique-constraint occupancy, and a single bound parameter used in more than one SQL context (a raw column assignment plus a cast expression) needs matching explicit casts in both places or Postgres can't resolve a consistent type.
+
+**Status: zero open findings on PR #609 from this review.** All six subsystem findings (DELETE-grant bypass, `doctor_id` reassignment bypass, column-ACL gap, READ COMMITTED race, REPEATABLE READ race, lock-order deadlock) and the ETA SQL/TS precision-parity note (now with full persisted-parity coverage across every branch) are fixed, independently confirmed, and CI is green at head `de338c3`. The PR remains draft, pending the `L4 review authorization` reviewer-lease gate and a separately-requested external review — both outside this review's scope.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
