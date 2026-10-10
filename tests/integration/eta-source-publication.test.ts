@@ -295,6 +295,86 @@ describe('WU610: SQL and JS active timestamp millisecond parity', () => {
   });
 });
 
+describe('WU610: crossed session and queue lock ordering', () => {
+  it('fails the queue transition fast rather than deadlocking cancellation order', async () => {
+    const entry = await checkedIn('crossed-lock-order');
+    const sessionWriter = await pool.connect();
+    const queueWriter = await pool.connect();
+    try {
+      await sessionWriter.query('BEGIN');
+      await sessionWriter.query("SET LOCAL lock_timeout = '4s'");
+      await sessionWriter.query(
+        'SELECT id FROM consultation_sessions WHERE id=$1 FOR UPDATE',
+        [ids.session],
+      );
+      await queueWriter.query('BEGIN');
+      await queueWriter.query(
+        'SELECT id FROM queue_entries WHERE id=$1 FOR UPDATE',
+        [entry],
+      );
+      const backend = await sessionWriter.query<{ pid: number }>(
+        'SELECT pg_backend_pid() AS pid',
+      );
+      // The session writer now requests the queue row held by the other
+      // transaction: this is the exact session -> queue cancellation order.
+      const sessionAttempt = sessionWriter.query(
+        'UPDATE queue_entries SET updated_at=now() WHERE id=$1',
+        [entry],
+      );
+      let waiting = false;
+      for (let i = 0; i < 90; i++) {
+        const status = await pool.query<{ waiting: boolean }>(
+          `SELECT wait_event_type='Lock' AS waiting
+             FROM pg_stat_activity WHERE pid=$1`,
+          [backend.rows[0]!.pid],
+        );
+        if (status.rows[0]?.waiting) {
+          waiting = true;
+          break;
+        }
+        await pool.query('SELECT pg_sleep(0.01)');
+      }
+      expect(waiting).toBe(true);
+      // The opposite queue -> session attempt must not wait on the held
+      // session row. It fails NOWAIT and rolls back, unblocking the first.
+      await expect(
+        queueWriter.query(
+          `UPDATE queue_entries
+             SET state='in_consultation',
+                 in_consultation_started_at=clock_timestamp()
+           WHERE id=$1`,
+          [entry],
+        ),
+      ).rejects.toMatchObject({ code: '55P03' });
+      await queueWriter.query('ROLLBACK');
+      await sessionAttempt;
+      await sessionWriter.query('COMMIT');
+      const none = await pool.query<{ count: string }>(
+        'SELECT count(*)::text AS count FROM doctor_active_consultations WHERE queue_entry_id=$1',
+        [entry],
+      );
+      expect(none.rows[0]?.count).toBe('0');
+      await pool.query(
+        `UPDATE queue_entries
+           SET state='in_consultation',
+               in_consultation_started_at=clock_timestamp()
+         WHERE id=$1`,
+        [entry],
+      );
+      const stable = await pool.query<{ doctor_id: string }>(
+        'SELECT doctor_id FROM doctor_active_consultations WHERE queue_entry_id=$1',
+        [entry],
+      );
+      expect(stable.rows[0]?.doctor_id).toBe(ids.doctor);
+    } finally {
+      await sessionWriter.query('ROLLBACK').catch(() => undefined);
+      await queueWriter.query('ROLLBACK').catch(() => undefined);
+      sessionWriter.release();
+      queueWriter.release();
+    }
+  });
+});
+
 describe('WU610: production ETA database privilege boundary', () => {
   it('rejects effective PUBLIC column-only UPDATE on an unlisted table', async () => {
     const admin = await pool.connect();
