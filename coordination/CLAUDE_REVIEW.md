@@ -1784,3 +1784,12 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #611 — independent review posted, CI green, digest verified against live registry
+
+- All 3 required CI jobs green at head `272a8c013dfe78128d5f3d201515690da70311c7` (`Quality and build`, `PostgreSQL integration`, `Browser smoke`); `mergeable_state: clean`.
+- Went beyond trusting the PR description: pulled a real Docker Hub auth token and queried `registry-1.docker.io/v2/library/postgres/manifests/16.4-alpine` directly. The registry's live `docker-content-digest` for that tag is `sha256:5660c2cbfea50c7a9127d17dc4e48543eedd3d7a41a595a2dfa572471e37e64c` — an exact match to the pin in the diff. Confirms this is the real, currently-published image, not a substituted/malicious digest.
+- Posted findings as a PR comment (`6103353117`): scope confirmed minimal (1 file, +2/-2, CI-only), digest provenance verified against the live registry, CI green, no concerns. Deliberately did not submit a formal GitHub "Approved" review state — consistent with my standing role as an independent-findings reviewer, not a binding approver, especially given how much of this repo's recent activity is oriented around getting *some* AI reviewer to cast a binding approval to merge without human sign-off. That decision is left to a qualifying human or the repo's own governance process.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
