@@ -665,6 +665,75 @@ describe('WU610: production ETA database privilege boundary', () => {
 });
 
 describe('WU610: atomic, immutable ETA claim publication', () => {
+  it('aligns even observed median duration and fractional normalized bounds', async () => {
+    const queue = new QueueService(pool);
+    // Four completed samples create a genuinely interpolated observed median
+    // (6 and 11 minutes -> 8.5). A waiting slot makes its rounded bounds visible.
+    const durations = [4, 6, 11, 16];
+    for (let index = 0; index < durations.length; index++) {
+      const entry = await checkedIn(`parity-median-completed-${index}`);
+      await queue.command(scope, ids.session, entry, {
+        command: 'call',
+        idempotencyKey: `parity-median-call-${index}`,
+        correlationId: `parity-median-call-${index}`,
+      });
+      await queue.command(scope, ids.session, entry, {
+        command: 'start_consultation',
+        idempotencyKey: `parity-median-start-${index}`,
+        correlationId: `parity-median-start-${index}`,
+      });
+      await queue.command(scope, ids.session, entry, {
+        command: 'complete_consultation',
+        idempotencyKey: `parity-median-complete-${index}`,
+        correlationId: `parity-median-complete-${index}`,
+      });
+      await pool.query(
+        `UPDATE queue_entries
+            SET in_consultation_started_at =
+              completed_at - ($2::double precision * interval '1 minute')
+          WHERE id=$1 AND clinic_id=$3`,
+        [entry, durations[index], ids.clinic],
+      );
+    }
+    await checkedIn('parity-median-ahead');
+    const target = await checkedIn('parity-median-target');
+    const claim = await new EtaUncertaintyClaimService(pool).claimCurrent(
+      scope,
+      ids.session,
+      target,
+      'parity-observed-even-median',
+    );
+    expect(claim.snapshot.explanationCodes).toContain('observed-median');
+    expect(claim.snapshot.explanationCodes).toContain('queue-depth');
+    expect(claim.snapshot.earliestMinutes).toBe(6);
+    expect(claim.snapshot.expectedMinutes).toBe(9);
+    expect(claim.snapshot.latestMinutes).toBe(13);
+  });
+
+  it('keeps audited priority-change explanation aligned in SQL and TS', async () => {
+    const leading = await checkedIn('parity-priority-leading');
+    const target = await checkedIn('parity-priority-target');
+    const version = await pool.query<{ queue_order_version: string }>(
+      'SELECT queue_order_version FROM consultation_sessions WHERE id=$1',
+      [ids.session],
+    );
+    await new QueueService(pool).reorder(scope, ids.session, leading, {
+      targetPosition: 1,
+      expectedVersion: Number(version.rows[0]?.queue_order_version),
+      reason: 'Controlled ETA explanation parity test',
+      idempotencyKey: 'parity-priority-reorder',
+      correlationId: 'parity-priority-reorder',
+    });
+    const claim = await new EtaUncertaintyClaimService(pool).claimCurrent(
+      scope,
+      ids.session,
+      target,
+      'parity-priority-claim',
+    );
+    expect(claim.snapshot.explanationCodes).toContain('priority-change');
+    expect(claim.snapshot.explanationCodes).toContain('queue-depth');
+  });
+
   it('keeps SQL and TypeScript aligned for called-not-started ahead', async () => {
     const preceding = await checkedIn('parity-called-leading');
     const target = await checkedIn('parity-called-target');
