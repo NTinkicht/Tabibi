@@ -194,6 +194,70 @@ describe('WU610: queue transition and doctor reassignment interleaving', () => {
   });
 });
 
+describe('WU610: stale-snapshot doctor assignment fencing', () => {
+  it('rejects a REPEATABLE READ reassignment after an active queue commits', async () => {
+    const entry = await checkedIn('doctor-mvcc-fence-entry');
+    const nextDoctorUser = randomUUID();
+    const nextDoctor = randomUUID();
+    await pool.query(
+      'INSERT INTO users(id,auth_subject,display_name) VALUES($1,$2,$3)',
+      [nextDoctorUser, 'mvcc-doctor-' + nextDoctorUser, 'MVCC Doctor'],
+    );
+    await pool.query(
+      'INSERT INTO doctor_profiles(id,user_id,display_name) VALUES($1,$2,$3)',
+      [nextDoctor, nextDoctorUser, 'MVCC Doctor'],
+    );
+    await pool.query(
+      'INSERT INTO doctor_clinics(clinic_id,doctor_id) VALUES($1,$2)',
+      [ids.clinic, nextDoctor],
+    );
+    const stale = await pool.connect();
+    try {
+      await stale.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
+      // Establish the old snapshot BEFORE the competing queue commit.
+      const originally = await stale.query<{ doctor_id: string }>(
+        'SELECT doctor_id FROM consultation_sessions WHERE id=$1',
+        [ids.session],
+      );
+      expect(originally.rows[0]?.doctor_id).toBe(ids.doctor);
+      await pool.query(
+        `UPDATE queue_entries
+            SET state='in_consultation',
+                in_consultation_started_at=clock_timestamp()
+          WHERE id=$1`,
+        [entry],
+      );
+      const fences = await pool.query<{ doctor_guard_fence_epoch: string }>(
+        'SELECT doctor_guard_fence_epoch FROM consultation_sessions WHERE id=$1',
+        [ids.session],
+      );
+      expect(Number(fences.rows[0]?.doctor_guard_fence_epoch)).toBe(1);
+      await expect(
+        stale.query(
+          'UPDATE consultation_sessions SET doctor_id=$1 WHERE id=$2',
+          [nextDoctor, ids.session],
+        ),
+      ).rejects.toMatchObject({ code: '40001' });
+      await stale.query('ROLLBACK');
+      // The retry against a fresh snapshot is correctly denied by 0038.
+      await expect(
+        pool.query(
+          'UPDATE consultation_sessions SET doctor_id=$1 WHERE id=$2',
+          [nextDoctor, ids.session],
+        ),
+      ).rejects.toMatchObject({ code: '23514' });
+      const stable = await pool.query<{ doctor_id: string }>(
+        'SELECT doctor_id FROM doctor_active_consultations WHERE queue_entry_id=$1',
+        [entry],
+      );
+      expect(stable.rows[0]?.doctor_id).toBe(ids.doctor);
+    } finally {
+      await stale.query('ROLLBACK').catch(() => undefined);
+      stale.release();
+    }
+  });
+});
+
 describe('WU610: production ETA database privilege boundary', () => {
   it('rejects effective PUBLIC column-only UPDATE on an unlisted table', async () => {
     const admin = await pool.connect();
