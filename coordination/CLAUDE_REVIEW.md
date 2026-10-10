@@ -1484,3 +1484,12 @@ All three CI checks green on this head. Status: zero known open correctness/secu
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 / Issue #610 — owner ruling: role-separation finding IS a merge blocker (2026-10-10)
+
+Nassim posted his own checkpoint comment on issue #610 (not a review bot), confirming the exact same facts I'd independently verified at head `cd710d7` — all three CI jobs green, the three fix commits (`5ff3059` payload-substance recomputation, `2124524` lock ordering, `cd710d7` byte-equivalent replay + doc correction) — and explicitly ruling: "Do not mark WU610 complete or merge PR #609" because the shared-DATABASE_URL role-separation finding remains open, requiring a provisioned separate DB owner/migrator role, non-owner runtime credentials, and an adversarial `ALTER TABLE ... DISABLE TRIGGER` denial test before claims can be trusted against compromised runtime SQL.
+
+This resolves the scope question from my earlier dissent (where I'd suggested tracking it separately rather than blocking this PR) in favor of treating it as a hard merge blocker — the owner's call, now made explicitly. Updating my own tracking to match: PR #609 is STILL_BLOCKING on role separation, not just "flagged." No new PR comment needed since this doesn't add information beyond what both of us already independently confirmed; it's the owner finalizing scope, not a new finding requiring verification.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
