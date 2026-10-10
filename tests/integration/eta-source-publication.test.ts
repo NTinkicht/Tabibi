@@ -111,6 +111,89 @@ function estimate(
   });
 }
 
+describe('WU610: queue transition and doctor reassignment interleaving', () => {
+  it('serializes both doctor-lock acquisition orders at transaction boundaries', async () => {
+    const entry = await checkedIn('doctor-lock-order-entry');
+    const otherUser = randomUUID();
+    const otherDoctor = randomUUID();
+    await pool.query(
+      'INSERT INTO users(id,auth_subject,display_name) VALUES($1,$2,$3)',
+      [otherUser, 'lock-test-' + otherUser, 'Lock Doctor'],
+    );
+    await pool.query(
+      'INSERT INTO doctor_profiles(id,user_id,display_name) VALUES($1,$2,$3)',
+      [otherDoctor, otherUser, 'Lock Doctor'],
+    );
+    await pool.query(
+      'INSERT INTO doctor_clinics(clinic_id,doctor_id) VALUES($1,$2)',
+      [ids.clinic, otherDoctor],
+    );
+    const sessionWriter = await pool.connect();
+    const queueWriter = await pool.connect();
+    try {
+      // First: doctor reassignment holds the session row before activation.
+      await sessionWriter.query('BEGIN');
+      await sessionWriter.query(
+        'UPDATE consultation_sessions SET doctor_id=$1 WHERE id=$2',
+        [otherDoctor, ids.session],
+      );
+      await queueWriter.query('BEGIN');
+      await queueWriter.query("SET LOCAL lock_timeout = '400ms'");
+      await expect(
+        queueWriter.query(
+          `UPDATE queue_entries SET state='in_consultation',
+             in_consultation_started_at=clock_timestamp() WHERE id=$1`,
+          [entry],
+        ),
+      ).rejects.toMatchObject({ code: '55P03' });
+      await queueWriter.query('ROLLBACK');
+      await sessionWriter.query('COMMIT');
+
+      // After the doctor's commit the guard is attributed to the new doctor.
+      await queueWriter.query('BEGIN');
+      await queueWriter.query(
+        `UPDATE queue_entries SET state='in_consultation',
+           in_consultation_started_at=clock_timestamp() WHERE id=$1`,
+        [entry],
+      );
+      const guard = await queueWriter.query<{ doctor_id: string }>(
+        'SELECT doctor_id FROM doctor_active_consultations WHERE queue_entry_id=$1',
+        [entry],
+      );
+      expect(guard.rows[0]?.doctor_id).toBe(otherDoctor);
+
+      // Reverse: queue activation locks the session first, so doctor edit
+      // cannot sneak through before guard commit.
+      await sessionWriter.query('BEGIN');
+      await sessionWriter.query("SET LOCAL lock_timeout = '400ms'");
+      await expect(
+        sessionWriter.query(
+          'UPDATE consultation_sessions SET doctor_id=$1 WHERE id=$2',
+          [ids.doctor, ids.session],
+        ),
+      ).rejects.toMatchObject({ code: '55P03' });
+      await sessionWriter.query('ROLLBACK');
+      await queueWriter.query('COMMIT');
+      await expect(
+        pool.query(
+          'UPDATE consultation_sessions SET doctor_id=$1 WHERE id=$2',
+          [ids.doctor, ids.session],
+        ),
+      ).rejects.toMatchObject({ code: '23514' });
+      const stable = await pool.query<{ doctor_id: string }>(
+        'SELECT doctor_id FROM doctor_active_consultations WHERE queue_entry_id=$1',
+        [entry],
+      );
+      expect(stable.rows[0]?.doctor_id).toBe(otherDoctor);
+    } finally {
+      await sessionWriter.query('ROLLBACK').catch(() => undefined);
+      await queueWriter.query('ROLLBACK').catch(() => undefined);
+      sessionWriter.release();
+      queueWriter.release();
+    }
+  });
+});
+
 describe('WU610: production ETA database privilege boundary', () => {
   it('rejects effective PUBLIC column-only UPDATE on an unlisted table', async () => {
     const admin = await pool.connect();
