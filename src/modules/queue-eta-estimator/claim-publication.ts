@@ -119,9 +119,10 @@ export class EtaUncertaintyClaimService {
   }
 
   /**
-   * Persist one immutable exact-source claim, with no stale retries.
-   * Database trigger locks and checks source/prior epochs transactionally.
-   * If any source changed, the caller must recompute a fresh candidate.
+   * Replay an ALREADY committed immutable claim using its exact source tuple,
+   * canonical snapshot and original evaluation instant. A missing row fails
+   * closed; caller-provided timestamps never grant fresh publication.
+   * New claims must use claimCurrent() with the trusted PostgreSQL clock.
    */
   async claim(
     scope: ClinicScope,
