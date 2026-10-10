@@ -187,6 +187,33 @@ describe('WU610: production ETA database privilege boundary', () => {
         'restricted-role-publish',
       );
       expect(published.snapshot.estimateVersion).toBe('eta-uncertainty/v1');
+      // WU192's SECURITY INVOKER trigger also INSERTs and DELETEs a
+      // doctor-global active guard row; the runtime must have exact DML.
+      await service.command(scope, ids.session, admitted.entry.id, {
+        command: 'call',
+        idempotencyKey: 'restricted-role-call',
+        correlationId: 'restricted-role-call',
+      });
+      await service.command(scope, ids.session, admitted.entry.id, {
+        command: 'start_consultation',
+        idempotencyKey: 'restricted-role-start',
+        correlationId: 'restricted-role-start',
+      });
+      const active = await restricted.query<{ queue_entry_id: string }>(
+        'SELECT queue_entry_id FROM doctor_active_consultations WHERE doctor_id=$1',
+        [ids.doctor],
+      );
+      expect(active.rows[0]?.queue_entry_id).toBe(admitted.entry.id);
+      await service.command(scope, ids.session, admitted.entry.id, {
+        command: 'complete_consultation',
+        idempotencyKey: 'restricted-role-complete',
+        correlationId: 'restricted-role-complete',
+      });
+      const cleared = await restricted.query<{ count: string }>(
+        'SELECT count(*)::text AS count FROM doctor_active_consultations WHERE doctor_id=$1',
+        [ids.doctor],
+      );
+      expect(cleared.rows[0]?.count).toBe('0');
     } finally {
       if (restricted) await restricted.end();
       await admin.query(`DROP OWNED BY "${login}"`).catch(() => undefined);

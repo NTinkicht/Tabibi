@@ -41,6 +41,7 @@ const applicationTables = [
   'appointment_bulk_no_show_receipts',
   'eta_clinic_prior_epochs',
   'eta_session_source_epochs',
+  'doctor_active_consultations',
   'eta_uncertainty_claims',
   'eta_claim_idempotency_receipts',
 ] as const;
@@ -149,7 +150,9 @@ export async function provisionRuntimeDmlGrants(
       const permissions =
         table === 'platform_metadata'
           ? 'SELECT'
-          : immutableTables.has(table)
+          : table === 'doctor_active_consultations'
+            ? 'SELECT, INSERT, DELETE'
+            : immutableTables.has(table)
             ? 'SELECT, INSERT'
             : 'SELECT, INSERT, UPDATE, DELETE';
       await client.query(
