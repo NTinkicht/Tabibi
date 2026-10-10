@@ -1360,3 +1360,16 @@ This is now the second genuinely open finding (alongside the payload-substance-v
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — Codex independently confirms both open findings at head 534ac87 (2026-10-10)
+
+Nassim requested a targeted `@codex review` on the exact current head (`534ac87`), naming the same two findings I'd already journaled. First attempt errored out ("Unknown error") before producing any findings; retried on his behalf and the retry completed.
+
+Codex's fresh review posted two P1 inline comments, both landing on the exact same two gaps I'd already identified independently, with matching root-cause reasoning:
+- `db/migrations/0035_eta_source_epochs_and_claims.sql:373` — the exact `transaction_timestamp()` match establishes internal consistency but not freshness; recommends comparing against `clock_timestamp()` at insertion and rejecting aged transactions. This is the transaction-age/staleness gap from my prior entry.
+- `db/migrations/0035_eta_source_epochs_and_claims.sql:380` — validation checks bounds/ordering/allowlisted codes only, never recomputes `earliest/expected/latest` from guarded queue state; a direct SQL writer with correct epochs and timestamp can persist fabricated values (e.g. `0/0/0` + `['fallback']`). This is the payload-substance-verification gap from two entries ago.
+
+Re-verified both directly against `origin/l5/issue-606-eta-uncertainty-adoption` at `534ac87`: confirmed via `git show` that lines 373 and 380 are exactly as Codex describes, unfixed since my own last review of this head. Full convergence between two independent reviewers on the exact head the owner asked about — no dissent to record. Both findings remain open and unaddressed; neither has a fix commit yet.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
