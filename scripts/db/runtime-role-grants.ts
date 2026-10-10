@@ -120,10 +120,15 @@ export async function provisionRuntimeDmlGrants(
     `SELECT tablename FROM pg_tables
       WHERE schemaname='public' AND tablename<>'schema_migrations'`,
   );
-  const observed = objects.rows.map((r) => r.tablename).sort();
-  const allowed = [...applicationTables].sort();
-  if (JSON.stringify(observed) !== JSON.stringify(allowed)) {
-    throw new Error('Runtime grants manifest does not match migrated tables');
+  const observed = new Set(objects.rows.map((r) => r.tablename));
+  // Unknown owner-only tables remain deny-by-default: do not grant them.
+  // Missing required tables are fatal because app operations would fail or
+  // an incomplete migration might otherwise appear to be provisioned.
+  const missing = applicationTables.filter((table) => !observed.has(table));
+  if (missing.length > 0) {
+    throw new Error(
+      `Runtime grants manifest missing required tables: ${missing.join(',')}`,
+    );
   }
 
   const role = identifier(username);
