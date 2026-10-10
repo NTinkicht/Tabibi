@@ -453,10 +453,10 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
       `INSERT INTO audit_events(
          clinic_id, actor_user_id, entity_type, entity_id, action, metadata
        ) VALUES
-         ($1,$2,'consultation_session',$3,'queue_entry.reordered',
-          jsonb_build_object('sessionId',$3::text,'resultingOrder','[]'::jsonb)),
-         ($1,$2,'consultation_session',$4,'queue_entry.reordered',
-          jsonb_build_object('sessionId',$4::text,'resultingOrder','[]'::jsonb))
+         ($1,$2,'consultation_session',$3::uuid,'queue_entry.reordered',
+          jsonb_build_object('sessionId',$3::uuid::text,'resultingOrder','[]'::jsonb)),
+         ($1,$2,'consultation_session',$4::uuid,'queue_entry.reordered',
+          jsonb_build_object('sessionId',$4::uuid::text,'resultingOrder','[]'::jsonb))
        RETURNING id::text`,
       [ids.clinic, ids.actor, ids.session, ids.historicSession],
     );
