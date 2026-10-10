@@ -340,7 +340,10 @@ describe('committed migration chain', () => {
 
   it('recovers an ETA reorder index left behind before migration ledger recording', async () => {
     const migration = await readFile(
-      resolve(process.cwd(), 'db/migrations/0036_eta_reorder_audit_lookup_index.sql'),
+      resolve(
+        process.cwd(),
+        'db/migrations/0036_eta_reorder_audit_lookup_index.sql',
+      ),
       'utf8',
     );
     const statements = migration
