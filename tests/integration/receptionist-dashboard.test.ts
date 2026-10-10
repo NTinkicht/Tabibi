@@ -86,9 +86,7 @@ describe('receptionist dashboard read model', () => {
       'SELECT clock_timestamp() AS sampled',
     );
     const stamped = new Date(snapshot.generatedAt).getTime();
-    expect(stamped).toBeGreaterThanOrEqual(
-      before.rows[0]!.sampled.getTime(),
-    );
+    expect(stamped).toBeGreaterThanOrEqual(before.rows[0]!.sampled.getTime());
     expect(stamped).toBeLessThanOrEqual(after.rows[0]!.sampled.getTime());
     expect(snapshot.entries[0]?.eta?.uncertainty?.evaluatedAt).toBe(
       snapshot.generatedAt,
