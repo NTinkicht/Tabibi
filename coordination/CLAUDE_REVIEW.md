@@ -1435,3 +1435,16 @@ No divergence found in either direction (nothing that would reject a legitimate 
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — two new Codex findings at head 5ff3059: one confirmed blocker, one scoped dissent (2026-10-10)
+
+Codex's fresh review (dispatched by Nassim alongside a CodeRabbit request, both against head `5ff3059`) surfaced two findings not previously caught by me or Codex.
+
+**Confirmed new STILL_BLOCKING (P2): cross-clinic clinic-prior-epoch lock ordering.** In `eta_queue_source_changed()`, the cross-clinic branch increments `OLD.clinic_id`'s then `NEW.clinic_id`'s prior epoch unconditionally in transfer direction, not canonical sorted order — unlike the session-epoch locking three lines above it in the same function, which already does `ROW(OLD.clinic_id,OLD.session_id) < ROW(NEW.clinic_id,NEW.session_id)`. Same deadlock shape `b4af929` fixed for `eta_audit_source_changed` earlier in this review, left unfixed here. Verified directly against the migration file. Needs the same canonical-order fix plus an opposing-transfer regression.
+
+**Confirmed real but dissenting on scope (P1): shared runtime/migration DB role.** Verified `scripts/db/lib.ts` (migration runner) and `src/platform/database/pool.ts` (app runtime pool) both read the same `DATABASE_URL`. True, but this is a pre-existing property of the entire schema, not something WU610 introduces or narrows — every other trigger/constraint in this database has the same weakness. The threat model this PR actually targets (a direct-SQL writer without DDL/ALTER authority) is still meaningfully narrowed by the new trigger; the finding's threat model (same privileges as migrations) already defeats every other invariant in the system, not just this one. Posted as a legitimate finding but recommended tracking it as a separate repo-wide infra-hardening item rather than blocking this migration on it — left the actual call to Nassim since he explicitly asked Codex to probe this angle.
+
+Status: one new confirmed blocker (cross-clinic lock ordering) on top of the two already-resolved findings. Still watching for a fix commit, and for CodeRabbit's independent review (also dispatched on this head) to land.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
