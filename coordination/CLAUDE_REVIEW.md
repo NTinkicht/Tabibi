@@ -1590,3 +1590,14 @@ This validates the manifest-drift design rather than undermining it — the fail
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — fix at 0008f04 addresses the symptom, not the root cause (2026-10-10)
+
+`0008f04` relaxes the manifest-drift check (exact-match → "manifest tables must exist, extras tolerated ungranted") to make the `9d02f65` CI failure disappear, but does NOT add `doctor_active_consultations` to the manifest. Verified this table is genuinely load-bearing: its `SECURITY INVOKER` trigger (`0034_doctor_global_active_consultation_guard.sql`) does INSERT/DELETE on it for every `queue_entries` state transition — check-in, call, start/end consultation, no-show, cancel — the single most common write path in the app. Left ungranted, a genuinely separated production runtime role would hit `permission denied` on essentially every ordinary queue operation.
+
+Flagged this as a regression in safety relative to the previous (stricter but incomplete) check: the relaxation now lets this real gap pass CI silently instead of catching it loudly. Posted the correct fix direction: add the table to `applicationTables` directly, keep the relaxation only for genuinely-irrelevant extra tables.
+
+Status: role-separation subsystem still not closed. Fourth real finding on this specific area (SET ROLE bypass → temp-table shadowing → missing grants → now a check-relaxation that reopens the missing-grants gap instead of closing it).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
