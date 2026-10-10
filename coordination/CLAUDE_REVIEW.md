@@ -1673,3 +1673,10 @@ CI hadn't started at time of posting; will verify once it runs. Status: role-sep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — 7224ed4 is test-only (proves transitive-membership fix), DELETE-grant bypass still open (2026-10-10)
+
+`7224ed4` adds the regression test for `7a263b5`'s fix (login with only inherited UPDATE via role membership correctly rejected). No logic change; CI failure is the familiar Prettier gate. Status unchanged: role-separation/grants subsystem has exactly one open finding remaining — the `doctor_active_consultations` DELETE-grant bypass (WU192 invariant defeat), needing the SECURITY DEFINER trigger-ownership fix.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
