@@ -134,6 +134,16 @@ export async function provisionRuntimeDmlGrants(
   const role = identifier(username);
   await client.query('BEGIN');
   try {
+    // Reconciliation, not additive grants. Prior manual grants or older
+    // manifest versions must never survive a reviewed privilege reduction.
+    // Unknown tables are explicitly denied by default, including migration
+    // metadata. Never revoke privileges from the owner or PUBLIC.
+    await client.query(
+      `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM ${role}`,
+    );
+    await client.query(
+      `REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM ${role}`,
+    );
     await client.query(`GRANT USAGE ON SCHEMA public TO ${role}`);
     for (const table of applicationTables) {
       const permissions =

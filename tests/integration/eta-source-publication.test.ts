@@ -123,16 +123,38 @@ describe('WU610: production ETA database privilege boundary', () => {
     let restricted: Pool | undefined;
     try {
       await admin.query(`CREATE ROLE "${login}" LOGIN PASSWORD '${password}'`);
-      await provisionRuntimeDmlGrants(admin, {
+      const provisionConfig = {
         NODE_ENV: 'production',
         DATABASE_URL: url.toString(),
-      });
+      };
+      // Seed privileges a compromised/old grant could have retained.
+      await admin.query(
+        `GRANT DELETE ON TABLE public.eta_uncertainty_claims TO "${login}"`,
+      );
+      await admin.query(
+        `GRANT UPDATE ON TABLE public.schema_migrations TO "${login}"`,
+      );
+      await provisionRuntimeDmlGrants(admin, provisionConfig);
       restricted = new Pool({ connectionString: url.toString(), max: 2 });
       const { assertEtaClaimRuntimeRole } = await import(
         '@/platform/database/eta-claim-runtime-role'
       );
       const client = await restricted.connect();
       try {
+        const denied = await client.query<{
+          immutable_delete: boolean;
+          migration_update: boolean;
+        }>(
+          `SELECT
+             has_table_privilege('public.eta_uncertainty_claims', 'DELETE')
+               AS immutable_delete,
+             has_table_privilege('public.schema_migrations', 'UPDATE')
+               AS migration_update`,
+        );
+        expect(denied.rows[0]).toEqual({
+          immutable_delete: false,
+          migration_update: false,
+        });
         await expect(
           assertEtaClaimRuntimeRole(client, 'production'),
         ).resolves.toBeUndefined();
