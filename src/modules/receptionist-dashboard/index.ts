@@ -102,7 +102,7 @@ type Row = {
 export class ReceptionistDashboardService {
   constructor(
     private readonly pool: Pool,
-    private readonly now: () => Date = () => new Date(),
+    private readonly now?: () => Date,
   ) {}
 
   async getSnapshot(
@@ -206,7 +206,23 @@ export class ReceptionistDashboardService {
         historicalDurationResult.rows.map((row) => row.duration_minutes),
       );
       const declaredDelayMinutes = first.declared_delay_minutes ?? 0;
-      const snapshotNow = this.now();
+      // Sample the production ETA instant inside the same committed read
+      // transaction, never from this application's ambient wall clock.
+      // A supplied clock is only for deterministic fixtures and the claim
+      // publisher's trusted PostgreSQL time captured in its transaction.
+      const clockResult = this.now
+        ? null
+        : await client.query<{ evaluated_at: Date }>(
+            'SELECT clock_timestamp() AS evaluated_at',
+          );
+      const snapshotNow =
+        this.now?.() ?? clockResult?.rows[0]?.evaluated_at;
+      if (
+        !(snapshotNow instanceof Date) ||
+        !Number.isFinite(snapshotNow.getTime())
+      ) {
+        throw new Error('Trusted ETA evaluation instant is unavailable');
+      }
       let patientsAhead = 0;
       // Retain the existing dashboard order and legacy range semantics.
       // v1 alone ranks the active consultation strictly ahead of called work,
