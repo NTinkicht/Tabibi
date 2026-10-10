@@ -415,7 +415,13 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     const entryId = await checkedIn('eta-claim-direct');
     const service = new EtaUncertaintyClaimService(pool);
     const source = await service.readSourceTuple(scope, ids.session, entryId);
-    const snapshot = estimate(entryId, source);
+    const clock = await pool.query<{ evaluated_at: Date }>(
+      'SELECT clock_timestamp() AS evaluated_at',
+    );
+    const snapshot: EtaUncertaintySnapshot = {
+      ...estimate(entryId, source),
+      evaluatedAt: clock.rows[0]!.evaluated_at.toISOString(),
+    };
     const writeRaw = (
       epoch: EtaSourceTuple,
       value: object,
@@ -454,9 +460,10 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     ).rejects.toMatchObject({ code: '22023' });
     // A direct SQL writer must also fail closed on arbitrary evaluation
     // times, even when all seven evidence fields are otherwise normalized.
-    await expect(writeRaw(source, snapshot)).rejects.toMatchObject({
-      code: '22023',
-    });
+    const pastInstant = '2026-09-08T10:05:30.000Z';
+    await expect(
+      writeRaw(source, { ...snapshot, evaluatedAt: pastInstant }, pastInstant),
+    ).rejects.toMatchObject({ code: '22023' });
     const futureInstant = '2049-01-01T23:59:59.000Z';
     await expect(
       writeRaw(
