@@ -115,18 +115,19 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     const entryId = await checkedIn('eta-claim-first');
     const service = new EtaUncertaintyClaimService(pool);
     const source = await service.readSourceTuple(scope, ids.session, entryId);
-    const snapshot = estimate(entryId, source);
+    const issued = await service.claimCurrent(scope, ids.session, entryId);
     const claims = await Promise.all([
-      service.claim(scope, ids.session, entryId, source, snapshot),
-      service.claim(scope, ids.session, entryId, source, snapshot),
+      service.claim(scope, ids.session, entryId, source, issued.snapshot),
+      service.claim(scope, ids.session, entryId, source, issued.snapshot),
     ]);
     expect(claims[0]).toEqual(claims[1]);
+    expect(claims[0]).toEqual(issued);
     const same = await service.claim(
       scope,
       ids.session,
       entryId,
       source,
-      snapshot,
+      issued.snapshot,
     );
     expect(same).toEqual(claims[0]);
     const rows = await pool.query(
@@ -154,13 +155,7 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     await expect(
       service.claim(scope, ids.session, entryId, before, snapshot),
     ).rejects.toBeInstanceOf(EtaPublicationStaleError);
-    const newer = await service.claim(
-      scope,
-      ids.session,
-      entryId,
-      after,
-      estimate(entryId, after, 25),
-    );
+    const newer = await service.claimCurrent(scope, ids.session, entryId);
     expect(newer.snapshot.expectedMinutes).toBe(25);
   });
 
@@ -190,13 +185,7 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     await expect(
       service.claim(scope, ids.session, entryId, freshSource, oldEstimate),
     ).rejects.toBeInstanceOf(EtaPublicationStaleError);
-    const valid = await service.claim(
-      scope,
-      ids.session,
-      entryId,
-      freshSource,
-      estimate(entryId, freshSource, 30),
-    );
+    const valid = await service.claimCurrent(scope, ids.session, entryId);
     expect(valid.snapshot.expectedMinutes).toBe(30);
   });
 
@@ -208,14 +197,8 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
       ids.session,
       entryId,
     );
-    const oldEstimate = estimate(entryId, oldSource);
-    const first = await service.claim(
-      scope,
-      ids.session,
-      entryId,
-      oldSource,
-      oldEstimate,
-    );
+    const first = await service.claimCurrent(scope, ids.session, entryId);
+    const oldEstimate = first.snapshot;
     await pool.query(
       `UPDATE consultation_sessions
           SET declared_delay_minutes=9,delay_version=delay_version+1,
@@ -314,16 +297,9 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     const entryId = await checkedIn('eta-claim-immutable');
     const service = new EtaUncertaintyClaimService(pool);
     const source = await service.readSourceTuple(scope, ids.session, entryId);
-    const snapshot = estimate(entryId, source);
-    const saved = await service.claim(
-      scope,
-      ids.session,
-      entryId,
-      source,
-      snapshot,
-    );
+    const saved = await service.claimCurrent(scope, ids.session, entryId);
     const changed: EtaUncertaintySnapshot = {
-      ...snapshot,
+      ...saved.snapshot,
       earliestMinutes: 1,
       expectedMinutes: 1,
       latestMinutes: 1,
@@ -341,6 +317,41 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
       [saved.claimId],
     );
     expect(row.rows).toHaveLength(1);
+  });
+
+  it('uses the database transaction clock instead of arbitrary supplied times', async () => {
+    const entryId = await checkedIn('eta-claim-trusted-clock');
+    const service = new EtaUncertaintyClaimService(pool);
+    const source = await service.readSourceTuple(scope, ids.session, entryId);
+    const oldTimestamp = estimate(entryId, source);
+    const futureTimestamp: EtaUncertaintySnapshot = {
+      ...oldTimestamp,
+      evaluatedAt: '2049-01-01T23:59:59.000Z',
+    };
+    await expect(
+      service.claim(scope, ids.session, entryId, source, oldTimestamp),
+    ).rejects.toBeInstanceOf(EtaPublicationStaleError);
+    await expect(
+      service.claim(scope, ids.session, entryId, source, futureTimestamp),
+    ).rejects.toBeInstanceOf(EtaPublicationStaleError);
+
+    const before = await pool.query<{ clock_at: Date }>(
+      'SELECT clock_timestamp() AS clock_at',
+    );
+    const saved = await service.claimCurrent(scope, ids.session, entryId);
+    const after = await pool.query<{ clock_at: Date }>(
+      'SELECT clock_timestamp() AS clock_at',
+    );
+    const evaluated = new Date(saved.snapshot.evaluatedAt).getTime();
+    expect(evaluated).toBeGreaterThanOrEqual(
+      before.rows[0]!.clock_at.getTime(),
+    );
+    expect(evaluated).toBeLessThanOrEqual(after.rows[0]!.clock_at.getTime());
+    expect(saved.snapshot.evaluatedAt).not.toBe(oldTimestamp.evaluatedAt);
+    expect(saved.snapshot.evaluatedAt).not.toBe(futureTimestamp.evaluatedAt);
+    expect(
+      await service.claim(scope, ids.session, entryId, source, saved.snapshot),
+    ).toEqual(saved);
   });
 
   it('never grants the claim to an unauthorized or cross-clinic actor', async () => {
