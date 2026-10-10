@@ -1601,3 +1601,12 @@ Status: role-separation subsystem still not closed. Fourth real finding on this 
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — grant reconciliation added at 3502a66, but doctor_active_consultations gap still unfixed (2026-10-10)
+
+`3502a66` adds `REVOKE ALL PRIVILEGES ON ALL TABLES/SEQUENCES IN SCHEMA public FROM <role>` before regranting from the manifest — a good, separate improvement against privilege creep from stale/prior grants. Confirmed via `grep` this does NOT add `doctor_active_consultations` to `applicationTables`; the gap I flagged at `0008f04` remains exactly as before. The revoke-then-regrant only affects pre-existing grants, not tables that were never in the manifest.
+
+Posted a repeat of the exact fix needed (one array entry) since this is now the third fix attempt in a row that addressed something real but adjacent, without closing this specific gap. Nassim has dispatched a fresh Codex review on this head; will reconcile once it lands. Status: role-separation subsystem still not closed; `doctor_active_consultations` remains the one concretely-identified unfixed item.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
