@@ -338,6 +338,52 @@ describe('committed migration chain', () => {
     expect(uncommented.split(';').filter((sql) => sql.trim())).toHaveLength(2);
   });
 
+  it('recovers an ETA reorder index left behind before migration ledger recording', async () => {
+    const migration = await readFile(
+      resolve(process.cwd(), 'db/migrations/0036_eta_reorder_audit_lookup_index.sql'),
+      'utf8',
+    );
+    const statements = migration
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('--'))
+      .join('\n')
+      .split(';')
+      .map((statement) => statement.trim())
+      .filter(Boolean);
+    expect(statements).toHaveLength(2);
+
+    // Simulate a concurrent index build that committed before the migration
+    // ledger write. A stale object with the correct name must not block retry.
+    await client.query(
+      'DROP INDEX CONCURRENTLY IF EXISTS audit_events_eta_reorder_session_idx',
+    );
+    await client.query(
+      'CREATE INDEX audit_events_eta_reorder_session_idx ON audit_events (clinic_id, occurred_at)',
+    );
+    try {
+      for (const statement of statements) await client.query(statement);
+      const recovered = await client.query<{
+        valid: boolean;
+        ready: boolean;
+        definition: string;
+      }>(
+        `SELECT idx.indisvalid AS valid, idx.indisready AS ready,
+                pg_get_indexdef(idx.indexrelid) AS definition
+           FROM pg_index idx
+           JOIN pg_class relation ON relation.oid=idx.indexrelid
+          WHERE relation.relname='audit_events_eta_reorder_session_idx'`,
+      );
+      expect(recovered.rows).toHaveLength(1);
+      expect(recovered.rows[0]!.valid).toBe(true);
+      expect(recovered.rows[0]!.ready).toBe(true);
+      expect(recovered.rows[0]!.definition).toMatch(/metadata.*sessionId/);
+      expect(recovered.rows[0]!.definition).toContain('queue_entry.reordered');
+    } finally {
+      // Keep the disposable CI database usable even if an assertion fails.
+      for (const statement of statements) await client.query(statement);
+    }
+  });
+
   it('runs the retry claim index replacement outside a migration transaction', async () => {
     const migration = await readFile(
       resolve(
