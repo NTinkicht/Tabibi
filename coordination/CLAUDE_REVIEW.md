@@ -1373,3 +1373,14 @@ Re-verified both directly against `origin/l5/issue-606-eta-uncertainty-adoption`
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — transaction-age staleness finding fixed at head 1aa3eed (2026-10-10)
+
+New commit `1aa3eed` ("fix(eta): bound database transaction age before claim publication") directly addresses the first of the two open P1s. The trigger's freshness check in `0035_eta_source_epochs_and_claims.sql` now also rejects `clock_timestamp() - transaction_timestamp() > interval '5 seconds'` (and the symmetric direction), in addition to the existing exact-match requirement. This closes the gap: a transaction can no longer be held open indefinitely and still satisfy the check with an aged-but-internally-consistent timestamp.
+
+Verified independently: read the full trigger body at this head directly via `git show` (lines 366-380) — the bound is exactly as described, applied before the INSERT, with no tolerance window reopened. New regression test holds a direct-SQL transaction open past the bound (`pg_sleep(5.2)`) and asserts the INSERT is rejected with `22023`; all three required CI checks (Quality and build, PostgreSQL integration, Browser smoke) are green on this exact head per the Checks API. `ETA_UNCERTAINTY_CONTRACT.md` updated to describe the five-second publication budget and explicitly flag the remaining concern as still open.
+
+The commit message itself correctly scopes the fix: "Does not claim to resolve the separate raw-SQL semantic attestation P1." Matches my own assessment — no dissent. One finding remains open: the trigger still never recomputes/cross-checks `earliest/expected/latest`/`explanationCodes` against real queue state, so a direct SQL writer with correct epochs and a fresh timestamp can still persist fabricated values. Posted confirmation on the PR.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
