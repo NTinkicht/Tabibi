@@ -215,8 +215,7 @@ export class ReceptionistDashboardService {
         : await client.query<{ evaluated_at: Date }>(
             'SELECT clock_timestamp() AS evaluated_at',
           );
-      const snapshotNow =
-        this.now?.() ?? clockResult?.rows[0]?.evaluated_at;
+      const snapshotNow = this.now?.() ?? clockResult?.rows[0]?.evaluated_at;
       if (
         !(snapshotNow instanceof Date) ||
         !Number.isFinite(snapshotNow.getTime())
