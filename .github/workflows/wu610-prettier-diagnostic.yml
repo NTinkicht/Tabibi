@@ -1,0 +1,25 @@
+# TEMPORARY: read-only formatting diagnostic, REMOVE before review/merge.
+name: WU610 temporary Prettier diff
+on:
+  push:
+    branches:
+      - l5/issue-606-eta-uncertainty-adoption
+    paths:
+      - .github/workflows/wu610-prettier-diagnostic.yml
+permissions:
+  contents: read
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Print exact Prettier diff without writing to GitHub
+        run: |
+          npx prettier --write src/modules/queue-eta-estimator/claim-publication.ts tests/integration/eta-source-publication.test.ts
+          git diff -- src/modules/queue-eta-estimator/claim-publication.ts tests/integration/eta-source-publication.test.ts
