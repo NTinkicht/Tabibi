@@ -1610,3 +1610,14 @@ Posted a repeat of the exact fix needed (one array entry) since this is now the 
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — doctor_active_consultations gap finally closed correctly at head ced3b0e (2026-10-10)
+
+`ced3b0e` is the correct, complete fix. Verified: `doctor_active_consultations` added to `applicationTables` with precisely-scoped `SELECT, INSERT, DELETE` (matching the trigger's exact usage, no unneeded UPDATE). New test runs the real `call`→`start_consultation`→`complete_consultation` commands through the actual service layer under the restricted role and verifies the guard row is inserted/deleted correctly — genuine end-to-end proof, not a grants-table inspection.
+
+CI failure is the familiar Prettier gate on `runtime-role-grants.ts` alone — not a defect.
+
+**Every concretely-identified gap in the role-separation subsystem is now closed**: SET ROLE bypass (16de261), temp-table shadowing (16de261), missing grants including doctor_active_consultations (784cbbb → 0008f04 → 3502a66 → ced3b0e, took four iterations but landed correctly), and grant reconciliation hardening (3502a66). Four real findings, four real fixes, on this one subsystem across this session. Watching for the format commit, then will reconcile with Codex's dispatched review (on 3502a66, likely to be re-run on this head) once it lands.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
