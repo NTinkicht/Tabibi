@@ -1531,3 +1531,15 @@ Status: role separation reopened as STILL_BLOCKING. Two new, real, unaddressed f
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — both role-separation findings fixed at head 16de261, verified empirically (2026-10-10)
+
+`16de261` fixes both findings from the previous entry. Given I'd already gotten this subsystem's design wrong once, verified both mechanisms empirically against a real local PostgreSQL 16 instance rather than reading-through again:
+
+1. **`SET ROLE` bypass**: confirmed `SET ROLE` changes `current_user` but never `session_user`, and `RESET ROLE` fully restores the original login's privileges. The fix's `session_user = current_user AND [session_user attribute/membership checks]` correctly rejects the masquerade since `session_user` never changes for the connection's lifetime.
+2. **Temp-table shadowing**: built the exact attack — real table + same-named temp table in one session, then an unpinned function (read forged temp data, confirming the vulnerability) vs. a function with `SET search_path = pg_catalog, public, pg_temp` (read real data). The position of `pg_temp` last in the explicit list is what makes this work — a function's own `SET search_path` overrides the default implicit "temp always first" behavior. This contradicts my own initial assumption (that explicitly listing pg_temp wouldn't help) — I was wrong, verified empirically, and corrected before reporting rather than guessing twice.
+
+CI failure on this head is the familiar Prettier gate (2 lines), not a logic defect. Posted confirmation with the empirical test methodology, not just a design read-through.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
