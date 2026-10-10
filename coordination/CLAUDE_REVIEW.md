@@ -1292,3 +1292,12 @@ Nassim requested a second fresh hostile Codex review at `13e1248` (superseded by
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — DB-level timestamp bound confirmed, real retry-dedup gap found in claimCurrent() (2026-10-10)
+
+Three commits landed in quick succession at head `23c419c`: `c55ea50` (DB trigger now rejects `evaluated_at` more than 5min stale or 1s future vs `clock_timestamp()`, closing the direct-SQL bypass of the app-layer timestamp fix), `8418a4e` (regression test: a raw SQL INSERT with a future or stale timestamp is rejected `22023`), `23c419c` (docstring accuracy only). Verified the trigger logic and test directly — sound, closes a real gap the earlier app-layer-only fix left open.
+
+Codex's review (against the prior head `2bd4165`, landing after these three commits) found three things. One ("bound direct-SQL evaluation times to the database clock") is exactly what `c55ea50` already fixed — resolved before the finding even posted. The other two are real and still open, verified by reading `claimCurrent()` myself: its `for (attempt < 3)` retry loop re-executes the whole transaction callback on a `40001` serialization failure, including the `SELECT clock_timestamp()` — so a retry (whether from genuine concurrent collision or a client that lost its response) samples a *new* `evaluatedAt`, and since that's part of the claim's unique key, the retry inserts a second distinct claim instead of finding and returning the original. This contradicts the contract's own "concurrent identical claims converge on the same row" requirement, because the method structurally never produces an identical tuple across separate invocations. Posted a comment distinguishing the already-fixed finding from the two genuinely open ones, with the precise mechanism and a suggested direction (capture the instant once, reuse across retries).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
