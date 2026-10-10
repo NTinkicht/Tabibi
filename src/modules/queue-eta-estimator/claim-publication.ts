@@ -247,12 +247,14 @@ export class EtaUncertaintyClaimService {
             };
           }
 
-          // The initial instant comes only from the DB inside this
-          // transaction; on retry it MUST remain the identical first value.
+          // The canonical millisecond transaction timestamp is the exact
+          // value enforced by the database claim trigger. Across retries
+          // preserve the original instant and source snapshot; if the new
+          // transaction has a different timestamp, a new INSERT is forbidden.
           let evaluatedAt = frozen?.snapshot.evaluatedAt;
           if (!evaluatedAt) {
             const time = await client.query<{ evaluated_at: Date }>(
-              'SELECT clock_timestamp() AS evaluated_at',
+              "SELECT date_trunc('milliseconds', transaction_timestamp()) AS evaluated_at",
             );
             const instant = time.rows[0]?.evaluated_at;
             if (
