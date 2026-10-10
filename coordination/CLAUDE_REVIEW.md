@@ -1642,3 +1642,10 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — CI green at head 817b792, two findings still open (2026-10-10)
+
+All three CI checks green at `817b792`. The two grant-reconciliation findings (REVOKE ownership-scoping, effective-privilege/transitive-membership gap) posted on the previous head remain open — this head only carries the Prettier formatting fix, no change to that logic. Waiting for the freshly-dispatched Codex review on this exact head to complete before further status update.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
