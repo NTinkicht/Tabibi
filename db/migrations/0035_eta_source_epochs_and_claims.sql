@@ -275,6 +275,27 @@ CREATE TABLE eta_uncertainty_claims (
 CREATE INDEX eta_uncertainty_claims_session_idx
   ON eta_uncertainty_claims (clinic_id, session_id, claimed_at DESC);
 
+-- A stable caller-created request key survives lost acknowledgements and
+-- makes concurrent exact retries converge even after the source epoch moves.
+-- Each receipt is committed atomically with its immutable claim.
+ALTER TABLE eta_uncertainty_claims
+  ADD CONSTRAINT eta_claim_id_scope_uq
+  UNIQUE (id, clinic_id, session_id, queue_entry_id);
+
+CREATE TABLE eta_claim_idempotency_receipts (
+  clinic_id uuid NOT NULL,
+  request_key text NOT NULL
+    CHECK (char_length(request_key) BETWEEN 1 AND 128),
+  session_id uuid NOT NULL,
+  queue_entry_id uuid NOT NULL,
+  claim_id bigint NOT NULL,
+  recorded_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (clinic_id, request_key),
+  FOREIGN KEY (claim_id, clinic_id, session_id, queue_entry_id)
+    REFERENCES eta_uncertainty_claims (id, clinic_id, session_id, queue_entry_id)
+    ON DELETE RESTRICT
+);
+
 -- Even direct INSERTs must supply a fresh exact source tuple. Lock epoch rows
 -- in canonical order (session source THEN clinic prior) for the duration of
 -- the surrounding INSERT transaction; writers update these same rows.
@@ -400,4 +421,8 @@ $$;
 
 CREATE TRIGGER eta_claim_immutable_update_delete
 BEFORE UPDATE OR DELETE ON eta_uncertainty_claims
+FOR EACH ROW EXECUTE FUNCTION eta_claim_immutable();
+
+CREATE TRIGGER eta_claim_receipt_immutable_update_delete
+BEFORE UPDATE OR DELETE ON eta_claim_idempotency_receipts
 FOR EACH ROW EXECUTE FUNCTION eta_claim_immutable();
