@@ -193,7 +193,9 @@ export class EtaUncertaintyClaimService {
       typeof requestKey !== 'string' ||
       !/^[A-Za-z0-9._:-]{1,128}$/.test(requestKey)
     ) {
-      throw new RangeError('A stable non-secret ETA claim request key is required');
+      throw new RangeError(
+        'A stable non-secret ETA claim request key is required',
+      );
     }
 
     // An immutable candidate is retained across transaction-level retries:
@@ -288,11 +290,9 @@ export class EtaUncertaintyClaimService {
           };
           if (
             frozen &&
-            (
-              source.sourceEpoch !== frozen.source.sourceEpoch ||
+            (source.sourceEpoch !== frozen.source.sourceEpoch ||
               source.clinicPriorEpoch !== frozen.source.clinicPriorEpoch ||
-              source.queueRevision !== frozen.source.queueRevision
-            )
+              source.queueRevision !== frozen.source.queueRevision)
           ) {
             throw new EtaPublicationStaleError();
           }
@@ -388,12 +388,16 @@ export class EtaUncertaintyClaimService {
           'code' in error &&
           error.code === '40001';
         if (
-          (serializationFailure || error instanceof EtaClaimRetryRequiredError) &&
+          (serializationFailure ||
+            error instanceof EtaClaimRetryRequiredError) &&
           attempt < 4
         ) {
           continue;
         }
-        if (serializationFailure || error instanceof EtaClaimRetryRequiredError) {
+        if (
+          serializationFailure ||
+          error instanceof EtaClaimRetryRequiredError
+        ) {
           throw new EtaPublicationStaleError();
         }
         throw error;
