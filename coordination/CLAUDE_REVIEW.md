@@ -1649,3 +1649,16 @@ All three CI checks green at `817b792`. The two grant-reconciliation findings (R
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — self-correction: doctor_active_consultations DELETE grant reopens the WU192 invariant bypass (2026-10-10)
+
+Codex's review on `817b792` found a real P1 I missed when confirming `ced3b0e`'s `doctor_active_consultations` fix as "correct and complete" two heads ago. Verified: the table's `doctor_id` is its PRIMARY KEY, and migration 0034's own comment states the design intent — the uniqueness constraint was meant to serialize "every transition into in_consultation, including direct/future SQL writers," i.e. a backstop even against raw SQL. Granting the runtime role direct `DELETE` (needed for the trigger's own `SECURITY INVOKER` execution) also hands that same capability to ordinary callers: a writer can delete the guard row out-of-band, then transition a second queue entry for the same doctor into `in_consultation`, defeating the entire invariant.
+
+This is my second "confirmed correct, actually wasn't" moment on this specific subsystem this session (the first was the SET ROLE/temp-shadow design review at 66bb5f2). Posted the correction with the standard fix (make the trigger `SECURITY DEFINER`, owned by the migrator, pinned search_path — consistent with the rest of this migration's hardening — so the runtime role needs no direct grant on this table at all).
+
+Also noted (not independently verified, lower priority): a P2 SQL/TS timestamp-precision mismatch on `in_consultation_started_at` that could flip a minute-boundary rounding decision between the two estimators.
+
+Status: role-separation/grants subsystem now has three open findings (REVOKE ownership-scoping, effective-privilege/PUBLIC gap, and now this DELETE-grant bypass) plus one noted-but-unverified parity concern. Seventh and eighth real finding Codex has surfaced on this one PR's role-separation work this session.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
