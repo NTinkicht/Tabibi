@@ -188,7 +188,7 @@ export async function provisionRuntimeDmlGrants(
       if (table === 'platform_metadata') {
         permissions = 'SELECT';
       } else if (table === 'doctor_active_consultations') {
-        permissions = 'SELECT, INSERT, DELETE';
+        permissions = 'SELECT';
       } else if (immutableTables.has(table)) {
         permissions = 'SELECT, INSERT';
       }
@@ -245,13 +245,16 @@ export async function provisionRuntimeDmlGrants(
       const table = actual.tablename;
       const listed = (applicationTables as readonly string[]).includes(table);
       const readable = listed;
-      const insertable = listed && table !== 'platform_metadata';
+      const insertable =
+        listed &&
+        table !== 'platform_metadata' &&
+        table !== 'doctor_active_consultations';
       const writable =
         listed &&
         table !== 'platform_metadata' &&
         !immutableTables.has(table) &&
         table !== 'doctor_active_consultations';
-      const deletable = writable || table === 'doctor_active_consultations';
+      const deletable = writable;
       if (
         actual.can_select !== readable ||
         actual.can_insert !== insertable ||

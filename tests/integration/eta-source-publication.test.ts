@@ -185,16 +185,24 @@ describe('WU610: production ETA database privilege boundary', () => {
         const denied = await client.query<{
           immutable_delete: boolean;
           migration_update: boolean;
+          doctor_guard_insert: boolean;
+          doctor_guard_delete: boolean;
         }>(
           `SELECT
              has_table_privilege('public.eta_uncertainty_claims', 'DELETE')
                AS immutable_delete,
              has_table_privilege('public.schema_migrations', 'UPDATE')
-               AS migration_update`,
+               AS migration_update,
+             has_table_privilege('public.doctor_active_consultations', 'INSERT')
+               AS doctor_guard_insert,
+             has_table_privilege('public.doctor_active_consultations', 'DELETE')
+               AS doctor_guard_delete`,
         );
         expect(denied.rows[0]).toEqual({
           immutable_delete: false,
           migration_update: false,
+          doctor_guard_insert: false,
+          doctor_guard_delete: false,
         });
         await expect(
           assertEtaClaimRuntimeRole(client, 'production'),
@@ -228,8 +236,8 @@ describe('WU610: production ETA database privilege boundary', () => {
         'restricted-role-publish',
       );
       expect(published.snapshot.estimateVersion).toBe('eta-uncertainty/v1');
-      // WU192's SECURITY INVOKER trigger also INSERTs and DELETEs a
-      // doctor-global active guard row; the runtime must have exact DML.
+      // WU192 guard now uses an owner-owned SECURITY DEFINER trigger;
+      // runtime table DML is forbidden even while queue transitions work.
       await service.command(scope, ids.session, admitted.entry.id, {
         command: 'call',
         idempotencyKey: 'restricted-role-call',
@@ -245,6 +253,12 @@ describe('WU610: production ETA database privilege boundary', () => {
         [ids.doctor],
       );
       expect(active.rows[0]?.queue_entry_id).toBe(admitted.entry.id);
+      await expect(
+        restricted.query(
+          'DELETE FROM public.doctor_active_consultations WHERE queue_entry_id=$1',
+          [admitted.entry.id],
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
       await service.command(scope, ids.session, admitted.entry.id, {
         command: 'complete_consultation',
         idempotencyKey: 'restricted-role-complete',
