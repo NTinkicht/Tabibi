@@ -1563,3 +1563,14 @@ Status: role separation reopened again. Fourth consecutive head on this specific
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — missing-GRANTs finding addressed at head 784cbbb, blocked on familiar Prettier gate (2026-10-10)
+
+`784cbbb` directly addresses the third role-separation finding (missing GRANTs). Reviewed design: `provisionRuntimeDmlGrants()` runs post-migration using the privileged migrator connection, verifies the runtime login is genuinely unprivileged and non-owner before granting anything, diffs the actual `public` schema against an explicit reviewed table manifest (fails closed on drift), and grants least-privilege per table (SELECT-only for `platform_metadata`, SELECT+INSERT for immutable/append-only tables including both ETA claim tables, full DML for mutable tables including the epoch tables the triggers update). Sequences granted only via traced `pg_depend` ownership, not blanket.
+
+New test creates a genuine LOGIN role (not a transaction-local `SET ROLE`), runs the real grants provisioning, and calls the actual `claimCurrent()` end-to-end through that restricted connection — directly the real-operation coverage Codex's finding said was missing, not a repeat of the trigger-disable-only pattern.
+
+CI failure is the familiar Prettier gate (2 files), not a logic defect. Posted assessment; watching for the format fix.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
