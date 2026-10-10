@@ -1411,3 +1411,14 @@ Status: payload-substance-verification finding not yet resolved — implementati
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — follow-up commit 524c42f mislabeled, SQL bug still unfixed (2026-10-10)
+
+`524c42f`'s commit message claims to "repair PostgreSQL delimiter," but `git show --stat` shows only `tests/integration/eta-source-publication.test.ts` changed (the Prettier formatting fix) — `db/migrations/0035_eta_source_epochs_and_claims.sql` is byte-identical to `c25ccb9`, reconfirmed via `cat -A` on the same line ranges. The bare-`$` delimiter bug is still present.
+
+CI on this head corroborates exactly: `Quality and build` now passes (Prettier was genuinely fixed), but `PostgreSQL integration` and `Browser smoke` still fail — same root cause as before, not a new regression. Posted the correction with the precise diff evidence.
+
+Status unchanged: payload-substance-verification finding still open, implementation still broken on the one concrete defect already identified. Waiting for an actual fix to the migration file.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
