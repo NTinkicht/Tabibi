@@ -308,7 +308,7 @@ CREATE FUNCTION eta_expected_claim_snapshot(
   p_clinic uuid, p_session uuid, p_entry uuid,
   p_revision bigint, p_at timestamptz
 ) RETURNS jsonb
-LANGUAGE plpgsql STABLE AS $
+LANGUAGE plpgsql STABLE AS $eta_claim$
 DECLARE
   ses consultation_sessions%ROWTYPE;
   item record;
@@ -475,7 +475,7 @@ BEGIN
                             'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
     'explanationCodes',codes);
 END
-$;
+$eta_claim$;
 
 CREATE FUNCTION eta_guard_claim_publication() RETURNS trigger
 LANGUAGE plpgsql AS $$
