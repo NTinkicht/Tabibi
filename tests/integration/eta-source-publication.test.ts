@@ -112,6 +112,59 @@ function estimate(
 }
 
 describe('WU610: production ETA database privilege boundary', () => {
+  it('rejects effective PUBLIC column-only UPDATE on an unlisted table', async () => {
+    const admin = await pool.connect();
+    const login = 'eta_column_' + randomUUID().replaceAll('-', '').slice(0, 16);
+    const table =
+      'eta_unlisted_' + randomUUID().replaceAll('-', '').slice(0, 16);
+    const url = new URL(process.env.DATABASE_URL!);
+    url.username = login;
+    url.password = randomUUID().replaceAll('-', '');
+    try {
+      await admin.query(
+        `CREATE TABLE public."${table}" (id integer, protected integer)`,
+      );
+      await admin.query(
+        `GRANT UPDATE (protected) ON TABLE public."${table}" TO PUBLIC`,
+      );
+      await admin.query(
+        `CREATE ROLE "${login}" LOGIN PASSWORD '${url.password}'`,
+      );
+      const before = await admin.query<{
+        table_update: boolean;
+        any_column_update: boolean;
+      }>(
+        `SELECT
+           has_table_privilege($1,'public."${table}"','UPDATE')
+             AS table_update,
+           has_any_column_privilege($1,'public."${table}"','UPDATE')
+             AS any_column_update`,
+        [login],
+      );
+      expect(before.rows[0]).toEqual({
+        table_update: false,
+        any_column_update: true,
+      });
+      await expect(
+        provisionRuntimeDmlGrants(admin, {
+          NODE_ENV: 'production',
+          DATABASE_URL: url.toString(),
+        }),
+      ).rejects.toThrow(
+        new RegExp('Unexpected effective runtime table privilege: ' + table),
+      );
+    } finally {
+      await admin
+        .query(
+          `REVOKE UPDATE (protected) ON TABLE public."${table}" FROM PUBLIC`,
+        )
+        .catch(() => undefined);
+      await admin.query(`DROP TABLE IF EXISTS public."${table}"`);
+      await admin.query(`DROP ROLE IF EXISTS "${login}"`);
+      admin.release();
+    }
+  });
+
   it('rejects a login that inherits forbidden grants through any role', async () => {
     const admin = await pool.connect();
     const login =

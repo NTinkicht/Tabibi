@@ -227,6 +227,10 @@ export async function provisionRuntimeDmlGrants(
       can_truncate: boolean;
       can_references: boolean;
       can_trigger: boolean;
+      any_column_select: boolean;
+      any_column_insert: boolean;
+      any_column_update: boolean;
+      any_column_references: boolean;
     }>(
       `SELECT c.relname AS tablename,
         has_table_privilege($1::oid,c.oid,'SELECT') AS can_select,
@@ -235,7 +239,12 @@ export async function provisionRuntimeDmlGrants(
         has_table_privilege($1::oid,c.oid,'DELETE') AS can_delete,
         has_table_privilege($1::oid,c.oid,'TRUNCATE') AS can_truncate,
         has_table_privilege($1::oid,c.oid,'REFERENCES') AS can_references,
-        has_table_privilege($1::oid,c.oid,'TRIGGER') AS can_trigger
+        has_table_privilege($1::oid,c.oid,'TRIGGER') AS can_trigger,
+        has_any_column_privilege($1::oid,c.oid,'SELECT') AS any_column_select,
+        has_any_column_privilege($1::oid,c.oid,'INSERT') AS any_column_insert,
+        has_any_column_privilege($1::oid,c.oid,'UPDATE') AS any_column_update,
+        has_any_column_privilege($1::oid,c.oid,'REFERENCES')
+          AS any_column_references
        FROM pg_class c
        JOIN pg_namespace ns ON ns.oid=c.relnamespace
       WHERE ns.nspname='public' AND c.relkind IN ('r','p','v','m','f')`,
@@ -262,7 +271,13 @@ export async function provisionRuntimeDmlGrants(
         actual.can_delete !== deletable ||
         actual.can_truncate ||
         actual.can_references ||
-        actual.can_trigger
+        actual.can_trigger ||
+        // Table-level has_table_privilege is false for column-only ACLs.
+        // Effective access also includes direct and PUBLIC column grants.
+        (!readable && actual.any_column_select) ||
+        (!insertable && actual.any_column_insert) ||
+        (!writable && actual.any_column_update) ||
+        actual.any_column_references
       ) {
         throw new Error(
           `Unexpected effective runtime table privilege: ${table}`,
