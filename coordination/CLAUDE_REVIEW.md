@@ -1744,3 +1744,12 @@ None of these three bugs were logic, security, or concurrency defects — purely
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — reliability gap fixed (55P03/40001/40P01 now a retryable 409, not a 500) (2026-10-10)
+
+Follow-up to the Codex P2 I elevated in the previous entry: `da42691` adds a `.catch()` chained directly off `inTransaction(...)` in `QueueService.command()` — the outer transaction boundary, after rollback — that converts `55P03` (NOWAIT contention, from `0042`), `40001` (serialization failure, from `0040`'s MVCC fence), and `40P01` (deadlock, defense-in-depth) into `QueueConflictError`, which `operationalJson` already maps to HTTP 409. Verified correct placement: it wraps the whole transaction without disturbing the existing inner catch (handling `23505`/`23514` for the entry-update statement specifically) — codes that inner catch doesn't match still propagate to this new outer catch rather than escaping as raw driver errors reaching a generic 500. The conflict message explicitly tells the caller to retry with the same idempotency key rather than silently auto-retrying, preserving idempotency semantics. `e017cdd` adds a unit test covering all three codes plus a negative case (unrelated errors pass through unchanged) — good coverage of the thing that actually mattered.
+
+This closes the last standing item from this review. **Status: zero open findings on PR #609.** All six subsystem findings (DELETE-grant bypass, `doctor_id` reassignment bypass, column-ACL gap, READ COMMITTED race, REPEATABLE READ race, lock-order deadlock), the ETA SQL/TS precision-parity note (with full persisted-parity test coverage), and this error-handling reliability gap are fixed and independently confirmed. CI's only remaining red at time of writing is the familiar Prettier-only formatting gate on the new test file, not a logic issue. PR remains draft, pending the `L4 review authorization` reviewer-lease gate and a separately-requested external review — both outside this review's scope.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
