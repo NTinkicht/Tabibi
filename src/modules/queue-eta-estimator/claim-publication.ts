@@ -188,9 +188,7 @@ export class EtaUncertaintyClaimService {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         return await inTransaction(this.pool, async (client) => {
-          await client.query(
-            'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ',
-          );
+          await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
           await requireClinicRole(client, scope, [
             'receptionist',
             'clinic_admin',
@@ -199,7 +197,10 @@ export class EtaUncertaintyClaimService {
             'SELECT clock_timestamp() AS evaluated_at',
           );
           const instant = time.rows[0]?.evaluated_at;
-          if (!(instant instanceof Date) || !Number.isFinite(instant.getTime())) {
+          if (
+            !(instant instanceof Date) ||
+            !Number.isFinite(instant.getTime())
+          ) {
             throw new EtaPublicationStaleError();
           }
           const evaluatedAt = instant.toISOString();
