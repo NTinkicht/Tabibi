@@ -229,6 +229,31 @@ async function insertQueueEntry(
 }
 
 describe('WU63 public guest live queue status', () => {
+  it('sources the default guest ETA evaluation instant from PostgreSQL', async () => {
+    const booking = await createBooking('1000');
+    await openSession(booking);
+    await new PublicGuestBookingCheckInService(pool, () => now).checkIn(
+      booking.bearer,
+      'db-clock-guest-checkin',
+    );
+    const before = await pool.query<{ sampled: Date }>(
+      'SELECT clock_timestamp() AS sampled',
+    );
+    const response = await new PublicGuestLiveQueueStatusService(pool).get(
+      booking.bearer,
+    );
+    const after = await pool.query<{ sampled: Date }>(
+      'SELECT clock_timestamp() AS sampled',
+    );
+    const evaluatedAt = response.eta?.uncertainty?.evaluatedAt;
+    expect(evaluatedAt).toBeDefined();
+    const stamped = new Date(evaluatedAt!).getTime();
+    expect(stamped).toBeGreaterThanOrEqual(
+      before.rows[0]!.sampled.getTime(),
+    );
+    expect(stamped).toBeLessThanOrEqual(after.rows[0]!.sampled.getTime());
+  });
+
   it("reads a valid capability's own durably bound booking and queue participation", async () => {
     const booking = await createBooking('1001');
     await openSession(booking);
