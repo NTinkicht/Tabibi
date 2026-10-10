@@ -1508,3 +1508,12 @@ CI failure on this head is the familiar Prettier formatting gate (4 files: 2 new
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — role-separation fix verified green at head 66bb5f2; every known finding now resolved (2026-10-10)
+
+`66bb5f2` is the expected formatting-only fix for the previous head's Prettier failure. All three CI checks green, including `PostgreSQL integration` — confirming the adversarial negative-privilege test (`19d4c30`'s `assertEtaClaimRuntimeRole` design) actually executed against real PostgreSQL and passed: unprivileged role created, switched into via `SET LOCAL ROLE`, catalog check resolves for it, and its `ALTER TABLE ... DISABLE TRIGGER` attempt is denied with `42501`.
+
+**Every finding raised across this entire review is now resolved and backed by a passing test at this exact head** — migration restartability, epoch-capture gap, replay-ordering race, audit-trigger lock-ordering deadlock, caller-controlled evaluatedAt, claimCurrent retry-dedup, GET-path clock source, DB timestamp window, transaction-age staleness, payload-substance verification, cross-clinic lock ordering, receipt-replay byte-equivalence, and now role separation (the owner's explicit merge blocker). Still not MERGE_READY on process grounds only: PR remains draft, `L4 review authorization` has not recorded a qualifying non-author review at this exact head.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
