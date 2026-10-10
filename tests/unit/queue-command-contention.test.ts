@@ -17,7 +17,9 @@ function failingCommandPool(code: string) {
     async query(sql: string) {
       calls.push(sql);
       if (sql === 'BEGIN' || sql === 'ROLLBACK') return { rows: [] };
-      throw Object.assign(new Error('PostgreSQL operation contention'), { code });
+      throw Object.assign(new Error('PostgreSQL operation contention'), {
+        code,
+      });
     },
     release() {
       released = true;
