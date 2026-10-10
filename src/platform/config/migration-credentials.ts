@@ -13,7 +13,9 @@ export function migrationConnectionString(
     return privileged || env.DATABASE_URL;
   }
   if (!privileged) {
-    throw new Error('Production migrations require a separate MIGRATION_DATABASE_URL');
+    throw new Error(
+      'Production migrations require a separate MIGRATION_DATABASE_URL',
+    );
   }
   let owner: URL;
   try {
@@ -28,7 +30,9 @@ export function migrationConnectionString(
     !owner.pathname ||
     decodeURIComponent(owner.username) === decodeURIComponent(runtime.username)
   ) {
-    throw new Error('Production migrator and runtime must use distinct PostgreSQL roles');
+    throw new Error(
+      'Production migrator and runtime must use distinct PostgreSQL roles',
+    );
   }
   return privileged;
 }

@@ -43,10 +43,9 @@ export async function assertEtaClaimRuntimeRole(
       WHERE claim_schema.nspname='public'
         AND claim_table.relname='eta_uncertainty_claims'`,
   );
-  if (
-    check.rows.length !== 1 ||
-    check.rows[0]?.least_privileged !== true
-  ) {
-    throw new Error('ETA claim runtime database role is privileged or guard is unavailable');
+  if (check.rows.length !== 1 || check.rows[0]?.least_privileged !== true) {
+    throw new Error(
+      'ETA claim runtime database role is privileged or guard is unavailable',
+    );
   }
 }

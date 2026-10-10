@@ -116,7 +116,8 @@ describe('WU610: production ETA database privilege boundary', () => {
       '@/platform/database/eta-claim-runtime-role'
     );
     const actor = await pool.connect();
-    const restrictedRole = 'eta_runtime_probe_' + randomUUID().replaceAll('-', '').slice(0, 16);
+    const restrictedRole =
+      'eta_runtime_probe_' + randomUUID().replaceAll('-', '').slice(0, 16);
     try {
       // The PostgreSQL CI container has CREATEROLE rights; all probe DDL is
       // rolled back, so no role or grant is retained outside the transaction.
@@ -125,14 +126,14 @@ describe('WU610: production ETA database privilege boundary', () => {
         assertEtaClaimRuntimeRole(actor, 'production'),
       ).rejects.toThrow(/privileged/);
       await actor.query(`CREATE ROLE "${restrictedRole}" NOLOGIN`);
-      await actor.query(
-        `GRANT USAGE ON SCHEMA public TO "${restrictedRole}"`,
-      );
+      await actor.query(`GRANT USAGE ON SCHEMA public TO "${restrictedRole}"`);
       await actor.query(
         `GRANT SELECT, INSERT ON eta_uncertainty_claims TO "${restrictedRole}"`,
       );
       await actor.query(`SET LOCAL ROLE "${restrictedRole}"`);
-      await expect(assertEtaClaimRuntimeRole(actor, 'production')).resolves.toBeUndefined();
+      await expect(
+        assertEtaClaimRuntimeRole(actor, 'production'),
+      ).resolves.toBeUndefined();
       await actor.query('SAVEPOINT no_trigger_bypass');
       await expect(
         actor.query(
