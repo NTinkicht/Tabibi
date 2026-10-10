@@ -1753,3 +1753,15 @@ This closes the last standing item from this review. **Status: zero open finding
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — ready-for-review transition (head unchanged: 374a352d04657935dd409adbfd37349fac2c081b)
+
+- 2026-10-10T21:56Z: NTinkicht marked PR #609 ready for review (no longer draft). Head commit unchanged from the prior zero-open-findings state (`374a352d`).
+- Re-verified: all 3 required CI jobs still green at this head (Quality and build, PostgreSQL integration, Browser smoke — all `success`). `L4 review authorization` still fails at this head.
+- Checked every review on the PR (`get_reviews`, all pages, ~70 entries) before concluding this is a no-op: no `APPROVED` review exists from anyone. All reviews are `COMMENTED` from `chatgpt-codex-connector[bot]` (automated, author_association `NONE`), `coderabbitai[bot]` (automated, `CONTRIBUTOR`), or NTinkicht themself (`OWNER` — self-review on their own PR, not a qualifying non-author approval).
+- Conclusion: the `L4 review authorization` failure is still the same substantive condition as before (no qualifying non-author review at the exact head), only the *proximate cause* changed — it's no longer "draft," it's now genuinely "no one has approved it yet." This is not a new finding; no PR comment needed.
+- Also observed and dismissed as no-ops: (1) Codex hit its usage-limit quota and cannot currently post further automated reviews (informational, no action — this does not change my own independent-reviewer obligations); (2) a CodeRabbit "review skipped" comment was edited in place but is the same stale auto-disabled-reviews notice already seen many times.
+- Status unchanged: zero open findings from my independent review at this head; CI green; still blocked only on the reviewer-lease gate, which remains outside what I can directly cause.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
