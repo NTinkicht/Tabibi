@@ -112,6 +112,49 @@ function estimate(
 }
 
 describe('WU610: production ETA database privilege boundary', () => {
+  it('rejects a login that inherits forbidden grants through any role', async () => {
+    const admin = await pool.connect();
+    const login =
+      'eta_inherited_' + randomUUID().replaceAll('-', '').slice(0, 16);
+    const legacy =
+      'eta_legacy_' + randomUUID().replaceAll('-', '').slice(0, 16);
+    const url = new URL(process.env.DATABASE_URL!);
+    url.username = login;
+    url.password = randomUUID().replaceAll('-', '');
+    try {
+      await admin.query(
+        `CREATE ROLE "${login}" LOGIN PASSWORD '${url.password}'`,
+      );
+      await admin.query(`CREATE ROLE "${legacy}" NOLOGIN`);
+      await admin.query(
+        `GRANT UPDATE ON TABLE public.schema_migrations TO "${legacy}"`,
+      );
+      await admin.query(`GRANT "${legacy}" TO "${login}"`);
+      const inherited = await admin.query<{ can_update: boolean }>(
+        `SELECT has_table_privilege($1,'public.schema_migrations','UPDATE')
+           AS can_update`,
+        [login],
+      );
+      expect(inherited.rows[0]?.can_update).toBe(true);
+      await expect(
+        provisionRuntimeDmlGrants(admin, {
+          NODE_ENV: 'production',
+          DATABASE_URL: url.toString(),
+        }),
+      ).rejects.toThrow(/schema\/owner privileges/);
+    } finally {
+      await admin
+        .query(`REVOKE "${legacy}" FROM "${login}"`)
+        .catch(() => undefined);
+      await admin
+        .query(`DROP OWNED BY "${legacy}"`)
+        .catch(() => undefined);
+      await admin.query(`DROP ROLE IF EXISTS "${legacy}"`);
+      await admin.query(`DROP ROLE IF EXISTS "${login}"`);
+      admin.release();
+    }
+  });
+
   it('provisions a login with operational DML but without trigger ownership', async () => {
     const admin = await pool.connect();
     const login =
