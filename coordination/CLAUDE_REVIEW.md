@@ -1322,3 +1322,14 @@ Running tally: of the three real findings open two entries ago (retry-dedup, GET
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — clock-source fixes verified, CI green at a8e5100, one real finding remains (2026-10-10)
+
+Traced `2b69b37` (guest) + `4942136` (receptionist): both now source `evaluated_at` from PostgreSQL's `clock_timestamp()` — guest selects it as part of the same scoped SQL query, receptionist queries it within the already-open transaction client, matching `claimCurrent()`'s established pattern. Constructor clock params are now optional, reserved for test fixtures. Sound.
+
+Chased several rounds of formatting fallout from these two fixes (new files not covered by the CI step's increasingly stale hardcoded fallback list — `receptionist-dashboard/index.ts`, then two more test files), plus a repeat of the Node 22/engine-strict bug in a new temporary diagnostic workflow (same fix as before: pin to 20). All resolved by `a8e5100`. Verified independently: Checks API all green, `prettier --check .` clean, `tsc --noEmit` clean, temporary diagnostic workflow cleanly removed.
+
+Of the three real findings tracked since the last major entry, two are now fixed (retry-dedup, clock source). The third — the direct-SQL claim trigger's 5-minute timestamp tolerance window — remains open; Codex re-confirmed it STILL_BLOCKING on the immediately prior head and nothing in this batch touches `eta_guard_claim_publication()`. Posted a consolidated status comment.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
