@@ -364,14 +364,14 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
-  -- Service code captures the authoritative evaluation instant INSIDE its
-  -- publishing transaction. Additionally reject arbitrary past/future time
-  -- values on direct SQL inserts; replay of an old claim is read-only.
-  -- The tolerance covers bounded in-transaction work and clock precision,
-  -- and is NOT a substitute for the service's trusted DB clock capture.
-  IF NEW.evaluated_at < clock_timestamp() - interval '5 minutes'
-     OR NEW.evaluated_at > clock_timestamp() + interval '1 second' THEN
-    RAISE EXCEPTION 'ETA evaluation instant is outside the publication window'
+  -- New claims MUST bind to a database-owned evaluation instant:
+  -- the millisecond-normalized transaction timestamp. A tolerated window
+  -- would let direct SQL persist stale estimates with perfectly current
+  -- epochs. The application reads this SAME value inside claimCurrent's
+  -- publishing transaction; historical replay uses SELECT, not INSERT.
+  IF NEW.evaluated_at IS DISTINCT FROM
+       date_trunc('milliseconds', transaction_timestamp()) THEN
+    RAISE EXCEPTION 'ETA evaluation instant is not the database transaction timestamp'
       USING ERRCODE = '22023';
   END IF;
 
