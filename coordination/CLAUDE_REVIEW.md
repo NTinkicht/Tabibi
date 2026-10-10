@@ -1574,3 +1574,10 @@ CI failure is the familiar Prettier gate (2 files), not a logic defect. Posted a
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — heartbeat: new head 9d02f65 landed (formatting + type-compat fix), CI running (2026-10-10)
+
+During a routine heartbeat sweep, found `9d02f65` had already landed on top of `784cbbb`: fixes the expected Prettier formatting plus a legitimate type-compatibility change (`provisionRuntimeDmlGrants` now takes `Pick<PoolClient, 'query'>` instead of `Client`, so it structurally accepts both the migration script's `pg.Client` and the integration test's `PoolClient`). CI in progress on this head at time of writing; no other open PRs or new issues. Will confirm once CI completes.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
