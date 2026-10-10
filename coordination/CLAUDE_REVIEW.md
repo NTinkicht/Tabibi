@@ -1280,3 +1280,15 @@ Separately, found a thread (`r4234787779`, the `readSourceTuple`-epoch-capture P
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — lock-order fix verified, new evaluatedAt P1 fixed, guest-path P1s retracted (2026-10-10)
+
+Caught up on ~1hr of rapid activity to head `1ddf863`:
+- Lock-ordering P2 (my earlier finding, confirmed by Codex too): `b4af929` sorts old/new `(clinic_id,session_id)` before locking in `eta_audit_source_changed`, matching the sibling trigger's established pattern. `ddbe974`'s barrier-coordinated two-connection deadlock regression (`lock_timeout='5s'`, real opposing A→B/B→A moves) is genuine, not cosmetic. Verified sound by reading both trigger functions side by side again.
+- New Codex P1: a caller could supply an arbitrary `evaluatedAt` for a *new* claim, since the old single `claim()` accepted it from the candidate. `1ddf863` splits `claim()` (replay-only, exact-tuple lookup, can never mint new evidence) from a new `claimCurrent()` (the sole fresh-publication path, samples `clock_timestamp()` inside the same transaction that reads source epochs). Confirmed via `git grep` neither method has any caller yet — still unwired infrastructure.
+- Retracted my own "two genuinely open P1s" on the guest GET path (posted two comments ago) after actually reading `docs/architecture/ETA_UNCERTAINTY_CONTRACT.md` in full for the first time: it explicitly says the GET projections are not atomic claims and a same-snapshot check "never qualifies as CAS" — so the tautological check isn't a bug against the accepted contract, it's an invariant assertion on a path the contract deliberately excludes from CAS. Flagged (not blocking) that this contract text was itself rewritten by this same PR (`eeddc21`) — the pre-PR version's wording most plausibly did require CAS on the GET path, since the claim service didn't exist yet. Assessed the rewrite as substantively sound engineering (splitting best-effort display from audit-grade atomic claim) but noted the scope moved during implementation, by the author being reviewed.
+
+Nassim requested a second fresh hostile Codex review at `13e1248` (superseded by `1ddf863` almost immediately); multiple `L4 review authorization` failures on intermediate heads are expected/correct, not defects — no qualifying review has landed at any single exact head yet since heads keep moving faster than review turnaround.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
