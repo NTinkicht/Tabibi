@@ -1543,3 +1543,10 @@ CI failure on this head is the familiar Prettier gate (2 lines), not a logic def
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — role-separation fixes green in CI at head a819e86; awaiting fresh Codex pass before declaring final (2026-10-10)
+
+`a819e86` is the expected formatting-only fix. All three CI checks green, confirming the restricted-LOGIN and temp-schema-spoofing regression tests (added in `16de261`) pass against real Postgres in CI, matching my own local empirical verification. Nassim has already dispatched a fresh Codex security review on this exact head. Deliberately not declaring "all clear" as final this time — the last two positive calls on this specific subsystem (`66bb5f2`'s design review, and now this) each needed correction after the next adversarial pass, so waiting for Codex's result before treating role separation as settled.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
