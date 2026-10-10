@@ -157,7 +157,9 @@ describe('WU610: production ETA database privilege boundary', () => {
     } finally {
       if (app) await app.end();
       await admin.query('ROLLBACK').catch(() => undefined);
-      await admin.query(`DROP OWNED BY "${restrictedRole}"`).catch(() => undefined);
+      await admin
+        .query(`DROP OWNED BY "${restrictedRole}"`)
+        .catch(() => undefined);
       await admin.query(`DROP ROLE IF EXISTS "${restrictedRole}"`);
       admin.release();
     }
@@ -607,7 +609,9 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
         [ids.clinic, ids.session, target, source.queueRevision],
       );
       expect(actual.rows[0]?.snapshot?.expectedMinutes).toBeGreaterThan(0);
-      expect(actual.rows[0]?.snapshot?.explanationCodes).toContain('queue-depth');
+      expect(actual.rows[0]?.snapshot?.explanationCodes).toContain(
+        'queue-depth',
+      );
       await actor.query('ROLLBACK');
     } catch (error) {
       await actor.query('ROLLBACK');
