@@ -38,6 +38,8 @@ export class EtaPublicationConflictError extends Error {
   }
 }
 
+class EtaClaimRetryRequiredError extends Error {}
+
 function nonnegativeInteger(value: number): boolean {
   return Number.isSafeInteger(value) && value >= 0;
 }
@@ -185,8 +187,24 @@ export class EtaUncertaintyClaimService {
     scope: ClinicScope,
     sessionId: string,
     entryId: string,
+    requestKey: string,
   ): Promise<EtaUncertaintyClaim> {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    if (
+      typeof requestKey !== 'string' ||
+      !/^[A-Za-z0-9._:-]{1,128}$/.test(requestKey)
+    ) {
+      throw new RangeError('A stable non-secret ETA claim request key is required');
+    }
+
+    // An immutable candidate is retained across transaction-level retries:
+    // a serialization loser cannot resample the clock and create a different
+    // key merely because another transaction committed the same tuple first.
+    let frozen: {
+      source: EtaSourceTuple;
+      snapshot: EtaUncertaintySnapshot;
+    } | null = null;
+
+    for (let attempt = 0; attempt < 5; attempt++) {
       try {
         return await inTransaction(this.pool, async (client) => {
           await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
@@ -194,17 +212,55 @@ export class EtaUncertaintyClaimService {
             'receptionist',
             'clinic_admin',
           ]);
-          const time = await client.query<{ evaluated_at: Date }>(
-            'SELECT clock_timestamp() AS evaluated_at',
+
+          // Durable replay FIRST, before inspecting changed source epochs.
+          // This supports a caller that lost the original commit response and
+          // knows only its stable key. It never creates new evidence on replay.
+          const receipt = await client.query<{
+            claim_id: string;
+            session_id: string;
+            queue_entry_id: string;
+            snapshot: EtaUncertaintySnapshot;
+          }>(
+            `SELECT receipt.claim_id::text, receipt.session_id::text,
+                    receipt.queue_entry_id::text, claim.snapshot
+               FROM eta_claim_idempotency_receipts receipt
+               JOIN eta_uncertainty_claims claim
+                 ON claim.id=receipt.claim_id
+                AND claim.clinic_id=receipt.clinic_id
+              WHERE receipt.clinic_id=$1 AND receipt.request_key=$2`,
+            [scope.clinicId, requestKey],
           );
-          const instant = time.rows[0]?.evaluated_at;
-          if (
-            !(instant instanceof Date) ||
-            !Number.isFinite(instant.getTime())
-          ) {
-            throw new EtaPublicationStaleError();
+          if (receipt.rows[0]) {
+            const previous = receipt.rows[0];
+            if (
+              previous.session_id !== sessionId ||
+              previous.queue_entry_id !== entryId
+            ) {
+              throw new EtaPublicationConflictError();
+            }
+            return {
+              claimId: previous.claim_id,
+              snapshot: previous.snapshot,
+            };
           }
-          const evaluatedAt = instant.toISOString();
+
+          // The initial instant comes only from the DB inside this
+          // transaction; on retry it MUST remain the identical first value.
+          let evaluatedAt = frozen?.snapshot.evaluatedAt;
+          if (!evaluatedAt) {
+            const time = await client.query<{ evaluated_at: Date }>(
+              'SELECT clock_timestamp() AS evaluated_at',
+            );
+            const instant = time.rows[0]?.evaluated_at;
+            if (
+              !(instant instanceof Date) ||
+              !Number.isFinite(instant.getTime())
+            ) {
+              throw new EtaPublicationStaleError();
+            }
+            evaluatedAt = instant.toISOString();
+          }
 
           const current = await client.query<{
             source_epoch: string;
@@ -225,11 +281,22 @@ export class EtaUncertaintyClaimService {
           );
           const versions = current.rows[0];
           if (!versions) throw new EtaPublicationStaleError();
-          const source = {
+          const source: EtaSourceTuple = {
             sourceEpoch: asSafeEpoch(versions.source_epoch),
             clinicPriorEpoch: asSafeEpoch(versions.prior_epoch),
             queueRevision: asSafeEpoch(versions.queue_order_version),
           };
+          if (
+            frozen &&
+            (
+              source.sourceEpoch !== frozen.source.sourceEpoch ||
+              source.clinicPriorEpoch !== frozen.source.clinicPriorEpoch ||
+              source.queueRevision !== frozen.source.queueRevision
+            )
+          ) {
+            throw new EtaPublicationStaleError();
+          }
+
           const readModel = await new ReceptionistDashboardService(
             this.pool,
             () => new Date(evaluatedAt),
@@ -245,7 +312,14 @@ export class EtaUncertaintyClaimService {
           ) {
             throw new EtaPublicationStaleError();
           }
-          const payload = JSON.stringify(snapshot);
+          if (
+            frozen &&
+            JSON.stringify(snapshot) !== JSON.stringify(frozen.snapshot)
+          ) {
+            throw new EtaPublicationStaleError();
+          }
+          if (!frozen) frozen = { source, snapshot };
+
           const args = [
             scope.clinicId,
             sessionId,
@@ -254,52 +328,74 @@ export class EtaUncertaintyClaimService {
             source.clinicPriorEpoch,
             source.queueRevision,
             evaluatedAt,
-            payload,
+            JSON.stringify(snapshot),
           ];
-          const inserted = await client.query<{ id: string }>(
-            `INSERT INTO eta_uncertainty_claims (
-                 clinic_id,session_id,queue_entry_id,source_epoch,
-                 clinic_prior_epoch,queue_revision,estimate_version,
-                 evaluated_at,snapshot
-               ) VALUES ($1,$2,$3,$4,$5,$6,'eta-uncertainty/v1',$7,$8::jsonb)
-               ON CONFLICT (
-                 clinic_id,session_id,queue_entry_id,source_epoch,
-                 clinic_prior_epoch,estimate_version,evaluated_at
-               ) DO NOTHING
-               RETURNING id::text`,
-            args,
-          );
-          if (inserted.rows[0]) {
-            return { claimId: inserted.rows[0].id, snapshot };
-          }
-          // A same-millisecond concurrent insert can win the unique key.
-          // A duplicate with different payload must NEVER overwrite evidence.
-          const existing = await client.query<{
-            id: string;
-            same_payload: boolean;
-          }>(
-            `SELECT id::text, snapshot=$8::jsonb AS same_payload
+          const lookupSql = `SELECT id::text, snapshot=$8::jsonb AS same_payload
                FROM eta_uncertainty_claims
               WHERE clinic_id=$1 AND session_id=$2 AND queue_entry_id=$3
                 AND source_epoch=$4 AND clinic_prior_epoch=$5
                 AND queue_revision=$6 AND estimate_version='eta-uncertainty/v1'
-                AND evaluated_at=$7`,
-            args,
-          );
-          if (!existing.rows[0]) throw new EtaPublicationStaleError();
-          if (!existing.rows[0].same_payload) {
+                AND evaluated_at=$7`;
+
+          // Exact replay of a tuple committed by a different idempotency key
+          // is valid only if its byte-normalized payload is identical.
+          const previous = await client.query<{
+            id: string;
+            same_payload: boolean;
+          }>(lookupSql, args);
+          let claimId = previous.rows[0]?.id;
+          if (previous.rows[0] && !previous.rows[0].same_payload) {
             throw new EtaPublicationConflictError();
           }
-          return { claimId: existing.rows[0].id, snapshot };
+          if (!claimId) {
+            const inserted = await client.query<{ id: string }>(
+              `INSERT INTO eta_uncertainty_claims (
+                 clinic_id,session_id,queue_entry_id,source_epoch,
+                 clinic_prior_epoch,queue_revision,estimate_version,
+                 evaluated_at,snapshot
+               ) VALUES ($1,$2,$3,$4,$5,$6,'eta-uncertainty/v1',$7,$8::jsonb)
+               ON CONFLICT DO NOTHING
+               RETURNING id::text`,
+              args,
+            );
+            claimId = inserted.rows[0]?.id;
+            if (!claimId) {
+              // Retry from a new snapshot; the winning row can now be read
+              // using the preserved tuple/time, never a freshly sampled time.
+              throw new EtaClaimRetryRequiredError();
+            }
+          }
+
+          const receiptInsert = await client.query<{ claim_id: string }>(
+            `INSERT INTO eta_claim_idempotency_receipts (
+                 clinic_id, request_key, session_id, queue_entry_id, claim_id
+               ) VALUES ($1,$2,$3,$4,$5)
+               ON CONFLICT (clinic_id, request_key) DO NOTHING
+               RETURNING claim_id::text`,
+            [scope.clinicId, requestKey, sessionId, entryId, claimId],
+          );
+          if (!receiptInsert.rows[0]) {
+            // The other transaction may have committed this stable key.
+            // Roll back ANY claim written here, then read its receipt anew.
+            throw new EtaClaimRetryRequiredError();
+          }
+          return { claimId, snapshot };
         });
       } catch (error) {
-        const retry =
+        const serializationFailure =
           error &&
           typeof error === 'object' &&
           'code' in error &&
           error.code === '40001';
-        if (retry && attempt < 2) continue;
-        if (retry) throw new EtaPublicationStaleError();
+        if (
+          (serializationFailure || error instanceof EtaClaimRetryRequiredError) &&
+          attempt < 4
+        ) {
+          continue;
+        }
+        if (serializationFailure || error instanceof EtaClaimRetryRequiredError) {
+          throw new EtaPublicationStaleError();
+        }
         throw error;
       }
     }
