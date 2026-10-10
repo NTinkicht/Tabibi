@@ -710,6 +710,40 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     expect(claim.snapshot.latestMinutes).toBe(13);
   });
 
+  it('aligns interpolated historical median across committed sessions', async () => {
+    // Seed four completed, prior-day samples for the same doctor directly
+    // into the committed historical session. No current-session duration
+    // samples exist, so both estimators must take the clinic-prior branch.
+    const durations = [4, 6, 11, 16];
+    for (let index = 0; index < durations.length; index++) {
+      const entry = await checkedIn(`parity-historical-${index}`);
+      await pool.query(
+        `UPDATE queue_entries
+            SET session_id=$2, state='completed',
+                called_at='2026-09-07 09:40:00+00'::timestamptz,
+                in_consultation_started_at=
+                  '2026-09-07 10:00:00+00'::timestamptz
+                  - ($3::double precision * interval '1 minute'),
+                completed_at='2026-09-07 10:00:00+00'::timestamptz
+          WHERE id=$1 AND clinic_id=$4`,
+        [entry, ids.historicSession, durations[index], ids.clinic],
+      );
+    }
+    await checkedIn('parity-history-ahead');
+    const target = await checkedIn('parity-history-target');
+    const claim = await new EtaUncertaintyClaimService(pool).claimCurrent(
+      scope,
+      ids.session,
+      target,
+      'parity-historical-even-median',
+    );
+    expect(claim.snapshot.explanationCodes).toContain('historical-median');
+    expect(claim.snapshot.explanationCodes).toContain('queue-depth');
+    expect(claim.snapshot.earliestMinutes).toBe(6);
+    expect(claim.snapshot.expectedMinutes).toBe(9);
+    expect(claim.snapshot.latestMinutes).toBe(13);
+  });
+
   it('keeps audited priority-change explanation aligned in SQL and TS', async () => {
     const leading = await checkedIn('parity-priority-leading');
     const target = await checkedIn('parity-priority-target');
