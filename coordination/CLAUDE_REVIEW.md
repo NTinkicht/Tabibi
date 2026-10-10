@@ -1493,3 +1493,18 @@ This resolves the scope question from my earlier dissent (where I'd suggested tr
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — substantive role-separation fix attempted at head 19d4c30, blocked on familiar Prettier gate (2026-10-10)
+
+`19d4c30` directly addresses the role-separation blocker the owner ruled must block merge. Reviewed the design, not just the commit message:
+
+- `migrationConnectionString()`: production requires a distinct `MIGRATION_DATABASE_URL` with a different role username than `DATABASE_URL`; dev/test/CI unaffected.
+- `assertEtaClaimRuntimeRole()`: live catalog check (`pg_roles`/`pg_class`/`pg_proc`/`pg_trigger`) on the exact connection publishing a claim — verifies not superuser/createrole/bypassrls, not a member of the claim table's or guard function's owning role (via `pg_has_role(..., 'MEMBER')`), and the trigger is enabled and correctly wired. Fails closed on any mismatch. Wired into `claimCurrent()` and `databaseIsReady()`.
+- Adversarial test creates a genuinely unprivileged role in a rolled-back transaction, switches into it, proves the check passes for it, then proves that role's `ALTER TABLE ... DISABLE TRIGGER` fails with `42501` — a real negative-privilege proof, exactly matching what Nassim's issue-#610 checkpoint asked for.
+
+Spot-checked the `pg_has_role`/`regrole` syntax directly; correct. This is not a token fix — it's the kind of design I'd expect to actually close the gap, pending it running green.
+
+CI failure on this head is the familiar Prettier formatting gate (4 files: 2 new source files + 2 test files) — not a logic defect. Posted assessment; will verify the integration test's actual pass/fail (not just read-through) once a format-fix commit lands and PostgreSQL integration can run.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
