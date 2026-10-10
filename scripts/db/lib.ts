@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Client } from 'pg';
-import { getEnvironment } from '../../src/platform/config/env';
+import { migrationConnectionString } from '../../src/platform/config/migration-credentials';
 
 const migrationDirectory = resolve(process.cwd(), 'db/migrations');
 const nonTransactionalMarker = '-- tabibi:no-transaction';
@@ -24,7 +24,7 @@ async function runNonTransactionalMigration(
 
 export async function migrate(): Promise<void> {
   const client = new Client({
-    connectionString: getEnvironment().DATABASE_URL,
+    connectionString: migrationConnectionString(),
   });
   await client.connect();
   try {

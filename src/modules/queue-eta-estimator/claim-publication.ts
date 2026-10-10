@@ -6,6 +6,7 @@ import {
   type EtaUncertaintySnapshot,
 } from '@/modules/queue-eta-estimator/uncertainty-v1';
 import { inTransaction } from '@/platform/database/transaction';
+import { assertEtaClaimRuntimeRole } from '@/platform/database/eta-claim-runtime-role';
 
 /**
  * Internal claim-only persistence boundary for owner-approved WU #610.
@@ -210,6 +211,7 @@ export class EtaUncertaintyClaimService {
       try {
         return await inTransaction(this.pool, async (client) => {
           await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+          await assertEtaClaimRuntimeRole(client);
           await requireClinicRole(client, scope, [
             'receptionist',
             'clinic_admin',

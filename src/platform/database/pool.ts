@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import { getEnvironment } from '@/platform/config/env';
+import { assertEtaClaimRuntimeRole } from './eta-claim-runtime-role';
 
 let pool: Pool | undefined;
 let publicDiscoveryPool: Pool | undefined;
@@ -40,7 +41,16 @@ export async function databaseIsReady(): Promise<boolean> {
     const result = await getPool().query<{ ready: number }>(
       'SELECT 1 AS ready',
     );
-    return result.rows[0]?.ready === 1;
+    if (result.rows[0]?.ready !== 1) return false;
+    if (getEnvironment().NODE_ENV === 'production') {
+      const client = await getPool().connect();
+      try {
+        await assertEtaClaimRuntimeRole(client);
+      } finally {
+        client.release();
+      }
+    }
+    return true;
   } catch (error) {
     getLogger().error({ err: error }, 'database readiness check failed');
     return false;

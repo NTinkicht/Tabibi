@@ -110,6 +110,46 @@ function estimate(
   });
 }
 
+describe('WU610: production ETA database privilege boundary', () => {
+  it('rejects an owner connection and permits a role that cannot disable the guard', async () => {
+    const { assertEtaClaimRuntimeRole } = await import(
+      '@/platform/database/eta-claim-runtime-role'
+    );
+    const actor = await pool.connect();
+    const restrictedRole = 'eta_runtime_probe_' + randomUUID().replaceAll('-', '').slice(0, 16);
+    try {
+      // The PostgreSQL CI container has CREATEROLE rights; all probe DDL is
+      // rolled back, so no role or grant is retained outside the transaction.
+      await actor.query('BEGIN');
+      await expect(
+        assertEtaClaimRuntimeRole(actor, 'production'),
+      ).rejects.toThrow(/privileged/);
+      await actor.query(`CREATE ROLE "${restrictedRole}" NOLOGIN`);
+      await actor.query(
+        `GRANT USAGE ON SCHEMA public TO "${restrictedRole}"`,
+      );
+      await actor.query(
+        `GRANT SELECT, INSERT ON eta_uncertainty_claims TO "${restrictedRole}"`,
+      );
+      await actor.query(`SET LOCAL ROLE "${restrictedRole}"`);
+      await expect(assertEtaClaimRuntimeRole(actor, 'production')).resolves.toBeUndefined();
+      await actor.query('SAVEPOINT no_trigger_bypass');
+      await expect(
+        actor.query(
+          'ALTER TABLE eta_uncertainty_claims DISABLE TRIGGER eta_guard_claim_publication_insert',
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
+      await actor.query('ROLLBACK TO SAVEPOINT no_trigger_bypass');
+      await actor.query('ROLLBACK');
+    } catch (error) {
+      await actor.query('ROLLBACK');
+      throw error;
+    } finally {
+      actor.release();
+    }
+  });
+});
+
 describe('WU610: atomic, immutable ETA claim publication', () => {
   it('accepts one exact-source claim and converges concurrent identical retries', async () => {
     const entryId = await checkedIn('eta-claim-first');
