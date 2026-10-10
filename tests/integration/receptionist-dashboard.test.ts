@@ -61,6 +61,38 @@ beforeEach(async () => {
 afterAll(async () => pool.end());
 
 describe('receptionist dashboard read model', () => {
+  it('takes the default ETA evaluation instant from PostgreSQL', async () => {
+    const queue = new QueueService(pool);
+    const registered = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Trusted database clock',
+      preferredLocale: 'fr',
+      idempotencyKey: 'db-clock-register',
+      correlationId: 'db-clock-register',
+    });
+    await queue.command(scope, ids.sessionA, registered.entry.id, {
+      command: 'check_in',
+      idempotencyKey: 'db-clock-checkin',
+      correlationId: 'db-clock-checkin',
+    });
+
+    const before = await pool.query<{ sampled: Date }>(
+      'SELECT clock_timestamp() AS sampled',
+    );
+    const snapshot = await new ReceptionistDashboardService(pool).getSnapshot(
+      scope,
+      ids.sessionA,
+    );
+    const after = await pool.query<{ sampled: Date }>(
+      'SELECT clock_timestamp() AS sampled',
+    );
+    const stamped = new Date(snapshot.generatedAt).getTime();
+    expect(stamped).toBeGreaterThanOrEqual(before.rows[0]!.sampled.getTime());
+    expect(stamped).toBeLessThanOrEqual(after.rows[0]!.sampled.getTime());
+    expect(snapshot.entries[0]?.eta?.uncertainty?.evaluatedAt).toBe(
+      snapshot.generatedAt,
+    );
+  });
+
   it('composes session, delay and deterministic fallback ETA without clinical/contact values', async () => {
     const queue = new QueueService(pool);
     const waiting = await queue.registerWalkIn(scope, ids.sessionA, {
@@ -96,7 +128,7 @@ describe('receptionist dashboard read model', () => {
       checked.entry.id,
       waiting.entry.id,
     ]);
-    expect(snapshot.entries[0]!.eta).toEqual({
+    expect(snapshot.entries[0]!.eta).toMatchObject({
       patientsAhead: 0,
       minWaitMinutes: 20,
       maxWaitMinutes: 20,
@@ -113,9 +145,55 @@ describe('receptionist dashboard read model', () => {
       estimateSource: 'fallback',
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
+    expect(snapshot.entries[0]!.eta?.uncertainty).toMatchObject({
+      estimateVersion: 'eta-uncertainty/v1',
+      queueRevision: snapshot.session.queueOrderVersion,
+      earliestMinutes: 20,
+      expectedMinutes: 20,
+      latestMinutes: 20,
+      explanationCodes: ['declared-delay', 'fallback'],
+    });
+    expect(snapshot.entries[1]!.eta?.uncertainty).toBeUndefined();
     expect(snapshot.refreshAfterSeconds).toBe(30);
     expect(JSON.stringify(snapshot)).not.toContain('0555000000');
     expect(Object.keys(snapshot.entries[0]!)).not.toContain('diagnosis');
+  });
+
+  it('suppresses staff countdowns while the session is paused', async () => {
+    const queue = new QueueService(pool);
+    const entry = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Paused service candidate',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu610-paused-register',
+      correlationId: 'wu610-paused-register',
+    });
+    await queue.command(scope, ids.sessionA, entry.entry.id, {
+      command: 'check_in',
+      idempotencyKey: 'wu610-paused-checkin',
+      correlationId: 'wu610-paused-checkin',
+    });
+    const dashboard = new ReceptionistDashboardService(pool);
+    const before = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(before.entries[0]?.eta?.uncertainty?.estimateVersion).toBe(
+      'eta-uncertainty/v1',
+    );
+    await pool.query(
+      "UPDATE consultation_sessions SET status='paused' WHERE id=$1",
+      [ids.sessionA],
+    );
+    const paused = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(paused.session.status).toBe('paused');
+    expect(paused.entries[0]?.eta).toBeNull();
+    expect(paused.entries[0]?.activeConsultationRemainingMinutes).toBeNull();
+    await pool.query(
+      "UPDATE consultation_sessions SET status='open' WHERE id=$1",
+      [ids.sessionA],
+    );
+    const resumed = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(resumed.session.status).toBe('open');
+    expect(resumed.entries[0]?.eta?.uncertainty?.estimateVersion).toBe(
+      'eta-uncertainty/v1',
+    );
   });
 
   it('uses a clamped same-session observed median only after three completed samples and stays deterministic', async () => {
@@ -172,7 +250,7 @@ describe('receptionist dashboard read model', () => {
     const secondEntry = firstRead.entries.find(
       (entry) => entry.id === second.entry.id,
     )!;
-    expect(secondEntry.eta).toEqual({
+    expect(secondEntry.eta).toMatchObject({
       patientsAhead: 1,
       minWaitMinutes: 28,
       maxWaitMinutes: 35,
@@ -441,6 +519,16 @@ describe('receptionist dashboard read model', () => {
       before.session.queueOrderVersion + 1,
     );
     expect(afterEta?.revision).not.toBe(beforeEta?.revision);
+    expect(beforeEta?.uncertainty?.estimateVersion).toBe('eta-uncertainty/v1');
+    expect(beforeEta?.uncertainty?.explanationCodes).toContain(
+      'called-not-started',
+    );
+    expect(afterEta?.uncertainty?.queueRevision).toBe(
+      after.session.queueOrderVersion,
+    );
+    expect(afterEta?.uncertainty?.explanationCodes).toContain(
+      'active-consultation-remaining',
+    );
 
     await command(first.entry.id, 'start_consultation', 'wu192-first-start');
     const retry = await dashboard.getSnapshot(scope, ids.sessionA);
@@ -450,6 +538,102 @@ describe('receptionist dashboard read model', () => {
     expect(
       retry.entries.find((row) => row.id === second.entry.id)?.eta?.revision,
     ).toBe(afterEta?.revision);
+  });
+
+  it('ranks an active consultation ahead of newly called service in v1 only', async () => {
+    const queue = new QueueService(pool);
+    const first = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Active service',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu606-active-register',
+      correlationId: 'wu606-active-register',
+    });
+    const second = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Called service',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu606-called-register',
+      correlationId: 'wu606-called-register',
+    });
+    const command = async (
+      id: string,
+      action: 'check_in' | 'call' | 'start_consultation',
+      key: string,
+    ) =>
+      queue.command(scope, ids.sessionA, id, {
+        command: action,
+        idempotencyKey: key,
+        correlationId: 'wu606-precedence',
+      });
+    await command(first.entry.id, 'check_in', 'wu606-active-checkin');
+    await command(second.entry.id, 'check_in', 'wu606-called-checkin');
+    await command(first.entry.id, 'call', 'wu606-active-call');
+    await command(first.entry.id, 'start_consultation', 'wu606-active-start');
+    await command(second.entry.id, 'call', 'wu606-second-call');
+    // Force historical eligibility order to prefer the called entry,
+    // without changing the already committed actual active consultation.
+    await pool.query(
+      'UPDATE queue_entries SET eligibility_order=999 WHERE id=$1',
+      [first.entry.id],
+    );
+
+    const snapshot = await new ReceptionistDashboardService(pool).getSnapshot(
+      scope,
+      ids.sessionA,
+    );
+    const active = snapshot.entries.find((row) => row.id === first.entry.id);
+    const called = snapshot.entries.find((row) => row.id === second.entry.id);
+    expect(called?.eta?.uncertainty?.estimateVersion).toBe(
+      'eta-uncertainty/v1',
+    );
+    expect(called?.eta?.uncertainty?.explanationCodes).toContain(
+      'active-consultation-remaining',
+    );
+    expect(active?.eta?.uncertainty?.explanationCodes).not.toContain(
+      'called-not-started',
+    );
+  });
+
+  it('explains committed priority reorders in the staff ETA', async () => {
+    const queue = new QueueService(pool);
+    const first = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'First non-priority patient',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu606-audit-priority-first',
+      correlationId: 'wu606-audit-priority-first',
+    });
+    const second = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Second prioritized patient',
+      preferredLocale: 'fr',
+      idempotencyKey: 'wu606-audit-priority-second',
+      correlationId: 'wu606-audit-priority-second',
+    });
+    for (const [index, entry] of [first.entry, second.entry].entries()) {
+      await queue.command(scope, ids.sessionA, entry.id, {
+        command: 'check_in',
+        idempotencyKey: `wu606-audit-checkin-${index}`,
+        correlationId: `wu606-audit-checkin-${index}`,
+      });
+    }
+    const dashboard = new ReceptionistDashboardService(pool);
+    const before = await dashboard.getSnapshot(scope, ids.sessionA);
+    const beforeFirst = before.entries.find((row) => row.id === first.entry.id);
+    const beforeCodes = beforeFirst?.eta?.uncertainty?.explanationCodes;
+    expect(beforeCodes).not.toContain('priority-change');
+
+    await queue.reorder(scope, ids.sessionA, second.entry.id, {
+      targetPosition: 1,
+      expectedVersion: before.session.queueOrderVersion,
+      idempotencyKey: 'wu606-audit-reorder',
+      reason: 'Operational accommodation',
+      correlationId: 'wu606-audit-reorder',
+    });
+    const after = await dashboard.getSnapshot(scope, ids.sessionA);
+    const firstRow = after.entries.find((row) => row.id === first.entry.id);
+    const secondRow = after.entries.find((row) => row.id === second.entry.id);
+    const firstCodes = firstRow?.eta?.uncertainty?.explanationCodes;
+    const secondCodes = secondRow?.eta?.uncertainty?.explanationCodes;
+    expect(firstCodes).toContain('priority-change');
+    expect(secondCodes).toContain('priority-change');
   });
 
   it('denies wrong roles and treats a cross-clinic session as absent', async () => {

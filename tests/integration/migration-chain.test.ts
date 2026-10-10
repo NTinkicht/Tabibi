@@ -40,6 +40,14 @@ const committedMigrations = [
   '0032_doctor_global_consultation_open_guard.sql',
   '0033_doctor_global_consultation_insert_guard.sql',
   '0034_doctor_global_active_consultation_guard.sql',
+  '0035_eta_source_epochs_and_claims.sql',
+  '0036_eta_reorder_audit_lookup_index.sql',
+  '0037_doctor_active_guard_definer_boundary.sql',
+  '0038_doctor_reassignment_active_consultation_guard.sql',
+  '0039_active_queue_doctor_assignment_lock.sql',
+  '0040_doctor_guard_session_mvcc_fence.sql',
+  '0041_eta_active_start_millisecond_parity.sql',
+  '0042_doctor_guard_nowait_lock_order.sql',
 ];
 
 beforeAll(async () => {
@@ -306,6 +314,82 @@ describe('committed migration chain', () => {
       );
       await writer.end();
       await competitor.end();
+    }
+  });
+
+  it('rebuilds the ETA reorder index safely after an interrupted attempt', async () => {
+    const migration = await readFile(
+      resolve(
+        process.cwd(),
+        'db/migrations/0036_eta_reorder_audit_lookup_index.sql',
+      ),
+      'utf8',
+    );
+    expect(migration.startsWith('-- tabibi:no-transaction\n')).toBe(true);
+    const drop = migration.indexOf(
+      'DROP INDEX CONCURRENTLY IF EXISTS audit_events_eta_reorder_session_idx;',
+    );
+    const create = migration.indexOf(
+      'CREATE INDEX CONCURRENTLY audit_events_eta_reorder_session_idx',
+    );
+    expect(drop).toBeGreaterThan(0);
+    expect(create).toBeGreaterThan(drop);
+    // Existing migrator runs each semicolon-delimited statement separately.
+    // No SQL comment within this non-transactional migration may contain
+    // an extra semicolon, which would make the following fragment invalid.
+    const uncommented = migration
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('--'))
+      .join('\n');
+    expect(uncommented.split(';').filter((sql) => sql.trim())).toHaveLength(2);
+  });
+
+  it('recovers an ETA reorder index left behind before migration ledger recording', async () => {
+    const migration = await readFile(
+      resolve(
+        process.cwd(),
+        'db/migrations/0036_eta_reorder_audit_lookup_index.sql',
+      ),
+      'utf8',
+    );
+    const statements = migration
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('--'))
+      .join('\n')
+      .split(';')
+      .map((statement) => statement.trim())
+      .filter(Boolean);
+    expect(statements).toHaveLength(2);
+
+    // Simulate a concurrent index build that committed before the migration
+    // ledger write. A stale object with the correct name must not block retry.
+    await client.query(
+      'DROP INDEX CONCURRENTLY IF EXISTS audit_events_eta_reorder_session_idx',
+    );
+    await client.query(
+      'CREATE INDEX audit_events_eta_reorder_session_idx ON audit_events (clinic_id, occurred_at)',
+    );
+    try {
+      for (const statement of statements) await client.query(statement);
+      const recovered = await client.query<{
+        valid: boolean;
+        ready: boolean;
+        definition: string;
+      }>(
+        `SELECT idx.indisvalid AS valid, idx.indisready AS ready,
+                pg_get_indexdef(idx.indexrelid) AS definition
+           FROM pg_index idx
+           JOIN pg_class relation ON relation.oid=idx.indexrelid
+          WHERE relation.relname='audit_events_eta_reorder_session_idx'`,
+      );
+      expect(recovered.rows).toHaveLength(1);
+      expect(recovered.rows[0]!.valid).toBe(true);
+      expect(recovered.rows[0]!.ready).toBe(true);
+      expect(recovered.rows[0]!.definition).toMatch(/metadata.*sessionId/);
+      expect(recovered.rows[0]!.definition).toContain('queue_entry.reordered');
+    } finally {
+      // Keep the disposable CI database usable even if an assertion fails.
+      for (const statement of statements) await client.query(statement);
     }
   });
 

@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
 import type { QueueEntryState } from '@/modules/queue';
 import {
@@ -8,6 +8,11 @@ import {
   selectConsultationEstimate,
 } from '@/modules/queue-eta-estimator';
 import { createEtaSnapshot } from '@/modules/queue-eta-estimator/snapshot';
+import {
+  computeEtaUncertaintyV1,
+  isEtaUncertaintySnapshotForRevision,
+  type EtaUncertaintySnapshot,
+} from '@/modules/queue-eta-estimator/uncertainty-v1';
 import type { SessionStatus } from '@/modules/session';
 import { inTransaction } from '@/platform/database/transaction';
 
@@ -49,6 +54,7 @@ export interface ReceptionistDashboardEntry {
     estimatedConsultationMinutes: number;
     estimateSource: QueueEtaEstimateSource;
     observedSampleCount: number;
+    uncertainty?: EtaUncertaintySnapshot;
   } | null;
 }
 
@@ -96,21 +102,24 @@ type Row = {
 export class ReceptionistDashboardService {
   constructor(
     private readonly pool: Pool,
-    private readonly now: () => Date = () => new Date(),
+    private readonly now?: () => Date,
   ) {}
 
   async getSnapshot(
     scope: ClinicScope,
     sessionId: string,
+    existingClient?: PoolClient,
   ): Promise<ReceptionistDashboardSnapshot> {
-    return inTransaction(this.pool, async (client) => {
-      // getSnapshot performs multiple SELECTs that must observe one committed state.
-      // PostgreSQL READ COMMITTED takes a fresh snapshot per statement, which can mix
-      // queue/session rows from one version with duration samples from a later commit.
-      // This read-only REPEATABLE READ transaction fixes one snapshot for the whole read.
-      await client.query(
-        'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
-      );
+    // An internally supplied transaction is required to have established its
+    // own REPEATABLE READ isolation BEFORE the first statement. This lets the
+    // claim publisher read both provenance epochs and ETA inputs atomically.
+    const build = async (client: PoolClient) => {
+      // Existing public/staff display remains READ ONLY REPEATABLE READ.
+      if (!existingClient) {
+        await client.query(
+          'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
+        );
+      }
       await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
       const result = await client.query<Row>(
         `SELECT session.id AS session_id,
@@ -175,19 +184,73 @@ export class ReceptionistDashboardService {
            ) historical`,
         [scope.clinicId, sessionId, first.doctor_id, first.starts_at],
       );
+      // Priority decisions are durable audit facts; a current priority_order
+      // alone cannot identify an earlier mutation after a patient was called.
+      // Read them under the same REPEATABLE READ snapshot as queue positions.
+      const priorityResult = await client.query<{ entry_id: string }>(
+        `SELECT DISTINCT affected->>'entryId' AS entry_id
+           FROM audit_events audit
+           CROSS JOIN LATERAL jsonb_array_elements(
+             CASE WHEN jsonb_typeof(audit.metadata->'resultingOrder')='array'
+               THEN audit.metadata->'resultingOrder' ELSE '[]'::jsonb END
+           ) affected
+          WHERE audit.clinic_id=$1 AND audit.action='queue_entry.reordered'
+            AND audit.metadata->>'sessionId'=$2`,
+        [scope.clinicId, sessionId],
+      );
+      const priorityAffectedEntries = new Set(
+        priorityResult.rows.map((row) => row.entry_id),
+      );
       const estimate = selectConsultationEstimate(
         durationResult.rows.map((row) => row.duration_minutes),
         historicalDurationResult.rows.map((row) => row.duration_minutes),
       );
       const declaredDelayMinutes = first.declared_delay_minutes ?? 0;
-      const snapshotNow = this.now();
+      // Sample the production ETA instant inside the same committed read
+      // transaction, never from this application's ambient wall clock.
+      // A supplied clock is only for deterministic fixtures and the claim
+      // publisher's trusted PostgreSQL time captured in its transaction.
+      const clockResult = this.now
+        ? null
+        : await client.query<{ evaluated_at: Date }>(
+            'SELECT clock_timestamp() AS evaluated_at',
+          );
+      const snapshotNow = this.now?.() ?? clockResult?.rows[0]?.evaluated_at;
+      if (
+        !(snapshotNow instanceof Date) ||
+        !Number.isFinite(snapshotNow.getTime())
+      ) {
+        throw new Error('Trusted ETA evaluation instant is unavailable');
+      }
       let patientsAhead = 0;
+      // Retain the existing dashboard order and legacy range semantics.
+      // v1 alone ranks the active consultation strictly ahead of called work,
+      // keeping existing order stable within each state group.
+      const v1ServiceRows = result.rows
+        .filter(
+          (row) =>
+            row.entry_id &&
+            (row.entry_state === 'in_consultation' ||
+              row.entry_state === 'called' ||
+              row.entry_state === 'checked_in'),
+        )
+        .sort((left, right) => {
+          const rank = (state: QueueEntryState | null) =>
+            state === 'in_consultation' ? 0 : state === 'called' ? 1 : 2;
+          return rank(left.entry_state) - rank(right.entry_state);
+        });
+      const v1Positions = new Map(
+        v1ServiceRows.map((row, index) => [row.entry_id, index]),
+      );
 
       const entries = result.rows.flatMap((row) => {
         if (!row.entry_id) return [];
         const state = row.entry_state!;
         const eligible = OPERATIONAL_STATE_RANK[state] < TERMINAL_STATE_RANK;
-        const range = eligible
+        // A paused session is not advancing. Keep its committed state and
+        // queue entries visible, but never display a precise-looking ETA.
+        const etaEligible = eligible && first.session_status === 'open';
+        const range = etaEligible
           ? createEtaSnapshot({
               patientsAhead,
               declaredDelayMinutes,
@@ -199,6 +262,71 @@ export class ReceptionistDashboardService {
               delayVersion: first.delay_version,
             })
           : null;
+        // Count only committed v1 service slots preceding this target.
+        // An active consultation precedes newly called work regardless of
+        // historical eligibility/priority ordering.
+        const v1Index = v1Positions.get(row.entry_id);
+        const committedServiceAhead =
+          v1Index === undefined ? [] : v1ServiceRows.slice(0, v1Index);
+        const activeAhead = committedServiceAhead.filter(
+          (prior) => prior.entry_state === 'in_consultation',
+        );
+        const activeStartedAt = activeAhead[0]?.in_consultation_started_at;
+        let uncertainty: EtaUncertaintySnapshot | null = null;
+        if (
+          eligible &&
+          state !== 'waiting' &&
+          first.session_status === 'open' &&
+          row.entry_id &&
+          activeAhead.length <= 1 &&
+          (activeAhead.length === 0 ||
+            (activeStartedAt instanceof Date &&
+              Number.isFinite(activeStartedAt.getTime()) &&
+              activeStartedAt <= snapshotNow))
+        ) {
+          const queueRevision = Number(first.queue_order_version);
+          try {
+            const candidate = computeEtaUncertaintyV1({
+              clinicId: scope.clinicId,
+              sessionId,
+              targetEntryId: row.entry_id,
+              queueRevision,
+              evaluatedAt: snapshotNow.toISOString(),
+              declaredDelayMinutes,
+              activeConsultationRemainingMinutes:
+                activeStartedAt instanceof Date
+                  ? computeActiveConsultationRemainingMinutes({
+                      startedAt: activeStartedAt,
+                      now: snapshotNow,
+                      estimatedConsultationMinutes:
+                        estimate.estimatedConsultationMinutes,
+                    })
+                  : 0,
+              slotsAhead: committedServiceAhead.length,
+              activeSlotIncludedInAhead: activeAhead.length === 1,
+              calledNotStartedAhead: committedServiceAhead.filter(
+                (prior) => prior.entry_state === 'called',
+              ).length,
+              priorityChanged:
+                priorityAffectedEntries.has(row.entry_id) ||
+                committedServiceAhead.some(
+                  (prior) =>
+                    prior.entry_id !== null &&
+                    priorityAffectedEntries.has(prior.entry_id),
+                ),
+              estimatedConsultationMinutes:
+                estimate.estimatedConsultationMinutes,
+              estimateSource: estimate.estimateSource,
+              sessionStatus: 'open',
+            });
+            if (isEtaUncertaintySnapshotForRevision(candidate, queueRevision)) {
+              uncertainty = candidate;
+            }
+          } catch (error) {
+            if (!(error instanceof RangeError)) throw error;
+            // Invalid committed metadata cannot produce a v1 snapshot estimate.
+          }
+        }
         const eta =
           eligible && range
             ? {
@@ -210,6 +338,7 @@ export class ReceptionistDashboardService {
                   estimate.estimatedConsultationMinutes,
                 estimateSource: estimate.estimateSource,
                 observedSampleCount: estimate.observedSampleCount,
+                ...(uncertainty ? { uncertainty } : {}),
               }
             : null;
         if (eligible) patientsAhead += 1;
@@ -230,7 +359,9 @@ export class ReceptionistDashboardService {
             preferredLocale: row.preferred_locale!,
             hasContact: row.has_contact!,
             activeConsultationRemainingMinutes:
-              state === 'in_consultation' && row.in_consultation_started_at
+              first.session_status === 'open' &&
+              state === 'in_consultation' &&
+              row.in_consultation_started_at
                 ? computeActiveConsultationRemainingMinutes({
                     startedAt: row.in_consultation_started_at,
                     now: snapshotNow,
@@ -259,7 +390,10 @@ export class ReceptionistDashboardService {
         },
         entries,
       };
-    });
+    };
+    return existingClient
+      ? build(existingClient)
+      : inTransaction(this.pool, build);
   }
 }
 
