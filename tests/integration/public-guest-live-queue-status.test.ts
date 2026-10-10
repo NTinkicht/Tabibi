@@ -248,9 +248,7 @@ describe('WU63 public guest live queue status', () => {
     const evaluatedAt = response.eta?.uncertainty?.evaluatedAt;
     expect(evaluatedAt).toBeDefined();
     const stamped = new Date(evaluatedAt!).getTime();
-    expect(stamped).toBeGreaterThanOrEqual(
-      before.rows[0]!.sampled.getTime(),
-    );
+    expect(stamped).toBeGreaterThanOrEqual(before.rows[0]!.sampled.getTime());
     expect(stamped).toBeLessThanOrEqual(after.rows[0]!.sampled.getTime());
   });
 
