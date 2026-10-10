@@ -1395,3 +1395,19 @@ Status unchanged: one finding remains STILL_BLOCKING (payload-substance verifica
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — implementation attempt landed at c25ccb9, has a real SQL syntax bug (2026-10-10)
+
+Despite the three Codex dispatch failures, a real implementation commit landed: `c25ccb9` ("fix(eta): independently verify persisted claims against canonical DB inputs"). Approach is sound in principle — adds `eta_expected_claim_snapshot()`, a second independent in-DB recomputation of the full v1 payload (service-order queue projection, duration sampling, delay/active-minutes math, priority-change audit lookup), and the trigger now rejects any INSERT where `NEW.snapshot IS DISTINCT FROM` the recomputed value. This directly targets the payload-substance-verification gap, option (a) from the owner's brief.
+
+All three CI jobs failed on this head. Diagnosed both root causes independently (not duplicates of each other):
+
+1. **SQL syntax error.** `eta_expected_claim_snapshot` opens with `LANGUAGE plpgsql STABLE AS $` and closes with `END\n$;` — a single bare `$`, not `$$`. Confirmed via `cat -A` on the raw file content (ruled out a diff-rendering artifact) that this is literal. Every other function in the migration correctly uses `$$`. A lone `$` isn't a valid PostgreSQL dollar-quote delimiter, so this is a parse error that fails the migration outright — explains why both `PostgreSQL integration` and `Browser smoke` failed (both need the schema to apply).
+2. **Prettier formatting**, unrelated to #1: the new test in `eta-source-publication.test.ts` has the same recurring multi-line-argument formatting drift seen repeatedly earlier in this PR. This is why `Quality and build` failed (it exits at the `prettier --check` gate before reaching typecheck/build/tests, so it says nothing about #1).
+
+Posted both findings with exact line references and the one-line fix for each (change `$`→`$$` at both ends; run `npm run format`). Have not yet reviewed the semantic correctness of the recomputation logic itself (duration sampling policy, rounding, priority-change detection) since it's never actually executed — that review is next once a corrected commit lands and PostgreSQL integration can run.
+
+Status: payload-substance-verification finding not yet resolved — implementation exists but is currently broken. Not re-litigating MERGE_READY until a syntactically-valid, green-CI commit lands.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
