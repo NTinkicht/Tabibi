@@ -1351,3 +1351,12 @@ Posted this with a note that whether it's practically exploitable depends on who
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — self-correction: my own verification of the timestamp fix was incomplete (2026-10-10)
+
+Codex's review at `534ac87` caught a gap in my own earlier analysis. When I verified `3d2d9b1` (exact `transaction_timestamp()` match replacing the 5-minute window), I confirmed the claimed timestamp and the claimed data are pinned together within one transaction snapshot — true — and concluded that was sufficient. It isn't: `transaction_timestamp()` is fixed at `BEGIN` and never advances, so a transaction held open for an arbitrary duration (direct SQL, or `claimCurrent()` itself under stall) still satisfies the equality check with an hours-old instant. The guard checks internal consistency (claimed time == transaction start) but never absolute freshness (transaction start ≈ wall-clock now at insert). Re-read `eta_guard_claim_publication()` to confirm — no such bound exists. Posted the finding, noting the fix direction (bound `clock_timestamp() - transaction_timestamp()`) without guessing a specific threshold, since that depends on `claimCurrent()`'s normal execution time which I haven't measured.
+
+This is now the second genuinely open finding (alongside the payload-substance-verification gap from two entries ago) on an otherwise CI-green, heavily-hardened subsystem.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
