@@ -343,6 +343,17 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
+  -- Service code captures the authoritative evaluation instant INSIDE its
+  -- publishing transaction. Additionally reject arbitrary past/future time
+  -- values on direct SQL inserts; replay of an old claim is read-only.
+  -- The tolerance covers bounded in-transaction work and clock precision,
+  -- and is NOT a substitute for the service's trusted DB clock capture.
+  IF NEW.evaluated_at < clock_timestamp() - interval '5 minutes'
+     OR NEW.evaluated_at > clock_timestamp() + interval '1 second' THEN
+    RAISE EXCEPTION 'ETA evaluation instant is outside the publication window'
+      USING ERRCODE = '22023';
+  END IF;
+
   -- The database is the last line of defense even for direct SQL writers.
   -- Accept only bounded normalized whole-minute values and public-safe codes.
   IF (NEW.snapshot->>'earliestMinutes')::numeric < 0
