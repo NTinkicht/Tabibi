@@ -526,6 +526,54 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     }
   }, 15_000);
 
+  it('rejects forged but shape-valid ETA numbers even with current epochs and transaction time', async () => {
+    await checkedIn('eta-claim-ahead-first');
+    const target = await checkedIn('eta-claim-forged-target');
+    const service = new EtaUncertaintyClaimService(pool);
+    const source = await service.readSourceTuple(scope, ids.session, target);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const time = await client.query<{ evaluated_at: Date }>(
+        "SELECT date_trunc('milliseconds', transaction_timestamp()) AS evaluated_at",
+      );
+      const trustedAt = time.rows[0]!.evaluated_at.toISOString();
+      // Shape and all epochs are genuine; only the advertised ETA is forged.
+      // The actual queue contains an eligible service slot ahead of target.
+      const forged = {
+        ...estimate(target, source),
+        evaluatedAt: trustedAt,
+        earliestMinutes: 0,
+        expectedMinutes: 0,
+        latestMinutes: 0,
+        explanationCodes: ['fallback'],
+      };
+      await expect(
+        client.query(
+          `INSERT INTO eta_uncertainty_claims (
+            clinic_id,session_id,queue_entry_id,source_epoch,
+            clinic_prior_epoch,queue_revision,estimate_version,
+            evaluated_at,snapshot
+          ) VALUES ($1,$2,$3,$4,$5,$6,'eta-uncertainty/v1',$7,$8::jsonb)`,
+          [
+            ids.clinic, ids.session, target, source.sourceEpoch,
+            source.clinicPriorEpoch, source.queueRevision,
+            trustedAt, JSON.stringify(forged),
+          ],
+        ),
+      ).rejects.toMatchObject({ code: '22023' });
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+
+    const valid = await service.claimCurrent(
+      scope, ids.session, target, `canonical-${target}`,
+    );
+    expect(valid.snapshot.expectedMinutes).toBeGreaterThan(0);
+    expect(valid.snapshot.explanationCodes).toContain('queue-depth');
+  });
+
   it('rejects stale and unsafe direct SQL claims', async () => {
     const entryId = await checkedIn('eta-claim-direct');
     const service = new EtaUncertaintyClaimService(pool);
