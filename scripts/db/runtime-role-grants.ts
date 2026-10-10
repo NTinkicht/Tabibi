@@ -1,4 +1,4 @@
-import type { Client } from 'pg';
+import type { PoolClient } from 'pg';
 import { getEnvironment } from '../../src/platform/config/env';
 
 /**
@@ -67,13 +67,15 @@ function identifier(value: string): string {
 }
 
 export async function provisionRuntimeDmlGrants(
-  client: Client,
+  client: Pick<PoolClient, 'query'>,
   source: Record<string, string | undefined> = process.env,
 ): Promise<void> {
   const env = getEnvironment(source);
   if (env.NODE_ENV !== 'production') return;
   const username = decodeURIComponent(new URL(env.DATABASE_URL).username);
-  if (!username) throw new Error('Production runtime database login is missing');
+  if (!username) {
+    throw new Error('Production runtime database login is missing');
+  }
 
   // The application login must exist independently before provisioning.
   // Never create a role, copy its password, or grant schema ownership.

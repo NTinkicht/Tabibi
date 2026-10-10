@@ -114,7 +114,8 @@ function estimate(
 describe('WU610: production ETA database privilege boundary', () => {
   it('provisions a login with operational DML but without trigger ownership', async () => {
     const admin = await pool.connect();
-    const login = 'eta_runtime_grants_' + randomUUID().replaceAll('-', '').slice(0, 16);
+    const login =
+      'eta_runtime_grants_' + randomUUID().replaceAll('-', '').slice(0, 16);
     const password = randomUUID().replaceAll('-', '');
     const url = new URL(process.env.DATABASE_URL!);
     url.username = login;
@@ -157,7 +158,12 @@ describe('WU610: production ETA database privilege boundary', () => {
       });
       const published = await new EtaUncertaintyClaimService(
         restricted,
-      ).claimCurrent(scope, ids.session, admitted.entry.id, 'restricted-role-publish');
+      ).claimCurrent(
+        scope,
+        ids.session,
+        admitted.entry.id,
+        'restricted-role-publish',
+      );
       expect(published.snapshot.estimateVersion).toBe('eta-uncertainty/v1');
     } finally {
       if (restricted) await restricted.end();
