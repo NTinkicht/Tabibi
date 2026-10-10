@@ -13,6 +13,7 @@ import {
   type EtaUncertaintySnapshot,
 } from '@/modules/queue-eta-estimator/uncertainty-v1';
 import { migrate } from '../../scripts/db/lib';
+import { provisionRuntimeDmlGrants } from '../../scripts/db/runtime-role-grants';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
 const ids = {
@@ -111,6 +112,61 @@ function estimate(
 }
 
 describe('WU610: production ETA database privilege boundary', () => {
+  it('provisions a login with operational DML but without trigger ownership', async () => {
+    const admin = await pool.connect();
+    const login = 'eta_runtime_grants_' + randomUUID().replaceAll('-', '').slice(0, 16);
+    const password = randomUUID().replaceAll('-', '');
+    const url = new URL(process.env.DATABASE_URL!);
+    url.username = login;
+    url.password = password;
+    let restricted: Pool | undefined;
+    try {
+      await admin.query(`CREATE ROLE "${login}" LOGIN PASSWORD '${password}'`);
+      await provisionRuntimeDmlGrants(admin, {
+        NODE_ENV: 'production',
+        DATABASE_URL: url.toString(),
+      });
+      restricted = new Pool({ connectionString: url.toString(), max: 2 });
+      const { assertEtaClaimRuntimeRole } = await import(
+        '@/platform/database/eta-claim-runtime-role'
+      );
+      const client = await restricted.connect();
+      try {
+        await expect(
+          assertEtaClaimRuntimeRole(client, 'production'),
+        ).resolves.toBeUndefined();
+        await expect(
+          client.query(
+            'ALTER TABLE public.eta_uncertainty_claims DISABLE TRIGGER eta_guard_claim_publication_insert',
+          ),
+        ).rejects.toMatchObject({ code: '42501' });
+      } finally {
+        client.release();
+      }
+      const service = new QueueService(restricted);
+      const admitted = await service.registerWalkIn(scope, ids.session, {
+        privateDisplayName: 'restricted-login-claim',
+        preferredLocale: 'fr',
+        idempotencyKey: 'restricted-role-register',
+        correlationId: 'restricted-role-register',
+      });
+      await service.command(scope, ids.session, admitted.entry.id, {
+        command: 'check_in',
+        idempotencyKey: 'restricted-role-checkin',
+        correlationId: 'restricted-role-checkin',
+      });
+      const published = await new EtaUncertaintyClaimService(
+        restricted,
+      ).claimCurrent(scope, ids.session, admitted.entry.id, 'restricted-role-publish');
+      expect(published.snapshot.estimateVersion).toBe('eta-uncertainty/v1');
+    } finally {
+      if (restricted) await restricted.end();
+      await admin.query(`DROP OWNED BY "${login}"`).catch(() => undefined);
+      await admin.query(`DROP ROLE IF EXISTS "${login}"`);
+      admin.release();
+    }
+  });
+
   it('rejects owner SET ROLE masquerading but permits a genuinely restricted login', async () => {
     const { assertEtaClaimRuntimeRole } = await import(
       '@/platform/database/eta-claim-runtime-role'

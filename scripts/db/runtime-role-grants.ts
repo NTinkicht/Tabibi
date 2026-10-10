@@ -1,0 +1,167 @@
+import type { Client } from 'pg';
+import { getEnvironment } from '../../src/platform/config/env';
+
+/**
+ * Explicit current-schema application DML surface.
+ *
+ * Intentionally excludes schema_migrations and all new/unrecognized tables:
+ * changing the database schema requires a reviewed manifest update rather
+ * than silently giving the runtime account new table privileges.
+ */
+const applicationTables = [
+  'platform_metadata',
+  'users',
+  'clinics',
+  'clinic_memberships',
+  'doctor_profiles',
+  'doctor_clinics',
+  'schedule_templates',
+  'consultation_sessions',
+  'audit_events',
+  'session_command_receipts',
+  'patient_operational_records',
+  'queue_entries',
+  'queue_registration_receipts',
+  'queue_command_receipts',
+  'queue_reorder_receipts',
+  'appointments',
+  'appointment_booking_receipts',
+  'appointment_lifecycle_receipts',
+  'appointment_recovery_receipts',
+  'guest_exchange_ids',
+  'guest_credentials',
+  'guest_status_rate_limit_buckets',
+  'notification_outbox',
+  'notification_preferences',
+  'notification_preference_receipts',
+  'notification_inbox_items',
+  'public_guest_booking_receipts',
+  'public_guest_check_in_operations',
+  'patient_dependents',
+  'appointment_bulk_no_show_receipts',
+  'eta_clinic_prior_epochs',
+  'eta_session_source_epochs',
+  'eta_uncertainty_claims',
+  'eta_claim_idempotency_receipts',
+] as const;
+
+const immutableTables = new Set<string>([
+  'audit_events',
+  'session_command_receipts',
+  'queue_registration_receipts',
+  'queue_command_receipts',
+  'queue_reorder_receipts',
+  'appointment_booking_receipts',
+  'appointment_lifecycle_receipts',
+  'appointment_recovery_receipts',
+  'notification_preference_receipts',
+  'public_guest_booking_receipts',
+  'public_guest_check_in_operations',
+  'appointment_bulk_no_show_receipts',
+  'eta_uncertainty_claims',
+  'eta_claim_idempotency_receipts',
+]);
+
+function identifier(value: string): string {
+  return '"' + value.replaceAll('"', '""') + '"';
+}
+
+export async function provisionRuntimeDmlGrants(
+  client: Client,
+  source: Record<string, string | undefined> = process.env,
+): Promise<void> {
+  const env = getEnvironment(source);
+  if (env.NODE_ENV !== 'production') return;
+  const username = decodeURIComponent(new URL(env.DATABASE_URL).username);
+  if (!username) throw new Error('Production runtime database login is missing');
+
+  // The application login must exist independently before provisioning.
+  // Never create a role, copy its password, or grant schema ownership.
+  const result = await client.query<{
+    oid: string;
+    safe_login: boolean;
+    owner_membership: boolean;
+    owns_public_object: boolean;
+    can_create_schema_objects: boolean;
+  }>(
+    `SELECT r.oid::text,
+            (r.rolcanlogin AND NOT r.rolsuper AND NOT r.rolcreaterole
+             AND NOT r.rolcreatedb AND NOT r.rolreplication
+             AND NOT r.rolbypassrls) AS safe_login,
+            pg_has_role(r.oid, current_user::regrole::oid, 'MEMBER')
+              AS owner_membership,
+            (EXISTS(SELECT 1 FROM pg_class c
+                     JOIN pg_namespace n ON n.oid=c.relnamespace
+                     WHERE n.nspname='public' AND c.relowner=r.oid)
+              OR EXISTS(SELECT 1 FROM pg_proc p
+                     JOIN pg_namespace n ON n.oid=p.pronamespace
+                     WHERE n.nspname='public' AND p.proowner=r.oid))
+              AS owns_public_object,
+            has_schema_privilege(r.oid,'public','CREATE')
+              AS can_create_schema_objects
+       FROM pg_roles r WHERE r.rolname=$1`,
+    [username],
+  );
+  if (
+    result.rows.length !== 1 ||
+    !result.rows[0]?.safe_login ||
+    result.rows[0].owner_membership ||
+    result.rows[0].owns_public_object ||
+    result.rows[0].can_create_schema_objects
+  ) {
+    throw new Error(
+      'Production runtime login missing or carries schema/owner privileges',
+    );
+  }
+
+  const objects = await client.query<{ tablename: string }>(
+    `SELECT tablename FROM pg_tables
+      WHERE schemaname='public' AND tablename<>'schema_migrations'`,
+  );
+  const observed = objects.rows.map((r) => r.tablename).sort();
+  const allowed = [...applicationTables].sort();
+  if (JSON.stringify(observed) !== JSON.stringify(allowed)) {
+    throw new Error('Runtime grants manifest does not match migrated tables');
+  }
+
+  const role = identifier(username);
+  await client.query('BEGIN');
+  try {
+    await client.query(`GRANT USAGE ON SCHEMA public TO ${role}`);
+    for (const table of applicationTables) {
+      const permissions =
+        table === 'platform_metadata'
+          ? 'SELECT'
+          : immutableTables.has(table)
+            ? 'SELECT, INSERT'
+            : 'SELECT, INSERT, UPDATE, DELETE';
+      await client.query(
+        `GRANT ${permissions} ON TABLE public.${identifier(table)} TO ${role}`,
+      );
+    }
+    // Only sequences owned by current known application tables, not
+    // unrelated owner-only schema state, may be used by the runtime.
+    const sequences = await client.query<{ sequence_name: string }>(
+      `SELECT seq.relname AS sequence_name
+         FROM pg_class seq
+         JOIN pg_namespace sn ON sn.oid=seq.relnamespace
+         JOIN pg_depend dep ON dep.objid=seq.oid
+            AND dep.deptype IN ('a','i')
+         JOIN pg_class parent ON parent.oid=dep.refobjid
+         JOIN pg_namespace pn ON pn.oid=parent.relnamespace
+        WHERE seq.relkind='S'
+          AND sn.nspname='public' AND pn.nspname='public'
+          AND parent.relname=ANY($1::text[])`,
+      [applicationTables],
+    );
+    for (const seq of sequences.rows) {
+      await client.query(
+        `GRANT USAGE, SELECT ON SEQUENCE public.${identifier(seq.sequence_name)} TO ${role}`,
+      );
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
+}

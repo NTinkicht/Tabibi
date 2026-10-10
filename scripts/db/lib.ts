@@ -3,6 +3,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Client } from 'pg';
 import { migrationConnectionString } from '../../src/platform/config/migration-credentials';
+import { provisionRuntimeDmlGrants } from './runtime-role-grants';
 
 const migrationDirectory = resolve(process.cwd(), 'db/migrations');
 const nonTransactionalMarker = '-- tabibi:no-transaction';
@@ -62,6 +63,9 @@ export async function migrate(): Promise<void> {
         throw error;
       }
     }
+    // Run only after every schema migration has committed. This uses the
+    // privileged migrator connection and never puts that token in runtime.
+    await provisionRuntimeDmlGrants(client);
   } finally {
     await client.query('SELECT pg_advisory_unlock($1)', [730031]);
     await client.end();
