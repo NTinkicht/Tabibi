@@ -15,7 +15,20 @@ export async function assertEtaClaimRuntimeRole(
   }
   const check = await client.query<{ least_privileged: boolean }>(
     `SELECT (
-        NOT current_role_info.rolsuper
+        -- Check the login principal as well as the effective role. A schema
+        -- owner cannot use SET ROLE to appear restricted while retaining
+        -- RESET ROLE capability on the same authenticated connection.
+        session_user = current_user
+        AND NOT session_role_info.rolsuper
+        AND NOT session_role_info.rolcreaterole
+        AND NOT session_role_info.rolbypassrls
+        AND NOT pg_has_role(
+          session_user::regrole::oid, claim_table.relowner, 'MEMBER'
+        )
+        AND NOT pg_has_role(
+          session_user::regrole::oid, guard_func.proowner, 'MEMBER'
+        )
+        AND NOT current_role_info.rolsuper
         AND NOT current_role_info.rolcreaterole
         AND NOT current_role_info.rolbypassrls
         AND NOT pg_has_role(
@@ -40,6 +53,8 @@ export async function assertEtaClaimRuntimeRole(
         AND guard_func.pronargs=0
        JOIN pg_roles current_role_info
          ON current_role_info.rolname=current_user
+       JOIN pg_roles session_role_info
+         ON session_role_info.rolname=session_user
       WHERE claim_schema.nspname='public'
         AND claim_table.relname='eta_uncertainty_claims'`,
   );

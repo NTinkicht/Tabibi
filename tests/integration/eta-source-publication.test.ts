@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Pool } from 'pg';
+import { Client, Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { QueueService } from '@/modules/queue';
 import {
@@ -111,42 +111,55 @@ function estimate(
 }
 
 describe('WU610: production ETA database privilege boundary', () => {
-  it('rejects an owner connection and permits a role that cannot disable the guard', async () => {
+  it('rejects owner SET ROLE masquerading but permits a genuinely restricted login', async () => {
     const { assertEtaClaimRuntimeRole } = await import(
       '@/platform/database/eta-claim-runtime-role'
     );
-    const actor = await pool.connect();
+    const admin = await pool.connect();
     const restrictedRole =
       'eta_runtime_probe_' + randomUUID().replaceAll('-', '').slice(0, 16);
+    const password = randomUUID().replaceAll('-', '');
+    const restrictedConnection = new URL(process.env.DATABASE_URL!);
+    restrictedConnection.username = restrictedRole;
+    restrictedConnection.password = password;
+    let app: Client | undefined;
     try {
-      // The PostgreSQL CI container has CREATEROLE rights; all probe DDL is
-      // rolled back, so no role or grant is retained outside the transaction.
-      await actor.query('BEGIN');
       await expect(
-        assertEtaClaimRuntimeRole(actor, 'production'),
+        assertEtaClaimRuntimeRole(admin, 'production'),
       ).rejects.toThrow(/privileged/);
-      await actor.query(`CREATE ROLE "${restrictedRole}" NOLOGIN`);
-      await actor.query(`GRANT USAGE ON SCHEMA public TO "${restrictedRole}"`);
-      await actor.query(
+      await admin.query(
+        `CREATE ROLE "${restrictedRole}" LOGIN PASSWORD '${password}'`,
+      );
+      await admin.query(`GRANT USAGE ON SCHEMA public TO "${restrictedRole}"`);
+      await admin.query(
         `GRANT SELECT, INSERT ON eta_uncertainty_claims TO "${restrictedRole}"`,
       );
-      await actor.query(`SET LOCAL ROLE "${restrictedRole}"`);
+      await admin.query('BEGIN');
+      await admin.query(`SET LOCAL ROLE "${restrictedRole}"`);
+      // current_user alone looks safe here, but session_user remains owner.
       await expect(
-        assertEtaClaimRuntimeRole(actor, 'production'),
+        assertEtaClaimRuntimeRole(admin, 'production'),
+      ).rejects.toThrow(/privileged/);
+      await admin.query('ROLLBACK');
+
+      app = new Client({ connectionString: restrictedConnection.toString() });
+      await app.connect();
+      await expect(
+        assertEtaClaimRuntimeRole(app, 'production'),
       ).resolves.toBeUndefined();
-      await actor.query('SAVEPOINT no_trigger_bypass');
+      await app.query('BEGIN');
       await expect(
-        actor.query(
-          'ALTER TABLE eta_uncertainty_claims DISABLE TRIGGER eta_guard_claim_publication_insert',
+        app.query(
+          'ALTER TABLE public.eta_uncertainty_claims DISABLE TRIGGER eta_guard_claim_publication_insert',
         ),
       ).rejects.toMatchObject({ code: '42501' });
-      await actor.query('ROLLBACK TO SAVEPOINT no_trigger_bypass');
-      await actor.query('ROLLBACK');
-    } catch (error) {
-      await actor.query('ROLLBACK');
-      throw error;
+      await app.query('ROLLBACK');
     } finally {
-      actor.release();
+      if (app) await app.end();
+      await admin.query('ROLLBACK').catch(() => undefined);
+      await admin.query(`DROP OWNED BY "${restrictedRole}"`).catch(() => undefined);
+      await admin.query(`DROP ROLE IF EXISTS "${restrictedRole}"`);
+      admin.release();
     }
   });
 });
@@ -571,6 +584,38 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
       direct.release();
     }
   }, 15_000);
+
+  it('uses committed public ETA sources despite hostile temporary search-path shadowing', async () => {
+    await checkedIn('eta-claim-real-source-first');
+    const target = await checkedIn('eta-claim-real-source-target');
+    const service = new EtaUncertaintyClaimService(pool);
+    const source = await service.readSourceTuple(scope, ids.session, target);
+    const actor = await pool.connect();
+    try {
+      await actor.query('BEGIN');
+      await actor.query(
+        'CREATE TEMP TABLE queue_entries (LIKE public.queue_entries) ON COMMIT DROP',
+      );
+      await actor.query(
+        'CREATE TEMP TABLE consultation_sessions (LIKE public.consultation_sessions) ON COMMIT DROP',
+      );
+      await actor.query('SET LOCAL search_path TO pg_temp, public');
+      const actual = await actor.query<{ snapshot: EtaUncertaintySnapshot }>(
+        `SELECT public.eta_expected_claim_snapshot(
+           $1,$2,$3,$4,date_trunc('milliseconds',transaction_timestamp())
+         ) AS snapshot`,
+        [ids.clinic, ids.session, target, source.queueRevision],
+      );
+      expect(actual.rows[0]?.snapshot?.expectedMinutes).toBeGreaterThan(0);
+      expect(actual.rows[0]?.snapshot?.explanationCodes).toContain('queue-depth');
+      await actor.query('ROLLBACK');
+    } catch (error) {
+      await actor.query('ROLLBACK');
+      throw error;
+    } finally {
+      actor.release();
+    }
+  });
 
   it('rejects forged but shape-valid ETA numbers even with current epochs and transaction time', async () => {
     await checkedIn('eta-claim-ahead-first');

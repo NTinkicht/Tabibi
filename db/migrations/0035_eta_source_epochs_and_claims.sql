@@ -24,7 +24,7 @@ INSERT INTO eta_session_source_epochs (clinic_id, session_id)
 SELECT clinic_id, id FROM consultation_sessions;
 
 CREATE FUNCTION eta_create_clinic_prior_epoch() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   INSERT INTO eta_clinic_prior_epochs (clinic_id) VALUES (NEW.id);
   RETURN NEW;
@@ -36,7 +36,7 @@ AFTER INSERT ON clinics
 FOR EACH ROW EXECUTE FUNCTION eta_create_clinic_prior_epoch();
 
 CREATE FUNCTION eta_create_session_source_epoch() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   INSERT INTO eta_session_source_epochs (clinic_id, session_id)
   VALUES (NEW.clinic_id, NEW.id);
@@ -49,7 +49,7 @@ AFTER INSERT ON consultation_sessions
 FOR EACH ROW EXECUTE FUNCTION eta_create_session_source_epoch();
 
 CREATE FUNCTION eta_increment_session_epoch(p_clinic uuid, p_session uuid)
-RETURNS void LANGUAGE plpgsql AS $$
+RETURNS void LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   UPDATE eta_session_source_epochs
      SET source_epoch = source_epoch + 1
@@ -62,7 +62,7 @@ END
 $$;
 
 CREATE FUNCTION eta_increment_clinic_prior_epoch(p_clinic uuid)
-RETURNS void LANGUAGE plpgsql AS $$
+RETURNS void LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   UPDATE eta_clinic_prior_epochs
      SET prior_epoch = prior_epoch + 1
@@ -75,7 +75,7 @@ END
 $$;
 
 CREATE FUNCTION eta_session_source_changed() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   IF ROW(
     NEW.status, NEW.starts_at, NEW.ends_at, NEW.doctor_id,
@@ -111,7 +111,7 @@ FOR EACH ROW EXECUTE FUNCTION eta_session_source_changed();
 CREATE FUNCTION eta_increment_affected_prior_epochs(
   p_old uuid, p_new uuid, p_old_had_prior boolean, p_new_has_prior boolean
 ) RETURNS void
-LANGUAGE plpgsql AS $eta_prior$
+LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $eta_prior$
 DECLARE
   prior_clinic uuid;
 BEGIN
@@ -130,7 +130,7 @@ END
 $eta_prior$;
 
 CREATE FUNCTION eta_queue_source_changed() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE
   old_had_prior boolean := false;
   new_has_prior boolean := false;
@@ -212,7 +212,7 @@ FOR EACH ROW EXECUTE FUNCTION eta_queue_source_changed();
 -- The session-scoped reorder-audit index is installed online by the
 -- separate non-transactional migration 0036, after this schema transaction.
 CREATE FUNCTION eta_audit_source_changed() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE
   old_session uuid;
   new_session uuid;
@@ -327,7 +327,7 @@ CREATE FUNCTION eta_expected_claim_snapshot(
   p_clinic uuid, p_session uuid, p_entry uuid,
   p_revision bigint, p_at timestamptz
 ) RETURNS jsonb
-LANGUAGE plpgsql STABLE AS $eta_claim$
+LANGUAGE plpgsql STABLE SET search_path = pg_catalog, public, pg_temp AS $eta_claim$
 DECLARE
   ses consultation_sessions%ROWTYPE;
   item record;
@@ -497,7 +497,7 @@ END
 $eta_claim$;
 
 CREATE FUNCTION eta_guard_claim_publication() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE
   actual_source bigint;
   actual_prior bigint;
@@ -580,7 +580,7 @@ BEGIN
   -- A direct SQL writer cannot attest arbitrary well-formed ETA numbers.
   -- Independently recompute the v1 payload from the same committed, epoch-
   -- fenced queue snapshot and reject every semantically forged value.
-  IF NEW.snapshot IS DISTINCT FROM eta_expected_claim_snapshot(
+  IF NEW.snapshot IS DISTINCT FROM public.eta_expected_claim_snapshot(
        NEW.clinic_id, NEW.session_id, NEW.queue_entry_id,
        NEW.queue_revision, NEW.evaluated_at) THEN
     RAISE EXCEPTION 'ETA evidence differs from canonical committed source'
@@ -624,7 +624,7 @@ BEFORE INSERT ON eta_uncertainty_claims
 FOR EACH ROW EXECUTE FUNCTION eta_guard_claim_publication();
 
 CREATE FUNCTION eta_claim_immutable() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   RAISE EXCEPTION 'Published ETA evidence is immutable'
     USING ERRCODE = '23514';
