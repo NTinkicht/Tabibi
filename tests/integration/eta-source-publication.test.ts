@@ -448,6 +448,94 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     });
   });
 
+  it('avoids deadlocks for opposing concurrently corrected reorder audits', async () => {
+    const initial = await pool.query<{ id: string }>(
+      `INSERT INTO audit_events(
+         clinic_id, actor_user_id, entity_type, entity_id, action, metadata
+       ) VALUES
+         ($1,$2,'consultation_session',$3,'queue_entry.reordered',
+          jsonb_build_object('sessionId',$3::text,'resultingOrder','[]'::jsonb)),
+         ($1,$2,'consultation_session',$4,'queue_entry.reordered',
+          jsonb_build_object('sessionId',$4::text,'resultingOrder','[]'::jsonb))
+       RETURNING id::text`,
+      [ids.clinic, ids.actor, ids.session, ids.historicSession],
+    );
+    expect(initial.rows).toHaveLength(2);
+
+    const before = await pool.query<EpochRow>(
+      `SELECT session_id, source_epoch FROM eta_session_source_epochs
+        WHERE clinic_id=$1 ORDER BY session_id`,
+      [ids.clinic],
+    );
+    const first = await pool.connect();
+    const second = await pool.connect();
+    try {
+      await Promise.all([first.query('BEGIN'), second.query('BEGIN')]);
+      await Promise.all([
+        first.query("SET LOCAL lock_timeout = '5s'"),
+        second.query("SET LOCAL lock_timeout = '5s'"),
+      ]);
+
+      // Both updates start at the same JS barrier and touch separate audit
+      // rows. Their old/new session epoch pairs are reversed: A->B, B->A.
+      // Each transaction commits immediately after its own update so a
+      // well-ordered contender can make progress without waiting for the
+      // other contender's UPDATE to finish before either COMMIT occurs.
+      let openBarrier!: () => void;
+      const barrier = new Promise<void>((resolve) => {
+        openBarrier = resolve;
+      });
+      const move = async (
+        client: typeof first,
+        auditId: string,
+        sessionId: string,
+      ) => {
+        await barrier;
+        await client.query(
+          `UPDATE audit_events SET metadata=jsonb_set(
+             metadata, '{sessionId}', to_jsonb($2::text))
+            WHERE id=$1`,
+          [auditId, sessionId],
+        );
+        await client.query('COMMIT');
+      };
+      const changes = [
+        move(first, initial.rows[0]!.id, ids.historicSession),
+        move(second, initial.rows[1]!.id, ids.session),
+      ];
+      openBarrier();
+      await Promise.all(changes);
+    } finally {
+      await Promise.all([
+        first.query('ROLLBACK').catch(() => undefined),
+        second.query('ROLLBACK').catch(() => undefined),
+      ]);
+      first.release();
+      second.release();
+    }
+
+    const after = await pool.query<EpochRow>(
+      `SELECT session_id, source_epoch FROM eta_session_source_epochs
+        WHERE clinic_id=$1 ORDER BY session_id`,
+      [ids.clinic],
+    );
+    expect(after.rows).toHaveLength(2);
+    for (let index = 0; index < 2; index++) {
+      expect(Number(after.rows[index]!.source_epoch)).toBe(
+        Number(before.rows[index]!.source_epoch) + 2,
+      );
+    }
+    const audit = await pool.query<{ session_id: string }>(
+      `SELECT metadata->>'sessionId' AS session_id FROM audit_events
+        WHERE id=ANY($1::bigint[]) ORDER BY id`,
+      [initial.rows.map((row) => row.id)],
+    );
+    expect(audit.rows.map((row) => row.session_id)).toEqual([
+      ids.historicSession,
+      ids.session,
+    ]);
+  });
+
   it('keeps committed source epochs across identical read-only observations', async () => {
     const entryId = await checkedIn('eta-claim-stable');
     const service = new EtaUncertaintyClaimService(pool);
