@@ -1384,3 +1384,14 @@ The commit message itself correctly scopes the fix: "Does not claim to resolve t
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — Codex implementation dispatch failing repeatedly, flagged as blocker (2026-10-10)
+
+Nassim dispatched Codex (`@codex address that feedback`) to implement a fix for the last remaining open finding (payload-substance verification in `eta_guard_claim_publication()`), with explicit, well-scoped acceptance criteria (DB-enforced fix, adversarial forged-payload test, preserve existing guards, no production deploy). Three consecutive attempts failed identically — "Codex couldn't complete this request" — with no diff attempted each time. Retried twice on the owner's behalf (same pattern that worked for the earlier review-dispatch failure), then stopped: three identical failures in a row is a systemic issue with this dispatch path, not a flake worth burning further retries on.
+
+Did not attempt the implementation myself. PR #609's Material-Author is chatgpt; I hold no implementation lease on this PR, and my role here is independent adversarial review, not implementation. Posted the blocker back to the PR for Nassim's attention rather than silently retrying or overstepping scope.
+
+Status unchanged: one finding remains STILL_BLOCKING (payload-substance verification), now additionally blocked on finding a working implementer dispatch path.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
