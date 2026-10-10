@@ -1448,3 +1448,17 @@ Status: one new confirmed blocker (cross-clinic lock ordering) on top of the two
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — CodeRabbit review reconciled at head 5ff3059 (2026-10-10)
+
+CodeRabbit's dispatched review posted 6 actionable comments. Verified the two substantive ones directly against the code rather than taking the bot's claim at face value:
+
+1. **Receipt-replay snapshot byte-equivalence bug (confirmed real).** `claimCurrent`'s lost-ack replay branch (`return { claimId: previous.claim_id, snapshot: previous.snapshot }`) returns the `jsonb` column as parsed by the driver, whose key order PostgreSQL does not preserve from the original insert — differs from the frozen object's construction order (`earliestMinutes, expectedMinutes, latestMinutes, estimateVersion, queueRevision, evaluatedAt, explanationCodes`). `JSON.stringify` differs despite identical values; contract commits to byte-equivalent replay. Also not `Object.freeze`d unlike every other snapshot path. Low severity (no security impact, doesn't admit forged data), but real and unfixed.
+2. **Stale, self-contradicting doc sentence (confirmed real).** `ETA_UNCERTAINTY_CONTRACT.md`'s determinism paragraph says the guard recomputes the full payload and rejects forgeries, then two sentences later says substance "remains a blocking review gate" — leftover from before `c25ccb9`/`5ff3059`.
+
+Took the remaining four (CI image SHA-pinning, `.replace`→`.replaceAll`, `toMatchObject`→`toEqual`, missing SQL/TS parity test coverage for untested branches) largely at face value as mechanically correct and low-stakes, though flagged the test-coverage gap as more consequential than CodeRabbit's "Trivial" label suggests — it's the kind of gap where a future divergence would fail closed (availability, not security) and be easy to miss without it.
+
+None of these are new BLOCKER-level findings. STILL_BLOCKING remains: cross-clinic lock ordering (confirmed) and the role-separation scope question (flagged, dissent recorded). Posted consolidated reconciliation to the PR.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
