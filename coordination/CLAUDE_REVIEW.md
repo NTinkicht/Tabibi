@@ -1473,3 +1473,14 @@ The commit message itself explicitly notes "the runtime DB role-ownership P1 rem
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — all CodeRabbit findings cleaned up at head cd710d7 (2026-10-10)
+
+`cd710d7` fixes every remaining item from the CodeRabbit reconciliation in one commit: receipt-replay now rebuilds the snapshot in canonical field order + freezes it (matches CodeRabbit's proposed fix exactly, new byte-equivalence + frozen assertions added); `.replace`→`.replaceAll` for underscore normalization; unit test tightened to strict `toEqual`. Verified all via `git show`.
+
+The doc fix is notably well done: rather than just deleting the stale contradictory sentence, it now explicitly separates payload-substance (resolved, SQL recomputation) from role-separation ("a separate blocking deployment requirement... the existing shared migration/runtime DATABASE_URL does not establish that least-privilege guarantee") — directly resolving the scope ambiguity from my earlier dissent by naming it explicitly as a deployment requirement rather than leaving it conflated with the code-level fix.
+
+All three CI checks green on this head. Status: zero known open correctness/security BLOCKER findings; role-separation remains the one explicitly-documented, intentionally-deferred deployment requirement. Still not MERGE_READY on process grounds only (draft, no qualifying non-author review at exact head yet).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
