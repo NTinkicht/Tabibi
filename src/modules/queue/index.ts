@@ -766,6 +766,24 @@ export class QueueService {
         ],
       );
       return response;
+    }).catch((error: unknown) => {
+      // The doctor guard NOWAIT and MVCC fencing can reject concurrent
+      // writes. inTransaction has already rolled back at this boundary.
+      // Return a retryable 409, never a generic 500 or an automatic replay
+      // that could obscure idempotency and conflict semantics.
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error.code === '55P03' ||
+          error.code === '40001' ||
+          error.code === '40P01')
+      ) {
+        throw new QueueConflictError(
+          'Queue operation is busy; retry with the same idempotency key',
+        );
+      }
+      throw error;
     });
   }
 
