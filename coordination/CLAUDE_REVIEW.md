@@ -1774,3 +1774,13 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #611 — new governance-prerequisite PR opened and verified (head 272a8c01)
+
+- NTinkicht opened PR #611 ("CI governance prerequisite: immutable PostgreSQL 16.4 service pin"), base `main`@`7056890e`, head `272a8c013dfe78128d5f3d201515690da70311c7`. Subscribed this session to its PR activity.
+- Verified independently (not just from the comment claim): `get_diff` shows exactly a 2-line change, both lines pinning `postgres:16.4-alpine` to `@sha256:5660c2cbfea50c7a9127d17dc4e48543eedd3d7a41a595a2dfa572471e37e64c` in the integration and browser-smoke jobs — identical to the digest already reviewed and verified earlier in PR #609 (commit `fc55d6b`). No other file is touched (`changed_files: 1`, `+2/-2`). This matches the stated purpose exactly: make `main`'s CI workflow blob equal #609's current head blob, to unblock the Mistral trusted-review gate described in the prior verified comment.
+- Material-Author: chatgpt (same as #609) — I hold no implementation lease here either; purely independent-reviewer role applies.
+- CI just started (`Quality and build`, `PostgreSQL integration`, `Browser smoke` all `in_progress`) at time of this check. No action taken yet; will independently review this PR's own merits (not just rely on the description) once there's something substantive to review (CI result, any review activity), same standard as applied throughout to #609.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
