@@ -215,17 +215,32 @@ BEGIN
        AND session_id::text = NEW.metadata->>'sessionId';
   END IF;
   -- Existing service-authored reorder audits occur in the same transaction
-  -- as queue updates. The extra bump tracks evidence changes, not order only.
-  IF old_session IS NOT NULL THEN
-    PERFORM eta_increment_session_epoch(old_clinic, old_session);
-  END IF;
-  IF new_session IS NOT NULL AND (
-    old_session IS DISTINCT FROM new_session
-    OR old_clinic IS DISTINCT FROM new_clinic
-    OR TG_OP <> 'UPDATE'
-    OR OLD.metadata IS DISTINCT FROM NEW.metadata
-  ) THEN
-    PERFORM eta_increment_session_epoch(new_clinic, new_session);
+  -- as queue updates. Corrected evidence that moves between two sessions
+  -- must lock their epoch rows in canonical (clinic_id, session_id) order.
+  -- Opposing corrections A->B and B->A cannot then form a lock cycle.
+  IF old_session IS NOT NULL AND new_session IS NOT NULL AND
+     ROW(old_clinic, old_session) IS DISTINCT FROM
+     ROW(new_clinic, new_session) THEN
+    IF ROW(old_clinic, old_session) <
+       ROW(new_clinic, new_session) THEN
+      PERFORM eta_increment_session_epoch(old_clinic, old_session);
+      PERFORM eta_increment_session_epoch(new_clinic, new_session);
+    ELSE
+      PERFORM eta_increment_session_epoch(new_clinic, new_session);
+      PERFORM eta_increment_session_epoch(old_clinic, old_session);
+    END IF;
+  ELSE
+    IF old_session IS NOT NULL THEN
+      PERFORM eta_increment_session_epoch(old_clinic, old_session);
+    END IF;
+    IF new_session IS NOT NULL AND (
+      old_session IS DISTINCT FROM new_session
+      OR old_clinic IS DISTINCT FROM new_clinic
+      OR TG_OP <> 'UPDATE'
+      OR OLD.metadata IS DISTINCT FROM NEW.metadata
+    ) THEN
+      PERFORM eta_increment_session_epoch(new_clinic, new_session);
+    END IF;
   END IF;
   RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
 END
