@@ -1581,3 +1581,12 @@ During a routine heartbeat sweep, found `9d02f65` had already landed on top of `
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — real bug found at head 9d02f65: manifest missing doctor_active_consultations (2026-10-10)
+
+`PostgreSQL integration` failed on `9d02f65` for a genuine reason, not the formatting gate: the new manifest-drift check in `provisionRuntimeDmlGrants` threw `Runtime grants manifest does not match migrated tables`. Traced via `git grep -n "^CREATE TABLE"` across every migration file: 33 real tables exist, but the hardcoded `applicationTables` list in `runtime-role-grants.ts` only has 32 — missing `doctor_active_consultations` (created by migration `0034_doctor_global_active_consultation_guard.sql`, maintained via INSERT/DELETE triggers for the global active-consultation guard).
+
+This validates the manifest-drift design rather than undermining it — the fail-closed check caught a real incompleteness before it could silently misconfigure production grants. Posted the exact missing table name and fix (add to `applicationTables`, default DML tier, not the immutable set). One-line fix expected next.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
