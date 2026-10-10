@@ -1621,3 +1621,17 @@ CI failure is the familiar Prettier gate on `runtime-role-grants.ts` alone — n
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — two more real findings in grant-reconciliation logic (2026-10-10)
+
+Codex's review on `3502a66` surfaced two more findings targeting the REVOKE/safety-check logic, still present unchanged at current head `ced3b0e`. Verified both:
+
+1. **P2: blanket `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM <role>`** requires the migrator to own/hold grant-option on every table it iterates; a table owned by an unrelated role (extension, legacy object) would error the whole statement and roll back provisioning, contradicting the discovery logic's stated tolerance for unknown owner-only tables.
+2. **P1: reconciliation only reaches direct grants and owner-specific membership**, not PostgreSQL's full effective-privilege model (transitive role membership via any other role, or PUBLIC grants). A stale grant to an unrelated role that the runtime login happens to be a member of would survive untouched.
+
+Both confirmed real via direct reasoning about PostgreSQL's REVOKE/privilege semantics (not yet empirically tested against a live instance, given time constraints — but the mechanism is well-documented and the logic gap is unambiguous from reading the code). Posted with fix directions: scope REVOKE to owned tables only; either reject any non-essential role membership on the runtime login, or verify effective privileges post-reconciliation via `has_table_privilege`.
+
+This is the fifth and sixth real finding on the role-separation/grants subsystem this session (after SET ROLE bypass, temp-table shadowing, and the doctor_active_consultations manifest gap — all now fixed). Status: two new STILL_BLOCKING items on this subsystem.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
