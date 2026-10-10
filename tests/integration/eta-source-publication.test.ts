@@ -276,19 +276,12 @@ describe('WU610: SQL and JS active timestamp millisecond parity', () => {
       `SELECT public.eta_expected_claim_snapshot(
          $1,$2,$3,$4,'2026-09-08 10:15:00.000+00'::timestamptz
        ) AS snapshot`,
-      [
-        ids.clinic,
-        ids.session,
-        target,
-        revision.rows[0]!.queue_order_version,
-      ],
+      [ids.clinic, ids.session, target, revision.rows[0]!.queue_order_version],
     );
     const snapshot = result.rows[0]?.snapshot;
     expect(snapshot).toBeTruthy();
     expect(snapshot?.expectedMinutes).toBe(0);
-    expect(snapshot?.explanationCodes).toContain(
-      'active-consultation-overrun',
-    );
+    expect(snapshot?.explanationCodes).toContain('active-consultation-overrun');
     expect(snapshot?.explanationCodes).not.toContain(
       'active-consultation-remaining',
     );
