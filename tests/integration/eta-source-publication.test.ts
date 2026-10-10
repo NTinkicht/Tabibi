@@ -146,9 +146,7 @@ describe('WU610: production ETA database privilege boundary', () => {
       await admin
         .query(`REVOKE "${legacy}" FROM "${login}"`)
         .catch(() => undefined);
-      await admin
-        .query(`DROP OWNED BY "${legacy}"`)
-        .catch(() => undefined);
+      await admin.query(`DROP OWNED BY "${legacy}"`).catch(() => undefined);
       await admin.query(`DROP ROLE IF EXISTS "${legacy}"`);
       await admin.query(`DROP ROLE IF EXISTS "${login}"`);
       admin.release();
