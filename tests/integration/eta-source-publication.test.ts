@@ -720,7 +720,6 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
       await pool.query(
         `UPDATE queue_entries
             SET session_id=$2, state='completed',
-                called_at='2026-09-07 09:40:00+00'::timestamptz,
                 in_consultation_started_at=
                   '2026-09-07 10:00:00+00'::timestamptz
                   - ($3::double precision * interval '1 minute'),
