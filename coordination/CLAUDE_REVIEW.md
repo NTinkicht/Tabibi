@@ -1662,3 +1662,14 @@ Status: role-separation/grants subsystem now has three open findings (REVOKE own
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — two of three grant-reconciliation findings fixed at head 7a263b5 (2026-10-10)
+
+`7a263b5` fixes the REVOKE-ownership-scoping (P2) and effective-privilege/transitive-membership (P1) findings. REVOKE now scoped to migrator-owned objects only (via `pg_class.relowner`), with a fail-closed check if a required manifest table isn't owned by the migrator. The membership gap is closed two ways: structurally (reject the runtime login if it holds *any* role membership at all, via `pg_auth_members`, not just membership in the owner role) and via post-hoc verification (`has_table_privilege`/`has_sequence_privilege` — Postgres's own canonical effective-access check — re-derived for every table/sequence in `public` and compared against the exact expected shape, including that TRUNCATE/REFERENCES/TRIGGER are all false). Solid defense-in-depth design.
+
+**Not addressed**: the `doctor_active_consultations` DELETE-grant bypass (the newest finding) is untouched — the verification logic's `deletable` derivation still expects/allows DELETE on that table, so the WU192 invariant-bypass remains exploitable. That needs the SECURITY DEFINER trigger-ownership fix, not a verification-logic change.
+
+CI hadn't started at time of posting; will verify once it runs. Status: role-separation/grants subsystem down to one open finding (DELETE-grant bypass) plus the unverified low-priority timestamp-parity note.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
