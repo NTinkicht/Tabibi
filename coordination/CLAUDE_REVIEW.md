@@ -1517,3 +1517,17 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — self-correction: role-separation design has two real unfixed gaps (2026-10-10)
+
+Codex's security review at `66bb5f2` (explicitly requested by Nassim to adversarially probe the new role-separation code) found two serious P1 findings I missed when I assessed the design positively at `19d4c30`/`66bb5f2` earlier. Verified both directly, not taken on faith:
+
+1. **`SET ROLE` bypass.** `assertEtaClaimRuntimeRole` joins `pg_roles` on `current_user`, never `session_user`. PostgreSQL lets a privileged login `SET ROLE` into a restricted role (passing the check), then `RESET ROLE` back to full privilege and disable the trigger. The new integration test's `SET LOCAL ROLE` from the owner connection actually demonstrates this bypass rather than disproving it — I read it the wrong way the first time.
+2. **Temp-table shadowing defeats the trigger entirely.** Confirmed every table reference in `eta_guard_claim_publication()` and `eta_expected_claim_snapshot()` is unqualified (no `public.` prefix). `pg_temp` is always searched before `search_path`, and `CREATE TEMP TABLE` is PUBLIC-grantable by default and not revoked anywhere in this PR. A restricted role retaining that default privilege could shadow all five referenced tables with forged data; the catalog-based role check in `assertEtaClaimRuntimeRole` would still report everything fine since it only inspects the real object definitions, never what they resolve to at runtime for the calling session. This would defeat essentially every protection built across this entire review (epoch fencing, transaction-age bound, payload-substance recomputation) for any role that hasn't had `TEMP` explicitly revoked.
+
+**Retracting my `66bb5f2` confirmation.** This is now the second time in this review I've had to retract a "resolved" call after a subsequent reviewer found a gap in my own analysis (the first was the transaction-age staleness self-correction earlier). Both times the pattern was the same: I verified the mechanism does what it claims to do, but didn't push hard enough on what it *doesn't* cover. Posted the correction with fix directions: validate `session_user` not `current_user`; schema-qualify every relation reference and/or revoke TEMP from the runtime role, with a regression test that actually creates a shadow temp table.
+
+Status: role separation reopened as STILL_BLOCKING. Two new, real, unaddressed findings.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
