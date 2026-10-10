@@ -1462,3 +1462,14 @@ None of these are new BLOCKER-level findings. STILL_BLOCKING remains: cross-clin
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — cross-clinic lock-ordering fixed at head 2124524; zero confirmed-bug blockers remain (2026-10-10)
+
+`2124524` fixes the cross-clinic lock-ordering finding from the previous entry. New helper `eta_increment_affected_prior_epochs()` collects the affected clinic IDs via `SELECT DISTINCT ... ORDER BY affected.clinic_id` before looping and incrementing — canonical order regardless of transfer direction, matching the session-epoch locking pattern a few lines above. New opposing-concurrent-transfer regression test (`Promise.all([transfer(A,B), transfer(B,A)])`) exercises exactly the deadlock shape Codex flagged. Verified via `git show`; all three CI checks green on this head.
+
+The commit message itself explicitly notes "the runtime DB role-ownership P1 remains unresolved" — consistent with my own prior read that it's a legitimate but differently-scoped (repo-wide, pre-existing) item rather than a defect introduced by this migration. Posted confirmation to the PR.
+
+**Status: zero known open correctness/security BLOCKER findings remain on this subsystem** as of head `2124524`. Every finding raised across this entire review — migration restartability, epoch-capture gap, replay-ordering race, audit-trigger lock-ordering deadlock, caller-controlled evaluatedAt, claimCurrent retry-dedup, GET-path clock source, DB timestamp window, transaction-age staleness, payload-substance verification, cross-clinic lock ordering — is now resolved and backed by a passing regression test at this exact head. Still not MERGE_READY on process grounds only: PR remains draft, and `L4 review authorization` has not recorded a qualifying non-author review at this exact head.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
