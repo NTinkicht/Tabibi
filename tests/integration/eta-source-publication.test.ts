@@ -699,6 +699,50 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     });
   });
 
+  it('takes clinic-prior epoch locks in canonical order for opposing transfers', async () => {
+    const before = await pool.query<{ clinic_id: string; prior_epoch: string }>(
+      `SELECT clinic_id,prior_epoch FROM eta_clinic_prior_epochs
+         WHERE clinic_id IN ($1,$2) ORDER BY clinic_id`,
+      [ids.clinic, ids.otherClinic],
+    );
+    expect(before.rows).toHaveLength(2);
+
+    const transfer = async (from: string, to: string) => {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("SET LOCAL lock_timeout = '4s'");
+        await client.query(
+          'SELECT eta_increment_affected_prior_epochs($1,$2,true,true)',
+          [from, to],
+        );
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    };
+    // Both worker transactions request the same two clinic rows in opposite
+    // logical transfer directions; row-lock acquisition must still be sorted.
+    await Promise.all([
+      transfer(ids.clinic, ids.otherClinic),
+      transfer(ids.otherClinic, ids.clinic),
+    ]);
+    const after = await pool.query<{ clinic_id: string; prior_epoch: string }>(
+      `SELECT clinic_id,prior_epoch FROM eta_clinic_prior_epochs
+         WHERE clinic_id IN ($1,$2) ORDER BY clinic_id`,
+      [ids.clinic, ids.otherClinic],
+    );
+    for (let i = 0; i < before.rows.length; i++) {
+      expect(after.rows[i]!.clinic_id).toBe(before.rows[i]!.clinic_id);
+      expect(Number(after.rows[i]!.prior_epoch)).toBe(
+        Number(before.rows[i]!.prior_epoch) + 2,
+      );
+    }
+  });
+
   it('avoids deadlocks for opposing concurrently corrected reorder audits', async () => {
     const initial = await pool.query<{ id: string }>(
       `INSERT INTO audit_events(

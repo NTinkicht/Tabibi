@@ -106,6 +106,29 @@ AFTER UPDATE OF status, starts_at, ends_at, doctor_id,
 ON consultation_sessions
 FOR EACH ROW EXECUTE FUNCTION eta_session_source_changed();
 
+-- Lock all affected clinic-prior epoch rows in a stable key order,
+-- including for opposing cross-clinic transfers of completed evidence.
+CREATE FUNCTION eta_increment_affected_prior_epochs(
+  p_old uuid, p_new uuid, p_old_had_prior boolean, p_new_has_prior boolean
+) RETURNS void
+LANGUAGE plpgsql AS $eta_prior$
+DECLARE
+  prior_clinic uuid;
+BEGIN
+  FOR prior_clinic IN
+    SELECT DISTINCT affected.clinic_id
+      FROM (VALUES
+        (CASE WHEN p_old_had_prior THEN p_old ELSE NULL::uuid END),
+        (CASE WHEN p_new_has_prior THEN p_new ELSE NULL::uuid END)
+      ) AS affected(clinic_id)
+     WHERE affected.clinic_id IS NOT NULL
+     ORDER BY affected.clinic_id
+  LOOP
+    PERFORM eta_increment_clinic_prior_epoch(prior_clinic);
+  END LOOP;
+END
+$eta_prior$;
+
 CREATE FUNCTION eta_queue_source_changed() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -162,12 +185,8 @@ BEGIN
     AND NEW.in_consultation_started_at IS NOT NULL;
   IF old_had_prior OR new_has_prior THEN
     IF OLD.clinic_id IS DISTINCT FROM NEW.clinic_id THEN
-      IF old_had_prior THEN
-        PERFORM eta_increment_clinic_prior_epoch(OLD.clinic_id);
-      END IF;
-      IF new_has_prior THEN
-        PERFORM eta_increment_clinic_prior_epoch(NEW.clinic_id);
-      END IF;
+      PERFORM eta_increment_affected_prior_epochs(
+        OLD.clinic_id, NEW.clinic_id, old_had_prior, new_has_prior);
     ELSIF ROW(OLD.session_id, OLD.state,
               OLD.in_consultation_started_at, OLD.completed_at)
           IS DISTINCT FROM
