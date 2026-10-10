@@ -55,8 +55,11 @@ describe('ETA uncertainty-v1 adoption', () => {
       delete expected.explanationCodes;
       const codes = [...vector.expected.explanationCodes, 'fallback'];
 
-      expect(first).toMatchObject(expected);
-      expect(first.explanationCodes).toEqual(codes);
+      expect(first).toEqual({
+        ...expected,
+        estimateVersion: 'eta-uncertainty/v1',
+        explanationCodes: codes,
+      });
       expect(JSON.stringify(first)).toBe(JSON.stringify(second));
       expect(Object.isFrozen(first)).toBe(true);
       expect(Object.isFrozen(first.explanationCodes)).toBe(true);

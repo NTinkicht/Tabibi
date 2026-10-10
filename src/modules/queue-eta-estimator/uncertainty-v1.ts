@@ -124,7 +124,7 @@ export function computeEtaUncertaintyV1(
   else if (activeSlot === 1) codes.push('active-consultation-overrun');
   if (delay > 0) codes.push('declared-delay');
   if (input.priorityChanged) codes.push('priority-change');
-  codes.push(estimateSource.replace('_', '-'));
+  codes.push(estimateSource.replaceAll('_', '-'));
   return Object.freeze({
     earliestMinutes,
     expectedMinutes,

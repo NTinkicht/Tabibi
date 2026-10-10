@@ -242,6 +242,11 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
       `eta-claim-${entryId}`,
     );
     expect(lostAckReplay).toEqual(first);
+    expect(JSON.stringify(lostAckReplay.snapshot)).toBe(
+      JSON.stringify(first.snapshot),
+    );
+    expect(Object.isFrozen(lostAckReplay.snapshot)).toBe(true);
+    expect(Object.isFrozen(lostAckReplay.snapshot.explanationCodes)).toBe(true);
     const receiptRows = await pool.query(
       'SELECT claim_id FROM eta_claim_idempotency_receipts WHERE clinic_id=$1',
       [ids.clinic],

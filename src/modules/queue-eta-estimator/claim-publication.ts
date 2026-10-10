@@ -241,9 +241,22 @@ export class EtaUncertaintyClaimService {
             ) {
               throw new EtaPublicationConflictError();
             }
+            // jsonb object keys are reordered on storage; canonicalize
+            // receipt replays so lost-ack retries are byte-equivalent to
+            // the original versioned estimator response, not just deep-equal.
             return {
               claimId: previous.claim_id,
-              snapshot: previous.snapshot,
+              snapshot: Object.freeze({
+                earliestMinutes: previous.snapshot.earliestMinutes,
+                expectedMinutes: previous.snapshot.expectedMinutes,
+                latestMinutes: previous.snapshot.latestMinutes,
+                estimateVersion: previous.snapshot.estimateVersion,
+                queueRevision: previous.snapshot.queueRevision,
+                evaluatedAt: previous.snapshot.evaluatedAt,
+                explanationCodes: Object.freeze([
+                  ...previous.snapshot.explanationCodes,
+                ]),
+              }),
             };
           }
 
