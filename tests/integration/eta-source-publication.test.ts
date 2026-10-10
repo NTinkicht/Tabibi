@@ -539,6 +539,50 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     await expect(
       writeRaw(source, { ...snapshot, evaluatedAt: pastInstant }, pastInstant),
     ).rejects.toMatchObject({ code: '22023' });
+    const fourMinutesAgo = new Date(
+      clock.rows[0]!.evaluated_at.getTime() - 4 * 60_000,
+    ).toISOString();
+    await expect(
+      writeRaw(
+        source,
+        { ...snapshot, evaluatedAt: fourMinutesAgo },
+        fourMinutesAgo,
+      ),
+    ).rejects.toMatchObject({ code: '22023' });
+    // A direct SQL insert may create evidence only at the exact trusted
+    // transaction timestamp, never at a clock value chosen by the caller.
+    const direct = await pool.connect();
+    try {
+      await direct.query('BEGIN');
+      const timestamp = await direct.query<{ evaluated_at: Date }>(
+        "SELECT date_trunc('milliseconds', transaction_timestamp()) AS evaluated_at",
+      );
+      const canonical = timestamp.rows[0]!.evaluated_at.toISOString();
+      const compliant = { ...snapshot, evaluatedAt: canonical };
+      await direct.query(
+        `INSERT INTO eta_uncertainty_claims (
+           clinic_id,session_id,queue_entry_id,source_epoch,
+           clinic_prior_epoch,queue_revision,estimate_version,
+           evaluated_at,snapshot
+         ) VALUES($1,$2,$3,$4,$5,$6,'eta-uncertainty/v1',$7,$8::jsonb)`,
+        [
+          ids.clinic,
+          ids.session,
+          entryId,
+          source.sourceEpoch,
+          source.clinicPriorEpoch,
+          source.queueRevision,
+          canonical,
+          JSON.stringify(compliant),
+        ],
+      );
+      await direct.query('COMMIT');
+    } catch (error) {
+      await direct.query('ROLLBACK');
+      throw error;
+    } finally {
+      direct.release();
+    }
     const futureInstant = '2049-01-01T23:59:59.000Z';
     await expect(
       writeRaw(
