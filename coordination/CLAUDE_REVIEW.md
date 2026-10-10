@@ -1765,3 +1765,12 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — verified owner's CI-workflow-provenance blocker claim (head unchanged: 374a352d)
+
+- NTinkicht posted a comment claiming the separate Mistral-vibe trusted-review lane (`scripts/mistral-review-target.py`) fail-closes on this PR because `trusted_ci_definition()` requires the PR head's `.github/workflows/ci.yml` blob to be byte-identical to `main`'s, and this PR's own CI-hardening commit (pinning the two Postgres service images to a verified digest) makes it diverge.
+- Verified independently rather than trusting the comment: `git rev-parse origin/main:.github/workflows/ci.yml` = `ac09481987d07eaa7a87936c78f3229c1a89c2d6`; `git rev-parse origin/l5/issue-606-eta-uncertainty-adoption:.github/workflows/ci.yml` = `d45dd8b34c637693bde5eaa6ea2e09c735ad456f` — these match the comment's claimed hashes exactly. Confirmed `scripts/mistral-review-target.py` exists at this head and its `trusted_ci_definition()`/`ci_green()` logic does gate on exact blob equality, as described.
+- This is a real, verified governance/provenance condition, not a fabricated or injected instruction. It blocks only the Mistral-vibe trusted-control review path — it has no bearing on my own independent review of the application/database code, which remains at zero open findings on this same head. No action taken; no PR comment needed (nothing to dispute or add).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
