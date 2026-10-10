@@ -720,12 +720,15 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
       await pool.query(
         `UPDATE queue_entries
             SET session_id=$2, state='completed',
+                registration_order=$5, eligibility_order=NULL,
+                priority_order=NULL,
+                public_display_label='HIST-' || $5::text,
                 in_consultation_started_at=
                   '2026-09-07 10:00:00+00'::timestamptz
                   - ($3::double precision * interval '1 minute'),
                 completed_at='2026-09-07 10:00:00+00'::timestamptz
           WHERE id=$1 AND clinic_id=$4`,
-        [entry, ids.historicSession, durations[index], ids.clinic],
+        [entry, ids.historicSession, durations[index], ids.clinic, index + 1],
       );
     }
     await checkedIn('parity-history-ahead');
