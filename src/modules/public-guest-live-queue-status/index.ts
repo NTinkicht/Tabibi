@@ -49,6 +49,7 @@ export class PublicGuestLiveQueueStatusRejectedError extends Error {
 
 type StatusRow = {
   bearer_verifier: string;
+  evaluation_instant: Date;
   expires_at: Date;
   revoked_at: Date | null;
   appointment_status: string;
@@ -81,7 +82,7 @@ function bearerSecret(bearer: string): string | null {
 export class PublicGuestLiveQueueStatusService {
   constructor(
     private readonly pool: Pool,
-    private readonly clock: () => Date = () => new Date(),
+    private readonly clock?: () => Date,
   ) {}
 
   async get(
@@ -177,6 +178,7 @@ export class PublicGuestLiveQueueStatusService {
            ) historical
        )
        SELECT credential.bearer_verifier,
+              clock_timestamp() AS evaluation_instant,
               credential.expires_at,
               credential.revoked_at,
               appointment.status::text AS appointment_status,
@@ -253,9 +255,14 @@ export class PublicGuestLiveQueueStatusService {
     );
 
     const row = result.rows[0];
-    const snapshotNow = this.clock();
+    // The default production instant comes from the same scoped SQL query,
+    // never the application host's potentially skewed wall clock. Tests may
+    // explicitly inject a deterministic fixture instant.
+    const snapshotNow = this.clock?.() ?? row?.evaluation_instant;
     if (
       !row ||
+      !(snapshotNow instanceof Date) ||
+      !Number.isFinite(snapshotNow.getTime()) ||
       !verifierMatches(row.bearer_verifier, secret) ||
       row.revoked_at ||
       row.expires_at <= snapshotNow
