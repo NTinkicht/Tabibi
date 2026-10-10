@@ -1635,3 +1635,10 @@ This is the fifth and sixth real finding on the role-separation/grants subsystem
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — heartbeat note: head 817b792 is formatting-only, two prior findings still open (2026-10-10)
+
+`817b792` is the expected Prettier fix for `ced3b0e`. `Quality and build` green; other two jobs still running at time of writing. Nassim's dispatch request for a fresh Codex review on this head describes the doctor_active_consultations fix but doesn't mention the two REVOKE/privilege-scoping findings I posted on the previous head — those remain open and unaddressed regardless of what this new review covers. Watching for CI to complete and for Codex's result.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
