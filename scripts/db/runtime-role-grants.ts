@@ -84,6 +84,7 @@ export async function provisionRuntimeDmlGrants(
     oid: string;
     safe_login: boolean;
     owner_membership: boolean;
+    any_membership: boolean;
     owns_public_object: boolean;
     can_create_schema_objects: boolean;
   }>(
@@ -93,6 +94,8 @@ export async function provisionRuntimeDmlGrants(
              AND NOT r.rolbypassrls) AS safe_login,
             pg_has_role(r.oid, current_user::regrole::oid, 'MEMBER')
               AS owner_membership,
+            EXISTS(SELECT 1 FROM pg_auth_members m WHERE m.member=r.oid)
+              AS any_membership,
             (EXISTS(SELECT 1 FROM pg_class c
                      JOIN pg_namespace n ON n.oid=c.relnamespace
                      WHERE n.nspname='public' AND c.relowner=r.oid)
@@ -109,6 +112,7 @@ export async function provisionRuntimeDmlGrants(
     result.rows.length !== 1 ||
     !result.rows[0]?.safe_login ||
     result.rows[0].owner_membership ||
+    result.rows[0].any_membership ||
     result.rows[0].owns_public_object ||
     result.rows[0].can_create_schema_objects
   ) {
@@ -117,8 +121,12 @@ export async function provisionRuntimeDmlGrants(
     );
   }
 
-  const objects = await client.query<{ tablename: string }>(
-    `SELECT tablename FROM pg_tables
+  const objects = await client.query<{
+    tablename: string;
+    owned_by_migrator: boolean;
+  }>(
+    `SELECT tablename, tableowner=current_user AS owned_by_migrator
+       FROM pg_tables
       WHERE schemaname='public' AND tablename<>'schema_migrations'`,
   );
   const observed = new Set(objects.rows.map((r) => r.tablename));
@@ -131,6 +139,16 @@ export async function provisionRuntimeDmlGrants(
       `Runtime grants manifest missing required tables: ${missing.join(',')}`,
     );
   }
+  if (
+    objects.rows.some(
+      (row) =>
+        applicationTables.includes(
+          row.tablename as (typeof applicationTables)[number],
+        ) && !row.owned_by_migrator,
+    )
+  ) {
+    throw new Error('Runtime grant target is not owned by the migrator');
+  }
 
   const role = identifier(username);
   await client.query('BEGIN');
@@ -139,12 +157,31 @@ export async function provisionRuntimeDmlGrants(
     // manifest versions must never survive a reviewed privilege reduction.
     // Unknown tables are explicitly denied by default, including migration
     // metadata. Never revoke privileges from the owner or PUBLIC.
-    await client.query(
-      `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM ${role}`,
+    // A migrator must not attempt REVOKE on unrelated owner/extension
+    // objects it cannot administer. Those objects are validated below and
+    // any effective access is refused, not silently accepted.
+    const ownedTables = await client.query<{ name: string }>(
+      `SELECT c.relname AS name
+         FROM pg_class c JOIN pg_namespace ns ON ns.oid=c.relnamespace
+        WHERE ns.nspname='public' AND c.relkind IN ('r','p','v','m','f')
+          AND c.relowner=(SELECT oid FROM pg_roles WHERE rolname=current_user)`,
     );
-    await client.query(
-      `REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM ${role}`,
+    for (const owned of ownedTables.rows) {
+      await client.query(
+        `REVOKE ALL PRIVILEGES ON TABLE public.${identifier(owned.name)} FROM ${role}`,
+      );
+    }
+    const ownedSequences = await client.query<{ name: string }>(
+      `SELECT c.relname AS name
+         FROM pg_class c JOIN pg_namespace ns ON ns.oid=c.relnamespace
+        WHERE ns.nspname='public' AND c.relkind='S'
+          AND c.relowner=(SELECT oid FROM pg_roles WHERE rolname=current_user)`,
     );
+    for (const owned of ownedSequences.rows) {
+      await client.query(
+        `REVOKE ALL PRIVILEGES ON SEQUENCE public.${identifier(owned.name)} FROM ${role}`,
+      );
+    }
     await client.query(`GRANT USAGE ON SCHEMA public TO ${role}`);
     for (const table of applicationTables) {
       let permissions = 'SELECT, INSERT, UPDATE, DELETE';
@@ -178,6 +215,86 @@ export async function provisionRuntimeDmlGrants(
       await client.query(
         `GRANT USAGE, SELECT ON SEQUENCE public.${identifier(seq.sequence_name)} TO ${role}`,
       );
+    }
+    // Effective access is direct + inherited + PUBLIC. A successful
+    // GRANT/REVOKE command alone does not attest least privilege.
+    const tableRights = await client.query<{
+      tablename: string;
+      can_select: boolean;
+      can_insert: boolean;
+      can_update: boolean;
+      can_delete: boolean;
+      can_truncate: boolean;
+      can_references: boolean;
+      can_trigger: boolean;
+    }>(
+      `SELECT c.relname AS tablename,
+        has_table_privilege($1::oid,c.oid,'SELECT') AS can_select,
+        has_table_privilege($1::oid,c.oid,'INSERT') AS can_insert,
+        has_table_privilege($1::oid,c.oid,'UPDATE') AS can_update,
+        has_table_privilege($1::oid,c.oid,'DELETE') AS can_delete,
+        has_table_privilege($1::oid,c.oid,'TRUNCATE') AS can_truncate,
+        has_table_privilege($1::oid,c.oid,'REFERENCES') AS can_references,
+        has_table_privilege($1::oid,c.oid,'TRIGGER') AS can_trigger
+       FROM pg_class c
+       JOIN pg_namespace ns ON ns.oid=c.relnamespace
+      WHERE ns.nspname='public' AND c.relkind IN ('r','p','v','m','f')`,
+      [result.rows[0]!.oid],
+    );
+    for (const actual of tableRights.rows) {
+      const table = actual.tablename;
+      const listed = (applicationTables as readonly string[]).includes(table);
+      const readable = listed;
+      const insertable = listed && table !== 'platform_metadata';
+      const writable =
+        listed &&
+        table !== 'platform_metadata' &&
+        !immutableTables.has(table) &&
+        table !== 'doctor_active_consultations';
+      const deletable = writable || table === 'doctor_active_consultations';
+      if (
+        actual.can_select !== readable ||
+        actual.can_insert !== insertable ||
+        actual.can_update !== writable ||
+        actual.can_delete !== deletable ||
+        actual.can_truncate ||
+        actual.can_references ||
+        actual.can_trigger
+      ) {
+        throw new Error(
+          `Unexpected effective runtime table privilege: ${table}`,
+        );
+      }
+    }
+    const sequenceRights = await client.query<{
+      sequencename: string;
+      can_usage: boolean;
+      can_select: boolean;
+      can_update: boolean;
+    }>(
+      `SELECT c.relname AS sequencename,
+        has_sequence_privilege($1::oid,c.oid,'USAGE') AS can_usage,
+        has_sequence_privilege($1::oid,c.oid,'SELECT') AS can_select,
+        has_sequence_privilege($1::oid,c.oid,'UPDATE') AS can_update
+       FROM pg_class c
+       JOIN pg_namespace ns ON ns.oid=c.relnamespace
+      WHERE ns.nspname='public' AND c.relkind='S'`,
+      [result.rows[0]!.oid],
+    );
+    const expectedSequences = new Set(
+      sequences.rows.map((seq) => seq.sequence_name),
+    );
+    for (const actual of sequenceRights.rows) {
+      const expected = expectedSequences.has(actual.sequencename);
+      if (
+        actual.can_usage !== expected ||
+        actual.can_select !== expected ||
+        actual.can_update
+      ) {
+        throw new Error(
+          `Unexpected effective runtime sequence privilege: ${actual.sequencename}`,
+        );
+      }
     }
     await client.query('COMMIT');
   } catch (error) {
