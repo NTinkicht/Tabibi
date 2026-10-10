@@ -1550,3 +1550,16 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — third role-separation finding: missing GRANTs break production functionality (2026-10-10)
+
+Codex's fresh review on head `a819e86` found a third real issue in the role-separation subsystem, this time a completeness/availability gap rather than a security bypass. Verified via `git grep -n "GRANT\|SECURITY DEFINER\|SECURITY INVOKER"` across both migration files: zero matches. Every trigger function defaults to `SECURITY INVOKER` (runs with the caller's privileges), and nothing grants the now-required separate runtime role any privilege on `eta_session_source_epochs`, `eta_clinic_prior_epochs`, `eta_uncertainty_claims`, or `eta_claim_idempotency_receipts`.
+
+Consequence: with role separation now correctly enforced (per `16de261`/`a819e86`), a properly deployed production runtime role would hit `42501` permission denied on routine queue mutations (`eta_queue_source_changed()`'s `UPDATE eta_session_source_epochs`, etc.) and on `claimCurrent()` itself. The existing restricted-role regression test only grants `SELECT, INSERT ON eta_uncertainty_claims` — enough for the trigger-disable negative test, but it never exercises a real queue mutation or claim publish through that same role, so this was never caught.
+
+This is the third genuinely new finding Codex has surfaced on this specific subsystem across three consecutive heads (SET ROLE bypass → temp-table shadowing → missing grants), each confirmed real on independent verification. Posted concurrence with fix direction: add the missing GRANTs (or document them as a required manual provisioning step) and extend the regression test to perform real operations through the restricted role, not just the negative trigger-disable test.
+
+Status: role separation reopened again. Fourth consecutive head on this specific area with a real, unaddressed finding.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
