@@ -1333,3 +1333,12 @@ Of the three real findings tracked since the last major entry, two are now fixed
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — last open finding fixed, all known findings reconciled at head 92f4924 (2026-10-10)
+
+The direct-SQL timestamp tolerance window (the last of the three findings I was tracking) is fixed. `3d2d9b1` replaces the loose 5-minute window with an exact-match requirement against `date_trunc('milliseconds', transaction_timestamp())`; `1d520c4` updates `claimCurrent()` to sample the identical expression so app and trigger check the same value. Since `transaction_timestamp()` is fixed at transaction start and REPEATABLE READ already pins the epoch/data snapshot at the same point, a long-held transaction can't launder a stale timestamp against fresher data. `92f4924`'s test proves both directions (forged 4-minutes-ago rejected `22023`, canonical `transaction_timestamp()` value accepted). Verified independently: all three CI jobs green, clean `prettier --check .` and `tsc --noEmit` at this exact head.
+
+Posted a consolidated status: every finding raised across this entire review (migration restartability, epoch-capture gap, replay-ordering race, audit-trigger lock-ordering deadlock, caller-controlled evaluatedAt, claimCurrent retry-dedup, GET-path clock source, and now the DB timestamp window) is resolved and backed by a passing regression test at this exact head. No known open BLOCKER/MAJOR remains on this subsystem. Still not MERGE_READY: PR remains draft, and no independent non-author review has landed at this exact head yet (last Codex review was several commits behind, at `9e10d21`).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
