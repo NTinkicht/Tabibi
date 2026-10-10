@@ -253,6 +253,28 @@ describe('WU610: production ETA database privilege boundary', () => {
         [ids.doctor],
       );
       expect(active.rows[0]?.queue_entry_id).toBe(admitted.entry.id);
+      // Direct session doctor reassignment does not change queue state.
+      // It must not move an active entry away from its guard row.
+      const nextDoctorUser = randomUUID();
+      const nextDoctor = randomUUID();
+      await admin.query(
+        'INSERT INTO users(id,auth_subject,display_name) VALUES($1,$2,$3)',
+        [nextDoctorUser, 'guard-doctor-' + nextDoctorUser, 'Next Doctor'],
+      );
+      await admin.query(
+        'INSERT INTO doctor_profiles(id,user_id,display_name) VALUES($1,$2,$3)',
+        [nextDoctor, nextDoctorUser, 'Next Doctor'],
+      );
+      await admin.query(
+        'INSERT INTO doctor_clinics(clinic_id,doctor_id) VALUES($1,$2)',
+        [ids.clinic, nextDoctor],
+      );
+      await expect(
+        restricted.query(
+          'UPDATE consultation_sessions SET doctor_id=$1 WHERE id=$2',
+          [nextDoctor, ids.session],
+        ),
+      ).rejects.toMatchObject({ code: '23514' });
       await expect(
         restricted.query(
           'DELETE FROM public.doctor_active_consultations WHERE queue_entry_id=$1',
