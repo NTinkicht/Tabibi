@@ -45,6 +45,7 @@ const committedMigrations = [
   '0037_doctor_active_guard_definer_boundary.sql',
   '0038_doctor_reassignment_active_consultation_guard.sql',
   '0039_active_queue_doctor_assignment_lock.sql',
+  '0040_doctor_guard_session_mvcc_fence.sql',
 ];
 
 beforeAll(async () => {
