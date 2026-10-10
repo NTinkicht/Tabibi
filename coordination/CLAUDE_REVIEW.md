@@ -1301,3 +1301,13 @@ Codex's review (against the prior head `2bd4165`, landing after these three comm
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — two more real Codex findings confirmed at head 12a9d44 (2026-10-10)
+
+- Guest/receptionist GET paths source `evaluated_at` from the app process clock (`() => new Date()` default in both `public-guest-live-queue-status/index.ts` and `receptionist-dashboard/index.ts`), not PostgreSQL's `clock_timestamp()`. Confirmed via `git show`. Contract (`ETA_UNCERTAINTY_CONTRACT.md:11`) explicitly requires the evaluation instant be captured by the trusted server transaction and says ambient process time is not an input. `claimCurrent()` does this correctly; the two older display paths don't. Real, unfixed.
+- The new direct-SQL timestamp guard's 5-minute tolerance (`c55ea50`) is loose enough that a direct writer can backdate `evaluated_at` by up to ~5 minutes and still pass, materially misrepresenting active-consultation remaining time. The code's own comment already hedges this as approximate/defense-in-depth, but Codex's point that it doesn't fully close the gap is correct as written. Real, unfixed.
+
+Posted both with precise line citations. Running open-item count on this PR: these two + the `claimCurrent()` retry-dedup gap from the previous entry. Nassim's `@codex review` request on this head didn't yet mention the retry-dedup finding — likely just timing (my comment landed close to Nassim's request).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
