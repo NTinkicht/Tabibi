@@ -115,7 +115,11 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     const entryId = await checkedIn('eta-claim-first');
     const service = new EtaUncertaintyClaimService(pool);
     const source = await service.readSourceTuple(scope, ids.session, entryId);
-    const issued = await service.claimCurrent(scope, ids.session, entryId);
+    const [issued, concurrent] = await Promise.all([
+      service.claimCurrent(scope, ids.session, entryId, `eta-claim-${entryId}`),
+      service.claimCurrent(scope, ids.session, entryId, `eta-claim-${entryId}`),
+    ]);
+    expect(concurrent).toEqual(issued);
     const claims = await Promise.all([
       service.claim(scope, ids.session, entryId, source, issued.snapshot),
       service.claim(scope, ids.session, entryId, source, issued.snapshot),
@@ -155,7 +159,7 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     await expect(
       service.claim(scope, ids.session, entryId, before, snapshot),
     ).rejects.toBeInstanceOf(EtaPublicationStaleError);
-    const newer = await service.claimCurrent(scope, ids.session, entryId);
+    const newer = await service.claimCurrent(scope, ids.session, entryId, `eta-claim-${entryId}`);
     expect(newer.snapshot.expectedMinutes).toBe(25);
   });
 
@@ -185,7 +189,7 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     await expect(
       service.claim(scope, ids.session, entryId, freshSource, oldEstimate),
     ).rejects.toBeInstanceOf(EtaPublicationStaleError);
-    const valid = await service.claimCurrent(scope, ids.session, entryId);
+    const valid = await service.claimCurrent(scope, ids.session, entryId, `eta-claim-${entryId}`);
     expect(valid.snapshot.expectedMinutes).toBe(30);
   });
 
@@ -197,7 +201,7 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
       ids.session,
       entryId,
     );
-    const first = await service.claimCurrent(scope, ids.session, entryId);
+    const first = await service.claimCurrent(scope, ids.session, entryId, `eta-claim-${entryId}`);
     const oldEstimate = first.snapshot;
     await pool.query(
       `UPDATE consultation_sessions
@@ -214,6 +218,20 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
       oldEstimate,
     );
     expect(replay).toEqual(first);
+    // Simulate an acknowledgement lost after COMMIT: the caller knows only
+    // its stable request key, not the issued timestamp or claim identifier.
+    const lostAckReplay = await service.claimCurrent(
+      scope,
+      ids.session,
+      entryId,
+      `eta-claim-${entryId}`,
+    );
+    expect(lostAckReplay).toEqual(first);
+    const receiptRows = await pool.query(
+      'SELECT claim_id FROM eta_claim_idempotency_receipts WHERE clinic_id=$1',
+      [ids.clinic],
+    );
+    expect(receiptRows.rows).toHaveLength(1);
     const count = await pool.query<{ count: string }>(
       'SELECT count(*)::text AS count FROM eta_uncertainty_claims WHERE queue_entry_id=$1',
       [entryId],
@@ -297,7 +315,7 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     const entryId = await checkedIn('eta-claim-immutable');
     const service = new EtaUncertaintyClaimService(pool);
     const source = await service.readSourceTuple(scope, ids.session, entryId);
-    const saved = await service.claimCurrent(scope, ids.session, entryId);
+    const saved = await service.claimCurrent(scope, ids.session, entryId, `eta-claim-${entryId}`);
     const changed: EtaUncertaintySnapshot = {
       ...saved.snapshot,
       earliestMinutes: 1,
@@ -338,7 +356,7 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     const before = await pool.query<{ clock_at: Date }>(
       'SELECT clock_timestamp() AS clock_at',
     );
-    const saved = await service.claimCurrent(scope, ids.session, entryId);
+    const saved = await service.claimCurrent(scope, ids.session, entryId, `eta-claim-${entryId}`);
     const after = await pool.query<{ clock_at: Date }>(
       'SELECT clock_timestamp() AS clock_at',
     );
@@ -352,6 +370,38 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     expect(
       await service.claim(scope, ids.session, entryId, source, saved.snapshot),
     ).toEqual(saved);
+  });
+
+  it('binds a request key to one clinic-scoped target and rejects invalid keys', async () => {
+    const firstId = await checkedIn('eta-claim-key-one');
+    const service = new EtaUncertaintyClaimService(pool);
+    await expect(
+      service.claimCurrent(scope, ids.session, firstId, 'contains spaces'),
+    ).rejects.toBeInstanceOf(RangeError);
+    const committed = await service.claimCurrent(
+      scope,
+      ids.session,
+      firstId,
+      'stable-claim-001',
+    );
+    const secondId = await checkedIn('eta-claim-key-two');
+    await expect(
+      service.claimCurrent(scope, ids.session, secondId, 'stable-claim-001'),
+    ).rejects.toBeInstanceOf(EtaPublicationConflictError);
+    const replay = await service.claimCurrent(
+      scope,
+      ids.session,
+      firstId,
+      'stable-claim-001',
+    );
+    expect(replay).toEqual(committed);
+    await expect(
+      pool.query(
+        `UPDATE eta_claim_idempotency_receipts
+            SET request_key='rewritten' WHERE clinic_id=$1`,
+        [ids.clinic],
+      ),
+    ).rejects.toThrow();
   });
 
   it('never grants the claim to an unauthorized or cross-clinic actor', async () => {
