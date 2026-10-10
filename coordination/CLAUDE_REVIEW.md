@@ -1712,3 +1712,18 @@ This subsystem turned out to need five rounds of adversarial back-and-forth (mos
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — sixth finding (lock-order deadlock) fixed; also closed the long-standing ETA precision-parity note (2026-10-10)
+
+Two more fixes landed and independently confirmed since the previous entry:
+
+**ETA SQL/TS millisecond-precision parity** (the P2 flagged as unverified all the way back near the start of this subsystem's review, comment `6100554490`): migration `0041` truncates `in_consultation_started_at` to milliseconds before using it in the SQL claim verifier's elapsed-time math, matching the precision loss that already happens on the TS side when node-postgres converts a `timestamptz` into a JS `Date` (`Date.getTime()` is millisecond-resolution; Postgres storage is microsecond-resolution). Confirmed `date_trunc('milliseconds', ...)` truncates rather than rounds, which is the correct direction to match JS's behavior. The new test targets exactly the right boundary (a 500-microsecond offset at an exact 15-minute mark) and would have failed without the fix (manufacturing a phantom 1-minute remainder and the wrong explanation code). This closes the last never-independently-verified item from early in this review.
+
+**Lock-order deadlock** (from the previous entry, comment `6101559849`): migration `0042` changes the queue-activation trigger's session-row lock from a blocking wait to `FOR UPDATE NOWAIT`. A contended lock now fails immediately with `55P03` instead of entering a wait that could cycle against `SessionService.command()`'s `session → queue` cancellation lock order — the standard fix for an inversion that can't easily be resolved by reordering, since the queue row lock is already implicitly held by the triggering `UPDATE` before the trigger body runs. Reproduced the same crossed-lock scenario from the previous entry against the new trigger and confirmed a clean, fast (2.3ms) `55P03` failure with no deadlock, no multi-second wait, and the competing cancellation committing normally. The `0040` MVCC fence (the real `UPDATE` that closes the `REPEATABLE READ` race) is preserved unchanged underneath.
+
+Noted one non-blocking follow-up (not a correctness/security gap, so it doesn't change this PR's security assessment): no handling of `55P03` or `40001` exists anywhere in `src/**/*.ts` — only the test suite asserts these codes in adversarial scenarios. An ordinary concurrent collision (not an attack, just two legitimate operations landing close together) now surfaces as an unhandled DB error rather than transparently retrying, a behavior change from the pre-`0039` blocking semantics. Worth a follow-up standard retry wrapper around the queue-command path, but out of scope for this PR's security review.
+
+**Every finding raised across this entire review chain is now independently confirmed fixed**: the five role-separation/doctor-guard findings (DELETE-grant bypass, `doctor_id` reassignment bypass, column-ACL gap, READ COMMITTED race, REPEATABLE READ race), the lock-order deadlock, and the ETA SQL/TS precision-parity note. No further open findings on PR #609 from this reviewer as of this entry. Still draft, still pending the `L4 review authorization` reviewer-lease gate (no qualifying non-author review recorded), which remains outside this review's scope to satisfy.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
