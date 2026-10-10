@@ -62,12 +62,7 @@ jobs:
         run: npm ci
 
       - name: Formatting
-        run: |
-          if ! npm run format; then
-            npx prettier --write src/modules/queue-eta-estimator/claim-publication.ts tests/integration/eta-source-publication.test.ts
-            git diff -- src/modules/queue-eta-estimator/claim-publication.ts tests/integration/eta-source-publication.test.ts
-            exit 1
-          fi
+        run: npm run format
 
       - name: Lint
         run: npm run lint
@@ -97,7 +92,7 @@ jobs:
     timeout-minutes: 25
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16.4-alpine
+        image: postgres:16.4-alpine
         env:
           POSTGRES_DB: tabibi_test
           POSTGRES_USER: tabibi
@@ -154,7 +149,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16.4-alpine
+        image: postgres:16.4-alpine
         env:
           POSTGRES_DB: tabibi_test
           POSTGRES_USER: tabibi
