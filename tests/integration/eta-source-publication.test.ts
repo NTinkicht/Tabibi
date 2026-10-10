@@ -416,7 +416,11 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     const service = new EtaUncertaintyClaimService(pool);
     const source = await service.readSourceTuple(scope, ids.session, entryId);
     const snapshot = estimate(entryId, source);
-    const writeRaw = (epoch: EtaSourceTuple, value: object) => {
+    const writeRaw = (
+      epoch: EtaSourceTuple,
+      value: object,
+      at = snapshot.evaluatedAt,
+    ) => {
       return pool.query(
         `INSERT INTO eta_uncertainty_claims (
            clinic_id,session_id,queue_entry_id,source_epoch,
@@ -430,7 +434,7 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
           epoch.sourceEpoch,
           epoch.clinicPriorEpoch,
           epoch.queueRevision,
-          snapshot.evaluatedAt,
+          at,
           JSON.stringify(value),
         ],
       );
@@ -448,6 +452,20 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
         explanationCodes: ['hidden-clinic-data'],
       }),
     ).rejects.toMatchObject({ code: '22023' });
+    // A direct SQL writer must also fail closed on arbitrary evaluation
+    // times, even when all seven evidence fields are otherwise normalized.
+    await expect(writeRaw(source, snapshot)).rejects.toMatchObject({
+      code: '22023',
+    });
+    const futureInstant = '2049-01-01T23:59:59.000Z';
+    await expect(
+      writeRaw(
+        source,
+        { ...snapshot, evaluatedAt: futureInstant },
+        futureInstant,
+      ),
+    ).rejects.toMatchObject({ code: '22023' });
+
     await pool.query(
       `UPDATE consultation_sessions SET delay_version=delay_version+1,
           declared_delay_minutes=9,delay_updated_at=now()
