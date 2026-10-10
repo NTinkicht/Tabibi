@@ -147,14 +147,14 @@ export async function provisionRuntimeDmlGrants(
     );
     await client.query(`GRANT USAGE ON SCHEMA public TO ${role}`);
     for (const table of applicationTables) {
-      const permissions =
-        table === 'platform_metadata'
-          ? 'SELECT'
-          : table === 'doctor_active_consultations'
-            ? 'SELECT, INSERT, DELETE'
-            : immutableTables.has(table)
-            ? 'SELECT, INSERT'
-            : 'SELECT, INSERT, UPDATE, DELETE';
+      let permissions = 'SELECT, INSERT, UPDATE, DELETE';
+      if (table === 'platform_metadata') {
+        permissions = 'SELECT';
+      } else if (table === 'doctor_active_consultations') {
+        permissions = 'SELECT, INSERT, DELETE';
+      } else if (immutableTables.has(table)) {
+        permissions = 'SELECT, INSERT';
+      }
       await client.query(
         `GRANT ${permissions} ON TABLE public.${identifier(table)} TO ${role}`,
       );
