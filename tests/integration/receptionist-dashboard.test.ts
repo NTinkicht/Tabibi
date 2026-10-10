@@ -61,6 +61,40 @@ beforeEach(async () => {
 afterAll(async () => pool.end());
 
 describe('receptionist dashboard read model', () => {
+  it('takes the default ETA evaluation instant from PostgreSQL', async () => {
+    const queue = new QueueService(pool);
+    const registered = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Trusted database clock',
+      preferredLocale: 'fr',
+      idempotencyKey: 'db-clock-register',
+      correlationId: 'db-clock-register',
+    });
+    await queue.command(scope, ids.sessionA, registered.entry.id, {
+      command: 'check_in',
+      idempotencyKey: 'db-clock-checkin',
+      correlationId: 'db-clock-checkin',
+    });
+
+    const before = await pool.query<{ sampled: Date }>(
+      'SELECT clock_timestamp() AS sampled',
+    );
+    const snapshot = await new ReceptionistDashboardService(pool).getSnapshot(
+      scope,
+      ids.sessionA,
+    );
+    const after = await pool.query<{ sampled: Date }>(
+      'SELECT clock_timestamp() AS sampled',
+    );
+    const stamped = new Date(snapshot.generatedAt).getTime();
+    expect(stamped).toBeGreaterThanOrEqual(
+      before.rows[0]!.sampled.getTime(),
+    );
+    expect(stamped).toBeLessThanOrEqual(after.rows[0]!.sampled.getTime());
+    expect(snapshot.entries[0]?.eta?.uncertainty?.evaluatedAt).toBe(
+      snapshot.generatedAt,
+    );
+  });
+
   it('composes session, delay and deterministic fallback ETA without clinical/contact values', async () => {
     const queue = new QueueService(pool);
     const waiting = await queue.registerWalkIn(scope, ids.sessionA, {
