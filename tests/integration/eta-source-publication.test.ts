@@ -665,6 +665,75 @@ describe('WU610: production ETA database privilege boundary', () => {
 });
 
 describe('WU610: atomic, immutable ETA claim publication', () => {
+  it('keeps SQL and TypeScript aligned for called-not-started ahead', async () => {
+    const preceding = await checkedIn('parity-called-leading');
+    const target = await checkedIn('parity-called-target');
+    await new QueueService(pool).command(scope, ids.session, preceding, {
+      command: 'call',
+      idempotencyKey: 'parity-called-leading-call',
+      correlationId: 'parity-called-leading-call',
+    });
+    const claim = await new EtaUncertaintyClaimService(pool).claimCurrent(
+      scope,
+      ids.session,
+      target,
+      'parity-called-target-claim',
+    );
+    expect(claim.snapshot.explanationCodes).toContain('called-not-started');
+    expect(claim.snapshot.explanationCodes).toContain('queue-depth');
+    expect(claim.snapshot.explanationCodes).toContain('fallback');
+    expect(claim.snapshot.earliestMinutes).toBeLessThanOrEqual(
+      claim.snapshot.expectedMinutes,
+    );
+  });
+
+  it('keeps SQL and TypeScript aligned for active remaining and overrun', async () => {
+    const preceding = await checkedIn('parity-active-leading');
+    const target = await checkedIn('parity-active-target');
+    const queue = new QueueService(pool);
+    await queue.command(scope, ids.session, preceding, {
+      command: 'call',
+      idempotencyKey: 'parity-active-leading-call',
+      correlationId: 'parity-active-leading-call',
+    });
+    await queue.command(scope, ids.session, preceding, {
+      command: 'start_consultation',
+      idempotencyKey: 'parity-active-leading-start',
+      correlationId: 'parity-active-leading-start',
+    });
+    const claims = new EtaUncertaintyClaimService(pool);
+    const running = await claims.claimCurrent(
+      scope,
+      ids.session,
+      target,
+      'parity-active-remaining',
+    );
+    expect(running.snapshot.explanationCodes).toContain(
+      'active-consultation-remaining',
+    );
+
+    // Adjust the committed active start, forcing the source epoch to change;
+    // SQL and TypeScript must agree on overrun and receipt-key separation.
+    await pool.query(
+      `UPDATE queue_entries
+          SET in_consultation_started_at=clock_timestamp()-interval '2 hours'
+        WHERE id=$1 AND clinic_id=$2`,
+      [preceding, ids.clinic],
+    );
+    const overrun = await claims.claimCurrent(
+      scope,
+      ids.session,
+      target,
+      'parity-active-overrun',
+    );
+    expect(overrun.snapshot.explanationCodes).toContain(
+      'active-consultation-overrun',
+    );
+    expect(overrun.snapshot.explanationCodes).not.toContain(
+      'active-consultation-remaining',
+    );
+  });
+
   it('accepts one exact-source claim and converges concurrent identical retries', async () => {
     const entryId = await checkedIn('eta-claim-first');
     const service = new EtaUncertaintyClaimService(pool);
