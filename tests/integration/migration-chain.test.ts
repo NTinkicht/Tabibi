@@ -44,6 +44,7 @@ const committedMigrations = [
   '0036_eta_reorder_audit_lookup_index.sql',
   '0037_doctor_active_guard_definer_boundary.sql',
   '0038_doctor_reassignment_active_consultation_guard.sql',
+  '0039_active_queue_doctor_assignment_lock.sql',
 ];
 
 beforeAll(async () => {
