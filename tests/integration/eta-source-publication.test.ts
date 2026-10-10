@@ -556,9 +556,14 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
             evaluated_at,snapshot
           ) VALUES ($1,$2,$3,$4,$5,$6,'eta-uncertainty/v1',$7,$8::jsonb)`,
           [
-            ids.clinic, ids.session, target, source.sourceEpoch,
-            source.clinicPriorEpoch, source.queueRevision,
-            trustedAt, JSON.stringify(forged),
+            ids.clinic,
+            ids.session,
+            target,
+            source.sourceEpoch,
+            source.clinicPriorEpoch,
+            source.queueRevision,
+            trustedAt,
+            JSON.stringify(forged),
           ],
         ),
       ).rejects.toMatchObject({ code: '22023' });
@@ -568,7 +573,10 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     }
 
     const valid = await service.claimCurrent(
-      scope, ids.session, target, `canonical-${target}`,
+      scope,
+      ids.session,
+      target,
+      `canonical-${target}`,
     );
     expect(valid.snapshot.expectedMinutes).toBeGreaterThan(0);
     expect(valid.snapshot.explanationCodes).toContain('queue-depth');
