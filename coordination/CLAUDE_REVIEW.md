@@ -1342,3 +1342,12 @@ Posted a consolidated status: every finding raised across this entire review (mi
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — new real finding: trigger never verifies claim payload substance (2026-10-10)
+
+Spoke too soon calling this "zero known open findings" — Codex's review at `92f4924` found a new, real P1, confirmed by reading `eta_guard_claim_publication()` end to end. The trigger validates provenance (epochs, queue state, session status, entry eligibility), payload *shape* (allowed keys/types, exact version/revision/timestamp string matches), and now the exact transaction timestamp — but never recomputes or cross-checks that `earliestMinutes`/`expectedMinutes`/`latestMinutes`/`explanationCodes` are the numbers the real queue state actually produces. A direct SQL writer who gets every provenance field exactly right can still write `0/0/0` + `['fallback']` for a target with real slots ahead, and it's accepted as immutable evidence.
+
+Posted this with a note that whether it's practically exploitable depends on who can reach the table with a raw INSERT (app-role-only vs. truly external), and that the realistic fix is narrowing INSERT privilege rather than reimplementing the whole estimator in PL/pgSQL. Open, unaddressed as of this head.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
