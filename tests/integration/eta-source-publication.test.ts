@@ -258,6 +258,43 @@ describe('WU610: stale-snapshot doctor assignment fencing', () => {
   });
 });
 
+describe('WU610: SQL and JS active timestamp millisecond parity', () => {
+  it('does not invent an active minute from a 500-microsecond start', async () => {
+    const active = await checkedIn('microsecond-active');
+    const target = await checkedIn('microsecond-target');
+    await pool.query(
+      `UPDATE queue_entries SET state='in_consultation',
+         in_consultation_started_at='2026-09-08 10:00:00.000500+00'
+       WHERE id=$1`,
+      [active],
+    );
+    const revision = await pool.query<{ queue_order_version: string }>(
+      'SELECT queue_order_version FROM consultation_sessions WHERE id=$1',
+      [ids.session],
+    );
+    const result = await pool.query<{ snapshot: EtaUncertaintySnapshot }>(
+      `SELECT public.eta_expected_claim_snapshot(
+         $1,$2,$3,$4,'2026-09-08 10:15:00.000+00'::timestamptz
+       ) AS snapshot`,
+      [
+        ids.clinic,
+        ids.session,
+        target,
+        revision.rows[0]!.queue_order_version,
+      ],
+    );
+    const snapshot = result.rows[0]?.snapshot;
+    expect(snapshot).toBeTruthy();
+    expect(snapshot?.expectedMinutes).toBe(0);
+    expect(snapshot?.explanationCodes).toContain(
+      'active-consultation-overrun',
+    );
+    expect(snapshot?.explanationCodes).not.toContain(
+      'active-consultation-remaining',
+    );
+  });
+});
+
 describe('WU610: production ETA database privilege boundary', () => {
   it('rejects effective PUBLIC column-only UPDATE on an unlisted table', async () => {
     const admin = await pool.connect();
