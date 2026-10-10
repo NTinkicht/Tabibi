@@ -1311,3 +1311,14 @@ Posted both with precise line citations. Running open-item count on this PR: the
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — claimCurrent() retry-dedup gap fixed with idempotency receipts (2026-10-10)
+
+The retry-dedup gap I flagged two entries ago is fixed, well-designed, at head `768208a`. `claimCurrent()` now requires a caller-stable `requestKey`, backed by a new `eta_claim_idempotency_receipts` table `(clinic_id, request_key) -> claim_id`. The method checks the receipt table first on every attempt (handles lost-response retries), and freezes `{source, snapshot}` in a closure variable outside the retry loop so a `40001`/retry-required retry reuses the original `evaluatedAt` instead of resampling the clock — directly fixing the bug. Traced the full insert/receipt race logic by hand: two concurrent calls sharing one `request_key` always converge on one receipt even if each independently computed a claim row in a narrow race (the loser's row becomes harmless orphan data, never referenced). Test coverage matches: a real `Promise.all` concurrent-identical-key test, a lost-ack replay test checking receipt-row count, and a key-validation/isolation test.
+
+Only issue at this head: `Quality and build` fails, confirmed locally — same two files, pure Prettier wrapping on the new call sites. `PostgreSQL integration` already passes, so the logic itself is verified independent of the formatting gate. Posted full confirmation on the PR.
+
+Running tally: of the three real findings open two entries ago (retry-dedup, GET-path clock source, DB timestamp-window looseness), only this one has a fix commit so far.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
