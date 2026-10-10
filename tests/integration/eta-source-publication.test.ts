@@ -486,6 +486,46 @@ describe('WU610: atomic, immutable ETA claim publication', () => {
     ).rejects.toBeInstanceOf(EtaPublicationStaleError);
   });
 
+  it('rejects stale evidence from a long-held publishing transaction', async () => {
+    const entryId = await checkedIn('eta-claim-aged-transaction');
+    const service = new EtaUncertaintyClaimService(pool);
+    const source = await service.readSourceTuple(scope, ids.session, entryId);
+    const direct = await pool.connect();
+    try {
+      await direct.query('BEGIN');
+      const timestamp = await direct.query<{ evaluated_at: Date }>(
+        "SELECT date_trunc('milliseconds', transaction_timestamp()) AS evaluated_at",
+      );
+      const evaluatedAt = timestamp.rows[0]!.evaluated_at.toISOString();
+      const snapshot = { ...estimate(entryId, source), evaluatedAt };
+      // A transaction older than the bounded freshness budget is rejected
+      // even if it still holds unchanged source epochs.
+      await direct.query('SELECT pg_sleep(5.2)');
+      await expect(
+        direct.query(
+          `INSERT INTO eta_uncertainty_claims (
+             clinic_id,session_id,queue_entry_id,source_epoch,
+             clinic_prior_epoch,queue_revision,estimate_version,
+             evaluated_at,snapshot
+           ) VALUES($1,$2,$3,$4,$5,$6,'eta-uncertainty/v1',$7,$8::jsonb)`,
+          [
+            ids.clinic,
+            ids.session,
+            entryId,
+            source.sourceEpoch,
+            source.clinicPriorEpoch,
+            source.queueRevision,
+            evaluatedAt,
+            JSON.stringify(snapshot),
+          ],
+        ),
+      ).rejects.toMatchObject({ code: '22023' });
+      await direct.query('ROLLBACK');
+    } finally {
+      direct.release();
+    }
+  }, 15_000);
+
   it('rejects stale and unsafe direct SQL claims', async () => {
     const entryId = await checkedIn('eta-claim-direct');
     const service = new EtaUncertaintyClaimService(pool);

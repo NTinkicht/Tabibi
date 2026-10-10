@@ -369,9 +369,14 @@ BEGIN
   -- would let direct SQL persist stale estimates with perfectly current
   -- epochs. The application reads this SAME value inside claimCurrent's
   -- publishing transaction; historical replay uses SELECT, not INSERT.
+  -- transaction_timestamp() remains fixed at BEGIN. An arbitrarily old
+  -- snapshot may not be published even if its source epochs are unchanged.
+  -- Discard a transaction older than the bounded five-second claim budget.
   IF NEW.evaluated_at IS DISTINCT FROM
-       date_trunc('milliseconds', transaction_timestamp()) THEN
-    RAISE EXCEPTION 'ETA evaluation instant is not the database transaction timestamp'
+       date_trunc('milliseconds', transaction_timestamp())
+     OR clock_timestamp() - transaction_timestamp() > interval '5 seconds'
+     OR transaction_timestamp() - clock_timestamp() > interval '5 seconds' THEN
+    RAISE EXCEPTION 'ETA evaluation instant is not a fresh database transaction timestamp'
       USING ERRCODE = '22023';
   END IF;
 
