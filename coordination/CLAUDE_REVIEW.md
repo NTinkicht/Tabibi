@@ -1422,3 +1422,16 @@ Status unchanged: payload-substance-verification finding still open, implementat
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — payload-substance-verification finding resolved at head 5ff3059 (2026-10-10)
+
+`5ff3059` fixes the delimiter bug correctly: `eta_expected_claim_snapshot` now opens/closes with a proper tagged dollar-quote (`$eta_claim$`). Confirmed via `git show --stat` this touched only the two delimiter lines. All three CI checks green on this head, including `PostgreSQL integration` (which runs the adversarial forged-`0/0/0`-rejected / canonical-accepted test added in `c25ccb9`).
+
+With the function actually executable, did the semantic review deferred from the `c25ccb9` entry: independent line-by-line comparison of `eta_expected_claim_snapshot()` against the real TypeScript estimator it must mirror — `computeEtaUncertaintyV1`, `selectConsultationEstimate` (duration/median), `computeActiveConsultationRemainingMinutes`, and the exact queries in `ReceptionistDashboardService.getSnapshot()` (confirmed `claimCurrent()` calls this service, not the guest path). Verified parity on: duration-sample queries (textually identical filters/joins/limits), median via `percentile_cont(0.5)` (correct SQL equivalent of the TS average-of-middle-two for even counts), active-remaining formula (byte-for-byte same clamp/ceil/floor arithmetic), earliest/expected/latest rounding modes (including the `queuedSlots=0` point-case special rounding), priority-change audit scope (`influence_ids` = target ∪ ahead-entries, same audit query shape), service ordering (SQL's explicit multi-key `ORDER BY` vs TS's stable re-sort on state rank alone — same effective order), and paused/non-open session fail-closed behavior (`RETURN NULL` → always rejected).
+
+No divergence found in either direction (nothing that would reject a legitimate claim or admit a forged one). Treating this as genuinely resolved, not just "tests pass" — this was an independent adversarial read of the implementation, not a restatement of the PR's own test results.
+
+**Status: zero known open BLOCKER/MAJOR findings remain** on this subsystem. Both of the two findings tracked since the last major entry (transaction-age staleness, payload-substance verification) are now fixed and independently verified. Still not MERGE_READY on process grounds only: PR remains draft, and `L4 review authorization` has not recorded a qualifying non-author review at this exact head (`5ff3059`) yet.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
