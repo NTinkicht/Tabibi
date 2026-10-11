@@ -645,6 +645,26 @@ describe('WU610: production ETA database privilege boundary', () => {
       await expect(
         assertEtaClaimRuntimeRole(app, 'production'),
       ).resolves.toBeUndefined();
+      // Even after deployment-time grant verification, a later privilege
+      // elevation on the connected login must fail closed at publication.
+      await admin.query(`ALTER ROLE "${restrictedRole}" CREATEDB`);
+      await expect(
+        assertEtaClaimRuntimeRole(app, 'production'),
+      ).rejects.toThrow(/privileged/);
+      await admin.query(`ALTER ROLE "${restrictedRole}" NOCREATEDB`);
+      await admin.query(`ALTER ROLE "${restrictedRole}" REPLICATION`);
+      await expect(
+        assertEtaClaimRuntimeRole(app, 'production'),
+      ).rejects.toThrow(/privileged/);
+      await admin.query(`ALTER ROLE "${restrictedRole}" NOREPLICATION`);
+      await admin.query(`GRANT CREATE ON SCHEMA public TO "${restrictedRole}"`);
+      await expect(
+        assertEtaClaimRuntimeRole(app, 'production'),
+      ).rejects.toThrow(/privileged/);
+      await admin.query(`REVOKE CREATE ON SCHEMA public FROM "${restrictedRole}"`);
+      await expect(
+        assertEtaClaimRuntimeRole(app, 'production'),
+      ).resolves.toBeUndefined();
       await app.query('BEGIN');
       await expect(
         app.query(
