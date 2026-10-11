@@ -1811,3 +1811,13 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #611 merged; PR #609 now "behind" main — reconciliation still needed
+
+- PR #611 (CI governance prerequisite) merged into `main` (new main head `67abe95`). Verified independently: `git rev-parse origin/main:.github/workflows/ci.yml` = `d45dd8b34c637693bde5eaa6ea2e09c735ad456f`, which now exactly equals PR #609's head (`55842f3`) ci.yml blob. This is precisely the condition `scripts/mistral-review-target.py::trusted_ci_definition()` checks for the Mistral trusted-review lane.
+- However, PR #609's `mergeable_state` is now `"behind"` (base `7056890e` predates the #611 merge). Per #609's own PR-body governance text ("Then rebase/reconcile #609 to the new main and recheck exact-head CI, provenance and independent review. Do not merge #609 on outdated base or reuse old review evidence."), blob equality alone is not sufficient by the stated process — #609 needs to be reconciled against new main and CI/review re-verified on the new exact head before this is treated as binding.
+- No action taken: I don't hold an implementation lease on #609 (Material-Author: chatgpt) and reconciling the base is the author's/owner's step, not mine. Watching for the reconciliation commit (merge or rebase of new main into #609) and will re-verify CI + my own findings at that new exact head when it lands.
+- My own review status unchanged: zero open findings at head `55842f3`, all 3 required CI jobs green.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
