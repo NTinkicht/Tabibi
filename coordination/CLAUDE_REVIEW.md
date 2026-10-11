@@ -1793,3 +1793,12 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — new commits: least-privilege hardening (head 909eeb3), Prettier-only CI failure
+
+- Two new commits landed: `17953c6` (security: `assertEtaClaimRuntimeRole` now also rejects `rolcreatedb`, `rolreplication`, and `has_schema_privilege(..., 'public', 'CREATE')` for both the session and current role, symmetrically added to the existing rolsuper/rolcreaterole/rolbypassrls checks) and `909eeb3` (integration test exercising exactly those three new rejections via live `ALTER ROLE ... CREATEDB/REPLICATION` and `GRANT/REVOKE CREATE ON SCHEMA public`, confirming fail-closed then pass-again behavior).
+- Independently reviewed both diffs directly (not just the commit messages): the added SQL conditions are structurally sound, applied consistently to both principal checks, strictly more restrictive (no weakening), and the new test's grant/revoke/assert sequence matches the production code path being hardened. No correctness concern found.
+- `Quality and build` failed at this head (`909eeb3`) — verified via job log (`get_job_logs`, job 114458113171): the only failure is `npm run format` (Prettier) reporting style issues in `tests/integration/eta-source-publication.test.ts`, exit code 1. Not a logic/test failure. This matches the same self-correcting pattern already seen once before in this PR (`374a352` fixed an identical Prettier-only failure). No action taken; will verify the formatting fix when the next commit lands, per the established pattern.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
