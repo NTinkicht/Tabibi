@@ -1821,3 +1821,13 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — properly reconciled against new main (head 3f38c08), CI green, clean
+
+- `3f38c08` ("Reconcile ETA uncertainty adoption with protected CI digest pin (#611)") merges the updated `main` (post-#611, base now `67abe95`) into #609's branch. Verified via `git diff 55842f3 3f38c08`: the resulting tree is byte-for-byte identical to the prior head — a pure merge commit, no new content, no regression risk.
+- All 3 required CI jobs green at this new exact head; `mergeable_state: clean`.
+- This completes the reconciliation the PR's own governance text called for (not just a coincidental blob match): base and `main` are now properly aligned, `main`'s ci.yml blob equals this head's ci.yml blob through an actual merge rather than independent coincidence. The `trusted_ci_definition()` condition for the Mistral trusted-review lane should now genuinely hold at this head.
+- My own review status: zero open findings, carried forward unchanged (no new application logic in this merge). Still outstanding: no qualifying non-author approval recorded yet — that remains the only blocker, and remains outside what I can directly cause.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
