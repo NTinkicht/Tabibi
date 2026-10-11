@@ -21,7 +21,10 @@ export async function assertEtaClaimRuntimeRole(
         session_user = current_user
         AND NOT session_role_info.rolsuper
         AND NOT session_role_info.rolcreaterole
+        AND NOT session_role_info.rolcreatedb
+        AND NOT session_role_info.rolreplication
         AND NOT session_role_info.rolbypassrls
+        AND NOT has_schema_privilege(session_user, 'public', 'CREATE')
         AND NOT pg_has_role(
           session_user::regrole::oid, claim_table.relowner, 'MEMBER'
         )
@@ -30,7 +33,10 @@ export async function assertEtaClaimRuntimeRole(
         )
         AND NOT current_role_info.rolsuper
         AND NOT current_role_info.rolcreaterole
+        AND NOT current_role_info.rolcreatedb
+        AND NOT current_role_info.rolreplication
         AND NOT current_role_info.rolbypassrls
+        AND NOT has_schema_privilege(current_user, 'public', 'CREATE')
         AND NOT pg_has_role(
           current_user::regrole::oid, claim_table.relowner, 'MEMBER'
         )
