@@ -661,7 +661,9 @@ describe('WU610: production ETA database privilege boundary', () => {
       await expect(
         assertEtaClaimRuntimeRole(app, 'production'),
       ).rejects.toThrow(/privileged/);
-      await admin.query(`REVOKE CREATE ON SCHEMA public FROM "${restrictedRole}"`);
+      await admin.query(
+        `REVOKE CREATE ON SCHEMA public FROM "${restrictedRole}"`,
+      );
       await expect(
         assertEtaClaimRuntimeRole(app, 'production'),
       ).resolves.toBeUndefined();
