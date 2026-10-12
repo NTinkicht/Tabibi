@@ -168,7 +168,9 @@ describe('ETA uncertainty-v1 adoption', () => {
     expect(Object.isFrozen(first)).toBe(true);
     expect(Object.isFrozen(first.explanationCodes)).toBe(true);
     expect(computeEtaUncertaintyV1(valid).countdownEligible).toBe(true);
-    expect(computeEtaUncertaintyV1(valid).explanationCodes).not.toContain('session-paused');
+    expect(computeEtaUncertaintyV1(valid).explanationCodes).not.toContain(
+      'session-paused',
+    );
   });
 
   it('rejects invalid session state, missing scope and contradictory inputs', () => {
