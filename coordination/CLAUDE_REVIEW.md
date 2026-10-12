@@ -1862,3 +1862,12 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #612 — Mistral Vibe posted APPROVED; noted conflict with my open finding
+
+- A second reviewer pathway (the "Mistral Vibe" automated reviewer, `github-actions[bot]` acting as its dispatcher) posted a binding `APPROVED` review at the same exact head (`69165aa6`) I reviewed, with `VERDICT: PASS`. Its summary is structural ("imports compile, CI green") and does not engage with the paused-session contract mismatch Codex raised and I independently verified moments earlier.
+- Per protocol (note explicitly when a second review pathway posts a verdict rather than silently duplicate), posted a transparency comment (`6120881530`) pointing out the PASS doesn't address the still-open finding — not disputing the Mistral review's validity for whatever gate it serves, just making sure the open concern isn't read as resolved.
+- Status: my own finding (paused-session throws instead of returning a flagged estimate, verified against `docs/architecture/ETA_UNCERTAINTY_CONTRACT.md`) remains open and unaddressed on PR #612 despite the Mistral PASS/approval. Continuing to watch for either a fix commit or the author's response.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
