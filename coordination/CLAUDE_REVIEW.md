@@ -1841,3 +1841,13 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #612 — new bounded extraction from archived #609, independent review posted
+
+- `l5/eta-uncertainty-v1-extraction` opened as PR #612, exactly matching the extraction promised in #609's closure note: carries over `computeEtaUncertaintyV1()` (pure function) and its acceptance-vector tests from the archived branch, exports `absoluteTimestampMs` (no logic change) so the module compiles standalone. Only 3 files, +329/-1. No DB/migration/persistence/endpoint code touched — matches its own stated hard boundary.
+- Subscribed to PR activity. Independently reviewed (not just the description): traced the arithmetic of `computeEtaUncertaintyV1` by hand against 4 of its test cases (called-vs-active double-counting, outward rounding, zero-remaining overrun, validation bounds) and confirmed each one matches by direct calculation rather than trusting the test assertions. Confirmed the `absoluteTimestampMs` export is genuinely a no-op change via diff inspection.
+- CI: `Quality and build` and `PostgreSQL integration` green; `Browser smoke` still running at review time. Posted findings as a comment (`6120844384`): no correctness or scope concerns, did not cast a formal approval (consistent with my standing non-approver reviewer role, same as PR #611).
+- This is the first of what the #609 closure note said would be "subsequent separately tested and independently reviewed PRs" recovering the archived work. Expect more of these to follow; will review each on its own merits as they appear.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
