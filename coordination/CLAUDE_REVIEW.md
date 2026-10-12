@@ -1871,3 +1871,12 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #612 — paused-session fix verified correct; CI failure is Prettier-only (same recurring pattern)
+
+- `8ce5bf5` ("fix(eta): surface paused snapshot evidence with explicit countdown veto") lands the fix for the finding Codex raised and I independently verified. Reviewed the diff directly: `sessionStatus !== 'open'` validation relaxed to `!['open','paused'].includes(...)` (still rejects genuinely invalid states like `'closed'`); adds a `countdownEligible: boolean` field (`true` only when open) and a `session-paused` explanation code when paused; the underlying earliest/expected/latest arithmetic is untouched. New test explicitly checks determinism (replay equality), frozen output, and that open sessions are unaffected (`countdownEligible: true`, no `session-paused` code). This correctly resolves the contract mismatch I flagged — paused sessions now produce versioned evidence instead of being rejected, exactly as `ETA_UNCERTAINTY_CONTRACT.md` requires.
+- `Quality and build` failed at this new head (`8ce5bf5`) — verified via job log: `npm run format` (Prettier) found style issues in the same test file, exit code 1. Same recurring self-correcting pattern seen twice already on the archived #609 and once more here. Not a logic failure; no action needed beyond waiting for the formatting fix.
+- Status: the one substantive finding on PR #612 is now resolved by the author; only the mechanical Prettier failure remains, expected to self-correct on the next commit as before.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
