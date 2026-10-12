@@ -1831,3 +1831,13 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #609 — CLOSED without merge (governance decision, not a correctness finding)
+
+- PR #609 closed by NTinkicht at 2026-10-12T08:42:59Z, retitled "ARCHIVED: oversized ETA uncertainty + atomic publication stream (#606/#610)". Verified directly against the PR body (not just the webhook summary): the owner's own closure note states the 166-commit/30-file PR (~220 KB diff) is closed without merge because its commits lack consistent `Material-Author` provenance trailers at that scale, which cannot pass the independent exact-head review-provenance controls — a governance/process limitation, **not** a correctness defect in the reviewed code.
+- Confirms: no data/schema/production change was deployed; source branch `l5/issue-606-eta-uncertainty-adoption` preserved unchanged at `3f38c084ed292aebc0fad0f15f426180d4c7861a` (the exact head I last reviewed, zero open findings, CI green, properly reconciled against main). The work is to be resubmitted as smaller bounded extraction PRs; the first is `l5/eta-uncertainty-v1-extraction` at `69165aa68bd0eba11ad606c9d59e376b8db7c234` (pure ETA v1 calculator + acceptance vectors + existing timestamp-helper export only).
+- Final status of my review of this PR: throughout its entire life (DELETE-grant bypass, doctor_id reassignment bypass, column-ACL gap, REPEATABLE READ race, lock-order deadlock, error-handling reliability gap, ETA SQL/TS precision parity, least-privilege CREATEDB/REPLICATION/schema-CREATE hardening) every finding I raised was independently verified and ultimately closed by the author's fix commits, with CI green and zero open findings at the final head. The PR's closure is unrelated to any of that work's correctness — it is being split for provenance-scale review reasons.
+- No action needed: this session was automatically unsubscribed from PR #609's activity on closure. Will pick up review on the successor PR(s) (starting with `l5/eta-uncertainty-v1-extraction`) if/when they appear in the regular heartbeat sweep and need review.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
