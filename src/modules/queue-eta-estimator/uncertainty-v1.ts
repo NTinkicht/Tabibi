@@ -33,6 +33,8 @@ export interface EtaUncertaintySnapshot {
   readonly queueRevision: number;
   readonly evaluatedAt: string;
   readonly explanationCodes: readonly string[];
+  /** Paused estimates are audit evidence only, NEVER an advancing countdown. */
+  readonly countdownEligible: boolean;
 }
 
 function absoluteInstant(value: string): boolean {
@@ -85,7 +87,7 @@ export function computeEtaUncertaintyV1(
     !Number.isFinite(duration) ||
     duration <= 0 ||
     !validSource ||
-    input.sessionStatus !== 'open'
+    !['open', 'paused'].includes(input.sessionStatus)
   ) {
     throw new RangeError(
       'Incomplete or invalid committed ETA uncertainty input',
@@ -124,12 +126,14 @@ export function computeEtaUncertaintyV1(
   else if (activeSlot === 1) codes.push('active-consultation-overrun');
   if (delay > 0) codes.push('declared-delay');
   if (input.priorityChanged) codes.push('priority-change');
+  if (input.sessionStatus === 'paused') codes.push('session-paused');
   codes.push(estimateSource.replaceAll('_', '-'));
   return Object.freeze({
     earliestMinutes,
     expectedMinutes,
     latestMinutes,
     estimateVersion: ETA_UNCERTAINTY_VERSION,
+    countdownEligible: input.sessionStatus === 'open',
     queueRevision,
     evaluatedAt,
     explanationCodes: Object.freeze(codes),

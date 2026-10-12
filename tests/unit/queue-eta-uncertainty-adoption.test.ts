@@ -58,6 +58,7 @@ describe('ETA uncertainty-v1 adoption', () => {
       expect(first).toEqual({
         ...expected,
         estimateVersion: 'eta-uncertainty/v1',
+        countdownEligible: true,
         explanationCodes: codes,
       });
       expect(JSON.stringify(first)).toBe(JSON.stringify(second));
@@ -155,15 +156,30 @@ describe('ETA uncertainty-v1 adoption', () => {
     }
   });
 
-  it('rejects paused, missing-scope and contradictory inputs', () => {
+  it('preserves immutable paused evidence without authorizing a countdown', () => {
     const paused = { ...valid, sessionStatus: 'paused' as const };
+    const first = computeEtaUncertaintyV1(paused);
+    const replay = computeEtaUncertaintyV1({ ...paused });
+    expect(first.countdownEligible).toBe(false);
+    expect(first.explanationCodes).toContain('session-paused');
+    expect(first.earliestMinutes).toBeLessThanOrEqual(first.expectedMinutes);
+    expect(first.expectedMinutes).toBeLessThanOrEqual(first.latestMinutes);
+    expect(JSON.stringify(first)).toBe(JSON.stringify(replay));
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Object.isFrozen(first.explanationCodes)).toBe(true);
+    expect(computeEtaUncertaintyV1(valid).countdownEligible).toBe(true);
+    expect(computeEtaUncertaintyV1(valid).explanationCodes).not.toContain('session-paused');
+  });
+
+  it('rejects invalid session state, missing scope and contradictory inputs', () => {
+    const invalidState = { ...valid, sessionStatus: 'closed' as 'open' };
     const unscoped = { ...valid, clinicId: '' };
     const duplicated = {
       ...valid,
       activeSlotIncludedInAhead: true,
       calledNotStartedAhead: 1,
     };
-    expect(() => computeEtaUncertaintyV1(paused)).toThrow(RangeError);
+    expect(() => computeEtaUncertaintyV1(invalidState)).toThrow(RangeError);
     expect(() => computeEtaUncertaintyV1(unscoped)).toThrow(RangeError);
     expect(() => computeEtaUncertaintyV1(duplicated)).toThrow(RangeError);
   });
