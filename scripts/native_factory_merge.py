@@ -84,6 +84,9 @@ TRUSTED_GATE_PATHS = frozenset({
     "scripts/coordination/grok-review-proof.py",
     "scripts/coordination/grok-review-attestation.mjs",
     "scripts/native_factory_merge.py",
+    "scripts/native_factory_ruleset_attestation.py",
+    "tests/test_native_factory_ruleset_attestation.py",
+    ".github/workflows/native-ruleset-attestation-ci.yml",
     "scripts/native_factory_ruleset_policy.py",
     "tests/test_native_factory_ruleset_policy.py",
 })

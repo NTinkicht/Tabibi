@@ -78,6 +78,18 @@ class AttestationTests(unittest.TestCase):
         owner["body"] += "\n" + owner["body"]
         self.assertIsNone(a.authorized_ruleset_detail(detail, summary, [owner]))
 
+    def test_attestation_code_and_tests_are_owner_governed(self):
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "scripts" / "native_factory_merge.py"
+        ).read_text(encoding="utf-8")
+        for critical in (
+            "scripts/native_factory_ruleset_attestation.py",
+            "tests/test_native_factory_ruleset_attestation.py",
+            ".github/workflows/native-ruleset-attestation-ci.yml",
+        ):
+            self.assertIn(f'"{critical}"', source)
+
     def test_missing_timezone_fails_closed(self):
         detail, summary, owner = fixture()
         detail["updated_at"] = summary["updated_at"] = "2026-10-12T18:33:39"
