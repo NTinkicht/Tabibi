@@ -1851,3 +1851,14 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #612 — concur with Codex P2 finding: paused-session contract mismatch (unresolved)
+
+- Codex (second review pathway) posted a P2 inline finding on `uncertainty-v1.ts:88`: `computeEtaUncertaintyV1` throws for `sessionStatus !== 'open'` instead of returning a paused-flagged estimate, allegedly contradicting the ETA uncertainty contract.
+- Verified independently rather than trusting the citation: read `docs/architecture/ETA_UNCERTAINTY_CONTRACT.md` directly at the cited section ("Recompute and refresh policy") — it states *"If the session is paused or otherwise not currently advancing, explanation codes must expose that state and consumers must not present a falsely precise countdown."* This implies paused sessions should still get a versioned estimate (with a pause explanation code), not be rejected as malformed input.
+- Confirmed the mismatch is real: the function throws `RangeError` for any non-`'open'` status, and this PR's own carried-over test (`rejects paused, missing-scope and contradictory inputs`) locks in that throwing behavior as expected/correct.
+- This is pre-existing behavior from the archived #609, not a regression introduced by this extraction — but flagged it on the open PR (comment `6120869751`) since the extraction is scoped exactly to this function and the contract doc is already on `main`. Did not push a fix (no implementation lease, Material-Author: chatgpt); left the call to the author: either implement the paused branch properly, or state explicitly that pause-handling is deferred to a not-yet-extracted caller layer.
+- Status: one open, unresolved P2 finding (concurred with Codex) on PR #612. CI fully green otherwise. Watching for the author's response/fix.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
