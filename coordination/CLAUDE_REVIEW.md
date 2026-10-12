@@ -1902,3 +1902,12 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #613 — fix verified; TRUSTED_GATE_PATHS gap closed
+
+- `4801c97a` ("fix(governance): protect ruleset attestation helper and assurance tests from self-merge") lands the fix for the P1 finding Codex raised and I independently verified/concurred with. Read the diff directly: adds `scripts/native_factory_ruleset_attestation.py`, `tests/test_native_factory_ruleset_attestation.py`, and `.github/workflows/native-ruleset-attestation-ci.yml` to `TRUSTED_GATE_PATHS` — the third path wasn't explicitly named in Codex's finding but closes an adjacent loophole (the regression CI workflow itself could otherwise have been weakened without tripping external-merge). Also adds `test_attestation_code_and_tests_are_owner_governed`, a regression test that reads `native_factory_merge.py` as text and asserts all three paths are present as quoted `TRUSTED_GATE_PATHS` entries, so a future accidental removal fails CI.
+- New `Ruleset attestation adversarial tests` job green at this head. Posted confirmation (comment `6132363015`); noted the three main build/integration/smoke jobs were still in progress at comment time, to be confirmed on completion. `L4 review authorization` still failing — expected, since this PR correctly cannot self-authorize under the very policy it introduces.
+- Status: zero open findings from my review on PR #613. Watching for final CI completion and the routine L4/reviewer-lease gate.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
