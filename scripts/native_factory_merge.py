@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 from native_factory_ruleset_policy import strict_ruleset_enforces
+from native_factory_ruleset_attestation import authorized_ruleset_detail
 
 REPO = os.environ["GITHUB_REPOSITORY"]
 OWNER, NAME = REPO.split("/", 1)
@@ -371,8 +372,19 @@ def strict_base_enforcement():
             detail = gh(f"repos/{REPO}/rulesets/{summary['id']}")
         except RuntimeError:
             continue
-        if strict_ruleset_enforces(
-            detail,
+        # Limited workflow tokens may omit bypass_actors. Never infer [].
+        # A matching authenticated owner assertion on the fixed review-bus
+        # issue is required unless GitHub itself exposes an explicit [].
+        if "bypass_actors" not in detail:
+            try:
+                statements = paged_rest(f"repos/{REPO}/issues/11/comments")
+            except RuntimeError:
+                continue
+        else:
+            statements = []
+        attested = authorized_ruleset_detail(detail, summary, statements)
+        if attested is not None and strict_ruleset_enforces(
+            attested,
             branch="main",
             required_checks=PLATFORM_CHECKS,
             default_branch=default_branch,
