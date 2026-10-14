@@ -1937,3 +1937,15 @@ New substantive commit `99c07e9d` ("reject malformed runtime scope and boolean f
 Confirmed this is a real fix: the prior validation used `!clinicId?.trim()` / `absoluteInstant(evaluatedAt)` which only guarded against `null`/`undefined`. A non-string truthy value (e.g. `clinicId: 42`, `evaluatedAt: null`) would reach `.trim()`/`absoluteTimestampMs` and throw an **uncaught TypeError** instead of the intended `RangeError` — i.e. the old code did not actually fail closed for these cases, it crashed uncontrolled. The new `typeof x !== 'string'` / `typeof !== 'boolean'` guards fix this; traced the new test vectors (clinicId:42, sessionId:{}, targetEntryId:false, evaluatedAt:null, non-boolean activeSlotIncludedInAhead/priorityChanged) by hand and all now throw the structured RangeError as expected.
 
 CI: all 3 required jobs green at current head `83aa5a98d6fedbeacc616099fbd911d53162a7eb`. No defects found. Posted independent review as PR comment (no other reviewer — Codex/Mistral — had yet posted at this exact head): https://github.com/NTinkicht/Tabibi/pull/612#issuecomment-6168668992
+
+## PR #612 closed → PR #614 opened (2026-10-14T14:37Z, provenance repair)
+
+PR #612 was closed without merging (no comment, exact_head still `83aa5a98`). It was immediately superseded by PR #614 ("clean-lineage uncertainty-v1 adoption vectors (supersedes #612)"), which squashes the same reviewed content onto a fresh `main` parent as a single `Material-Author: chatgpt`-trailered commit — the old branch's sync-merge commit lacked that trailer, making its ancestry ineligible for the repo's strict Mistral provenance checks.
+
+Verified the provenance claim directly: diffed #614 head `fc0289e7` against #612's final head `83aa5a98` — byte-identical, same 3 files, same +386/-1. Nothing was altered or reattributed.
+
+Codex posted a new P1 on #614 (`uncertainty-v1.ts:51`): the new estimator isn't wired into any production path. Verified independently via `git grep` on the PR tree — `computeEtaUncertaintyV1` is referenced only by its own definition and the test file; both `public-guest-live-queue-status/index.ts` and `receptionist-dashboard/index.ts` still call `createEtaSnapshot` → legacy `computeQueueEtaRange`. Confirmed accurate, but not a new gap — #612's own description already disclosed this exact boundary (explicitly not "complete adoption", remaining work staged into future PRs), so this is a known, already-declared scope rather than an oversight. Posted as a concur-with-citation, non-blocking.
+
+CI green (`Quality and build`, `PostgreSQL integration`, `Browser smoke`) at `fc0289e7`. `L4 review authorization` red as the routine non-author-approval gate. Subscribed to #614; #612 auto-unsubscribed on close.
+
+Review posted: https://github.com/NTinkicht/Tabibi/pull/614#issuecomment-6170933896
