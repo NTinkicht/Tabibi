@@ -69,12 +69,20 @@ export function computeEtaUncertaintyV1(
     'observed_median',
   ].includes(estimateSource);
   if (
-    !clinicId?.trim() ||
-    !sessionId?.trim() ||
-    !targetEntryId?.trim() ||
+    typeof clinicId !== 'string' ||
+    !clinicId.trim() ||
+    typeof sessionId !== 'string' ||
+    !sessionId.trim() ||
+    typeof targetEntryId !== 'string' ||
+    !targetEntryId.trim() ||
     !Number.isSafeInteger(queueRevision) ||
     queueRevision < 0 ||
+    typeof evaluatedAt !== 'string' ||
     !absoluteInstant(evaluatedAt) ||
+    (input.activeSlotIncludedInAhead !== undefined &&
+      typeof input.activeSlotIncludedInAhead !== 'boolean') ||
+    (input.priorityChanged !== undefined &&
+      typeof input.priorityChanged !== 'boolean') ||
     !Number.isSafeInteger(slotsAhead) ||
     slotsAhead < activeSlot ||
     !Number.isSafeInteger(called) ||

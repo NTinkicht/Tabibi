@@ -149,6 +149,29 @@ describe('ETA uncertainty-v1 adoption', () => {
     }
   });
 
+  it('rejects malformed runtime flags and scope instead of silently changing ETA', () => {
+    // JSON inputs can bypass TypeScript declarations. A string active-slot
+    // flag would otherwise double-count work; a string priority flag would
+    // falsely report a priority change.
+    const malformed: EtaUncertaintyInput[] = [
+      { ...valid, activeSlotIncludedInAhead: 'true' as unknown as boolean },
+      { ...valid, activeSlotIncludedInAhead: 1 as unknown as boolean },
+      { ...valid, priorityChanged: 'false' as unknown as boolean },
+      { ...valid, priorityChanged: 0 as unknown as boolean },
+      { ...valid, evaluatedAt: null as unknown as string },
+      { ...valid, clinicId: 42 as unknown as string },
+      { ...valid, sessionId: {} as unknown as string },
+      { ...valid, targetEntryId: false as unknown as string },
+    ];
+    for (const input of malformed) {
+      expect(() => computeEtaUncertaintyV1(input)).toThrow(RangeError);
+    }
+    expect(computeEtaUncertaintyV1({ ...valid, priorityChanged: false }).explanationCodes)
+      .not.toContain('priority-change');
+    expect(computeEtaUncertaintyV1({ ...valid, activeSlotIncludedInAhead: false }).expectedMinutes)
+      .toBe(computeEtaUncertaintyV1(valid).expectedMinutes);
+  });
+
   it('rejects all invalid committed vectors', () => {
     for (const vector of fixture.invalidInputs) {
       const input = adapt(vector.input);
