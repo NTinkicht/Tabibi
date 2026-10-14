@@ -1911,3 +1911,12 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #613 — merged by repo owner (external merge, as designed)
+
+- Merged at `4801c97acbf32f3628d6ae320022b3fd485a70c4` by NTinkicht (the repo owner) via external/manual merge — consistent with the PR's own stated requirement that it "must not self-merge" since it touches `scripts/native_factory_merge.py`, a trust-defining path in `TRUSTED_GATE_PATHS`. This matches the governance design exactly: the native factory merge controller correctly refused to auto-merge this PR (confirmed earlier via direct code reading of `gates()` / `TRUSTED_GATE_PATHS`), so the repo owner merged it by hand instead.
+- Final state at merge: zero open findings from my review. The one P1 finding (Codex's, which I independently verified and concurred with — the new `scripts/native_factory_ruleset_attestation.py` module missing from `TRUSTED_GATE_PATHS`) was fixed in `4801c97a` and I confirmed the fix was correct and complete before merge.
+- Status: PR #613 closed out. Unsubscribed automatically per the merge event. Remaining open PR under watch: #612 (`l5/eta-uncertainty-v1-extraction`, head `63c5611`, zero open findings, routine `L4 review authorization` gate still pending as expected).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
