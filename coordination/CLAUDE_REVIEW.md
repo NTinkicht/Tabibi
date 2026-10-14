@@ -1929,3 +1929,11 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #612 — commits 99c07e9d + 83aa5a98 (2026-10-14T12:45Z heartbeat)
+
+New substantive commit `99c07e9d` ("reject malformed runtime scope and boolean flags") landed on PR #612, followed by a self-corrected Prettier-format fix `83aa5a98`. Diffed `ef7e12f5` → `99c07e9d` directly rather than trusting the commit message.
+
+Confirmed this is a real fix: the prior validation used `!clinicId?.trim()` / `absoluteInstant(evaluatedAt)` which only guarded against `null`/`undefined`. A non-string truthy value (e.g. `clinicId: 42`, `evaluatedAt: null`) would reach `.trim()`/`absoluteTimestampMs` and throw an **uncaught TypeError** instead of the intended `RangeError` — i.e. the old code did not actually fail closed for these cases, it crashed uncontrolled. The new `typeof x !== 'string'` / `typeof !== 'boolean'` guards fix this; traced the new test vectors (clinicId:42, sessionId:{}, targetEntryId:false, evaluatedAt:null, non-boolean activeSlotIncludedInAhead/priorityChanged) by hand and all now throw the structured RangeError as expected.
+
+CI: all 3 required jobs green at current head `83aa5a98d6fedbeacc616099fbd911d53162a7eb`. No defects found. Posted independent review as PR comment (no other reviewer — Codex/Mistral — had yet posted at this exact head): https://github.com/NTinkicht/Tabibi/pull/612#issuecomment-6168668992
