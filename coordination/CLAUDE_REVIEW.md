@@ -1920,3 +1920,12 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #612 — merge-forward to main; no substantive change
+
+- New head `ef7e12f5` is a plain "Merge branch 'main' into l5/eta-uncertainty-v1-extraction" commit, bringing in main's state after PR #613 merged. Diffed against base directly: content is identical to the already-reviewed `63c5611` (same `uncertainty-v1.ts`, same test file, same `index.ts` export). No new substantive changes to review.
+- All 3 required CI jobs green at this head. Zero open findings carried forward.
+- Status: still watching for the routine `L4 review authorization` gate (expected to keep failing pending a qualifying non-author approval, same as before).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
