@@ -99,7 +99,7 @@ export function selectConsultationEstimate(
  * Resolves only absolute ISO date-times or valid Date instances. Rejects
  * offset-free, calendar-normalized, or otherwise ambiguous timestamps.
  */
-function absoluteTimestampMs(value: Date | string): number {
+export function absoluteTimestampMs(value: Date | string): number {
   if (value instanceof Date) return value.getTime();
 
   const match =
