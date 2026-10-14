@@ -166,10 +166,14 @@ describe('ETA uncertainty-v1 adoption', () => {
     for (const input of malformed) {
       expect(() => computeEtaUncertaintyV1(input)).toThrow(RangeError);
     }
-    expect(computeEtaUncertaintyV1({ ...valid, priorityChanged: false }).explanationCodes)
-      .not.toContain('priority-change');
-    expect(computeEtaUncertaintyV1({ ...valid, activeSlotIncludedInAhead: false }).expectedMinutes)
-      .toBe(computeEtaUncertaintyV1(valid).expectedMinutes);
+    expect(
+      computeEtaUncertaintyV1({ ...valid, priorityChanged: false })
+        .explanationCodes,
+    ).not.toContain('priority-change');
+    expect(
+      computeEtaUncertaintyV1({ ...valid, activeSlotIncludedInAhead: false })
+        .expectedMinutes,
+    ).toBe(computeEtaUncertaintyV1(valid).expectedMinutes);
   });
 
   it('rejects all invalid committed vectors', () => {
