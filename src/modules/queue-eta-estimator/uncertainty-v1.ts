@@ -1,3 +1,13 @@
+/**
+ * eta-uncertainty/v1 estimator (library only, NOT YET ADOPTED).
+ *
+ * No production path calls this module yet: patient status and the
+ * receptionist dashboard still use the legacy createEtaSnapshot range.
+ * Per docs/architecture/ETA_AUDIT_VERSION_BINDING.md, no ETA evidence may
+ * carry the eta-uncertainty/v1 marker until a separate change (#606) wires
+ * this estimator into those paths and is verified. Merging this module does
+ * not complete #606 and does not unblock #587.
+ */
 import {
   ETA_MAX_MULTIPLIER,
   ETA_MIN_MULTIPLIER,

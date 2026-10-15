@@ -42,7 +42,7 @@ const valid = adapt({
   evaluatedAt: '2026-10-04T10:00:00Z',
 });
 
-describe('ETA uncertainty-v1 adoption', () => {
+describe('ETA uncertainty-v1 estimator (library, not yet adopted)', () => {
   for (const vector of fixture.cases) {
     if (vector.kind !== 'estimate' && vector.kind !== 'retry') continue;
 
