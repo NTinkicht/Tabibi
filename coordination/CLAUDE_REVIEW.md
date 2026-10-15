@@ -1976,3 +1976,14 @@ This closes out the #612 → #614 provenance-repair arc: the reviewed content is
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #615 — deletion-only CI retirement, PASS
+
+PR #615 ("retire the old native-factory merge machinery") was marked ready for review (draft lifted by NTinkicht) at exact head `05295c729d277f7a97cde88a00596cb79d407517`. Reviewed independently and posted PASS on the PR.
+
+Key verification beyond the PR's own description: the PR claims the "L4 review authorization" check (produced by the deleted `native-factory-merge-controller.yml`) is non-required. Rather than trust that, pulled the live branch ruleset via `gh api repos/NTinkicht/Tabibi/rulesets/24411900`: its `required_status_checks` currently lists only `Quality and build`, `PostgreSQL integration`, `Browser smoke` — no L4 check — and the ruleset's `updated_at` (2026-10-15T19:16:57+04:00) predates the PR's creation (20:39), confirming the requirement was deliberately dropped beforehand (consistent with the OneCompany #310 cutover this PR is gated on). This rules out the failure mode of deleting a workflow that produces a still-required status check (which would permanently block all future merges). Also confirmed via `git grep` on the PR's head tree that no other workflow references the deleted files/jobs, and that `scripts/native_factory_merge.py selftest` is still invoked directly from untouched `ci.yml`/`l5-write-adapter-ci.yml`, and `mistral-vibe-wake.yml` is unaffected.
+
+At time of posting: 3/3 required CI green, no formal reviews yet, Codex's own review triggered by the ready-for-review transition was still "running". Continuing to watch for Codex/ntk-reviewer verdicts to reconcile.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
