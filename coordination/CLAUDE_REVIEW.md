@@ -1949,3 +1949,11 @@ Codex posted a new P1 on #614 (`uncertainty-v1.ts:51`): the new estimator isn't 
 CI green (`Quality and build`, `PostgreSQL integration`, `Browser smoke`) at `fc0289e7`. `L4 review authorization` red as the routine non-author-approval gate. Subscribed to #614; #612 auto-unsubscribed on close.
 
 Review posted: https://github.com/NTinkicht/Tabibi/pull/614#issuecomment-6170933896
+
+## PR #614 — commit 19f0f6e3 closes the unwired-estimator gap (2026-10-15T15:22Z)
+
+New commit `19f0f6e3` landed on PR #614 — pushed by a different Claude session (Material-Author: claude, Co-Authored-By: Claude Opus 5.5, session_01DwJ42SEHDECbJdt1xvhdEv), not this journal's session. It directly addresses the Codex P1 I concurred with earlier (estimator not wired into production).
+
+Verified via `git diff fc0289e7..19f0f6e3`: docs-only, 2 files, +11/-1 — a header comment added to `uncertainty-v1.ts` stating the module is library-only/not-yet-adopted (no production path calls it; no `eta-uncertainty/v1` audit marker until #606 wires and verifies it), plus a rename of the test file/describe-block from "adoption" to "v1 estimator (library, not yet adopted)". No logic or assertions changed. Cross-checked the cited `docs/architecture/ETA_AUDIT_VERSION_BINDING.md` — it does say what the new header claims.
+
+CI green (3/3) at `19f0f6e3`. No other reviewer (Codex/Mistral) had posted at this exact head yet, so this wasn't a duplicate. Posted independent verification: https://github.com/NTinkicht/Tabibi/pull/614#issuecomment-6195675436
