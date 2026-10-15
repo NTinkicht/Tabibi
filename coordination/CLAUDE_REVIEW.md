@@ -1957,3 +1957,11 @@ New commit `19f0f6e3` landed on PR #614 — pushed by a different Claude session
 Verified via `git diff fc0289e7..19f0f6e3`: docs-only, 2 files, +11/-1 — a header comment added to `uncertainty-v1.ts` stating the module is library-only/not-yet-adopted (no production path calls it; no `eta-uncertainty/v1` audit marker until #606 wires and verifies it), plus a rename of the test file/describe-block from "adoption" to "v1 estimator (library, not yet adopted)". No logic or assertions changed. Cross-checked the cited `docs/architecture/ETA_AUDIT_VERSION_BINDING.md` — it does say what the new header claims.
 
 CI green (3/3) at `19f0f6e3`. No other reviewer (Codex/Mistral) had posted at this exact head yet, so this wasn't a duplicate. Posted independent verification: https://github.com/NTinkicht/Tabibi/pull/614#issuecomment-6195675436
+
+## PR #614 — dissent from ntk-reviewer[bot] false-positive CHANGES_REQUESTED (2026-10-15T15:23Z)
+
+A new reviewer pathway, `ntk-reviewer[bot]` (model mistral-vibe, posting formal GitHub reviews via OneCompany workflow runs), posted a CHANGES_REQUESTED review on `19f0f6e3` claiming the test fixture `tests/fixtures/eta-uncertainty-v1.vectors.json` is "not included in the changeset", blocking verification of `queue-eta-uncertainty-v1.test.ts`'s vector-driven tests.
+
+Verified independently and found this incorrect: the fixture already exists on `main` (`git cat-file -e origin/main:tests/fixtures/eta-uncertainty-v1.vectors.json` succeeds) — it correctly doesn't appear in the diff because nothing about it changed, not because it's missing from the repo. Pulled the actual `Quality and build` job log for job `116506105242` at this head and confirmed `tests/unit/queue-eta-uncertainty-v1.test.ts (12 tests)` ran and passed as part of `381 passed (381)` — the vector-driven tests were mechanically verified by the same green CI run the bot cites, contradicting its own "cannot verify" claim.
+
+Mistral Vibe (the other automated pathway, via github-actions comment) posted PASS at the same head with no such concern, consistent with my finding. Posted a dissent with the concrete evidence rather than letting an incorrect blocking review stand unchallenged: https://github.com/NTinkicht/Tabibi/pull/614#issuecomment-6195704750
