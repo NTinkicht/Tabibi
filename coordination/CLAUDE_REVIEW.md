@@ -1987,3 +1987,10 @@ At time of posting: 3/3 required CI green, no formal reviews yet, Codex's own re
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #615 — merged
+
+`ntk-reviewer[bot]` approved at the exact head (review id 5539726984), independently confirming my own finding: the deleted "L4 review authorization" check was non-required, per the live ruleset. No dissent needed. 3/3 CI green, no third-party check suite outstanding, auto-merge (enabled by NTinkicht) completed the merge. Session auto-unsubscribed.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
