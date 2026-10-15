@@ -1965,3 +1965,14 @@ A new reviewer pathway, `ntk-reviewer[bot]` (model mistral-vibe, posting formal 
 Verified independently and found this incorrect: the fixture already exists on `main` (`git cat-file -e origin/main:tests/fixtures/eta-uncertainty-v1.vectors.json` succeeds) — it correctly doesn't appear in the diff because nothing about it changed, not because it's missing from the repo. Pulled the actual `Quality and build` job log for job `116506105242` at this head and confirmed `tests/unit/queue-eta-uncertainty-v1.test.ts (12 tests)` ran and passed as part of `381 passed (381)` — the vector-driven tests were mechanically verified by the same green CI run the bot cites, contradicting its own "cannot verify" claim.
 
 Mistral Vibe (the other automated pathway, via github-actions comment) posted PASS at the same head with no such concern, consistent with my finding. Posted a dissent with the concrete evidence rather than letting an incorrect blocking review stand unchallenged: https://github.com/NTinkicht/Tabibi/pull/614#issuecomment-6195704750
+
+## PR #614 — approved and merged
+
+`ntk-reviewer[bot]` re-reviewed at the exact current head `8d1e859c145f3b3d3df139617b98e1a5bfc6b36a` (review id 5539193615) and returned **Approved / PASS**, confirming the earlier false-positive CHANGES_REQUESTED (fixture-missing claim, disproven via CI job log inspection in the prior journal entry) was indeed a bug in the reviewer's diff-only context, now fixed upstream (OneCompany #309). This verdict matches my own independent review of the identical content at every prior head (`fc0289e7` → `19f0f6e3` → `8d1e859c`): pure, deterministic, validated library code; module header and renamed test suite correctly document non-adoption status per `ETA_AUDIT_VERSION_BINDING.md`; no production wiring, no security/correctness issues.
+
+All gates cleared (3/3 required CI jobs green, Mistral Vibe PASS, ntk-reviewer Approved, L4 authorization satisfied). GitHub's native auto-merge (enabled by NTinkicht) completed the merge at 2026-10-15T20:06:00Z, `merged_by: NTinkicht`. No manual merge action was taken or needed from this session.
+
+This closes out the #612 → #614 provenance-repair arc: the reviewed content is now on `main` with full, honest `Material-Author` attribution and independent verification at every step. Unsubscribing from PR #614 activity as it is closed/merged.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
