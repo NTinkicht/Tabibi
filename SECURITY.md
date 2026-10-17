@@ -18,10 +18,15 @@ Tabibi is healthcare-adjacent software. Treat patient and operational clinic dat
 - Priority, restore and transfer require explicit permission and non-empty audit reason.
 
 ## Guest access credential model
-The durable guest credential is a high-entropy bearer secret minted only when a valid single-use exchange ID is atomically consumed. The raw bearer is returned only in the Secure/HttpOnly cookie response and is never persisted or logged. Persist only its one-way verifier, created in that consumption transaction and bound to the target entry/session; the verifier itself must not authenticate.
+**Two separate guest bearer classes exist; neither is interchangeable or a staff identity.** Every read and mutation must authorize against the server's durable booking/queue/clinic/tenant binding, lifecycle and revocation state, not caller-provided IDs or display labels.
 
-### Single-use exchange transport
-The patient contact channel receives a short-TTL single-use opaque exchange ID, not the durable bearer credential.
+- **Booking-origin `guestBearer` (WU63/WU64/WU65):** the trusted booking frontend obtains it only from the successful `POST /api/public/bookings` response. The WU64 host hands it to read-only polling or the WU65 explicit check-in component in memory in the **same document**, clearing the host reference afterward. Consumers send it only in an `Authorization` header; it must never enter a cookie, URL, browser storage, DOM, logs, analytics or error payload. It is invalid across different durable booking/clinic/queue scopes, cannot be recovered from a reload or exchange cookie, and does not grant staff or other patient privileges. WU65 additionally binds a high-entropy body `operationId` to its authorized booking, one serialized eligible check-in transition and safe replay.
+- **Exchange-origin status-only bearer (TAB-FND-024/028):** minted **only** when a valid single-use exchange ID is atomically consumed, returned **only** via a Secure/HttpOnly cookie response, never exposed to JavaScript. Persist only a one-way status-bearer verifier bound to the target entry/session. This cookie can read the narrow authorized status route only; it cannot authorize WU65 check-in or produce/hydrate any header-bearing booking capability. The verifier itself must not authenticate. Staff-created, exchange-only and contact-less guests use authorized receptionist check-in; contact-less entries without a valid channel do not receive remote credentials.
+
+**Class non-interchangeability is a release requirement:** send a booking bearer to the cookie-only route, or a status cookie to a WU64/WU65 bearer-only route, and it must fail closed. A cross-class fallback, cookie-to-bearer conversion, URL injection or JS read of the status cookie is forbidden. Booking responses carrying a booking `guestBearer` require no-store/no-referrer headers and scoped redaction. Rotation/terminal/transfer rules revoke each credential class independently; a target transfer never carries source scope authority.
+
+### Single-use exchange transport (status-cookie class only)
+The patient contact channel receives a short-TTL single-use opaque exchange ID, **not** an exchange-origin durable status bearer or a booking-origin `guestBearer`.
 
 Rules:
 - exchange ID default TTL <=10 minutes;
@@ -52,7 +57,7 @@ A transfer must never silently carry a source-entry credential into a target ent
 
 Contact-less guest/walk-in entries are permitted. They receive no remote credential and no notification/live-remote feature until authorized staff add a valid contact channel.
 
-Never place durable guest credentials in URLs, logs, analytics or notification payload logs.
+Never place either class of durable guest credential in URLs, logs, analytics or notification payload logs; the approved booking-origin bearer is only in the initial no-store booking response and same-document memory/header transport; the exchange-origin status bearer is only in the HttpOnly cookie response.
 
 ### Encrypted exchange-link outbox exception — TAB-FND-028-secret-outbox
 Credential and exchange tables store only one-way verifiers. To preserve durable asynchronous exchange-link delivery, an outbox row may contain a short-lived envelope-encrypted secret payload plus non-secret metadata; plaintext exchange IDs/links remain forbidden in database columns, logs, metrics, errors and audit snapshots. The wrapping key comes from runtime secret management/KMS-equivalent, never the database or Git, and only the notification worker may decrypt immediately before dispatch.
@@ -86,7 +91,7 @@ Operational logs must not contain passwords, session tokens, raw guest credentia
 - Idempotency is mandatory for externally retried mutation/notification flows.
 
 ## Web/API baseline before pilot
-HTTPS only; secure cookie/session configuration; CSRF for cookie-authenticated mutations; schema validation; rate limits for auth/exchange/guest/resend endpoints; timing-safe verifier comparison; CSP/security headers; dependency/secret scanning in CI; tenant-isolation API tests.
+HTTPS only; secure cookie/session configuration; CSRF for cookie-authenticated mutations (no guest status-cookie mutation in MVP); schema validation; rate limits for auth/exchange/guest/resend endpoints; timing-safe verifier comparison; CSP/security headers; dependency/secret scanning in CI; tenant-isolation API tests. Positive and negative tests must validate both approved guest credential classes and reject cross-class authorization, browser cookie fallback on WU64, cookie-only WU65 mutation, bearer-in-URL/DOM/storage or status-bearer JavaScript access; no fabricated credential may be promoted to staff/account authority.
 
 ## Notification privacy and reliability
 Messages reveal only minimum operational information. Avoid medical specialty/condition details in lock-screen-visible text. Notification failure never rolls queue state back. Material dead-lettered events must surface to clinic operations staff without exposing provider secrets or sensitive payloads.
