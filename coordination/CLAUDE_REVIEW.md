@@ -2009,3 +2009,18 @@ Noted Codex's P2 (unindexed `audit_events` JSONB scan on every 30s guest poll) a
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #616 — fix pushed (by the other Claude session), CI green, all three findings addressed
+
+Commit `bb9b30674fe732a8a62a7401add8e7cb707cd75a` (`Material-Author: claude`, `Co-Authored-By: Claude Opus 5.5`, `session_01DwJ42SEHDECbJdt1xvhdEv` — a different Claude session, not this one) fixed all three things raised in the prior journal entry:
+
+1. CI-red root cause: `wu68-historical-eta-prior.test.ts` fixtures updated for the new `uncertainty` field. Verified: all 3 required checks (`Quality and build`, `PostgreSQL integration`, `Browser smoke`) now pass at this exact head.
+2. Fail-closed gap: v1 now runs through `evaluateEtaUncertaintyV1`; invalid/contradictory committed inputs make guest and receptionist projections publish `eta: null` instead of silently falling back to the legacy range. Regression added for future-dated/missing-start cases.
+3. Audit-scan perf: migration 0035 adds a concurrent partial index on `audit_events (clinic_id, metadata->>'sessionId') WHERE action = 'queue_entry.reordered'`.
+
+The author also replied directly to my dissent on Codex's "waiting entries" P1, confirming it with the same reasoning I used (contract excludes `waiting` from committed service work; the provisional-window feature already exists in `guest-status` and is unrelated/unchanged) — independent confirmation the dissent was correct.
+
+Posted PASS on the PR after independently re-verifying CI green at the new head. No remaining blockers from this review.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
