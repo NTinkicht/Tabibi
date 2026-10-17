@@ -25,6 +25,9 @@ The public serializer may expose only coarse guest-operational information neede
 
 It must not expose patient/contact data, internal IDs, clinic/doctor/session/tenant/membership identifiers, audit data, credential metadata, bearer material, database details, or implementation diagnostics.
 
+## Class-scoped terminal status
+WU63 booking-origin `guestBearer` uses `Authorization` header only, not the exchange-issued status cookie. On the authorized booking's committed terminal transition (`completed`, `cancelled`, `no_show`, or whole-session terminal close/cancel), live queue/ETA access ceases immediately. Only a privacy-minimal **final state** may be read by that still-valid booking bearer on the header route until the earlier of bearer expiry or committed terminal timestamp + 15 minutes; it never grants a new mutation or reveals a booking/internal identifier. After that the generic rejected-capability response applies, and retries do not extend grace. WU64 consumes a terminal response, stops polling and clears memory. The exchange-only status cookie is a different server-side status route and is neither a producer nor a fallback for this header bearer.
+
 ## Side-effect and transport rules
 
 - Read-only: no queue mutation, ETA prediction, notification, geofencing, rescheduling, staff override, analytics, or audit-event creation.
@@ -37,7 +40,7 @@ It must not expose patient/contact data, internal IDs, clinic/doctor/session/ten
 2. Booking-A capability cannot read booking B, including same-clinic/same-session fixtures.
 3. Cross-clinic/cross-tenant substitution and durable association drift fail closed.
 4. Malformed/tampered/expired/revoked credentials produce the same generic external rejection shape.
-5. Terminal booking/queue states serialize deterministically without private/internal data.
+5. Terminal booking/queue states serialize deterministically without private/internal data. Assert immediate live/ETA denial but a bounded final-state-only header read at T0 and T0+15m (subject to earlier token expiry), generic denial at T0+15m+epsilon, no extension after replay/network loss, no terminal check-in authority, and an immediate WU64 stop/clear on terminal observation.
 6. Public serialization is an explicit allow-list and contains no internal identifiers or bearer material.
 7. Repeated and concurrent polling creates no mutation/version change/audit event.
 8. Tests are non-vacuous, external-network free, and full CI remains green.

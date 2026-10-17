@@ -8,16 +8,19 @@ Controller rule: while a production PR is active, finish that canonical stream f
 
 _None._
 
-## NEXT
+## NEXT — reconcile live prerequisites before implementation
 
-1. **#606 - WU-L5-ETA-ESTIMATOR-ADOPTION** - implement the already-approved `eta-uncertainty/v1` output contract from merged PR #580 before persisting its audit version.
+1. **#610 — approved ETA canonical source epoch / atomic publication, NOT yet verified complete.** Reconcile against current `main` and live GitHub, including completed estimator adoption #606 via merged [PR #614](https://github.com/NTinkicht/Tabibi/pull/614) + [PR #616](https://github.com/NTinkicht/Tabibi/pull/616). The original oversized [PR #609](https://github.com/NTinkicht/Tabibi/pull/609) was **closed without merge** and is not an active implementation lease. Verify the remaining versioned-source-epoch/claim-only CAS work from issue #610, its owner-approved bounded migration scope, exact base/head and all existing branches/WUs before admitting one smallest new canonical implementation stream. Do not reopen or reuse the archived PR as proof of working atomic publication; do not create concurrent code writers.
+2. **Do not promote #587 until the full #610 atomic publication prerequisite is independently verified and merged.** A completed read-only `eta-uncertainty/v1` calculation (#606) is not persisted source-epoch CAS.
 
 ## BLOCKED
 
-- **#587 - WU-L5-ETA-VERSION** - blocked on #606. Do not persist `etaContractVersion` against the legacy min/max estimator output.
+- **#587 — WU-L5-ETA-VERSION** — still open. #606's estimator/adoption prerequisites are completed, but the separate canonical `eta_source_epoch` / full-source-tuple atomic publication prerequisite **#610 remains open and unverified**. Do not persist a misleading `etaContractVersion` audit on a read-only projection. Once #610 is actually verified/merged, reconcile #587's exact scope/CI and move it to NEXT.
+- Any proposed PRODUCT.md rows still marked `VERIFY`/`PLANNED` are **not** independently admitted queue WUs. Follow the native work selector and reconcile actual merged tests/CI/review first.
 
 ## DONE / RECONCILED
 
+- **#606 — WU-L5-ETA-ESTIMATOR-ADOPTION** — GitHub issue **closed completed 2026-10-17**; pure estimator and vectors merged in [PR #614](https://github.com/NTinkicht/Tabibi/pull/614) on 2026-10-15, and receptionist/guest projection adoption merged in [PR #616](https://github.com/NTinkicht/Tabibi/pull/616) on 2026-10-17. This is source projection and test evidence, **not** proof of #610 epoch-CAS publication. Never select #606 as NEXT again.
 - **#590 / PR #604 - WU-L5-QUEUE-RACE-TESTS** - deterministic concurrent call-next regression merged; issue closed completed.
 - **#607 / PR #608 - WU-L5-DEPENDENCY-AUDIT-REMEDIATION** - high-severity production dependency audit gate remediated; issue closed completed.
 - **#592 WU-L5-QUEUE-ORDERING-VECTORS** - ordering vector artifacts are already present on main; issue closed completed.
@@ -27,7 +30,7 @@ _None._
 
 Epic **#5** remains parent context and is not itself an executable NEXT item.
 
-Snapshot refreshed: 2026-10-07.
+Snapshot reconciled: 2026-10-18 against live issue #606 (closed), #587/#610 (open) and PR #609 (closed unmerged), #614/#616 (merged). Prior dated sections below remain historical evidence, never a competing selector.
 
 ---
 
