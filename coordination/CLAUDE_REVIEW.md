@@ -2024,3 +2024,10 @@ Posted PASS on the PR after independently re-verifying CI green at the new head.
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #616 — approved and merged
+
+`ntk-reviewer[bot]` approved at the exact final head `bb9b30674fe732a8a62a7401add8e7cb707cd75a` (review id 5560047021), consistent with my own PASS. NTinkicht merged the PR immediately after. Issue #606 (eta-uncertainty/v1 adoption into guest/receptionist read models) is closed. Session auto-unsubscribed.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
