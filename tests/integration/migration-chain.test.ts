@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Client } from 'pg';
@@ -40,6 +41,7 @@ const committedMigrations = [
   '0032_doctor_global_consultation_open_guard.sql',
   '0033_doctor_global_consultation_insert_guard.sql',
   '0034_doctor_global_active_consultation_guard.sql',
+  '0035_audit_queue_reorder_session_index.sql',
 ];
 
 beforeAll(async () => {
@@ -64,6 +66,44 @@ describe('committed migration chain', () => {
       'SELECT count(*)::text count FROM schema_migrations',
     );
     expect(rerun.rows[0]!.count).toBe(String(committedMigrations.length));
+  });
+
+  it('bounds the v1 priority-change audit lookup with a valid session-scoped partial index', async () => {
+    const index = await client.query<{ indexdef: string; valid: boolean }>(
+      `SELECT pg_get_indexdef(i.indexrelid) AS indexdef, i.indisvalid AS valid
+         FROM pg_index i
+         JOIN pg_class c ON c.oid = i.indexrelid
+        WHERE c.relname = 'audit_events_queue_reorder_session_idx'`,
+    );
+    expect(index.rows).toHaveLength(1);
+    expect(index.rows[0]!.valid).toBe(true);
+    expect(index.rows[0]!.indexdef).toContain(
+      "(metadata ->> 'sessionId'::text)",
+    );
+    expect(index.rows[0]!.indexdef).toContain(
+      "WHERE (action = 'queue_entry.reordered'::text)",
+    );
+
+    // The service predicates (clinic, literal reorder action, sessionId text)
+    // must be able to use it. Sequential scans are disabled only to prove
+    // index eligibility independent of this tiny fixture table's statistics.
+    await client.query('BEGIN');
+    try {
+      await client.query('SET LOCAL enable_seqscan = off');
+      const plan = await client.query<{ 'QUERY PLAN': unknown }>(
+        `EXPLAIN (FORMAT JSON)
+         SELECT 1 FROM audit_events audit
+          WHERE audit.clinic_id = $1::uuid
+            AND audit.action = 'queue_entry.reordered'
+            AND audit.metadata->>'sessionId' = $2`,
+        [randomUUID(), randomUUID()],
+      );
+      expect(JSON.stringify(plan.rows[0]!['QUERY PLAN'])).toContain(
+        'audit_events_queue_reorder_session_idx',
+      );
+    } finally {
+      await client.query('ROLLBACK');
+    }
   });
 
   it('exposes queue lifecycle, ETA timing, appointment-booking and notification artifacts created by later migrations', async () => {
