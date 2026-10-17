@@ -1994,3 +1994,18 @@ Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
+
+## PR #616 — ETA v1 adoption into guest/receptionist read models: CI red + dissent on Codex P1
+
+New PR (not opened by this session), closing #606, adopting the previously library-only `eta-uncertainty/v1` estimator into `public-guest-live-queue-status` and `receptionist-dashboard` production read models. Exact head `735d26b3fa85da62f8a0a0abe9e8241b6a87ab39`.
+
+**CI red, root-caused**: `PostgreSQL integration` fails on 4 assertions in `tests/integration/wu68-historical-eta-prior.test.ts` (lines 249/306/399/441) — pre-existing `toEqual()` fixtures not updated for the new `uncertainty` field this PR adds. The PR did update two other test files for the new field but missed this one. Posted on the PR as the one must-fix blocker.
+
+**Dissented on Codex's P1 "waiting entries" finding** (review thread on `receptionist-dashboard/index.ts:279`): it cites `ETA_UNCERTAINTY_CONTRACT.md` as requiring waiting patients to get a versioned v1 estimate. Read that contract in full — no such requirement exists there; it explicitly scopes v1 to checked-in/called/active-consultation work and excludes `waiting` by design. The actual "provisional arrival window for waiting patients" requirement is in `PRODUCT.md`/`ARCHITECTURE.md` and is already served by a separate pre-existing module (`src/modules/guest-status/index.ts`) outside this PR's scope. Verified via `search_code` before dissenting, consistent with established practice of checking cited documents directly rather than trusting a bot's citation.
+
+**Partially concurred, downgraded** on Codex's P1 "fail-closed" finding (catching `computeEtaUncertaintyV1`'s `RangeError` and silently omitting `uncertainty`): the contract itself calls this the correct behavior ("ineligible for publication"), so not a contract violation — but flagged the zero-observability gap (no log/metric on that path) as a legitimate non-blocking follow-up, since a latent bug there would silently degrade forever with no signal.
+
+Noted Codex's P2 (unindexed `audit_events` JSONB scan on every 30s guest poll) as a real but non-blocking perf concern.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DRFSiNCkm41MKVScfHabep
