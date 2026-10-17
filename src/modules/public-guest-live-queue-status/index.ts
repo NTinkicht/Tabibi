@@ -11,8 +11,7 @@ import {
 } from '@/modules/queue-eta-estimator';
 import { createEtaSnapshot } from '@/modules/queue-eta-estimator/snapshot';
 import {
-  computeEtaUncertaintyV1,
-  isEtaUncertaintySnapshotForRevision,
+  evaluateEtaUncertaintyV1,
   type EtaUncertaintySnapshot,
 } from '@/modules/queue-eta-estimator/uncertainty-v1';
 import { abortableQuery } from '@/platform/database/abortable-query';
@@ -338,54 +337,53 @@ export class PublicGuestLiveQueueStatusService {
     });
 
     // The guest v1 candidate is derived solely from one scoped SQL snapshot.
-    // An active slot without a valid committed start cannot produce v1 evidence.
+    // In an open session v1 applies; if its committed inputs are invalid or
+    // contradictory, the ETA fails closed (null) instead of silently falling
+    // back to the legacy range.
     let uncertainty: EtaUncertaintySnapshot | null = null;
-    const activeAhead = Number(row.active_slots_ahead);
-    const start = row.active_ahead_started_at;
-    const validActiveSlot =
-      activeAhead === 0 ||
-      (activeAhead === 1 &&
-        start instanceof Date &&
-        Number.isFinite(start.getTime()) &&
-        start <= snapshotNow);
-
-    // Keep the atomic-snapshot computation block together as a single review unit.
-    // prettier-ignore
-    if (row.session_status === 'open' && validActiveSlot) {
-      const queueRevision = Number(row.queue_order_version);
-      try {
-        const activeRemaining =
-          activeAhead === 1 && start
-            ? computeActiveConsultationRemainingMinutes({
-                startedAt: start,
-                now: snapshotNow,
-                estimatedConsultationMinutes:
-                  estimate.estimatedConsultationMinutes,
-              })
-            : 0;
-        const candidate = computeEtaUncertaintyV1({
+    if (row.session_status === 'open') {
+      uncertainty = evaluateEtaUncertaintyV1(() => {
+        const activeAhead = Number(row.active_slots_ahead);
+        const start = row.active_ahead_started_at;
+        // An active slot without a valid committed start, or more than one
+        // active consultation ahead, cannot produce v1 evidence.
+        if (
+          !(
+            activeAhead === 0 ||
+            (activeAhead === 1 &&
+              start instanceof Date &&
+              Number.isFinite(start.getTime()) &&
+              start <= snapshotNow)
+          )
+        ) {
+          throw new RangeError('Contradictory active consultation');
+        }
+        return {
           clinicId: row.clinic_id,
           sessionId: row.session_id,
           targetEntryId: row.target_entry_id,
-          queueRevision,
+          queueRevision: Number(row.queue_order_version),
           evaluatedAt: snapshotNow.toISOString(),
           declaredDelayMinutes,
-          activeConsultationRemainingMinutes: activeRemaining,
+          activeConsultationRemainingMinutes:
+            activeAhead === 1 && start
+              ? computeActiveConsultationRemainingMinutes({
+                  startedAt: start,
+                  now: snapshotNow,
+                  estimatedConsultationMinutes:
+                    estimate.estimatedConsultationMinutes,
+                })
+              : 0,
           slotsAhead: Number(row.committed_slots_ahead),
           calledNotStartedAhead: Number(row.called_slots_ahead),
           activeSlotIncludedInAhead: activeAhead === 1,
           priorityChanged: row.priority_changed,
-          estimatedConsultationMinutes:
-            estimate.estimatedConsultationMinutes,
+          estimatedConsultationMinutes: estimate.estimatedConsultationMinutes,
           estimateSource: estimate.estimateSource,
           sessionStatus: 'open',
-        });
-        if (isEtaUncertaintySnapshotForRevision(candidate, queueRevision)) {
-          uncertainty = candidate;
-        }
-      } catch (error) {
-        if (!(error instanceof RangeError)) throw error;
-      }
+        };
+      });
+      if (!uncertainty) return null;
     }
 
     return {

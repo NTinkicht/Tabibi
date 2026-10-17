@@ -9,8 +9,7 @@ import {
 } from '@/modules/queue-eta-estimator';
 import { createEtaSnapshot } from '@/modules/queue-eta-estimator/snapshot';
 import {
-  computeEtaUncertaintyV1,
-  isEtaUncertaintySnapshotForRevision,
+  evaluateEtaUncertaintyV1,
   type EtaUncertaintySnapshot,
 } from '@/modules/queue-eta-estimator/uncertainty-v1';
 import type { SessionStatus } from '@/modules/session';
@@ -272,63 +271,68 @@ export class ReceptionistDashboardService {
           (prior) => prior.entry_state === 'in_consultation',
         );
         const activeStartedAt = activeAhead[0]?.in_consultation_started_at;
-        let uncertainty: EtaUncertaintySnapshot | null = null;
-        if (
-          eligible &&
-          state !== 'waiting' &&
-          first.session_status === 'open' &&
-          row.entry_id &&
-          activeAhead.length <= 1 &&
-          (activeAhead.length === 0 ||
-            (activeStartedAt instanceof Date &&
-              Number.isFinite(activeStartedAt.getTime()) &&
-              activeStartedAt <= snapshotNow))
-        ) {
-          const queueRevision = Number(first.queue_order_version);
-          try {
-            const candidate = computeEtaUncertaintyV1({
-              clinicId: scope.clinicId,
-              sessionId,
-              targetEntryId: row.entry_id,
-              queueRevision,
-              evaluatedAt: snapshotNow.toISOString(),
-              declaredDelayMinutes,
-              activeConsultationRemainingMinutes:
-                activeStartedAt instanceof Date
-                  ? computeActiveConsultationRemainingMinutes({
-                      startedAt: activeStartedAt,
-                      now: snapshotNow,
-                      estimatedConsultationMinutes:
-                        estimate.estimatedConsultationMinutes,
-                    })
-                  : 0,
-              slotsAhead: committedServiceAhead.length,
-              activeSlotIncludedInAhead: activeAhead.length === 1,
-              calledNotStartedAhead: committedServiceAhead.filter(
-                (prior) => prior.entry_state === 'called',
-              ).length,
-              priorityChanged:
-                priorityAffectedEntries.has(row.entry_id) ||
-                committedServiceAhead.some(
-                  (prior) =>
-                    prior.entry_id !== null &&
-                    priorityAffectedEntries.has(prior.entry_id),
-                ),
-              estimatedConsultationMinutes:
-                estimate.estimatedConsultationMinutes,
-              estimateSource: estimate.estimateSource,
-              sessionStatus: 'open',
-            });
-            if (isEtaUncertaintySnapshotForRevision(candidate, queueRevision)) {
-              uncertainty = candidate;
-            }
-          } catch (error) {
-            if (!(error instanceof RangeError)) throw error;
-            // Invalid committed metadata cannot produce a v1 snapshot estimate.
-          }
-        }
+        // v1 applies to committed service work (checked_in, called,
+        // in_consultation) in an open session. A `waiting` target has no
+        // committed service position under ETA_UNCERTAINTY_CONTRACT.md
+        // (waiting entries never contribute merely by existing); its
+        // provisional arrival window is owned by the guest-status module.
+        const v1Applicable =
+          eligible && state !== 'waiting' && first.session_status === 'open';
+        const uncertainty: EtaUncertaintySnapshot | null = v1Applicable
+          ? evaluateEtaUncertaintyV1(() => {
+              // More than one active consultation ahead, or an active slot
+              // without a valid committed start, is contradictory evidence.
+              if (
+                activeAhead.length > 1 ||
+                (activeAhead.length === 1 &&
+                  !(
+                    activeStartedAt instanceof Date &&
+                    Number.isFinite(activeStartedAt.getTime()) &&
+                    activeStartedAt <= snapshotNow
+                  ))
+              ) {
+                throw new RangeError('Contradictory active consultation');
+              }
+              return {
+                clinicId: scope.clinicId,
+                sessionId,
+                targetEntryId: row.entry_id!,
+                queueRevision: Number(first.queue_order_version),
+                evaluatedAt: snapshotNow.toISOString(),
+                declaredDelayMinutes,
+                activeConsultationRemainingMinutes:
+                  activeStartedAt instanceof Date
+                    ? computeActiveConsultationRemainingMinutes({
+                        startedAt: activeStartedAt,
+                        now: snapshotNow,
+                        estimatedConsultationMinutes:
+                          estimate.estimatedConsultationMinutes,
+                      })
+                    : 0,
+                slotsAhead: committedServiceAhead.length,
+                activeSlotIncludedInAhead: activeAhead.length === 1,
+                calledNotStartedAhead: committedServiceAhead.filter(
+                  (prior) => prior.entry_state === 'called',
+                ).length,
+                priorityChanged:
+                  priorityAffectedEntries.has(row.entry_id!) ||
+                  committedServiceAhead.some(
+                    (prior) =>
+                      prior.entry_id !== null &&
+                      priorityAffectedEntries.has(prior.entry_id),
+                  ),
+                estimatedConsultationMinutes:
+                  estimate.estimatedConsultationMinutes,
+                estimateSource: estimate.estimateSource,
+                sessionStatus: 'open',
+              };
+            })
+          : null;
+        // Fail closed: where v1 applies but cannot be computed from valid
+        // committed inputs, publish no estimate rather than the legacy range.
+        const v1Ineligible = v1Applicable && uncertainty === null;
         const eta =
-          eligible && range
+          eligible && range && !v1Ineligible
             ? {
                 patientsAhead,
                 minWaitMinutes: range.minWaitMinutes,

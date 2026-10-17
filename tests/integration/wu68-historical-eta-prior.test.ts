@@ -208,6 +208,27 @@ async function insertDurationEntry(input: {
   return entryId;
 }
 
+// Exact eta-uncertainty/v1 projection for one queued slot ahead (N=1, D=0,
+// A=0) evaluated at the fixed guest fixture instant. Two committed check-ins
+// make queue revision 2. Codes carry committed facts only, never identity.
+function guestV1(
+  earliestMinutes: number,
+  expectedMinutes: number,
+  latestMinutes: number,
+  sourceCode: string,
+) {
+  return {
+    estimateVersion: 'eta-uncertainty/v1',
+    queueRevision: 2,
+    evaluatedAt: now.toISOString(),
+    earliestMinutes,
+    expectedMinutes,
+    latestMinutes,
+    explanationCodes: ['queue-depth', sourceCode],
+    countdownEligible: true,
+  };
+}
+
 async function etaPair(
   booking: Booking,
   receptionistScope: Awaited<ReturnType<typeof createReceptionist>>,
@@ -253,6 +274,8 @@ describe('WU68 deterministic historical ETA prior', () => {
       estimateSource: 'historical_median',
       delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+      // raw 22.5 / 30 / 45 normalized outward: floor, round, ceil.
+      uncertainty: guestV1(22, 30, 45, 'historical-median'),
     });
     expect(staff).toEqual({
       patientsAhead: 1,
@@ -262,7 +285,15 @@ describe('WU68 deterministic historical ETA prior', () => {
       estimateSource: 'historical_median',
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       observedSampleCount: 0,
+      // Staff samples its own trusted database instant; everything else in
+      // the v1 tuple must match the guest projection exactly.
+      uncertainty: {
+        ...guestV1(22, 30, 45, 'historical-median'),
+        evaluatedAt: expect.any(String),
+      },
     });
+    // Privacy allow-list: `uncertainty` is the only field #606 adds to the
+    // guest ETA, and its own fields are allow-listed exactly as well.
     expect(Object.keys(guest!).sort()).toEqual(
       [
         'patientsAhead',
@@ -271,10 +302,27 @@ describe('WU68 deterministic historical ETA prior', () => {
         'estimateSource',
         'delayStatus',
         'revision',
+        'uncertainty',
       ].sort(),
     );
-    expect(JSON.stringify(guest)).not.toContain(booking.doctorId);
-    expect(JSON.stringify(guest)).not.toContain(historySession);
+    expect(Object.keys(guest!.uncertainty!).sort()).toEqual(
+      [
+        'estimateVersion',
+        'queueRevision',
+        'evaluatedAt',
+        'earliestMinutes',
+        'expectedMinutes',
+        'latestMinutes',
+        'explanationCodes',
+        'countdownEligible',
+      ].sort(),
+    );
+    const serialized = JSON.stringify(guest);
+    expect(serialized).not.toContain(booking.doctorId);
+    expect(serialized).not.toContain(historySession);
+    expect(serialized).not.toContain(booking.sessionId);
+    expect(serialized).not.toContain(booking.clinicId);
+    expect(serialized).not.toContain(booking.queueEntryId);
   });
 
   it('keeps same-session observed evidence ahead of an available historical prior', async () => {
@@ -310,6 +358,8 @@ describe('WU68 deterministic historical ETA prior', () => {
       estimateSource: 'observed_median',
       delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+      // raw 7.5 / 10 / 15.
+      uncertainty: guestV1(7, 10, 15, 'observed-median'),
     });
     expect(staff).toMatchObject({
       estimatedConsultationMinutes: 10,
@@ -403,6 +453,8 @@ describe('WU68 deterministic historical ETA prior', () => {
       estimateSource: 'fallback',
       delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+      // raw 11.25 / 15 / 22.5.
+      uncertainty: guestV1(11, 15, 23, 'fallback'),
     });
     expect(staff).toMatchObject({
       estimatedConsultationMinutes: 15,
@@ -410,6 +462,60 @@ describe('WU68 deterministic historical ETA prior', () => {
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
       observedSampleCount: 0,
     });
+  });
+
+  it('fails closed with no ETA in either projection when committed v1 inputs are contradictory', async () => {
+    const ahead = await createBooking('5001');
+    const booking = await createBooking('5002', ahead);
+    await openAndCheckIn(ahead, booking);
+    const receptionistScope = await createReceptionist(booking.clinicId);
+    const project = async () => {
+      const guest = await new PublicGuestLiveQueueStatusService(
+        pool,
+        () => now,
+      ).get(booking.bearer);
+      const staff = await new ReceptionistDashboardService(
+        pool,
+        () => now,
+      ).getSnapshot(receptionistScope, booking.sessionId);
+      return {
+        guest,
+        staff: staff.entries.find((entry) => entry.id === booking.queueEntryId),
+      };
+    };
+
+    // The consultation ahead has a committed start AFTER the evaluation
+    // instant: contradictory active-slot evidence. Neither projection may
+    // fall back to publishing the legacy range in place of v1.
+    await pool.query(
+      `UPDATE queue_entries SET state='in_consultation', in_consultation_started_at=$2 WHERE id=$1`,
+      [ahead.queueEntryId, new Date(now.getTime() + 5 * 60_000)],
+    );
+    const invalid = await project();
+    expect(invalid.guest.queueState).toBe('checked_in');
+    expect(invalid.guest.eta).toBeNull();
+    expect(invalid.staff?.state).toBe('checked_in');
+    expect(invalid.staff?.eta).toBeNull();
+
+    // Control: the same queue with a valid committed start publishes v1.
+    // A=10 (fallback M=15, 5 minutes elapsed), N=0 => point estimate.
+    await pool.query(
+      `UPDATE queue_entries SET in_consultation_started_at=$2 WHERE id=$1`,
+      [ahead.queueEntryId, new Date(now.getTime() - 5 * 60_000)],
+    );
+    const valid = await project();
+    const expected = {
+      estimateVersion: 'eta-uncertainty/v1',
+      queueRevision: 2,
+      evaluatedAt: now.toISOString(),
+      earliestMinutes: 10,
+      expectedMinutes: 10,
+      latestMinutes: 10,
+      explanationCodes: ['active-consultation-remaining', 'fallback'],
+      countdownEligible: true,
+    };
+    expect(valid.guest.eta?.uncertainty).toEqual(expected);
+    expect(valid.staff?.eta?.uncertainty).toEqual(expected);
   });
 
   it('caps history at the deterministic 20-row completed-at/id boundary before taking the median', async () => {
@@ -445,6 +551,8 @@ describe('WU68 deterministic historical ETA prior', () => {
       estimateSource: 'historical_median',
       delayStatus: null,
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
+      // raw 11.25 / 15 / 22.5.
+      uncertainty: guestV1(11, 15, 23, 'historical-median'),
     });
     expect(staff).toMatchObject({
       estimatedConsultationMinutes: 15,

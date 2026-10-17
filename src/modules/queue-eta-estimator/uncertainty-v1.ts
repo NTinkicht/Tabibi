@@ -1,12 +1,11 @@
 /**
- * eta-uncertainty/v1 estimator (library only, NOT YET ADOPTED).
+ * eta-uncertainty/v1 estimator.
  *
- * No production path calls this module yet: patient status and the
- * receptionist dashboard still use the legacy createEtaSnapshot range.
- * Per docs/architecture/ETA_AUDIT_VERSION_BINDING.md, no ETA evidence may
- * carry the eta-uncertainty/v1 marker until a separate change (#606) wires
- * this estimator into those paths and is verified. Merging this module does
- * not complete #606 and does not unblock #587.
+ * #606 projects this estimator, read-only, into the guest live-queue status
+ * and the receptionist dashboard alongside the legacy range. It does NOT
+ * persist or publish ETA evidence: durable publication requires the
+ * transactionally fenced source-epoch protocol of #610, and #587 must not
+ * persist the eta-uncertainty/v1 marker before that exists.
  */
 import {
   ETA_MAX_MULTIPLIER,
@@ -156,6 +155,30 @@ export function computeEtaUncertaintyV1(
     evaluatedAt,
     explanationCodes: Object.freeze(codes),
   });
+}
+
+/**
+ * Evaluates v1 for one committed snapshot with an explicit fail-closed result.
+ *
+ * Returns the snapshot, or `null` when the committed inputs are invalid or
+ * contradictory (any RangeError raised while building the input or computing
+ * the estimate). Callers MUST treat `null` as "no estimate may be published
+ * for this target" and must not substitute the legacy range for it. Any other
+ * error is a defect and propagates.
+ */
+export function evaluateEtaUncertaintyV1(
+  buildInput: () => EtaUncertaintyInput,
+): EtaUncertaintySnapshot | null {
+  try {
+    const input = buildInput();
+    const candidate = computeEtaUncertaintyV1(input);
+    return isEtaUncertaintySnapshotForRevision(candidate, input.queueRevision)
+      ? candidate
+      : null;
+  } catch (error) {
+    if (error instanceof RangeError) return null;
+    throw error;
+  }
 }
 
 /**
