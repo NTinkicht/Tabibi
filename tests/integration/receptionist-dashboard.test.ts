@@ -96,7 +96,7 @@ describe('receptionist dashboard read model', () => {
       checked.entry.id,
       waiting.entry.id,
     ]);
-    expect(snapshot.entries[0]!.eta).toEqual({
+    expect(snapshot.entries[0]!.eta).toMatchObject({
       patientsAhead: 0,
       minWaitMinutes: 20,
       maxWaitMinutes: 20,
@@ -113,9 +113,46 @@ describe('receptionist dashboard read model', () => {
       estimateSource: 'fallback',
       revision: expect.stringMatching(/^eta-v2-[0-9a-f]{32}$/),
     });
+    expect(snapshot.entries[0]!.eta?.uncertainty).toMatchObject({
+      estimateVersion: 'eta-uncertainty/v1',
+      queueRevision: snapshot.session.queueOrderVersion,
+      earliestMinutes: 20,
+      expectedMinutes: 20,
+      latestMinutes: 20,
+      explanationCodes: ['declared-delay', 'fallback'],
+    });
+    expect(snapshot.entries[1]!.eta?.uncertainty).toBeUndefined();
     expect(snapshot.refreshAfterSeconds).toBe(30);
     expect(JSON.stringify(snapshot)).not.toContain('0555000000');
     expect(Object.keys(snapshot.entries[0]!)).not.toContain('diagnosis');
+  });
+
+  it('does not offer a live ETA while the session is paused', async () => {
+    const queue = new QueueService(pool);
+    const entry = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Pause candidate',
+      preferredLocale: 'fr',
+      idempotencyKey: 'v1-paused-register',
+      correlationId: 'v1-paused-register',
+    });
+    await queue.command(scope, ids.sessionA, entry.entry.id, {
+      command: 'check_in',
+      idempotencyKey: 'v1-paused-check-in',
+      correlationId: 'v1-paused-check-in',
+    });
+    const dashboard = new ReceptionistDashboardService(pool);
+    const before = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(before.entries[0]?.eta?.uncertainty?.estimateVersion).toBe(
+      'eta-uncertainty/v1',
+    );
+    await pool.query(
+      "UPDATE consultation_sessions SET status='paused' WHERE id=$1",
+      [ids.sessionA],
+    );
+    const paused = await dashboard.getSnapshot(scope, ids.sessionA);
+    expect(paused.session.status).toBe('paused');
+    expect(paused.entries[0]?.eta).toBeNull();
+    expect(paused.entries[0]?.activeConsultationRemainingMinutes).toBeNull();
   });
 
   it('uses a clamped same-session observed median only after three completed samples and stays deterministic', async () => {
@@ -166,13 +203,16 @@ describe('receptionist dashboard read model', () => {
       correlationId: 'eta-second',
     });
 
-    const service = new ReceptionistDashboardService(pool);
+    const service = new ReceptionistDashboardService(
+      pool,
+      () => new Date('2026-09-08T11:00:00.000Z'),
+    );
     const firstRead = await service.getSnapshot(scope, ids.sessionA);
     const secondRead = await service.getSnapshot(scope, ids.sessionA);
     const secondEntry = firstRead.entries.find(
       (entry) => entry.id === second.entry.id,
     )!;
-    expect(secondEntry.eta).toEqual({
+    expect(secondEntry.eta).toMatchObject({
       patientsAhead: 1,
       minWaitMinutes: 28,
       maxWaitMinutes: 35,
