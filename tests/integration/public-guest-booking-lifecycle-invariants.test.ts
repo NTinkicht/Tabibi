@@ -394,44 +394,32 @@ describe('#623 public guest appointment-to-queue lifecycle invariants', () => {
     expect(await snapshot(race.booking)).toEqual(after);
   });
 
-  it('forces check-in to win: the checked-in pair commits first and no mismatched pair or unmatched effect appears', async () => {
+  it('forces check-in to win: cancellation is rejected after re-reading the checked-in pair', async () => {
     const race = await forcedRace('check_in', '5001');
     expect(race.winnerOutcome).toBe('fulfilled');
+    expect(race.loserOutcome).toBe('rejected');
 
     const after = await snapshot(race.booking);
     expectNoMismatchedPair(after.pair);
+    expect(after.pair).toMatchObject({
+      appointment_status: 'checked_in',
+      queue_state: 'checked_in',
+    });
+    expect(Number(after.pair.queue_order_version)).toBe(
+      Number(race.before.pair.queue_order_version) + 1,
+    );
     expect(after.queueEntryCount).toBe(1);
     expect(after.operations).toEqual([race.operationId]);
-    expect(
-      after.audits.filter(
-        (row) => row.action === 'public_guest_appointment_checked_in',
-      ),
-    ).toEqual([CHECK_IN_AUDIT]);
-    const cancelAudits = after.audits.filter(
-      (row) => row.action === 'public_guest_appointment_cancelled',
-    );
-    // PRODUCT.md/ARCHITECTURE.md say the losing cancellation must be rejected.
-    // The guest cancellation service currently also accepts checked_in
-    // bookings (WU61), so whether it may succeed here is pending an owner
-    // decision on PR #624. Either way it must have observed the committed
-    // checked-in pair, and its effects must match its reported outcome.
-    if (race.loserOutcome === 'rejected') {
-      expect(after.pair.appointment_status).toBe('checked_in');
-      expect(cancelAudits).toEqual([]);
-    } else {
-      expect(after.pair.appointment_status).toBe('cancelled');
-      expect(cancelAudits).toHaveLength(1);
-      expect(cancelAudits[0]!.metadata).toMatchObject({
-        appointmentFrom: 'checked_in',
-        queueFrom: 'checked_in',
-      });
-    }
+    expect(after.audits).toEqual([CHECK_IN_AUDIT]);
     expectPrivacySafe(race.booking, after.audits, race.operationId);
 
     // Exact retry of the winning check-in is idempotent.
     await expect(
       race.checkIn.checkIn(race.booking.bearer, race.operationId),
     ).resolves.toEqual({ status: 'checked_in', reconciled: true });
+    await expect(
+      race.cancel.cancel(race.booking.bearer),
+    ).rejects.toBeInstanceOf(PublicGuestBookingCancellationRejectedError);
     expect(await snapshot(race.booking)).toEqual(after);
   });
 });
