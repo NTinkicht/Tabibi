@@ -7,6 +7,7 @@ import {
 } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import {
+  authenticatedGuestCredentialId,
   bearerSignature,
   guestBearerSigningSecret,
   verifier,
@@ -249,6 +250,7 @@ async function loadCompletedBooking(
 ): Promise<PublicGuestBookingResult> {
   const result = await client.query<{
     access_ciphertext: string;
+    credential_id: string;
     credential_expires_at: Date;
     service_date: string;
     starts_at: Date;
@@ -256,6 +258,7 @@ async function loadCompletedBooking(
     public_display_label: string;
   }>(
     `SELECT receipt.access_ciphertext,
+            credential.id AS credential_id,
             credential.expires_at AS credential_expires_at,
             session.service_date::text AS service_date,
             appointment.scheduled_start_at AS starts_at,
@@ -281,12 +284,22 @@ async function loadCompletedBooking(
   );
   const row = result.rows[0];
   if (!row?.access_ciphertext) throw new PublicGuestBookingRejectedError();
+  // Legacy v1 encrypted receipts use a fixed AEAD AAD; they remain valid,
+  // but a swapped ciphertext must never replay a *different* booking bearer.
+  // Verify the HMAC-signed bearer identity against the DB-linked credential.
+  const guestBearer = decryptBearer(row.access_ciphertext);
+  if (
+    authenticatedGuestCredentialId(guestBearer) !==
+    row.credential_id.toLowerCase()
+  ) {
+    throw new PublicGuestBookingRejectedError();
+  }
   return {
     serviceDate: row.service_date,
     startsAt: row.starts_at.toISOString(),
     endsAt: row.ends_at.toISOString(),
     queueLabel: row.public_display_label,
-    guestBearer: decryptBearer(row.access_ciphertext),
+    guestBearer,
     guestAccessExpiresAt: row.credential_expires_at.toISOString(),
   };
 }
