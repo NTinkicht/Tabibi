@@ -213,6 +213,100 @@ describe('public guest booking transaction', () => {
     });
   });
 
+  it('rejects swapping two genuine encrypted replay receipts between bookings', async () => {
+    const now = new Date('2099-02-01T00:00:00.000Z');
+    const seeded = await seed(now);
+    const service = new PublicGuestBookingService(
+      pool,
+      seeded.selections,
+      () => now,
+    );
+    const firstRequest = input(seeded.reference, 'receipt-swap-A');
+    const secondRequest = input(seeded.reference, 'receipt-swap-B');
+    const first = await service.book(firstRequest);
+    const second = await service.book(secondRequest);
+    expect(first.guestBearer).not.toBe(second.guestBearer);
+
+    const receipts = await pool.query<{
+      idempotency_key: string;
+      credential_id: string;
+      access_ciphertext: string;
+    }>(
+      `SELECT idempotency_key, credential_id::text, access_ciphertext
+         FROM public_guest_booking_receipts
+        WHERE clinic_id = $1
+          AND idempotency_key IN ($2, $3)
+        ORDER BY idempotency_key`,
+      [seeded.clinicId, firstRequest.idempotencyKey, secondRequest.idempotencyKey],
+    );
+    expect(receipts.rows).toHaveLength(2);
+    const [originalA, originalB] = receipts.rows;
+    if (!originalA || !originalB) throw new Error('receipts missing');
+    expect(originalA.credential_id).not.toBe(originalB.credential_id);
+    // Both ciphertext envelopes remain authentic under legacy v1 GCM.
+    // The receipt-linked credential ID must still reject a swapped bearer.
+    await pool.query(
+      `UPDATE public_guest_booking_receipts
+          SET access_ciphertext = CASE idempotency_key
+             WHEN $2 THEN $4
+             WHEN $3 THEN $5
+             ELSE access_ciphertext END
+        WHERE clinic_id = $1
+          AND idempotency_key IN ($2, $3)`,
+      [
+        seeded.clinicId,
+        firstRequest.idempotencyKey,
+        secondRequest.idempotencyKey,
+        originalB.access_ciphertext,
+        originalA.access_ciphertext,
+      ],
+    );
+
+    await expect(service.book(firstRequest)).rejects.toBeInstanceOf(
+      PublicGuestBookingRejectedError,
+    );
+    await expect(service.book(secondRequest)).rejects.toBeInstanceOf(
+      PublicGuestBookingRejectedError,
+    );
+    expect(await counts()).toEqual({
+      receipts: '2',
+      patients: '2',
+      appointments: '2',
+      entries: '2',
+      credentials: '2',
+      audits: '2',
+    });
+
+    // Restoring each matching encrypted receipt preserves identical-retry
+    // convergence without migrating or invalidating existing v1 ciphertext.
+    await pool.query(
+      `UPDATE public_guest_booking_receipts
+          SET access_ciphertext = CASE idempotency_key
+             WHEN $2 THEN $4
+             WHEN $3 THEN $5
+             ELSE access_ciphertext END
+        WHERE clinic_id = $1
+          AND idempotency_key IN ($2, $3)`,
+      [
+        seeded.clinicId,
+        firstRequest.idempotencyKey,
+        secondRequest.idempotencyKey,
+        originalA.access_ciphertext,
+        originalB.access_ciphertext,
+      ],
+    );
+    expect(await service.book(firstRequest)).toEqual(first);
+    expect(await service.book(secondRequest)).toEqual(second);
+    expect(await counts()).toEqual({
+      receipts: '2',
+      patients: '2',
+      appointments: '2',
+      entries: '2',
+      credentials: '2',
+      audits: '2',
+    });
+  });
+
   it('fails closed before mutation for malformed, tampered, expired, and stale selections', async () => {
     const now = new Date('2099-02-01T00:00:00.000Z');
     const seeded = await seed(now);
