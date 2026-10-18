@@ -288,7 +288,10 @@ async function loadCompletedBooking(
   // but a swapped ciphertext must never replay a *different* booking bearer.
   // Verify the HMAC-signed bearer identity against the DB-linked credential.
   const guestBearer = decryptBearer(row.access_ciphertext);
-  if (authenticatedGuestCredentialId(guestBearer) !== row.credential_id.toLowerCase()) {
+  if (
+    authenticatedGuestCredentialId(guestBearer) !==
+    row.credential_id.toLowerCase()
+  ) {
     throw new PublicGuestBookingRejectedError();
   }
   return {
