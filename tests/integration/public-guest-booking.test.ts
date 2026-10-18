@@ -237,7 +237,11 @@ describe('public guest booking transaction', () => {
         WHERE clinic_id = $1
           AND idempotency_key IN ($2, $3)
         ORDER BY idempotency_key`,
-      [seeded.clinicId, firstRequest.idempotencyKey, secondRequest.idempotencyKey],
+      [
+        seeded.clinicId,
+        firstRequest.idempotencyKey,
+        secondRequest.idempotencyKey,
+      ],
     );
     expect(receipts.rows).toHaveLength(2);
     const [originalA, originalB] = receipts.rows;
