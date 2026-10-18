@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { requireSameOrigin, StaffCsrfError } from '@/platform/http/staff-auth';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  authenticatedClinicScope,
+  createStaffSessionToken,
+  requireSameOrigin,
+  StaffAuthenticationError,
+  StaffCsrfError,
+} from '@/platform/http/staff-auth';
 
 describe('requireSameOrigin', () => {
   it('accepts the canonical request URL origin', () => {
@@ -44,5 +50,67 @@ describe('requireSameOrigin', () => {
     expect(() => requireSameOrigin(missing)).toThrow(StaffCsrfError);
     expect(() => requireSameOrigin(malformed)).toThrow(StaffCsrfError);
     expect(() => requireSameOrigin(wrongProtocol)).toThrow(StaffCsrfError);
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe('signed staff session token structure', () => {
+  const clinicId = '00000000-0000-4000-8000-000000000001';
+
+  function staffRequest(token: string): Request {
+    return new Request('http://localhost:3000/api/clinics/example/sessions', {
+      headers: { cookie: `tabibi_staff_session=${token}` },
+    });
+  }
+
+  it('rejects extra signed-token components before any staff lookup', async () => {
+    vi.stubEnv(
+      'STAFF_SESSION_SECRET',
+      'staff-auth-unit-test-only-signing-secret-0123456789',
+    );
+    const token = createStaffSessionToken(
+      'synthetic-staff-subject',
+      new Date(Date.now() + 60_000),
+    );
+    expect(token.split('.')).toHaveLength(2);
+    for (const malformed of [
+      `${token}.untrusted`,
+      `${token}.`,
+      `${token}..`,
+      `prefix.${token}`,
+    ]) {
+      await expect(
+        authenticatedClinicScope(staffRequest(malformed), clinicId),
+      ).rejects.toBeInstanceOf(StaffAuthenticationError);
+    }
+  });
+
+  it('rejects missing signature pieces and a tampered signature', async () => {
+    vi.stubEnv(
+      'STAFF_SESSION_SECRET',
+      'staff-auth-unit-test-only-signing-secret-0123456789',
+    );
+    const token = createStaffSessionToken(
+      'synthetic-staff-subject',
+      new Date(Date.now() + 60_000),
+    );
+    const [payload, signature] = token.split('.');
+    expect(payload).toBeTruthy();
+    expect(signature).toBeTruthy();
+    if (!payload || !signature) throw new Error('invalid test fixture');
+    const alternate = signature.endsWith('A') ? 'B' : 'A';
+    for (const malformed of [
+      payload,
+      `${payload}.`,
+      `.${signature}`,
+      `${payload}.${signature.slice(0, -1)}${alternate}`,
+    ]) {
+      await expect(
+        authenticatedClinicScope(staffRequest(malformed), clinicId),
+      ).rejects.toBeInstanceOf(StaffAuthenticationError);
+    }
   });
 });
