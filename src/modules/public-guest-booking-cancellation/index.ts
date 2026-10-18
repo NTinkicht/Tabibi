@@ -5,8 +5,12 @@ import {
 } from '@/modules/guest-access';
 import { inTransaction } from '@/platform/database/transaction';
 
-const CANCELLABLE_APPOINTMENT_STATES = ['booked', 'confirmed', 'checked_in'];
-const CANCELLABLE_QUEUE_STATES = ['waiting', 'checked_in', 'called'];
+// Guest cancellation is an advance cancellation only: it is valid solely from
+// the pre-arrival pair. Once check-in commits, a racing or later guest
+// cancellation is rejected (PRODUCT.md "Booking vs. queue position",
+// ARCHITECTURE.md TAB-FND-023 first-commit-wins); staff handle later exits.
+const CANCELLABLE_APPOINTMENT_STATES = ['booked', 'confirmed'];
+const CANCELLABLE_QUEUE_STATES = ['waiting'];
 
 export interface PublicGuestBookingCancellationResult {
   status: 'cancelled';
