@@ -18,6 +18,10 @@ Build a mobile-first Arabic/French guest live-queue screen on top of the public 
 - Rejected, absent, and non-reacquirable capability states remain generic and reveal no booking/credential existence information.
 - Preserve no-store/no-referrer behavior.
 
+## Already merged header-safe change-hint stream (WU95/WU119)
+
+The live-queue host currently uses `fetch('/api/public/bookings/live-queue-stream')` with the **booking-origin bearer only in the Authorization header** and `Accept: text/event-stream`, an AbortController, stream parsing and reconnect/fallback. Change events are **hints**: the existing canonical `/api/public/bookings/live-queue-status` poll remains authoritative and re-fetches the approved snapshot when a hint arrives. The WU119 reconnection/fallback behaviors are already merged; this documented baseline must **not** be removed or classified as an unapproved future streaming capability. Native `EventSource` cannot attach the Authorization header and remains prohibited with a URL token or cookie downgrade. The bounded visible polling, terminal stop, timeout, hidden-tab, retry/stream-outage and no-memory-leak safeguards remain mandatory; reconcile the exact existing WU95/WU119 source/tests rather than replacing the stream implementation.
+
 ## Polling state machine
 
 - At most one request may be in flight.
@@ -52,7 +56,8 @@ No ETA invention, notifications, geofencing, rescheduling, queue/check-in mutati
 7. Explicit stale/offline recovery and manual-retry behavior after retry exhaustion.
 8. Polling-stop tests for each terminal value (`completed`, `cancelled`, `no_show`) when observed in either `bookingState` or `queueState`, plus evidence that active states continue polling. With a deterministic clock/real bound receipt, test T0 terminal transition, T0+15m boundary and T0+15m+epsilon denial on header route, earlier bearer expiry, terminal-only no-ETA/public-ID allow-list, no mutation/check-in authority during grace, never-renewed grace after response loss, and immediate in-memory bearer clearing/stop on terminal observation; generic deny if observed too late. No cookie fallback or credential persistence.
 9. no-store/no-referrer and no new analytics/audit side effects.
-10. External-network-free component/browser coverage and green full CI.
+10. Read back merged WU95/WU119 header-only fetch stream tests: no Authorization bearer in URL/DOM/cookie, SSE event hint→canonical fresh status poll, invalid stream/error/fallback, reconnect/retry budget, hidden/offline behavior, no duplicate poll, no re-created authority after terminal/unmount.
+11. External-network-free component/browser coverage and green full CI.
 
 ## Governance
 
