@@ -53,7 +53,6 @@ describe('requireSameOrigin', () => {
   });
 });
 
-
 afterEach(() => {
   vi.unstubAllEnvs();
 });
