@@ -68,12 +68,14 @@ test('guest live queue completes the booking-to-live handoff using only the Auth
   expect(response?.headers()['referrer-policy']).toBe('no-referrer');
 });
 
-test('a bearer-authenticated change hint triggers an authoritative refresh without credential leakage', async ({
+test('a bearer-authenticated change hint may refresh before 30 seconds while periodic polling stays bounded', async ({
   page,
 }) => {
+  await page.clock.install();
   await mockBooking(page);
   let snapshots = 0;
   let streamAuthorization = '';
+  let streamConnections = 0;
   await page.route(STATUS_URL, async (route) => {
     snapshots += 1;
     await route.fulfill({
@@ -95,6 +97,13 @@ test('a bearer-authenticated change hint triggers an authoritative refresh witho
   });
   await page.route(STREAM_URL, async (route) => {
     streamAuthorization = route.request().headers()['authorization'] ?? '';
+    streamConnections += 1;
+    // The first genuine hint must bypass the periodic 30-second timer. The
+    // optional stream later fails; it must not generate more status polls.
+    if (streamConnections !== 1) {
+      await route.fulfill({ status: 400, body: '{"status":"rejected"}' });
+      return;
+    }
     await route.fulfill({
       status: 200,
       contentType: 'text/event-stream',
@@ -103,7 +112,13 @@ test('a bearer-authenticated change hint triggers an authoritative refresh witho
   });
 
   await submitBookingForm(page);
-  await expect.poll(() => snapshots).toBeGreaterThan(1);
+  // A real version hint can prompt an early canonical snapshot read.
+  await expect.poll(() => snapshots).toBe(2);
+  const afterHint = snapshots;
+  await page.clock.fastForward(29_000);
+  expect(snapshots).toBe(afterHint); // no blind five-second client poll
+  await page.clock.fastForward(2_000);
+  await expect.poll(() => snapshots).toBe(afterHint + 1);
   expect(streamAuthorization).toBe(`Bearer ${BEARER}`);
   expect(page.url()).not.toContain(BEARER);
   expect(await page.locator('body').innerText()).not.toContain(BEARER);
