@@ -27,7 +27,11 @@ function decode(value: string): StaffClaims | null {
   const secret = process.env.STAFF_SESSION_SECRET;
   if (!secret || secret.length < 32)
     throw new Error('STAFF_SESSION_SECRET must contain at least 32 characters');
-  const [payload, supplied] = value.split('.');
+  // A staff bearer has exactly one separator. Ignoring extra segments would
+  // accept malformed aliases of a valid HMAC-signed session token.
+  const parts = value.split('.');
+  if (parts.length !== 2) return null;
+  const [payload, supplied] = parts;
   if (!payload || !supplied) return null;
   const expected = createHmac('sha256', secret)
     .update(payload)
