@@ -465,6 +465,42 @@ describe('WU61 public guest booking cancellation', () => {
     },
   );
 
+  it.each([
+    ['checked_in', 'checked_in'],
+    ['checked_in', 'called'],
+  ] as const)(
+    'rejects cancellation after arrival (%s/%s) without mutation or audit',
+    async (appointmentState, queueState) => {
+      const booking = await createBooking(`650-${queueState}`);
+      await pool.query(
+        `UPDATE consultation_sessions SET status='open' WHERE id=$1`,
+        [booking.sessionId],
+      );
+      await pool.query('UPDATE appointments SET status=$2 WHERE id=$1', [
+        booking.appointmentId,
+        appointmentState,
+      ]);
+      await pool.query(
+        `UPDATE queue_entries SET state=$2, eligibility_order=1 WHERE id=$1`,
+        [booking.queueEntryId, queueState],
+      );
+      const before = await state(booking);
+      expect(before).toMatchObject({
+        appointment_status: appointmentState,
+        queue_state: queueState,
+      });
+
+      await expect(
+        new PublicGuestBookingCancellationService(pool, () => now).cancel(
+          booking.bearer,
+        ),
+      ).rejects.toBeInstanceOf(PublicGuestBookingCancellationRejectedError);
+
+      expect(await state(booking)).toEqual(before);
+      expect((await cancellationAudits(booking)).rows).toHaveLength(0);
+    },
+  );
+
   it('rolls back appointment, queue, session version and audit on an injected late failure', async () => {
     const booking = await createBooking('7001');
     const before = await state(booking);
