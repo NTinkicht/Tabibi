@@ -465,6 +465,87 @@ describe('WU61 public guest booking cancellation', () => {
     },
   );
 
+  it.each([
+    ['checked_in', ['checked_in']],
+    ['called', ['checked_in', 'called']],
+  ] as const)(
+    'rejects guest cancellation once the booking is %s, with no writes or audit',
+    async (queueState, path) => {
+      const booking = await createBooking(`650-${queueState}`);
+      await pool.query(
+        'UPDATE queue_entries SET priority_order=1 WHERE id=$1',
+        [booking.queueEntryId],
+      );
+      for (const step of path) {
+        await pool.query('UPDATE queue_entries SET state=$2 WHERE id=$1', [
+          booking.queueEntryId,
+          step,
+        ]);
+      }
+      const before = await state(booking);
+      expect(before).toMatchObject({
+        appointment_status: 'checked_in',
+        queue_state: queueState,
+        priority_order: '1',
+      });
+
+      const service = new PublicGuestBookingCancellationService(
+        pool,
+        () => now,
+      );
+      await expect(service.cancel(booking.bearer)).rejects.toBeInstanceOf(
+        PublicGuestBookingCancellationRejectedError,
+      );
+      // A retry observes the same committed state and is rejected again.
+      await expect(service.cancel(booking.bearer)).rejects.toBeInstanceOf(
+        PublicGuestBookingCancellationRejectedError,
+      );
+
+      expect(await state(booking)).toEqual(before);
+      expect((await cancellationAudits(booking)).rows).toHaveLength(0);
+    },
+  );
+
+  it('compacts the remaining priority cohort when a prioritized waiting booking is cancelled', async () => {
+    const first = await createBooking('6601');
+    const second = await createBookingInSession(first, '6602');
+    const third = await createBookingInSession(first, '6603');
+    for (const [booking, order] of [
+      [first, 1],
+      [second, 2],
+      [third, 3],
+    ] as const) {
+      await pool.query(
+        'UPDATE queue_entries SET priority_order=$2 WHERE id=$1',
+        [booking.queueEntryId, order],
+      );
+    }
+    const before = await state(second);
+
+    await new PublicGuestBookingCancellationService(pool, () => now).cancel(
+      second.bearer,
+    );
+
+    expect(await state(second)).toMatchObject({
+      appointment_status: 'cancelled',
+      queue_state: 'cancelled',
+      priority_order: null,
+    });
+    expect((await state(first))?.priority_order).toBe('1');
+    expect((await state(third))?.priority_order).toBe('2');
+    expect(Number((await state(first))?.queue_order_version)).toBe(
+      Number(before?.queue_order_version) + 1,
+    );
+    expect((await cancellationAudits(second)).rows).toHaveLength(1);
+    expect((await cancellationAudits(second)).rows[0]?.metadata).toEqual({
+      appointmentFrom: 'confirmed',
+      appointmentTo: 'cancelled',
+      queueFrom: 'waiting',
+      queueTo: 'cancelled',
+      authority: 'guest_capability',
+    });
+  });
+
   it('rolls back appointment, queue, session version and audit on an injected late failure', async () => {
     const booking = await createBooking('7001');
     const before = await state(booking);

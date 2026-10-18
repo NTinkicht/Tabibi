@@ -5,8 +5,12 @@ import {
 } from '@/modules/guest-access';
 import { inTransaction } from '@/platform/database/transaction';
 
-const CANCELLABLE_APPOINTMENT_STATES = ['booked', 'confirmed', 'checked_in'];
-const CANCELLABLE_QUEUE_STATES = ['waiting', 'checked_in', 'called'];
+// Guest self-cancellation is only valid before check-in. Once a check-in has
+// committed (PRODUCT.md "Booking vs. queue position", TAB-FND-023), a guest
+// cancellation must observe that result and be rejected; later cancellation
+// of a checked-in/called patient is a staff (reception) operation.
+const CANCELLABLE_APPOINTMENT_STATES = ['booked', 'confirmed'];
+const CANCELLABLE_QUEUE_STATES = ['waiting'];
 
 export interface PublicGuestBookingCancellationResult {
   status: 'cancelled';
@@ -156,10 +160,7 @@ export class PublicGuestBookingCancellationService {
         [row.queue_entry_id, row.session_id, row.clinic_id],
       );
 
-      if (
-        row.priority_order !== null &&
-        ['waiting', 'checked_in'].includes(row.queue_state)
-      ) {
+      if (row.priority_order !== null) {
         const cohort = await client.query<{ id: string }>(
           `SELECT id
              FROM queue_entries
