@@ -2,6 +2,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { getPool } from '@/platform/database/pool';
 import type { ClinicScope } from '@/modules/identity';
 
+const STAFF_SESSION_COOKIE = 'tabibi_staff_session';
+
 interface StaffClaims {
   sub: string;
   exp: number;
@@ -40,28 +42,47 @@ function decode(value: string): StaffClaims | null {
   const right = Buffer.from(expected);
   if (left.length !== right.length || !timingSafeEqual(left, right))
     return null;
+  let parsed: unknown;
   try {
-    const claims = JSON.parse(
-      Buffer.from(payload, 'base64url').toString('utf8'),
-    ) as StaffClaims;
-    return typeof claims.sub === 'string' && claims.exp > Date.now() / 1000
-      ? claims
-      : null;
+    parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
   } catch {
     return null;
   }
+  return validClaims(parsed) ? parsed : null;
+}
+
+// Claims are checked by exact type, never by JavaScript coercion: a string,
+// array or fractional `exp` and an empty `sub` are malformed even when signed.
+function validClaims(value: unknown): value is StaffClaims {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return false;
+  const { sub, exp } = value as Record<string, unknown>;
+  return (
+    typeof sub === 'string' &&
+    sub.length > 0 &&
+    typeof exp === 'number' &&
+    Number.isSafeInteger(exp) &&
+    exp > Date.now() / 1000
+  );
+}
+
+// Exactly one session cookie is accepted. Several cookies with this name
+// (for example one planted from a sibling subdomain with a narrower path,
+// which browsers send first) are ambiguous and fail closed.
+function staffSessionCookie(request: Request): string | null {
+  const values = (request.headers.get('cookie') ?? '')
+    .split(';')
+    .map((part) => part.trim())
+    .filter((part) => part.startsWith(`${STAFF_SESSION_COOKIE}=`))
+    .map((part) => part.slice(STAFF_SESSION_COOKIE.length + 1));
+  return values.length === 1 && values[0] ? values[0] : null;
 }
 
 export async function authenticatedClinicScope(
   request: Request,
   clinicId: string,
 ): Promise<ClinicScope> {
-  const cookie = request.headers
-    .get('cookie')
-    ?.split(';')
-    .map((part) => part.trim())
-    .find((part) => part.startsWith('tabibi_staff_session='))
-    ?.slice('tabibi_staff_session='.length);
+  const cookie = staffSessionCookie(request);
   const claims = cookie ? decode(cookie) : null;
   if (!claims) throw new StaffAuthenticationError();
   const user = await getPool().query<{ id: string }>(
