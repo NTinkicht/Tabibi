@@ -466,24 +466,31 @@ describe('WU61 public guest booking cancellation', () => {
   );
 
   it.each([
-    ['checked_in', 'checked_in'],
-    ['checked_in', 'called'],
+    ['checked_in', 'checked_in', '651'],
+    ['checked_in', 'called', '652'],
+    // Drifted pairs: a pre-arrival appointment state must not make a
+    // post-arrival queue entry cancellable.
+    ['confirmed', 'checked_in', '653'],
+    ['confirmed', 'called', '654'],
+    ['booked', 'checked_in', '655'],
   ] as const)(
     'rejects cancellation after arrival (%s/%s) without mutation or audit',
-    async (appointmentState, queueState) => {
-      const booking = await createBooking(`650-${queueState}`);
+    async (appointmentState, queueState, suffix) => {
+      const booking = await createBooking(suffix);
       await pool.query(
         `UPDATE consultation_sessions SET status='open' WHERE id=$1`,
         [booking.sessionId],
       );
-      await pool.query('UPDATE appointments SET status=$2 WHERE id=$1', [
-        booking.appointmentId,
-        appointmentState,
-      ]);
       await pool.query(
         `UPDATE queue_entries SET state=$2, eligibility_order=1 WHERE id=$1`,
         [booking.queueEntryId, queueState],
       );
+      // Set the appointment after the queue entry so the queue-state sync
+      // trigger cannot overwrite the requested pair.
+      await pool.query('UPDATE appointments SET status=$2 WHERE id=$1', [
+        booking.appointmentId,
+        appointmentState,
+      ]);
       const before = await state(booking);
       expect(before).toMatchObject({
         appointment_status: appointmentState,
