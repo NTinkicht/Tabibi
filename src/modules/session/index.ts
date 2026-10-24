@@ -8,7 +8,10 @@ import {
   requireDoctorIdentity,
   type Queryable,
 } from '@/modules/identity';
-import { lockClinicCalendar } from '@/modules/scheduling';
+import {
+  doctorSessionOverlaps,
+  lockClinicCalendar,
+} from '@/modules/scheduling';
 import { inTransaction } from '@/platform/database/transaction';
 
 export type SessionStatus =
@@ -300,6 +303,21 @@ export class SessionService {
           if (closure.rowCount)
             throw new SessionConflictError(
               'Clinic is closed on this service date',
+            );
+          // TAB-P0-02 (#640): one doctor never has two overlapping
+          // non-cancelled sessions in one clinic. Ranges are half-open, so
+          // adjacent sessions are allowed. The clinic calendar lock above also
+          // serializes this check with generateSessions and other creates.
+          if (
+            await doctorSessionOverlaps(client, {
+              clinicId: scope.clinicId,
+              doctorId: input.doctorId,
+              startsAt: input.startsAt,
+              endsAt: input.endsAt,
+            })
+          )
+            throw new SessionConflictError(
+              'Session overlaps an existing session for this doctor',
             );
           const id = randomUUID();
           const result = await client.query<SessionRow>(
