@@ -65,6 +65,64 @@ export class ScheduleCollisionError extends Error {
   }
 }
 
+// An unknown template id and another clinic's template id are reported with
+// the same error, so the scoped lookup is not a cross-tenant existence oracle.
+export class ScheduleTemplateNotFoundError extends Error {
+  constructor() {
+    super('Schedule template not found');
+    this.name = 'ScheduleTemplateNotFoundError';
+  }
+}
+
+const UUID_TEXT =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Serializes template collision checks and activation changes per doctor. The
+// key uses the canonical uuid text, so equivalent spellings (for example upper
+// and lower case) of one doctor id share one lock.
+async function lockDoctorTemplates(
+  client: Queryable,
+  doctorId: string,
+): Promise<void> {
+  await client.query(
+    `SELECT pg_advisory_xact_lock(
+       hashtextextended('schedule-template:' || $1::uuid::text, 0))`,
+    [doctorId],
+  );
+}
+
+// True when another active template of the doctor in this clinic overlaps the
+// half-open local range [start, end) on the same weekday. Callers hold the
+// doctor template lock.
+async function activeTemplateOverlaps(
+  client: Queryable,
+  input: {
+    clinicId: string;
+    doctorId: string;
+    weekday: number;
+    localStartTime: string;
+    localEndTime: string;
+    excludeTemplateId?: string;
+  },
+): Promise<boolean> {
+  const result = await client.query(
+    `SELECT 1 FROM schedule_templates
+      WHERE clinic_id = $1 AND doctor_id = $2 AND weekday = $3 AND active
+        AND local_start_time < $5::time AND $4::time < local_end_time
+        AND ($6::uuid IS NULL OR id <> $6::uuid)
+      LIMIT 1`,
+    [
+      input.clinicId,
+      input.doctorId,
+      input.weekday,
+      input.localStartTime,
+      input.localEndTime,
+      input.excludeTemplateId ?? null,
+    ],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
 // A clinic closure (holiday) cannot be added over a day that still has any
 // non-cancelled session in that clinic: those sessions may carry queue entries
 // and appointments, which must be resolved through the existing session
@@ -156,28 +214,18 @@ export class SchedulingService {
       const active = input.active ?? true;
       if (active) {
         // Serialize collision check and insert per doctor so two concurrent
-        // overlapping creates cannot both pass the check. The key uses the
-        // canonical uuid text, so equivalent spellings (for example upper
-        // and lower case) of one doctor id share one lock.
-        await client.query(
-          `SELECT pg_advisory_xact_lock(
-             hashtextextended('schedule-template:' || $1::uuid::text, 0))`,
-          [input.doctorId],
-        );
-        const collision = await client.query(
-          `SELECT 1 FROM schedule_templates
-            WHERE clinic_id = $1 AND doctor_id = $2 AND weekday = $3 AND active
-              AND local_start_time < $5::time AND $4::time < local_end_time
-            LIMIT 1`,
-          [
-            scope.clinicId,
-            input.doctorId,
-            input.weekday,
-            input.localStartTime,
-            input.localEndTime,
-          ],
-        );
-        if (collision.rowCount) throw new ScheduleCollisionError();
+        // overlapping creates cannot both pass the check.
+        await lockDoctorTemplates(client, input.doctorId);
+        if (
+          await activeTemplateOverlaps(client, {
+            clinicId: scope.clinicId,
+            doctorId: input.doctorId,
+            weekday: input.weekday,
+            localStartTime: input.localStartTime,
+            localEndTime: input.localEndTime,
+          })
+        )
+          throw new ScheduleCollisionError();
       }
       const id = randomUUID();
       const result = await client.query<TemplateRow>(
@@ -204,6 +252,74 @@ export class SchedulingService {
         action: 'schedule_template.created',
       });
       return templateFromRow(result.rows[0]!);
+    });
+  }
+
+  // TAB-P0-02 (#647): retire or restore a recurring template. Already generated
+  // sessions are left unchanged; later generation skips an inactive template.
+  // Reactivation re-runs the doctor collision check under the doctor template
+  // lock. Setting the current state is an idempotent no-op without audit.
+  async setTemplateActive(
+    scope: ClinicScope,
+    input: { templateId: string; active: boolean },
+  ): Promise<ScheduleTemplate> {
+    if (typeof input.active !== 'boolean')
+      throw new TypeError('active must be a boolean');
+    return inTransaction(this.pool, async (client) => {
+      // Deny non-members and receptionists before the lookup, so the lookup
+      // result is only observable to actors who may write schedules here.
+      await requireClinicRole(client, scope, ['doctor', 'clinic_admin']);
+      if (!UUID_TEXT.test(input.templateId))
+        throw new ScheduleTemplateNotFoundError();
+      const found = await client.query<{ doctor_id: string }>(
+        `SELECT doctor_id FROM schedule_templates WHERE id = $1 AND clinic_id = $2`,
+        [input.templateId, scope.clinicId],
+      );
+      const doctorId = found.rows[0]?.doctor_id;
+      if (!doctorId) throw new ScheduleTemplateNotFoundError();
+      await requireScheduleWrite(client, scope, doctorId);
+      await lockDoctorTemplates(client, doctorId);
+
+      const current = await client.query<TemplateRow>(
+        `SELECT id, clinic_id, doctor_id, weekday, local_start_time::text,
+                local_end_time::text, occurrence_index, active
+           FROM schedule_templates WHERE id = $1 AND clinic_id = $2
+           FOR UPDATE`,
+        [input.templateId, scope.clinicId],
+      );
+      const row = current.rows[0];
+      if (!row) throw new ScheduleTemplateNotFoundError();
+      if (row.active === input.active) return templateFromRow(row);
+
+      if (
+        input.active &&
+        (await activeTemplateOverlaps(client, {
+          clinicId: scope.clinicId,
+          doctorId: row.doctor_id,
+          weekday: row.weekday,
+          localStartTime: row.local_start_time,
+          localEndTime: row.local_end_time,
+          excludeTemplateId: row.id,
+        }))
+      )
+        throw new ScheduleCollisionError();
+
+      const updated = await client.query<TemplateRow>(
+        `UPDATE schedule_templates SET active = $3, updated_at = now()
+          WHERE id = $1 AND clinic_id = $2
+          RETURNING id, clinic_id, doctor_id, weekday, local_start_time::text,
+                    local_end_time::text, occurrence_index, active`,
+        [input.templateId, scope.clinicId, input.active],
+      );
+      await appendAuditEvent(client, {
+        ...scope,
+        entityType: 'schedule_template',
+        entityId: row.id,
+        action: input.active
+          ? 'schedule_template.activated'
+          : 'schedule_template.deactivated',
+      });
+      return templateFromRow(updated.rows[0]!);
     });
   }
 
