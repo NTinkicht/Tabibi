@@ -304,6 +304,17 @@ export class SessionService {
             throw new SessionConflictError(
               'Clinic is closed on this service date',
             );
+          // TAB-P0-02 (#655): nor does a day on which this doctor is absent
+          // in this clinic. addDoctorAbsence takes the same calendar lock.
+          const absence = await client.query(
+            `SELECT 1 FROM doctor_absences
+              WHERE clinic_id = $1 AND doctor_id = $2 AND absence_date = $3::date`,
+            [scope.clinicId, input.doctorId, input.serviceDate],
+          );
+          if (absence.rowCount)
+            throw new SessionConflictError(
+              'Doctor is absent on this service date',
+            );
           // TAB-P0-02 (#640): one doctor never has two overlapping
           // non-cancelled sessions in one clinic. Ranges are half-open, so
           // adjacent sessions are allowed. The clinic calendar lock above also
