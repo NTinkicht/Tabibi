@@ -512,3 +512,12 @@ export class SchedulingService {
 }
 
 export { AuthorizationError };
+
+export {
+  CONSULTATION_DURATION_MAX_MINUTES,
+  CONSULTATION_DURATION_MIN_MINUTES,
+  type ConsultationType,
+  ConsultationTypeConflictError,
+  ConsultationTypeNotFoundError,
+  ConsultationTypeService,
+} from './consultation-types';

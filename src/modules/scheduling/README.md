@@ -33,3 +33,14 @@ A clinic admin can remove a clinic closure day with
 one `clinic_closure.removed` audit event is written, and removing a day that is
 not a closure is a no-op. Removal takes the clinic calendar lock; it does not
 generate sessions itself, so the next generation plans the reopened day.
+
+`ConsultationTypeService` (TAB-P0-02, #651) keeps each clinic's catalogue of
+consultation types: a unique per-clinic `code`, a short staff-facing `label` and
+a nominal duration of 5–240 minutes. Only that clinic's `clinic_admin` may
+create, deactivate or reactivate a type; any clinic member may list them
+(inactive ones on request). A duplicate code in the same clinic fails with
+`ConsultationTypeConflictError`; an unknown id and another clinic's id both fail
+with `ConsultationTypeNotFoundError`. Each real change writes one audit event
+(`consultation_type.created`, `.deactivated`, `.activated`) whose metadata holds
+the id, code and duration, never the label. Templates, sessions, bookings and
+ETA do not reference consultation types yet.
