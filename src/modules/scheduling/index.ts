@@ -54,6 +54,17 @@ function templateFromRow(row: TemplateRow): ScheduleTemplate {
   };
 }
 
+// Two active weekly templates of one doctor in one clinic must not overlap on
+// the same weekday: generation would otherwise plan overlapping sessions for
+// that doctor on every matching day. Ranges are half-open, so 09:00-12:00 and
+// 12:00-15:00 are adjacent, not colliding.
+export class ScheduleCollisionError extends Error {
+  constructor() {
+    super('Schedule template overlaps an existing template for this doctor');
+    this.name = 'ScheduleCollisionError';
+  }
+}
+
 export class SchedulingService {
   constructor(private readonly pool: Pool) {}
 
@@ -84,6 +95,32 @@ export class SchedulingService {
   ): Promise<ScheduleTemplate> {
     return inTransaction(this.pool, async (client) => {
       await requireScheduleWrite(client, scope, input.doctorId);
+      const active = input.active ?? true;
+      if (active) {
+        // Serialize collision check and insert per doctor so two concurrent
+        // overlapping creates cannot both pass the check. The key uses the
+        // canonical uuid text, so equivalent spellings (for example upper
+        // and lower case) of one doctor id share one lock.
+        await client.query(
+          `SELECT pg_advisory_xact_lock(
+             hashtextextended('schedule-template:' || $1::uuid::text, 0))`,
+          [input.doctorId],
+        );
+        const collision = await client.query(
+          `SELECT 1 FROM schedule_templates
+            WHERE clinic_id = $1 AND doctor_id = $2 AND weekday = $3 AND active
+              AND local_start_time < $5::time AND $4::time < local_end_time
+            LIMIT 1`,
+          [
+            scope.clinicId,
+            input.doctorId,
+            input.weekday,
+            input.localStartTime,
+            input.localEndTime,
+          ],
+        );
+        if (collision.rowCount) throw new ScheduleCollisionError();
+      }
       const id = randomUUID();
       const result = await client.query<TemplateRow>(
         `INSERT INTO schedule_templates
@@ -99,7 +136,7 @@ export class SchedulingService {
           input.localStartTime,
           input.localEndTime,
           input.occurrenceIndex,
-          input.active ?? true,
+          active,
         ],
       );
       await appendAuditEvent(client, {
