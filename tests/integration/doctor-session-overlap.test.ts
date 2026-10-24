@@ -233,7 +233,10 @@ describe('doctor session overlap within one clinic', () => {
 
   it('skips only the generated occurrence that would overlap a manual session and audits it', async () => {
     await mondayTemplate();
-    await mondayTemplate({ clinicId: ids.otherClinic, actorUserId: ids.otherAdmin });
+    await mondayTemplate({
+      clinicId: ids.otherClinic,
+      actorUserId: ids.otherAdmin,
+    });
     await manual(MONDAY, 10, 11);
 
     expect(await generate()).toBe(1);
@@ -253,7 +256,10 @@ describe('doctor session overlap within one clinic', () => {
     ]);
     // Another clinic's generation never depends on this clinic's sessions.
     expect(
-      await generate({ clinicId: ids.otherClinic, actorUserId: ids.otherAdmin }),
+      await generate({
+        clinicId: ids.otherClinic,
+        actorUserId: ids.otherAdmin,
+      }),
     ).toBe(2);
 
     // Regeneration is idempotent: the generated occurrence is not a collision
