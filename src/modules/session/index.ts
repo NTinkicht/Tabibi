@@ -8,6 +8,7 @@ import {
   requireDoctorIdentity,
   type Queryable,
 } from '@/modules/identity';
+import { lockClinicCalendar } from '@/modules/scheduling';
 import { inTransaction } from '@/platform/database/transaction';
 
 export type SessionStatus =
@@ -288,6 +289,18 @@ export class SessionService {
             [scope.clinicId, input.doctorId],
           );
           if (association.rowCount !== 1) throw new AuthorizationError();
+          // TAB-P0-02 (#638): a clinic closure day never gets a new session.
+          // The shared calendar lock serializes this check with addClosure.
+          await lockClinicCalendar(client, scope.clinicId);
+          const closure = await client.query(
+            `SELECT 1 FROM clinic_closures
+              WHERE clinic_id = $1 AND closure_date = $2::date`,
+            [scope.clinicId, input.serviceDate],
+          );
+          if (closure.rowCount)
+            throw new SessionConflictError(
+              'Clinic is closed on this service date',
+            );
           const id = randomUUID();
           const result = await client.query<SessionRow>(
             `INSERT INTO consultation_sessions (id, clinic_id, doctor_id, service_date, starts_at, ends_at)

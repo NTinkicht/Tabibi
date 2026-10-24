@@ -92,9 +92,10 @@ function requireCalendarDay(value: string, name: string): void {
     throw new TypeError(`${name} must be a real YYYY-MM-DD calendar day`);
 }
 
-// Closure creation and session generation for one clinic are serialized, so a
-// concurrent closure and generation can never both commit for the same day.
-async function lockClinicCalendar(
+// Closure creation, session generation and manual session creation for one
+// clinic are serialized, so a closure and a new session can never both commit
+// for the same day.
+export async function lockClinicCalendar(
   client: Queryable,
   clinicId: string,
 ): Promise<void> {

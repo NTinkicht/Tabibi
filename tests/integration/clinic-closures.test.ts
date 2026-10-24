@@ -7,6 +7,7 @@ import {
   ClinicClosureConflictError,
   SchedulingService,
 } from '@/modules/scheduling';
+import { SessionConflictError, SessionService } from '@/modules/session';
 
 // TAB-P0-02 (#638): clinic closure days (holidays). Generation plans nothing on
 // a closure day, closures are clinic-scoped and admin-only, and a closure can
@@ -33,7 +34,8 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await pool.query(`TRUNCATE audit_events, clinic_closures, consultation_sessions,
+  await pool.query(`TRUNCATE audit_events, clinic_closures, session_command_receipts,
+    consultation_sessions,
     schedule_templates, doctor_clinics, doctor_profiles, clinic_memberships,
     clinics, users CASCADE`);
   await pool.query(
@@ -234,6 +236,68 @@ describe('clinic closure days', () => {
         expect(mondaySessions).toEqual([]);
       } else {
         expect(closure.reason).toBeInstanceOf(ClinicClosureConflictError);
+        expect(closed).toBe(false);
+        expect(mondaySessions).toEqual([MONDAY]);
+      }
+    }
+  });
+
+  function createManual(serviceDate: string, key: string) {
+    // 14:00-16:00 Africa/Algiers (UTC+1), clear of the 09:00-12:00 templates.
+    return new SessionService(pool).createManual(
+      { clinicId: ids.clinic, actorUserId: ids.receptionist },
+      {
+        doctorId: ids.doctor,
+        serviceDate,
+        startsAt: new Date(`${serviceDate}T13:00:00Z`),
+        endsAt: new Date(`${serviceDate}T15:00:00Z`),
+        idempotencyKey: key,
+        correlationId: `request-${key}`,
+      },
+    );
+  }
+
+  it('rejects a manual session on a closure day and writes nothing', async () => {
+    await new SchedulingService(pool).addClosure(scope, MONDAY);
+    const audits = await pool.query(
+      'SELECT count(*)::int AS n FROM audit_events',
+    );
+
+    await expect(createManual(MONDAY, 'manual-closed')).rejects.toBeInstanceOf(
+      SessionConflictError,
+    );
+    expect(await sessionDays(ids.clinic)).toEqual([]);
+    expect(
+      (await pool.query('SELECT count(*)::int AS n FROM audit_events')).rows,
+    ).toEqual(audits.rows);
+    // Other days of the same clinic stay open for manual sessions.
+    expect((await createManual(TUESDAY, 'manual-open')).serviceDate).toBe(
+      TUESDAY,
+    );
+    expect(await sessionDays(ids.clinic)).toEqual([TUESDAY]);
+  });
+
+  it('never lets a concurrent closure and manual session both commit for one day', async () => {
+    const schedules = new SchedulingService(pool);
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await pool.query('DELETE FROM clinic_closures');
+      await pool.query('DELETE FROM consultation_sessions');
+      const [closure, manual] = await Promise.allSettled([
+        schedules.addClosure(scope, MONDAY),
+        createManual(MONDAY, `manual-race-${attempt}`),
+      ]);
+      const closed = (await snapshot()).closures.length === 1;
+      const mondaySessions = await sessionDays(ids.clinic);
+      if (closure.status === 'fulfilled') {
+        expect(closed).toBe(true);
+        expect(manual.status).toBe('rejected');
+        expect((manual as PromiseRejectedResult).reason).toBeInstanceOf(
+          SessionConflictError,
+        );
+        expect(mondaySessions).toEqual([]);
+      } else {
+        expect(closure.reason).toBeInstanceOf(ClinicClosureConflictError);
+        expect(manual.status).toBe('fulfilled');
         expect(closed).toBe(false);
         expect(mondaySessions).toEqual([MONDAY]);
       }
