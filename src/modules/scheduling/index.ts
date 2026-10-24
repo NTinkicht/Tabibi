@@ -98,10 +98,13 @@ export class SchedulingService {
       const active = input.active ?? true;
       if (active) {
         // Serialize collision check and insert per doctor so two concurrent
-        // overlapping creates cannot both pass the check.
+        // overlapping creates cannot both pass the check. The key uses the
+        // canonical uuid text, so equivalent spellings (for example upper
+        // and lower case) of one doctor id share one lock.
         await client.query(
-          'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
-          [`schedule-template:${input.doctorId}`],
+          `SELECT pg_advisory_xact_lock(
+             hashtextextended('schedule-template:' || $1::uuid::text, 0))`,
+          [input.doctorId],
         );
         const collision = await client.query(
           `SELECT 1 FROM schedule_templates

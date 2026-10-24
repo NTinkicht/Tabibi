@@ -161,6 +161,24 @@ describe('schedule template doctor collision validation', () => {
     expect(after.audits).toBe(1);
   });
 
+  it('serializes equivalent spellings of the same doctor id under one lock', async () => {
+    const schedules = new SchedulingService(pool);
+    const results = await Promise.allSettled([
+      schedules.createTemplate(scope, template('09:00', '12:00', 0)),
+      schedules.createTemplate(
+        scope,
+        template('10:00', '13:00', 1, { doctorId: ids.doctor.toUpperCase() }),
+      ),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.filter(
+      (r): r is PromiseRejectedResult => r.status === 'rejected',
+    );
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.reason).toBeInstanceOf(ScheduleCollisionError);
+    expect((await snapshot()).templates).toHaveLength(1);
+  });
+
   it('never generates overlapping planned sessions after a rejected collision', async () => {
     const schedules = new SchedulingService(pool);
     await schedules.createTemplate(scope, template('09:00', '12:00', 0));
