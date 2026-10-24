@@ -122,6 +122,18 @@ export class PublicDiscoveryService {
   }
 }
 
+// A clinic timezone must be a named IANA zone known to PostgreSQL: every
+// clinic-local computation (session generation, service dates) runs
+// `AT TIME ZONE clinics.timezone`, so an unknown value would break the clinic
+// for all later scheduling. Offset strings and abbreviations are not names in
+// pg_timezone_names and are rejected too.
+export class InvalidClinicTimezoneError extends Error {
+  constructor() {
+    super('Clinic timezone must be a known IANA timezone name');
+    this.name = 'InvalidClinicTimezoneError';
+  }
+}
+
 export class ClinicService {
   constructor(private readonly pool: Pool) {}
 
@@ -152,6 +164,13 @@ export class ClinicService {
   ): Promise<Clinic> {
     return inTransaction(this.pool, async (client) => {
       await requireClinicRole(client, scope, ['clinic_admin']);
+      if (update.timezone !== undefined) {
+        const known = await client.query(
+          'SELECT 1 FROM pg_timezone_names WHERE name = $1',
+          [update.timezone],
+        );
+        if (!known.rowCount) throw new InvalidClinicTimezoneError();
+      }
       const result = await client.query<ClinicRow>(
         `UPDATE clinics SET name = $2, timezone = COALESCE($3, timezone),
            default_locale = COALESCE($4, default_locale),
