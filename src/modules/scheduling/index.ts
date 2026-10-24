@@ -479,6 +479,36 @@ export class SchedulingService {
       return { closureDate, created: true };
     });
   }
+
+  /**
+   * Removes a clinic closure day so it can be planned again (#649). Only that
+   * clinic's row is deleted; removing a day that is not a closure is a no-op.
+   * Sessions are not regenerated here: callers run generation as usual.
+   */
+  async removeClosure(
+    scope: ClinicScope,
+    closureDate: string,
+  ): Promise<{ closureDate: string; removed: boolean }> {
+    requireCalendarDay(closureDate, 'closureDate');
+    return inTransaction(this.pool, async (client) => {
+      await requireClinicRole(client, scope, ['clinic_admin']);
+      await lockClinicCalendar(client, scope.clinicId);
+      const deleted = await client.query(
+        `DELETE FROM clinic_closures
+          WHERE clinic_id = $1 AND closure_date = $2::date`,
+        [scope.clinicId, closureDate],
+      );
+      if (!deleted.rowCount) return { closureDate, removed: false };
+      await appendAuditEvent(client, {
+        ...scope,
+        entityType: 'clinic',
+        entityId: scope.clinicId,
+        action: 'clinic_closure.removed',
+        metadata: { closureDate },
+      });
+      return { closureDate, removed: true };
+    });
+  }
 }
 
 export { AuthorizationError };

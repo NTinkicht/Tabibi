@@ -27,3 +27,9 @@ the template. Reactivation re-runs the doctor collision check under the same
 per-doctor lock as template creation and fails with `ScheduleCollisionError` on
 overlap. A real change writes `schedule_template.deactivated` or
 `schedule_template.activated`; setting the current state is a no-op without audit.
+
+A clinic admin can remove a clinic closure day with
+`SchedulingService.removeClosure` (#649). Only that clinic's closure is deleted,
+one `clinic_closure.removed` audit event is written, and removing a day that is
+not a closure is a no-op. Removal takes the clinic calendar lock; it does not
+generate sessions itself, so the next generation plans the reopened day.
