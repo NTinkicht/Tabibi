@@ -17,3 +17,13 @@ exist on its service date in the clinic's timezone (a DST spring-forward gap,
 #645), instead of storing a shifted or zero-length session. Such skips are
 counted as `skippedNonexistentLocalTime` in the same audit event; the remaining
 occurrences of the call are generated normally.
+
+`SchedulingService.setTemplateActive` retires or restores a recurring template
+(TAB-P0-02, #647). Only a `clinic_admin` or the template's own doctor may change
+it; a non-member or receptionist is denied before the lookup. An unknown id and
+another clinic's template id both fail with `ScheduleTemplateNotFoundError`.
+Deactivation leaves already generated sessions unchanged; later generation skips
+the template. Reactivation re-runs the doctor collision check under the same
+per-doctor lock as template creation and fails with `ScheduleCollisionError` on
+overlap. A real change writes `schedule_template.deactivated` or
+`schedule_template.activated`; setting the current state is a no-op without audit.
