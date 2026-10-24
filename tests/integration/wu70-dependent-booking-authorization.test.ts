@@ -109,8 +109,8 @@ function bookingInput(
   };
 }
 
-function authCookie() {
-  return `tabibi_staff_session=${createStaffSessionToken(
+async function authCookie() {
+  return `tabibi_staff_session=${await createStaffSessionToken(
     'wu70-owner',
     new Date(Date.now() + 60_000),
   )}`;
@@ -126,7 +126,7 @@ async function routeBooking(dependentId: string, idempotencyKey: string) {
           origin: 'http://localhost',
           'content-type': 'application/json',
           'idempotency-key': idempotencyKey,
-          cookie: authCookie(),
+          cookie: await authCookie(),
         },
         body: JSON.stringify({
           patientId: ids.patient,
