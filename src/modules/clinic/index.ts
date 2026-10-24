@@ -164,7 +164,7 @@ export class ClinicService {
   ): Promise<Clinic> {
     return inTransaction(this.pool, async (client) => {
       await requireClinicRole(client, scope, ['clinic_admin']);
-      if (update.timezone !== undefined) {
+      if (update.timezone != null) {
         const known = await client.query(
           'SELECT 1 FROM pg_timezone_names WHERE name = $1',
           [update.timezone],

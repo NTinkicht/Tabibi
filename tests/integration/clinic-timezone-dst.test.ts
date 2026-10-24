@@ -108,12 +108,20 @@ describe('clinic timezone validation', () => {
     await expect(
       clinics.updateClinic(scope, { name: 'Clinic 2' }),
     ).resolves.toMatchObject({ name: 'Clinic 2', timezone: 'Europe/Paris' });
+    // An untyped caller passing null gets the same keep-current behaviour as
+    // omission (the UPDATE uses COALESCE), not a validation error.
+    await expect(
+      clinics.updateClinic(scope, {
+        name: 'Clinic 3',
+        timezone: null as unknown as string,
+      }),
+    ).resolves.toMatchObject({ name: 'Clinic 3', timezone: 'Europe/Paris' });
     const audit = await pool.query(
       `SELECT count(*)::int AS n FROM audit_events
         WHERE clinic_id = $1 AND action = 'clinic.updated'`,
       [ids.clinic],
     );
-    expect(audit.rows[0]?.n).toBe(2);
+    expect(audit.rows[0]?.n).toBe(3);
   });
 });
 
