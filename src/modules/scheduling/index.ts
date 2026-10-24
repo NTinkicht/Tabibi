@@ -106,6 +106,23 @@ export async function lockClinicCalendar(
   );
 }
 
+// TAB-P0-02 (#640): true when the doctor already has a non-cancelled session
+// in this clinic overlapping the half-open range [startsAt, endsAt). Callers
+// must hold the clinic calendar lock so the check and their insert are atomic.
+export async function doctorSessionOverlaps(
+  client: Queryable,
+  input: { clinicId: string; doctorId: string; startsAt: Date; endsAt: Date },
+): Promise<boolean> {
+  const result = await client.query(
+    `SELECT 1 FROM consultation_sessions
+      WHERE clinic_id = $1 AND doctor_id = $2 AND status <> 'cancelled'
+        AND starts_at < $4::timestamptz AND $3::timestamptz < ends_at
+      LIMIT 1`,
+    [input.clinicId, input.doctorId, input.startsAt, input.endsAt],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
 export class SchedulingService {
   constructor(private readonly pool: Pool) {}
 
@@ -202,37 +219,66 @@ export class SchedulingService {
     return inTransaction(this.pool, async (client) => {
       await requireScheduleWrite(client, scope, input.doctorId);
       await lockClinicCalendar(client, scope.clinicId);
-      const generated = await client.query<{ id: string }>(
-        `INSERT INTO consultation_sessions
-           (id, clinic_id, doctor_id, template_id, service_date,
-            template_occurrence, starts_at, ends_at)
-         SELECT (
-                  substr(md5(t.id::text || ':' || day::date::text || ':' || t.occurrence_index::text), 1, 8) || '-' ||
-                  substr(md5(t.id::text || ':' || day::date::text || ':' || t.occurrence_index::text), 9, 4) || '-' ||
-                  substr(md5(t.id::text || ':' || day::date::text || ':' || t.occurrence_index::text), 13, 4) || '-' ||
-                  substr(md5(t.id::text || ':' || day::date::text || ':' || t.occurrence_index::text), 17, 4) || '-' ||
-                  substr(md5(t.id::text || ':' || day::date::text || ':' || t.occurrence_index::text), 21, 12)
-                )::uuid,
-                t.clinic_id, t.doctor_id, t.id, day::date,
-                t.occurrence_index,
-                (day::date + t.local_start_time) AT TIME ZONE c.timezone,
-                (day::date + t.local_end_time) AT TIME ZONE c.timezone
-           FROM schedule_templates t
-           JOIN clinics c ON c.id = t.clinic_id
-           CROSS JOIN generate_series(
-             $3::date, $3::date + ($4::integer - 1), interval '1 day'
-           ) generated(day)
-          WHERE t.clinic_id = $1 AND t.doctor_id = $2 AND t.active
-            AND extract(dow FROM day::date)::smallint = t.weekday
-            AND NOT EXISTS (
-              SELECT 1 FROM clinic_closures closure
-               WHERE closure.clinic_id = t.clinic_id
-                 AND closure.closure_date = day::date)
-         ON CONFLICT (clinic_id, doctor_id, service_date, template_id, template_occurrence)
-           WHERE template_id IS NOT NULL DO NOTHING
-         RETURNING id`,
+      // Each candidate occurrence is skipped when it would overlap a
+      // non-cancelled session of the same doctor in this clinic (for example a
+      // manual session), other than its own already-generated occurrence,
+      // which ON CONFLICT keeps idempotent. Skips are counted and audited.
+      const generated = await client.query<{
+        generated: number;
+        skipped: number;
+      }>(
+        `WITH candidates AS (
+           SELECT t.id AS template_id, t.clinic_id, t.doctor_id,
+                  day::date AS service_date, t.occurrence_index,
+                  (day::date + t.local_start_time) AT TIME ZONE c.timezone AS starts_at,
+                  (day::date + t.local_end_time) AT TIME ZONE c.timezone AS ends_at
+             FROM schedule_templates t
+             JOIN clinics c ON c.id = t.clinic_id
+             CROSS JOIN generate_series(
+               $3::date, $3::date + ($4::integer - 1), interval '1 day'
+             ) generated(day)
+            WHERE t.clinic_id = $1 AND t.doctor_id = $2 AND t.active
+              AND extract(dow FROM day::date)::smallint = t.weekday
+              AND NOT EXISTS (
+                SELECT 1 FROM clinic_closures closure
+                 WHERE closure.clinic_id = t.clinic_id
+                   AND closure.closure_date = day::date)
+         ), checked AS (
+           SELECT candidate.*, EXISTS (
+                    SELECT 1 FROM consultation_sessions existing
+                     WHERE existing.clinic_id = candidate.clinic_id
+                       AND existing.doctor_id = candidate.doctor_id
+                       AND existing.status <> 'cancelled'
+                       AND existing.starts_at < candidate.ends_at
+                       AND candidate.starts_at < existing.ends_at
+                       AND NOT (existing.template_id IS NOT DISTINCT FROM candidate.template_id
+                                AND existing.service_date = candidate.service_date
+                                AND existing.template_occurrence = candidate.occurrence_index)
+                  ) AS collides
+             FROM candidates candidate
+         ), inserted AS (
+           INSERT INTO consultation_sessions
+             (id, clinic_id, doctor_id, template_id, service_date,
+              template_occurrence, starts_at, ends_at)
+           SELECT (
+                    substr(md5(template_id::text || ':' || service_date::text || ':' || occurrence_index::text), 1, 8) || '-' ||
+                    substr(md5(template_id::text || ':' || service_date::text || ':' || occurrence_index::text), 9, 4) || '-' ||
+                    substr(md5(template_id::text || ':' || service_date::text || ':' || occurrence_index::text), 13, 4) || '-' ||
+                    substr(md5(template_id::text || ':' || service_date::text || ':' || occurrence_index::text), 17, 4) || '-' ||
+                    substr(md5(template_id::text || ':' || service_date::text || ':' || occurrence_index::text), 21, 12)
+                  )::uuid,
+                  clinic_id, doctor_id, template_id, service_date,
+                  occurrence_index, starts_at, ends_at
+             FROM checked WHERE NOT collides
+           ON CONFLICT (clinic_id, doctor_id, service_date, template_id, template_occurrence)
+             WHERE template_id IS NOT NULL DO NOTHING
+           RETURNING id
+         )
+         SELECT (SELECT count(*) FROM inserted)::int AS generated,
+                (SELECT count(*) FROM checked WHERE collides)::int AS skipped`,
         [scope.clinicId, input.doctorId, input.startDate, daysAhead],
       );
+      const { generated: count, skipped } = generated.rows[0]!;
       await appendAuditEvent(client, {
         ...scope,
         entityType: 'doctor',
@@ -241,10 +287,11 @@ export class SchedulingService {
         metadata: {
           startDate: input.startDate,
           daysAhead,
-          generated: generated.rowCount ?? 0,
+          generated: count,
+          skippedCollisions: skipped,
         },
       });
-      return generated.rowCount ?? 0;
+      return count;
     });
   }
 
