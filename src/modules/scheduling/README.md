@@ -11,3 +11,9 @@ One doctor never has two overlapping non-cancelled sessions in one clinic
 skips any occurrence that would overlap an existing session of that doctor,
 counting it as `skippedCollisions` in the `sessions.generated` audit event. The
 clinic calendar advisory lock serializes both paths.
+
+Generation also skips any occurrence whose local start or end wall time does not
+exist on its service date in the clinic's timezone (a DST spring-forward gap,
+#645), instead of storing a shifted or zero-length session. Such skips are
+counted as `skippedNonexistentLocalTime` in the same audit event; the remaining
+occurrences of the call are generated normally.

@@ -271,8 +271,20 @@ describe('doctor session overlap within one clinic', () => {
       [ids.clinic],
     );
     expect(audits.rows.map((row) => row.metadata)).toEqual([
-      { startDate: MONDAY, daysAhead: 14, generated: 1, skippedCollisions: 1 },
-      { startDate: MONDAY, daysAhead: 14, generated: 0, skippedCollisions: 1 },
+      {
+        startDate: MONDAY,
+        daysAhead: 14,
+        generated: 1,
+        skippedCollisions: 1,
+        skippedNonexistentLocalTime: 0,
+      },
+      {
+        startDate: MONDAY,
+        daysAhead: 14,
+        generated: 0,
+        skippedCollisions: 1,
+        skippedNonexistentLocalTime: 0,
+      },
     ]);
     expect(await overlappingPairs()).toBe(0);
   });

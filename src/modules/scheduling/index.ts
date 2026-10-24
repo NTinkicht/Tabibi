@@ -223,15 +223,24 @@ export class SchedulingService {
       // non-cancelled session of the same doctor in this clinic (for example a
       // manual session), other than its own already-generated occurrence,
       // which ON CONFLICT keeps idempotent. Skips are counted and audited.
+      // An occurrence whose local start or end wall time does not exist on
+      // its service date (a DST spring-forward gap) is skipped as well:
+      // PostgreSQL would otherwise shift it to another instant, or collapse it
+      // to zero length and fail the whole call on the duration CHECK.
       const generated = await client.query<{
         generated: number;
         skipped: number;
+        skipped_nonexistent: number;
       }>(
         `WITH candidates AS (
            SELECT t.id AS template_id, t.clinic_id, t.doctor_id,
                   day::date AS service_date, t.occurrence_index,
                   (day::date + t.local_start_time) AT TIME ZONE c.timezone AS starts_at,
-                  (day::date + t.local_end_time) AT TIME ZONE c.timezone AS ends_at
+                  (day::date + t.local_end_time) AT TIME ZONE c.timezone AS ends_at,
+                  (((day::date + t.local_start_time) AT TIME ZONE c.timezone) AT TIME ZONE c.timezone
+                     <> day::date + t.local_start_time
+                   OR ((day::date + t.local_end_time) AT TIME ZONE c.timezone) AT TIME ZONE c.timezone
+                     <> day::date + t.local_end_time) AS nonexistent_local_time
              FROM schedule_templates t
              JOIN clinics c ON c.id = t.clinic_id
              CROSS JOIN generate_series(
@@ -256,6 +265,7 @@ export class SchedulingService {
                                 AND existing.template_occurrence = candidate.occurrence_index)
                   ) AS collides
              FROM candidates candidate
+            WHERE NOT candidate.nonexistent_local_time
          ), inserted AS (
            INSERT INTO consultation_sessions
              (id, clinic_id, doctor_id, template_id, service_date,
@@ -275,10 +285,16 @@ export class SchedulingService {
            RETURNING id
          )
          SELECT (SELECT count(*) FROM inserted)::int AS generated,
-                (SELECT count(*) FROM checked WHERE collides)::int AS skipped`,
+                (SELECT count(*) FROM checked WHERE collides)::int AS skipped,
+                (SELECT count(*) FROM candidates
+                  WHERE nonexistent_local_time)::int AS skipped_nonexistent`,
         [scope.clinicId, input.doctorId, input.startDate, daysAhead],
       );
-      const { generated: count, skipped } = generated.rows[0]!;
+      const {
+        generated: count,
+        skipped,
+        skipped_nonexistent: skippedNonexistent,
+      } = generated.rows[0]!;
       await appendAuditEvent(client, {
         ...scope,
         entityType: 'doctor',
@@ -289,6 +305,7 @@ export class SchedulingService {
           daysAhead,
           generated: count,
           skippedCollisions: skipped,
+          skippedNonexistentLocalTime: skippedNonexistent,
         },
       });
       return count;
