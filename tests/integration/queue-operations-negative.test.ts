@@ -69,14 +69,14 @@ afterAll(async () => {
   await closePool();
 });
 
-function authCookie() {
-  return `tabibi_staff_session=${createStaffSessionToken(
+async function authCookie() {
+  return `tabibi_staff_session=${await createStaffSessionToken(
     'queue-api-reception',
     new Date(Date.now() + 60_000),
   )}`;
 }
 
-function jsonRequest(
+async function jsonRequest(
   url: string,
   body: unknown,
   headers: Record<string, string> = {},
@@ -86,7 +86,7 @@ function jsonRequest(
     headers: {
       origin: 'http://localhost',
       'content-type': 'application/json',
-      cookie: authCookie(),
+      cookie: await authCookie(),
       ...headers,
     },
     body: JSON.stringify(body),
@@ -114,7 +114,7 @@ describe('queue HTTP negative boundaries', () => {
 
   it('rejects registration without an idempotency key after auth and same-origin checks succeed', async () => {
     const response = await queuePost(
-      jsonRequest(
+      await jsonRequest(
         `http://localhost/api/clinics/${ids.clinic}/sessions/${ids.session}/queue`,
         {
           privateDisplayName: 'Queue API patient',
@@ -153,7 +153,7 @@ describe('queue HTTP negative boundaries', () => {
     );
 
     const noShow = await commandPost(
-      jsonRequest(
+      await jsonRequest(
         `http://localhost/api/clinics/${ids.clinic}/sessions/${ids.session}/queue/${registration.entry.id}/commands`,
         { command: 'no_show' },
         { 'idempotency-key': 'queue-api-command-1' },
@@ -175,7 +175,7 @@ describe('queue HTTP negative boundaries', () => {
     expect(noShowBody.message).toContain('A reason is required');
 
     const cancel = await commandPost(
-      jsonRequest(
+      await jsonRequest(
         `http://localhost/api/clinics/${ids.clinic}/sessions/${ids.session}/queue/${registration.entry.id}/commands`,
         { command: 'cancel', reason: 'patient asked' },
         { 'idempotency-key': 'queue-api-command-2' },
@@ -221,7 +221,7 @@ describe('queue HTTP negative boundaries', () => {
     );
 
     const response = await reorderPost(
-      jsonRequest(
+      await jsonRequest(
         `http://localhost/api/clinics/${ids.clinic}/sessions/${ids.session}/queue/${registration.entry.id}/reorder`,
         {
           targetPosition: 0,

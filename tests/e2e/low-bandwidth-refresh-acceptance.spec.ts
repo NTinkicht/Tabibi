@@ -140,7 +140,11 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
     await page.context().addCookies([
       {
         name: 'tabibi_staff_session',
-        value: createStaffSessionToken(subject, new Date(Date.now() + 60_000)),
+        value: await createStaffSessionToken(
+          subject,
+          new Date(Date.now() + 60_000),
+          pool,
+        ),
         url: 'http://127.0.0.1:3000',
         httpOnly: true,
         sameSite: 'Strict',

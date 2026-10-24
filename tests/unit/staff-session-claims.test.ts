@@ -18,6 +18,16 @@ const CLINIC_ID = '00000000-0000-4000-8000-000000000001';
 const STAFF_USER_ID = '00000000-0000-4000-8000-0000000000a1';
 const NOW_MS = Date.UTC(2026, 9, 18, 12, 0, 0);
 const NOW_S = NOW_MS / 1000;
+const SID = 'synthetic-session-identifier';
+
+// Issues through a stub store so token creation never touches the mocked
+// pool: the pool mock then counts only authentication lookups.
+const issuingStore = {
+  query: async () => ({ rows: [{ user_id: STAFF_USER_ID }] }),
+};
+function issue(subject: string, expiresAt: Date): Promise<string> {
+  return createStaffSessionToken(subject, expiresAt, issuingStore as never);
+}
 
 function signRaw(json: string): string {
   const payload = Buffer.from(json).toString('base64url');
@@ -55,7 +65,7 @@ afterEach(() => {
 
 describe('staff session expiry', () => {
   it('accepts a single unexpired session cookie (positive control)', async () => {
-    const token = createStaffSessionToken(
+    const token = await issue(
       'synthetic-staff-subject',
       new Date(NOW_MS + 1_000),
     );
@@ -66,21 +76,21 @@ describe('staff session expiry', () => {
       ),
     ).resolves.toEqual({ clinicId: CLINIC_ID, actorUserId: STAFF_USER_ID });
     expect(query).toHaveBeenCalledTimes(1);
-    expect(query.mock.calls[0]?.[1]).toEqual(['synthetic-staff-subject']);
+    expect(query.mock.calls[0]?.[1]).toEqual([
+      expect.any(Buffer),
+      'synthetic-staff-subject',
+    ]);
   });
 
   it('rejects an expired token and a token at its exact expiry second', async () => {
     for (const expiresAt of [NOW_MS - 60_000, NOW_MS - 1_000, NOW_MS]) {
-      const token = createStaffSessionToken(
-        'synthetic-staff-subject',
-        new Date(expiresAt),
-      );
+      const token = await issue('synthetic-staff-subject', new Date(expiresAt));
       await expectRejectedWithoutLookup(`tabibi_staff_session=${token}`);
     }
   });
 
   it('starts rejecting a token once the clock reaches its expiry', async () => {
-    const token = createStaffSessionToken(
+    const token = await issue(
       'synthetic-staff-subject',
       new Date(NOW_MS + 1_000),
     );
@@ -93,15 +103,29 @@ describe('staff session claim shape', () => {
   const future = NOW_S + 3_600;
 
   it.each([
-    ['string exp', { sub: 'synthetic-staff-subject', exp: String(future) }],
-    ['array exp', { sub: 'synthetic-staff-subject', exp: [future] }],
-    ['fractional exp', { sub: 'synthetic-staff-subject', exp: future + 0.5 }],
-    ['unsafe integer exp', { sub: 'synthetic-staff-subject', exp: 2 ** 60 }],
-    ['null exp', { sub: 'synthetic-staff-subject', exp: null }],
-    ['missing exp', { sub: 'synthetic-staff-subject' }],
-    ['empty sub', { sub: '', exp: future }],
-    ['numeric sub', { sub: 42, exp: future }],
-    ['missing sub', { exp: future }],
+    [
+      'string exp',
+      { sub: 'synthetic-staff-subject', sid: SID, exp: String(future) },
+    ],
+    ['array exp', { sub: 'synthetic-staff-subject', sid: SID, exp: [future] }],
+    [
+      'fractional exp',
+      { sub: 'synthetic-staff-subject', sid: SID, exp: future + 0.5 },
+    ],
+    [
+      'unsafe integer exp',
+      { sub: 'synthetic-staff-subject', sid: SID, exp: 2 ** 60 },
+    ],
+    ['null exp', { sub: 'synthetic-staff-subject', sid: SID, exp: null }],
+    ['missing exp', { sub: 'synthetic-staff-subject', sid: SID }],
+    ['empty sub', { sub: '', sid: SID, exp: future }],
+    ['numeric sub', { sub: 42, sid: SID, exp: future }],
+    ['missing sub', { sid: SID, exp: future }],
+    // Pre-revocation `{sub, exp}` tokens have no session identifier (#634).
+    ['missing sid', { sub: 'synthetic-staff-subject', exp: future }],
+    ['empty sid', { sub: 'synthetic-staff-subject', sid: '', exp: future }],
+    ['numeric sid', { sub: 'synthetic-staff-subject', sid: 7, exp: future }],
+    ['array sid', { sub: 'synthetic-staff-subject', sid: [SID], exp: future }],
   ])('rejects a signed token with %s', async (_label, claims) => {
     await expectRejectedWithoutLookup(
       `tabibi_staff_session=${signRaw(JSON.stringify(claims))}`,
@@ -120,8 +144,8 @@ describe('staff session claim shape', () => {
 });
 
 describe('staff session cookie cardinality', () => {
-  function validToken(subject: string): string {
-    return createStaffSessionToken(subject, new Date(NOW_MS + 60_000));
+  function validToken(subject: string): Promise<string> {
+    return issue(subject, new Date(NOW_MS + 60_000));
   }
 
   it('rejects a request without a session cookie or with an empty one', async () => {
@@ -130,9 +154,9 @@ describe('staff session cookie cardinality', () => {
   });
 
   it('rejects duplicate session cookies whatever their order or validity', async () => {
-    const victim = validToken('synthetic-victim-subject');
-    const planted = validToken('synthetic-planted-subject');
-    const forged = `${validToken('synthetic-forged').split('.')[0]}.not-the-signature`;
+    const victim = await validToken('synthetic-victim-subject');
+    const planted = await validToken('synthetic-planted-subject');
+    const forged = `${(await validToken('synthetic-forged')).split('.')[0]}.not-the-signature`;
     for (const cookie of [
       `tabibi_staff_session=${planted}; tabibi_staff_session=${victim}`,
       `tabibi_staff_session=${victim}; tabibi_staff_session=${forged}`,
@@ -145,15 +169,19 @@ describe('staff session cookie cardinality', () => {
   });
 
   it('does not treat a cookie with a longer name as a session cookie', async () => {
-    const token = validToken('synthetic-staff-subject');
+    const token = await validToken('synthetic-staff-subject');
+    const other = await validToken('synthetic-other');
     await expect(
       authenticatedClinicScope(
         request(
-          `tabibi_staff_session_old=${validToken('synthetic-other')}; tabibi_staff_session=${token}`,
+          `tabibi_staff_session_old=${other}; tabibi_staff_session=${token}`,
         ),
         CLINIC_ID,
       ),
     ).resolves.toEqual({ clinicId: CLINIC_ID, actorUserId: STAFF_USER_ID });
-    expect(query.mock.calls[0]?.[1]).toEqual(['synthetic-staff-subject']);
+    expect(query.mock.calls[0]?.[1]).toEqual([
+      expect.any(Buffer),
+      'synthetic-staff-subject',
+    ]);
   });
 });

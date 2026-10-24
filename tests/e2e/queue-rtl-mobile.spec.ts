@@ -83,9 +83,10 @@ test('mobile Arabic queue view reloads safely after a stale reorder conflict and
     await page.context().addCookies([
       {
         name: 'tabibi_staff_session',
-        value: createStaffSessionToken(
+        value: await createStaffSessionToken(
           receptionSubject,
           new Date(Date.now() + 60_000),
+          pool,
         ),
         url: 'http://127.0.0.1:3000',
         httpOnly: true,

@@ -247,9 +247,13 @@ describe('session delay concurrency and idempotency hardening', () => {
 });
 
 describe('delay HTTP authorization boundaries', () => {
-  function request(clinicId: string, sessionId: string, authSubject?: string) {
+  async function request(
+    clinicId: string,
+    sessionId: string,
+    authSubject?: string,
+  ) {
     const cookie = authSubject
-      ? `tabibi_staff_session=${createStaffSessionToken(authSubject, new Date(Date.now() + 60_000))}`
+      ? `tabibi_staff_session=${await createStaffSessionToken(authSubject, new Date(Date.now() + 60_000))}`
       : undefined;
     return delayRoute(
       new Request(

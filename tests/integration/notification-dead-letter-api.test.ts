@@ -49,17 +49,17 @@ afterAll(async () => {
   await closePool();
 });
 
-function authCookie() {
-  return `tabibi_staff_session=${createStaffSessionToken(
+async function authCookie() {
+  return `tabibi_staff_session=${await createStaffSessionToken(
     authSubject,
     new Date(Date.now() + 60_000),
   )}`;
 }
 
-function request(clinicId: string, query = '', authenticated = true) {
+async function request(clinicId: string, query = '', authenticated = true) {
   return new Request(
     `http://localhost/api/clinics/${clinicId}/notifications/dead-letters${query}`,
-    authenticated ? { headers: { cookie: authCookie() } } : undefined,
+    authenticated ? { headers: { cookie: await authCookie() } } : undefined,
   );
 }
 
@@ -120,7 +120,7 @@ async function deadLetter(
 describe('notification dead-letter HTTP boundary', () => {
   it('rejects unauthenticated reads and disables caching', async () => {
     const response = await GET(
-      request(ids.clinicA, '', false),
+      await request(ids.clinicA, '', false),
       context(ids.clinicA),
     );
 
@@ -153,7 +153,7 @@ describe('notification dead-letter HTTP boundary', () => {
     await enqueue(ids.clinicA, 'still-pending');
 
     const response = await GET(
-      request(ids.clinicA, '?limit=1'),
+      await request(ids.clinicA, '?limit=1'),
       context(ids.clinicA),
     );
 
@@ -185,7 +185,10 @@ describe('notification dead-letter HTTP boundary', () => {
   });
 
   it('fails closed for a clinic where the authenticated staff member has no allowed membership', async () => {
-    const response = await GET(request(ids.clinicB), context(ids.clinicB));
+    const response = await GET(
+      await request(ids.clinicB),
+      context(ids.clinicB),
+    );
 
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ error: 'forbidden' });
@@ -195,7 +198,7 @@ describe('notification dead-letter HTTP boundary', () => {
   it('rejects invalid limits before querying the observability repository', async () => {
     for (const token of ['101', '1.5', '+2', ' 2 ', '1e2', '01', 'abc']) {
       const response = await GET(
-        request(ids.clinicA, `?limit=${encodeURIComponent(token)}`),
+        await request(ids.clinicA, `?limit=${encodeURIComponent(token)}`),
         context(ids.clinicA),
       );
 

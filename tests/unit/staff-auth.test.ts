@@ -58,6 +58,9 @@ afterEach(() => {
 });
 
 describe('signed staff session token structure', () => {
+  const issuingStore = {
+    query: async () => ({ rows: [{ user_id: 'synthetic-user' }] }),
+  };
   const clinicId = '00000000-0000-4000-8000-000000000001';
 
   function staffRequest(token: string): Request {
@@ -71,9 +74,10 @@ describe('signed staff session token structure', () => {
       'STAFF_SESSION_SECRET',
       'staff-auth-unit-test-only-signing-secret-0123456789',
     );
-    const token = createStaffSessionToken(
+    const token = await createStaffSessionToken(
       'synthetic-staff-subject',
       new Date(Date.now() + 60_000),
+      issuingStore as never,
     );
     expect(token.split('.')).toHaveLength(2);
     for (const malformed of [
@@ -93,9 +97,10 @@ describe('signed staff session token structure', () => {
       'STAFF_SESSION_SECRET',
       'staff-auth-unit-test-only-signing-secret-0123456789',
     );
-    const token = createStaffSessionToken(
+    const token = await createStaffSessionToken(
       'synthetic-staff-subject',
       new Date(Date.now() + 60_000),
+      issuingStore as never,
     );
     const [payload, signature] = token.split('.');
     expect(payload).toBeTruthy();
