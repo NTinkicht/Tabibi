@@ -99,8 +99,8 @@ function bookingInput(idempotencyKey = 'book-1') {
   };
 }
 
-function authCookie(authSubject: string) {
-  return `tabibi_staff_session=${createStaffSessionToken(
+async function authCookie(authSubject: string) {
+  return `tabibi_staff_session=${await createStaffSessionToken(
     authSubject,
     new Date(Date.now() + 60_000),
   )}`;
@@ -311,7 +311,7 @@ describe('appointment booking foundation', () => {
             origin: 'http://localhost',
             'content-type': 'application/json',
             'idempotency-key': 'book-forbidden',
-            cookie: authCookie('booking-reception-b'),
+            cookie: await authCookie('booking-reception-b'),
           },
           body: JSON.stringify({
             patientId: ids.patientA,

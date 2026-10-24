@@ -65,9 +65,9 @@ function routeKey(file: string): string {
 }
 
 function signedToken(sub: string, exp: number): string {
-  const payload = Buffer.from(JSON.stringify({ sub, exp })).toString(
-    'base64url',
-  );
+  const payload = Buffer.from(
+    JSON.stringify({ sub, sid: 'staff-boundary-session', exp }),
+  ).toString('base64url');
   const mac = createHmac('sha256', SECRET).update(payload).digest('base64url');
   return `${payload}.${mac}`;
 }

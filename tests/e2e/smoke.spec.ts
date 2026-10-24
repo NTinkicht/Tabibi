@@ -62,9 +62,10 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
   await page.context().addCookies([
     {
       name: 'tabibi_staff_session',
-      value: createStaffSessionToken(
+      value: await createStaffSessionToken(
         'browser-reception',
         new Date(Date.now() + 60_000),
+        pool,
       ),
       url: 'http://127.0.0.1:3000',
       httpOnly: true,

@@ -113,14 +113,14 @@ afterAll(async () => {
   await closePool();
 });
 
-function authCookie() {
-  return `tabibi_staff_session=${createStaffSessionToken(
+async function authCookie() {
+  return `tabibi_staff_session=${await createStaffSessionToken(
     authSubject,
     new Date(Date.now() + 60_000),
   )}`;
 }
 
-function request(
+async function request(
   clinicId: string,
   query = '',
   options: { authenticated?: boolean; origin?: string } = {},
@@ -128,7 +128,7 @@ function request(
   const authenticated = options.authenticated ?? true;
   const origin = options.origin ?? 'http://localhost';
   const headers = new Headers({ origin });
-  if (authenticated) headers.set('cookie', authCookie());
+  if (authenticated) headers.set('cookie', await authCookie());
   return new Request(
     `http://localhost/api/clinics/${clinicId}/notifications/dispatch${query}`,
     { method: 'POST', headers },
@@ -185,7 +185,7 @@ async function produce(
 describe('notification dispatch HTTP boundary', () => {
   it('rejects unauthenticated and cross-origin mutation attempts', async () => {
     const unauthenticated = await POST(
-      request(ids.clinicA, '', { authenticated: false }),
+      await request(ids.clinicA, '', { authenticated: false }),
       context(ids.clinicA),
     );
     expect(unauthenticated.status).toBe(401);
@@ -195,7 +195,7 @@ describe('notification dispatch HTTP boundary', () => {
     expect(unauthenticated.headers.get('cache-control')).toBe('no-store');
 
     const crossOrigin = await POST(
-      request(ids.clinicA, '', { origin: 'https://evil.example' }),
+      await request(ids.clinicA, '', { origin: 'https://evil.example' }),
       context(ids.clinicA),
     );
     expect(crossOrigin.status).toBe(403);
@@ -224,7 +224,10 @@ describe('notification dispatch HTTP boundary', () => {
       dispatch_attempt_count: 0,
     });
 
-    const response = await POST(request('not-a-uuid'), context('not-a-uuid'));
+    const response = await POST(
+      await request('not-a-uuid'),
+      context('not-a-uuid'),
+    );
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ error: 'invalid_request' });
@@ -255,7 +258,10 @@ describe('notification dispatch HTTP boundary', () => {
       'wu41-event-authorized',
     );
 
-    const response = await POST(request(ids.clinicA), context(ids.clinicA));
+    const response = await POST(
+      await request(ids.clinicA),
+      context(ids.clinicA),
+    );
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
@@ -302,7 +308,10 @@ describe('notification dispatch HTTP boundary', () => {
       'wu41-event-cross-clinic',
     );
 
-    const response = await POST(request(ids.clinicB), context(ids.clinicB));
+    const response = await POST(
+      await request(ids.clinicB),
+      context(ids.clinicB),
+    );
 
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ error: 'forbidden' });
@@ -332,7 +341,7 @@ describe('notification dispatch HTTP boundary', () => {
 
     for (const token of ['101', '1.5', '+2', ' 2 ', '1e2', '01', 'abc']) {
       const response = await POST(
-        request(ids.clinicA, `?limit=${encodeURIComponent(token)}`),
+        await request(ids.clinicA, `?limit=${encodeURIComponent(token)}`),
         context(ids.clinicA),
       );
 
@@ -353,7 +362,7 @@ describe('notification dispatch HTTP boundary', () => {
       'wu41-event-no-preference',
     );
 
-    const first = await POST(request(ids.clinicA), context(ids.clinicA));
+    const first = await POST(await request(ids.clinicA), context(ids.clinicA));
     expect(first.status).toBe(200);
     expect(await first.json()).toEqual({
       summary: {
@@ -372,7 +381,7 @@ describe('notification dispatch HTTP boundary', () => {
     );
     expect(state.rows[0]?.state).toBe('suppressed');
 
-    const second = await POST(request(ids.clinicA), context(ids.clinicA));
+    const second = await POST(await request(ids.clinicA), context(ids.clinicA));
     expect(second.status).toBe(200);
     expect(await second.json()).toEqual({
       summary: {

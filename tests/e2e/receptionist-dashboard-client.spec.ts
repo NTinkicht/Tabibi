@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
-import { createStaffSessionToken } from '@/platform/http/staff-auth';
+// Every staff API call in this spec is mocked with page.route, so the
+// session cookie is never verified and needs no server-side session row.
+const MOCKED_STAFF_SESSION = 'mocked-staff-session';
 
 const clinicId = '20000000-0000-4000-8000-000000000001';
 const sessionId = '20000000-0000-4000-8000-000000000002';
@@ -53,10 +55,7 @@ async function authenticate(page: Page) {
   await page.context().addCookies([
     {
       name: 'tabibi_staff_session',
-      value: createStaffSessionToken(
-        'browser-dashboard-reception',
-        new Date(Date.now() + 60_000),
-      ),
+      value: MOCKED_STAFF_SESSION,
       url: 'http://127.0.0.1:3000',
       httpOnly: true,
       sameSite: 'Strict',
