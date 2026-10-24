@@ -65,6 +65,47 @@ export class ScheduleCollisionError extends Error {
   }
 }
 
+// A clinic closure (holiday) cannot be added over a day that still has any
+// non-cancelled session in that clinic: those sessions may carry queue entries
+// and appointments, which must be resolved through the existing session
+// cancellation flow first. Fail closed instead of silently orphaning them.
+export class ClinicClosureConflictError extends Error {
+  constructor() {
+    super('Clinic closure day already has non-cancelled sessions');
+    this.name = 'ClinicClosureConflictError';
+  }
+}
+
+// Reject nonexistent calendar days before passing a date to PostgreSQL.
+// JavaScript Date and PostgreSQL otherwise have different normalization
+// and error paths for February 30 / non-leap February 29.
+function requireCalendarDay(value: string, name: string): void {
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T00:00:00.000Z`)
+    : null;
+  if (
+    !parsed ||
+    Number(value.slice(0, 4)) < 1 ||
+    !Number.isFinite(parsed.getTime()) ||
+    parsed.toISOString().slice(0, 10) !== value
+  )
+    throw new TypeError(`${name} must be a real YYYY-MM-DD calendar day`);
+}
+
+// Closure creation, session generation and manual session creation for one
+// clinic are serialized, so a closure and a new session can never both commit
+// for the same day.
+export async function lockClinicCalendar(
+  client: Queryable,
+  clinicId: string,
+): Promise<void> {
+  await client.query(
+    `SELECT pg_advisory_xact_lock(
+       hashtextextended('clinic-calendar:' || $1::uuid::text, 0))`,
+    [clinicId],
+  );
+}
+
 export class SchedulingService {
   constructor(private readonly pool: Pool) {}
 
@@ -156,22 +197,11 @@ export class SchedulingService {
     const daysAhead = input.daysAhead ?? 7;
     if (!Number.isInteger(daysAhead) || daysAhead < 7 || daysAhead > 366)
       throw new RangeError('daysAhead must be an integer from 7 through 366');
-    // Reject nonexistent calendar days before passing a date to PostgreSQL.
-    // JavaScript Date and PostgreSQL otherwise have different normalization
-    // and error paths for February 30 / non-leap February 29.
-    const parsedStart = /^\d{4}-\d{2}-\d{2}$/.test(input.startDate)
-      ? new Date(`${input.startDate}T00:00:00.000Z`)
-      : null;
-    if (
-      !parsedStart ||
-      Number(input.startDate.slice(0, 4)) < 1 ||
-      !Number.isFinite(parsedStart.getTime()) ||
-      parsedStart.toISOString().slice(0, 10) !== input.startDate
-    )
-      throw new TypeError('startDate must be a real YYYY-MM-DD calendar day');
+    requireCalendarDay(input.startDate, 'startDate');
 
     return inTransaction(this.pool, async (client) => {
       await requireScheduleWrite(client, scope, input.doctorId);
+      await lockClinicCalendar(client, scope.clinicId);
       const generated = await client.query<{ id: string }>(
         `INSERT INTO consultation_sessions
            (id, clinic_id, doctor_id, template_id, service_date,
@@ -194,6 +224,10 @@ export class SchedulingService {
            ) generated(day)
           WHERE t.clinic_id = $1 AND t.doctor_id = $2 AND t.active
             AND extract(dow FROM day::date)::smallint = t.weekday
+            AND NOT EXISTS (
+              SELECT 1 FROM clinic_closures closure
+               WHERE closure.clinic_id = t.clinic_id
+                 AND closure.closure_date = day::date)
          ON CONFLICT (clinic_id, doctor_id, service_date, template_id, template_occurrence)
            WHERE template_id IS NOT NULL DO NOTHING
          RETURNING id`,
@@ -211,6 +245,58 @@ export class SchedulingService {
         },
       });
       return generated.rowCount ?? 0;
+    });
+  }
+
+  async listClosures(scope: ClinicScope): Promise<string[]> {
+    await requireClinicRole(this.pool, scope, [
+      'doctor',
+      'receptionist',
+      'clinic_admin',
+    ]);
+    const result = await this.pool.query<{ closure_date: string }>(
+      `SELECT closure_date::text FROM clinic_closures
+        WHERE clinic_id = $1 ORDER BY closure_date`,
+      [scope.clinicId],
+    );
+    return result.rows.map((row) => row.closure_date);
+  }
+
+  async addClosure(
+    scope: ClinicScope,
+    closureDate: string,
+  ): Promise<{ closureDate: string; created: boolean }> {
+    requireCalendarDay(closureDate, 'closureDate');
+    return inTransaction(this.pool, async (client) => {
+      await requireClinicRole(client, scope, ['clinic_admin']);
+      await lockClinicCalendar(client, scope.clinicId);
+      const existing = await client.query(
+        `SELECT 1 FROM clinic_closures
+          WHERE clinic_id = $1 AND closure_date = $2::date`,
+        [scope.clinicId, closureDate],
+      );
+      if (existing.rowCount) return { closureDate, created: false };
+      const sessions = await client.query(
+        `SELECT 1 FROM consultation_sessions
+          WHERE clinic_id = $1 AND service_date = $2::date
+            AND status <> 'cancelled'
+          LIMIT 1`,
+        [scope.clinicId, closureDate],
+      );
+      if (sessions.rowCount) throw new ClinicClosureConflictError();
+      await client.query(
+        `INSERT INTO clinic_closures (clinic_id, closure_date)
+         VALUES ($1, $2::date)`,
+        [scope.clinicId, closureDate],
+      );
+      await appendAuditEvent(client, {
+        ...scope,
+        entityType: 'clinic',
+        entityId: scope.clinicId,
+        action: 'clinic_closure.created',
+        metadata: { closureDate },
+      });
+      return { closureDate, created: true };
     });
   }
 }

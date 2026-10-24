@@ -43,6 +43,7 @@ const committedMigrations = [
   '0034_doctor_global_active_consultation_guard.sql',
   '0035_audit_queue_reorder_session_index.sql',
   '0036_staff_sessions.sql',
+  '0037_clinic_closures.sql',
 ];
 
 beforeAll(async () => {
