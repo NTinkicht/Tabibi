@@ -27,6 +27,7 @@ const ids = {
   doctorId: '55555555-5555-4555-8555-555555555555',
   absenceDate: '2026-10-26',
   consultationTypeId: '66666666-6666-4666-8666-666666666666',
+  userId: '77777777-7777-4777-8777-777777777777',
 };
 const ROUTES_ROOT = join(__dirname, '..', '..', 'src', 'app', 'api', 'clinics');
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
@@ -44,8 +45,11 @@ const EXPECTED: Record<string, readonly Method[]> = {
   'closures/[closureDate]': ['DELETE'],
   'consultation-types': ['GET', 'POST'],
   'consultation-types/[consultationTypeId]': ['PATCH'],
+  doctors: ['GET'],
   'doctors/[doctorId]/absences': ['GET', 'POST'],
   'doctors/[doctorId]/absences/[absenceDate]': ['DELETE'],
+  memberships: ['GET'],
+  'memberships/[userId]': ['PATCH'],
   'notifications/dead-letters': ['GET'],
   'notifications/dispatch': ['POST'],
   'schedule-generations': ['POST'],
@@ -112,7 +116,8 @@ function url(key: string): string {
     .replace('[closureDate]', ids.closureDate)
     .replace('[doctorId]', ids.doctorId)
     .replace('[absenceDate]', ids.absenceDate)
-    .replace('[consultationTypeId]', ids.consultationTypeId);
+    .replace('[consultationTypeId]', ids.consultationTypeId)
+    .replace('[userId]', ids.userId);
   return `http://localhost/api/clinics/${ids.clinicId}/${path}?date=2026-10-24&limit=5`;
 }
 
@@ -183,8 +188,8 @@ describe('staff clinic route inventory', () => {
       );
     }
     expect(discovered).toEqual(EXPECTED);
-    expect(mutations).toHaveLength(20);
-    expect(reads).toHaveLength(9);
+    expect(mutations).toHaveLength(21);
+    expect(reads).toHaveLength(11);
   });
 });
 

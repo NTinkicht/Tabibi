@@ -81,3 +81,8 @@ export const includeInactiveSchema = z
   .enum(['true', 'false'])
   .nullable()
   .transform((value) => value === 'true');
+
+// TAB-P0-02 (#663): a staff role change. Only the three clinic roles exist.
+export const membershipRoleSchema = z
+  .object({ role: z.enum(['doctor', 'receptionist', 'clinic_admin']) })
+  .strict();
