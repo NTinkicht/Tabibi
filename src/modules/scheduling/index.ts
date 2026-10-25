@@ -137,16 +137,20 @@ export class ClinicClosureConflictError extends Error {
 // Reject nonexistent calendar days before passing a date to PostgreSQL.
 // JavaScript Date and PostgreSQL otherwise have different normalization
 // and error paths for February 30 / non-leap February 29.
-function requireCalendarDay(value: string, name: string): void {
+export function isCalendarDay(value: string): boolean {
   const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? new Date(`${value}T00:00:00.000Z`)
     : null;
-  if (
-    !parsed ||
-    Number(value.slice(0, 4)) < 1 ||
-    !Number.isFinite(parsed.getTime()) ||
-    parsed.toISOString().slice(0, 10) !== value
-  )
+  return (
+    !!parsed &&
+    Number(value.slice(0, 4)) >= 1 &&
+    Number.isFinite(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
+}
+
+function requireCalendarDay(value: string, name: string): void {
+  if (!isCalendarDay(value))
     throw new TypeError(`${name} must be a real YYYY-MM-DD calendar day`);
 }
 
