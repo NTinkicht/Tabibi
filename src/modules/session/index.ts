@@ -21,8 +21,10 @@ import {
   isValidDelayMinutes,
   MAX_DELAY_MINUTES,
   planDelayCommand,
+  SESSION_CANCELLATION_BLOCKING_QUEUE_STATES,
   SESSION_CANCELLATION_CASCADE_QUEUE_STATES,
   SESSION_COMMAND_TARGET,
+  sessionCancellationBlockedBy,
   type SessionCommand,
   sessionCommandRequiresDoctorLock,
   sessionCommandRequiresReason,
@@ -416,6 +418,30 @@ export class SessionService {
             throw new SessionConflictError(
               `Cannot transition session from ${current.status} to ${target} (${input.command})`,
             );
+          if (target === 'cancelled') {
+            // Under the session row lock: an active consultation blocks the
+            // whole-session cancellation before anything is written.
+            const blocking = await client.query<{ state: string }>(
+              `SELECT state::text AS state
+                 FROM queue_entries
+                WHERE clinic_id = $1 AND session_id = $2
+                  AND state = ANY($3::queue_entry_status[])
+                FOR UPDATE`,
+              [
+                scope.clinicId,
+                sessionId,
+                [...SESSION_CANCELLATION_BLOCKING_QUEUE_STATES],
+              ],
+            );
+            if (
+              sessionCancellationBlockedBy(
+                blocking.rows.map(({ state }) => state),
+              )
+            )
+              throw new SessionConflictError(
+                'Cannot cancel a session with an active consultation',
+              );
+          }
           try {
             const entriesCancelledBySession =
               target === 'cancelled'

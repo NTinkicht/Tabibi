@@ -9,10 +9,12 @@ import {
   isValidDelayMinutes,
   MAX_DELAY_MINUTES,
   planDelayCommand,
+  SESSION_CANCELLATION_BLOCKING_QUEUE_STATES,
   SESSION_CANCELLATION_CASCADE_QUEUE_STATES,
   SESSION_COMMANDS,
   SESSION_LIFECYCLE_CONTRACT_VERSION,
   SESSION_STATUSES,
+  sessionCancellationBlockedBy,
   type SessionCommand,
   sessionCommandRequiresDoctorLock,
   sessionCommandRequiresReason,
@@ -22,7 +24,7 @@ import * as sessionModule from '@/modules/session';
 
 describe('session lifecycle contract (TAB-P0-04)', () => {
   it('is versioned and re-exported by the session module', () => {
-    expect(SESSION_LIFECYCLE_CONTRACT_VERSION).toBe('session-lifecycle/v1');
+    expect(SESSION_LIFECYCLE_CONTRACT_VERSION).toBe('session-lifecycle/v2');
     expect(sessionModule.canTransitionSession).toBe(canTransitionSession);
     expect(sessionModule.MAX_DELAY_MINUTES).toBe(MAX_DELAY_MINUTES);
     expect(MAX_DELAY_MINUTES).toBe(720);
@@ -93,6 +95,40 @@ describe('session lifecycle contract (TAB-P0-04)', () => {
       'checked_in',
       'called',
     ]);
+  });
+
+  it('blocks whole-session cancellation only on an active consultation (v2)', () => {
+    expect([...SESSION_CANCELLATION_BLOCKING_QUEUE_STATES]).toEqual([
+      'in_consultation',
+    ]);
+    const queueStates = [
+      'waiting',
+      'checked_in',
+      'called',
+      'in_consultation',
+      'completed',
+      'cancelled',
+      'no_show',
+    ];
+    for (const state of queueStates)
+      expect([state, sessionCancellationBlockedBy([state])]).toEqual([
+        state,
+        state === 'in_consultation',
+      ]);
+    expect(sessionCancellationBlockedBy([])).toBe(false);
+    expect(
+      sessionCancellationBlockedBy(['waiting', 'completed', 'no_show']),
+    ).toBe(false);
+    expect(
+      sessionCancellationBlockedBy(['waiting', 'in_consultation', 'called']),
+    ).toBe(true);
+    // Blocking and cascading states never overlap.
+    for (const state of SESSION_CANCELLATION_BLOCKING_QUEUE_STATES)
+      expect(
+        (
+          SESSION_CANCELLATION_CASCADE_QUEUE_STATES as readonly string[]
+        ).includes(state),
+      ).toBe(false);
   });
 
   it('validates delay minutes as whole numbers in 1..720 except for clear', () => {
