@@ -11,12 +11,14 @@ import {
   planDelayCommand,
   SESSION_CANCELLATION_BLOCKING_QUEUE_STATES,
   SESSION_CANCELLATION_CASCADE_QUEUE_STATES,
+  SESSION_CLOSE_BLOCKING_QUEUE_STATES,
   SESSION_COMMAND_SOURCES,
   SESSION_COMMAND_TARGET,
   SESSION_COMMANDS,
   SESSION_LIFECYCLE_CONTRACT_VERSION,
   SESSION_STATUSES,
   sessionCancellationBlockedBy,
+  sessionCloseBlockedBy,
   type SessionCommand,
   sessionCommandRequiresDoctorLock,
   sessionCommandRequiresReason,
@@ -26,7 +28,7 @@ import * as sessionModule from '@/modules/session';
 
 describe('session lifecycle contract (TAB-P0-04)', () => {
   it('is versioned and re-exported by the session module', () => {
-    expect(SESSION_LIFECYCLE_CONTRACT_VERSION).toBe('session-lifecycle/v3');
+    expect(SESSION_LIFECYCLE_CONTRACT_VERSION).toBe('session-lifecycle/v4');
     expect(sessionModule.canTransitionSession).toBe(canTransitionSession);
     expect(sessionModule.MAX_DELAY_MINUTES).toBe(MAX_DELAY_MINUTES);
     expect(MAX_DELAY_MINUTES).toBe(720);
@@ -148,6 +150,37 @@ describe('session lifecycle contract (TAB-P0-04)', () => {
           SESSION_CANCELLATION_CASCADE_QUEUE_STATES as readonly string[]
         ).includes(state),
       ).toBe(false);
+  });
+
+  it('blocks closing while any non-terminal queue entry remains (v4)', () => {
+    expect([...SESSION_CLOSE_BLOCKING_QUEUE_STATES]).toEqual([
+      'waiting',
+      'checked_in',
+      'called',
+      'in_consultation',
+    ]);
+    const vectors: [string, boolean][] = [
+      ['waiting', true],
+      ['checked_in', true],
+      ['called', true],
+      ['in_consultation', true],
+      ['completed', false],
+      ['cancelled', false],
+      ['no_show', false],
+    ];
+    for (const [state, blocked] of vectors)
+      expect([state, sessionCloseBlockedBy([state])]).toEqual([state, blocked]);
+    expect(sessionCloseBlockedBy([])).toBe(false);
+    expect(sessionCloseBlockedBy(['completed', 'cancelled', 'no_show'])).toBe(
+      false,
+    );
+    expect(sessionCloseBlockedBy(['completed', 'waiting'])).toBe(true);
+    // Every state that blocks or is cascaded by cancellation also blocks close.
+    for (const state of [
+      ...SESSION_CANCELLATION_BLOCKING_QUEUE_STATES,
+      ...SESSION_CANCELLATION_CASCADE_QUEUE_STATES,
+    ])
+      expect(sessionCloseBlockedBy([state])).toBe(true);
   });
 
   it('validates delay minutes as whole numbers in 1..720 except for clear', () => {

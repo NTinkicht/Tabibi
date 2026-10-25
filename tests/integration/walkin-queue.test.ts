@@ -8,7 +8,7 @@ import {
   QueueConflictError,
   QueueService,
 } from '@/modules/queue';
-import { SessionService } from '@/modules/session';
+import { SessionConflictError, SessionService } from '@/modules/session';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 16 });
 
@@ -406,6 +406,115 @@ describe('walk-in registration foundation', () => {
     expect(entries.rows.every((entry) => entry.state === 'cancelled')).toBe(
       true,
     );
+  });
+  it('refuses closing while active queue entries remain, writes nothing, then closes once they are resolved', async () => {
+    const queue = new QueueService(pool);
+    const sessions = new SessionService(pool);
+    const served = (
+      await queue.registerWalkIn(
+        scopeA,
+        ids.session,
+        input('served', 'close-1'),
+      )
+    ).entry.id;
+    const left = (
+      await queue.registerWalkIn(scopeA, ids.session, input('left', 'close-2'))
+    ).entry.id;
+    await pool.query(
+      `UPDATE consultation_sessions SET status = 'open' WHERE id = $1`,
+      [ids.session],
+    );
+    const step = (
+      entry: string,
+      command:
+        | 'check_in'
+        | 'call'
+        | 'start_consultation'
+        | 'complete_consultation',
+    ) =>
+      queue.command(scopeA, ids.session, entry, {
+        command,
+        idempotencyKey: `close-active-${command}-${entry}`,
+        correlationId: `close-active-${command}`,
+      });
+    await step(served, 'check_in');
+    await step(served, 'call');
+    await step(served, 'start_consultation');
+
+    const snapshot = async () => {
+      const session = await pool.query<{
+        status: string;
+        closed_at: Date | null;
+      }>(`SELECT status, closed_at FROM consultation_sessions WHERE id = $1`, [
+        ids.session,
+      ]);
+      const entries = await pool.query<{ id: string; state: string }>(
+        `SELECT id, state FROM queue_entries WHERE session_id = $1 ORDER BY registration_order`,
+        [ids.session],
+      );
+      const audits = await pool.query<{ count: string }>(
+        `SELECT count(*) FROM audit_events WHERE action = 'consultation_session.close'`,
+      );
+      const receipts = await pool.query<{ count: string }>(
+        `SELECT count(*) FROM session_command_receipts WHERE idempotency_key = 'close-with-active-entries'`,
+      );
+      return {
+        session: session.rows[0],
+        entries: entries.rows,
+        closeAudits: audits.rows[0]!.count,
+        receipts: receipts.rows[0]!.count,
+      };
+    };
+    const close = () =>
+      sessions.command(scopeA, ids.session, {
+        command: 'close',
+        idempotencyKey: 'close-with-active-entries',
+        correlationId: 'close-with-active-entries',
+      });
+    const refused = async () => {
+      const error = await close().then(
+        () => null,
+        (caught: unknown) => caught,
+      );
+      expect(error).toBeInstanceOf(SessionConflictError);
+      expect((error as Error).message).toBe(
+        'Cannot close a session while active queue entries remain',
+      );
+    };
+
+    const before = await snapshot();
+    expect(before.session!.status).toBe('open');
+    expect(before.entries.map((entry) => entry.state)).toEqual([
+      'in_consultation',
+      'waiting',
+    ]);
+    expect(before.closeAudits).toBe('0');
+    await refused();
+    expect(await snapshot()).toEqual(before);
+    // No receipt was stored: the same key is refused again, not replayed.
+    await refused();
+    expect(await snapshot()).toEqual(before);
+
+    // Completing the consultation is not enough while a waiting entry remains.
+    await step(served, 'complete_consultation');
+    await refused();
+
+    await queue.command(scopeA, ids.session, left, {
+      command: 'cancel',
+      reason: 'Patient left before consultation',
+      cancellationSource: 'patient',
+      idempotencyKey: 'close-active-cancel-left',
+      correlationId: 'close-active-cancel-left',
+    });
+    const closed = await close();
+    expect(closed.status).toBe('closed');
+    const after = await snapshot();
+    expect(after.entries.map((entry) => entry.state)).toEqual([
+      'completed',
+      'cancelled',
+    ]);
+    expect(after.closeAudits).toBe('1');
+    expect(after.receipts).toBe('1');
   });
   it('refuses session cancellation while a consultation is active and writes nothing', async () => {
     const queue = new QueueService(pool);
