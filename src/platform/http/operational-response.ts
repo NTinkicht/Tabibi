@@ -2,6 +2,12 @@ import {
   AppointmentConflictError,
   AppointmentValidationError,
 } from '@/modules/appointment';
+import {
+  DoctorMembershipRequiresAssociationError,
+  LastClinicAdminError,
+  MembershipNotFoundError,
+  MembershipUserNotFoundError,
+} from '@/modules/clinic';
 import { AuthorizationError } from '@/modules/identity';
 import { QueueConflictError, QueueValidationError } from '@/modules/queue';
 import { ReceptionistDashboardNotFoundError } from '@/modules/receptionist-dashboard';
@@ -58,7 +64,9 @@ export async function operationalJson(
     } else if (
       error instanceof ReceptionistDashboardNotFoundError ||
       error instanceof ScheduleTemplateNotFoundError ||
-      error instanceof ConsultationTypeNotFoundError
+      error instanceof ConsultationTypeNotFoundError ||
+      error instanceof MembershipNotFoundError ||
+      error instanceof MembershipUserNotFoundError
     ) {
       status = 404;
       code = 'not_found';
@@ -80,6 +88,8 @@ export async function operationalJson(
       error instanceof ClinicClosureConflictError ||
       error instanceof DoctorAbsenceConflictError ||
       error instanceof ConsultationTypeConflictError ||
+      error instanceof LastClinicAdminError ||
+      error instanceof DoctorMembershipRequiresAssociationError ||
       isPostgresCheckConflict(error)
     ) {
       status = 409;
