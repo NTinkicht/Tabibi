@@ -9,7 +9,7 @@ import { AppointmentBulkNoShowService } from '@/modules/appointment/bulk-no-show
 import { AppointmentLifecycleService } from '@/modules/appointment/lifecycle';
 import { QueueService } from '@/modules/queue';
 import { ReceptionistDashboardService } from '@/modules/receptionist-dashboard';
-import { SessionService } from '@/modules/session';
+import { SessionConflictError, SessionService } from '@/modules/session';
 import { migrate } from '../../scripts/db/lib';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -379,7 +379,7 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
         idempotencyKey: 'wu175-close-with-active-entries',
         correlationId: 'wu175-close-with-active-entries',
       }),
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(SessionConflictError);
 
     const input = bulkInput(
       'wu175-day',
@@ -433,7 +433,7 @@ describe('WU171 explicit bulk absence, real PostgreSQL', () => {
         idempotencyKey: 'wu175-close-still-blocked',
         correlationId: 'wu175-close-still-blocked',
       }),
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(SessionConflictError);
 
     await new AppointmentLifecycleService(pool).command(
       scope,

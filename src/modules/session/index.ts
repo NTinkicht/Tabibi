@@ -23,8 +23,10 @@ import {
   planDelayCommand,
   SESSION_CANCELLATION_BLOCKING_QUEUE_STATES,
   SESSION_CANCELLATION_CASCADE_QUEUE_STATES,
+  SESSION_CLOSE_BLOCKING_QUEUE_STATES,
   SESSION_COMMAND_TARGET,
   sessionCancellationBlockedBy,
+  sessionCloseBlockedBy,
   type SessionCommand,
   sessionCommandRequiresDoctorLock,
   sessionCommandRequiresReason,
@@ -418,6 +420,27 @@ export class SessionService {
             throw new SessionConflictError(
               `Cannot transition session from ${current.status} to ${target} (${input.command})`,
             );
+          if (target === 'closed') {
+            // Under the session row lock: every active queue entry must be
+            // resolved before closing; refuse before anything is written
+            // (the database trigger remains the final guard).
+            const blocking = await client.query<{ state: string }>(
+              `SELECT state::text AS state
+                 FROM queue_entries
+                WHERE clinic_id = $1 AND session_id = $2
+                  AND state = ANY($3::queue_entry_status[])
+                FOR UPDATE`,
+              [
+                scope.clinicId,
+                sessionId,
+                [...SESSION_CLOSE_BLOCKING_QUEUE_STATES],
+              ],
+            );
+            if (sessionCloseBlockedBy(blocking.rows.map(({ state }) => state)))
+              throw new SessionConflictError(
+                'Cannot close a session while active queue entries remain',
+              );
+          }
           if (target === 'cancelled') {
             // Under the session row lock: an active consultation blocks the
             // whole-session cancellation before anything is written.
