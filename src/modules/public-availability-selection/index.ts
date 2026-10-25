@@ -72,7 +72,17 @@ export class PublicAvailabilitySelectionService {
   async issue(input: AvailabilitySelectionInput): Promise<string | null> {
     const current = await this.loadCurrent(input, this.pool);
     if (current === null) return null;
+    return this.seal(input);
+  }
 
+  /**
+   * Seal a clinic/doctor/session window the caller has just read from durable
+   * truth (for example a public read model) without re-querying it.
+   *
+   * Sealing is not authorization: every resolution still re-checks the full
+   * current durable state, so a stale or forged tuple fails closed there.
+   */
+  seal(input: AvailabilitySelectionInput): string {
     const now = this.clock().getTime();
     const claims: SelectionClaims = {
       version: 1,
