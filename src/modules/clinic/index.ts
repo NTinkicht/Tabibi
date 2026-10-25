@@ -161,6 +161,19 @@ export class MembershipUserNotFoundError extends Error {
   }
 }
 
+// setMembership with existingMemberOnly: the user is not a member of this
+// clinic (unknown, malformed or only a member elsewhere). Same error for all
+// of them, so the staff route is not a cross-clinic membership oracle.
+export class MembershipNotFoundError extends Error {
+  constructor() {
+    super('Membership not found');
+    this.name = 'MembershipNotFoundError';
+  }
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export class ClinicService {
   constructor(private readonly pool: Pool) {}
 
@@ -271,9 +284,13 @@ export class ClinicService {
     scope: ClinicScope,
     userId: string,
     role: ClinicRole,
+    options: { existingMemberOnly?: boolean } = {},
   ): Promise<void> {
     return inTransaction(this.pool, async (client) => {
       await requireClinicRole(client, scope, ['clinic_admin']);
+      if (options.existingMemberOnly && !UUID_PATTERN.test(userId)) {
+        throw new MembershipNotFoundError();
+      }
       await client.query('SELECT 1 FROM clinics WHERE id = $1 FOR UPDATE', [
         scope.clinicId,
       ]);
@@ -281,13 +298,22 @@ export class ClinicService {
       const user = await client.query('SELECT 1 FROM users WHERE id = $1', [
         userId,
       ]);
-      if (user.rowCount !== 1) throw new MembershipUserNotFoundError();
+      if (user.rowCount !== 1) {
+        throw options.existingMemberOnly
+          ? new MembershipNotFoundError()
+          : new MembershipUserNotFoundError();
+      }
       const current = await client.query<{ role: ClinicRole }>(
         `SELECT role FROM clinic_memberships
           WHERE clinic_id = $1 AND user_id = $2`,
         [scope.clinicId, userId],
       );
       const currentRole = current.rows[0]?.role;
+      // Checked under the clinic lock (#663): a role change over HTTP never
+      // adds a new member; inviting staff is a separate workflow.
+      if (options.existingMemberOnly && !currentRole) {
+        throw new MembershipNotFoundError();
+      }
       if (currentRole === role) return;
       if (currentRole === 'clinic_admin') {
         const otherAdmins = await client.query(
