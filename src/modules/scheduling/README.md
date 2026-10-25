@@ -45,6 +45,20 @@ with `ConsultationTypeNotFoundError`. Each real change writes one audit event
 the id, code and duration, never the label. Templates, sessions, bookings and
 ETA do not reference consultation types yet.
 
+A doctor absence day (TAB-P0-02, #655) marks one clinic-local day on which one
+associated doctor is unavailable in one clinic. `SchedulingService`
+`addDoctorAbsence` / `removeDoctorAbsence` are allowed to that clinic's
+`clinic_admin` and to the doctor themselves; a doctor who is not associated with
+the clinic is denied with `AuthorizationError`. Generation skips that doctor's
+absence days in that clinic only, and manual session creation on such a day
+fails with `SessionConflictError`. Adding an absence takes the clinic calendar
+lock and fails with `DoctorAbsenceConflictError` while that doctor still has a
+non-cancelled session in the clinic on that day. Re-adding or removing a day
+that is not an absence is a no-op; each real change writes one
+`doctor_absence.created` / `doctor_absence.removed` audit event with only the
+doctor id and date. Absences store no reason and are removed with the
+doctor-clinic association.
+
 Staff HTTP routes (TAB-P0-02, #657) expose this service under
 `/api/clinics/{clinicId}/`: `schedule-templates` (GET `?doctorId=`, POST),
 `schedule-templates/{templateId}` (PATCH `{ active }`), `schedule-generations`

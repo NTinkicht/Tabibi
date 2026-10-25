@@ -148,6 +148,22 @@ async function activeTemplateOverlaps(
   return (result.rowCount ?? 0) > 0;
 }
 
+// The doctor must be associated with this clinic. A clinic admin passes
+// requireScheduleWrite for any doctor id, so without this check another
+// clinic's doctor would surface as a raw foreign-key error.
+async function requireClinicDoctor(
+  db: Queryable,
+  clinicId: string,
+  doctorId: string,
+): Promise<void> {
+  if (!UUID_TEXT.test(doctorId)) throw new AuthorizationError();
+  const result = await db.query(
+    'SELECT 1 FROM doctor_clinics WHERE clinic_id = $1 AND doctor_id = $2',
+    [clinicId, doctorId],
+  );
+  if (result.rowCount !== 1) throw new AuthorizationError();
+}
+
 // A clinic closure (holiday) cannot be added over a day that still has any
 // non-cancelled session in that clinic: those sessions may carry queue entries
 // and appointments, which must be resolved through the existing session
@@ -156,6 +172,17 @@ export class ClinicClosureConflictError extends Error {
   constructor() {
     super('Clinic closure day already has non-cancelled sessions');
     this.name = 'ClinicClosureConflictError';
+  }
+}
+
+// TAB-P0-02 (#655): a doctor absence day cannot be added while that doctor
+// still has a non-cancelled session in this clinic on that day. Such sessions
+// may carry queue entries and appointments, which must be resolved through the
+// existing session cancellation flow first.
+export class DoctorAbsenceConflictError extends Error {
+  constructor() {
+    super('Doctor already has non-cancelled sessions on this absence day');
+    this.name = 'DoctorAbsenceConflictError';
   }
 }
 
@@ -403,6 +430,11 @@ export class SchedulingService {
                 SELECT 1 FROM clinic_closures closure
                  WHERE closure.clinic_id = t.clinic_id
                    AND closure.closure_date = day::date)
+              AND NOT EXISTS (
+                SELECT 1 FROM doctor_absences absence
+                 WHERE absence.clinic_id = t.clinic_id
+                   AND absence.doctor_id = t.doctor_id
+                   AND absence.absence_date = day::date)
          ), checked AS (
            SELECT candidate.*, EXISTS (
                     SELECT 1 FROM consultation_sessions existing
@@ -542,6 +574,103 @@ export class SchedulingService {
         metadata: { closureDate },
       });
       return { closureDate, removed: true };
+    });
+  }
+
+  async listDoctorAbsences(
+    scope: ClinicScope,
+    doctorId: string,
+  ): Promise<string[]> {
+    await requireClinicRole(this.pool, scope, [
+      'doctor',
+      'receptionist',
+      'clinic_admin',
+    ]);
+    // Same doctor check as add/remove: a malformed, unknown or other-clinic
+    // doctor id is AuthorizationError, never a database error or an empty list.
+    await requireClinicDoctor(this.pool, scope.clinicId, doctorId);
+    const result = await this.pool.query<{ absence_date: string }>(
+      `SELECT absence_date::text FROM doctor_absences
+        WHERE clinic_id = $1 AND doctor_id = $2 ORDER BY absence_date`,
+      [scope.clinicId, doctorId],
+    );
+    return result.rows.map((row) => row.absence_date);
+  }
+
+  /**
+   * Marks one clinic-local day on which an associated doctor is unavailable in
+   * this clinic (#655). Generation then plans nothing for that doctor on that
+   * day and manual session creation is rejected. Other doctors and other
+   * clinics are unaffected. Re-adding an existing absence is a no-op.
+   */
+  async addDoctorAbsence(
+    scope: ClinicScope,
+    input: { doctorId: string; absenceDate: string },
+  ): Promise<{ doctorId: string; absenceDate: string; created: boolean }> {
+    requireCalendarDay(input.absenceDate, 'absenceDate');
+    return inTransaction(this.pool, async (client) => {
+      await requireScheduleWrite(client, scope, input.doctorId);
+      await requireClinicDoctor(client, scope.clinicId, input.doctorId);
+      await lockClinicCalendar(client, scope.clinicId);
+      const { doctorId, absenceDate } = input;
+      const existing = await client.query(
+        `SELECT 1 FROM doctor_absences
+          WHERE clinic_id = $1 AND doctor_id = $2 AND absence_date = $3::date`,
+        [scope.clinicId, doctorId, absenceDate],
+      );
+      if (existing.rowCount) return { doctorId, absenceDate, created: false };
+      const sessions = await client.query(
+        `SELECT 1 FROM consultation_sessions
+          WHERE clinic_id = $1 AND doctor_id = $2 AND service_date = $3::date
+            AND status <> 'cancelled'
+          LIMIT 1`,
+        [scope.clinicId, doctorId, absenceDate],
+      );
+      if (sessions.rowCount) throw new DoctorAbsenceConflictError();
+      await client.query(
+        `INSERT INTO doctor_absences (clinic_id, doctor_id, absence_date)
+         VALUES ($1, $2, $3::date)`,
+        [scope.clinicId, doctorId, absenceDate],
+      );
+      await appendAuditEvent(client, {
+        ...scope,
+        entityType: 'doctor',
+        entityId: doctorId,
+        action: 'doctor_absence.created',
+        metadata: { doctorId, absenceDate },
+      });
+      return { doctorId, absenceDate, created: true };
+    });
+  }
+
+  /**
+   * Removes a doctor absence day so it can be planned again (#655). Removing a
+   * day that is not an absence is a no-op. Sessions are not regenerated here.
+   */
+  async removeDoctorAbsence(
+    scope: ClinicScope,
+    input: { doctorId: string; absenceDate: string },
+  ): Promise<{ doctorId: string; absenceDate: string; removed: boolean }> {
+    requireCalendarDay(input.absenceDate, 'absenceDate');
+    return inTransaction(this.pool, async (client) => {
+      await requireScheduleWrite(client, scope, input.doctorId);
+      await requireClinicDoctor(client, scope.clinicId, input.doctorId);
+      await lockClinicCalendar(client, scope.clinicId);
+      const { doctorId, absenceDate } = input;
+      const deleted = await client.query(
+        `DELETE FROM doctor_absences
+          WHERE clinic_id = $1 AND doctor_id = $2 AND absence_date = $3::date`,
+        [scope.clinicId, doctorId, absenceDate],
+      );
+      if (!deleted.rowCount) return { doctorId, absenceDate, removed: false };
+      await appendAuditEvent(client, {
+        ...scope,
+        entityType: 'doctor',
+        entityId: doctorId,
+        action: 'doctor_absence.removed',
+        metadata: { doctorId, absenceDate },
+      });
+      return { doctorId, absenceDate, removed: true };
     });
   }
 }

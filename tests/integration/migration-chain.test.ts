@@ -45,6 +45,7 @@ const committedMigrations = [
   '0036_staff_sessions.sql',
   '0037_clinic_closures.sql',
   '0038_consultation_types.sql',
+  '0039_doctor_absences.sql',
 ];
 
 beforeAll(async () => {
