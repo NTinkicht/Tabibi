@@ -586,6 +586,9 @@ export class SchedulingService {
       'receptionist',
       'clinic_admin',
     ]);
+    // Same doctor check as add/remove: a malformed, unknown or other-clinic
+    // doctor id is AuthorizationError, never a database error or an empty list.
+    await requireClinicDoctor(this.pool, scope.clinicId, doctorId);
     const result = await this.pool.query<{ absence_date: string }>(
       `SELECT absence_date::text FROM doctor_absences
         WHERE clinic_id = $1 AND doctor_id = $2 ORDER BY absence_date`,

@@ -410,6 +410,11 @@ describe('doctor absence days', () => {
         ids.doctor,
       ),
     ).rejects.toBeInstanceOf(AuthorizationError);
+    for (const doctorId of [ids.stranger, randomUUID(), 'not-a-uuid']) {
+      await expect(
+        schedules.listDoctorAbsences(scope, doctorId),
+      ).rejects.toBeInstanceOf(AuthorizationError);
+    }
   });
 
   it('drops the absences when the doctor leaves the clinic', async () => {
