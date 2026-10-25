@@ -74,6 +74,31 @@ export class ScheduleTemplateNotFoundError extends Error {
   }
 }
 
+// The doctor already has a template (active or not) with this weekday and
+// occurrence index in this clinic: the table's UNIQUE (clinic_id, doctor_id,
+// weekday, occurrence_index) key, which generation uses for stable occurrence
+// ids. Reported as a conflict instead of a raw unique violation (#657).
+export class ScheduleTemplateOccurrenceConflictError extends Error {
+  constructor() {
+    super(
+      'Doctor already has a template with this weekday and occurrence index',
+    );
+    this.name = 'ScheduleTemplateOccurrenceConflictError';
+  }
+}
+
+function isTemplateOccurrenceUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === '23505' &&
+    'constraint' in error &&
+    error.constraint ===
+      'schedule_templates_clinic_id_doctor_id_weekday_occurrence_i_key'
+  );
+}
+
 const UUID_TEXT =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -164,16 +189,20 @@ export class DoctorAbsenceConflictError extends Error {
 // Reject nonexistent calendar days before passing a date to PostgreSQL.
 // JavaScript Date and PostgreSQL otherwise have different normalization
 // and error paths for February 30 / non-leap February 29.
-function requireCalendarDay(value: string, name: string): void {
+export function isCalendarDay(value: string): boolean {
   const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? new Date(`${value}T00:00:00.000Z`)
     : null;
-  if (
-    !parsed ||
-    Number(value.slice(0, 4)) < 1 ||
-    !Number.isFinite(parsed.getTime()) ||
-    parsed.toISOString().slice(0, 10) !== value
-  )
+  return (
+    !!parsed &&
+    Number(value.slice(0, 4)) >= 1 &&
+    Number.isFinite(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
+}
+
+function requireCalendarDay(value: string, name: string): void {
+  if (!isCalendarDay(value))
     throw new TypeError(`${name} must be a real YYYY-MM-DD calendar day`);
 }
 
@@ -255,23 +284,29 @@ export class SchedulingService {
           throw new ScheduleCollisionError();
       }
       const id = randomUUID();
-      const result = await client.query<TemplateRow>(
-        `INSERT INTO schedule_templates
-           (id, clinic_id, doctor_id, weekday, local_start_time, local_end_time, occurrence_index, active)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING id, clinic_id, doctor_id, weekday, local_start_time::text,
-                   local_end_time::text, occurrence_index, active`,
-        [
-          id,
-          scope.clinicId,
-          input.doctorId,
-          input.weekday,
-          input.localStartTime,
-          input.localEndTime,
-          input.occurrenceIndex,
-          active,
-        ],
-      );
+      const result = await client
+        .query<TemplateRow>(
+          `INSERT INTO schedule_templates
+             (id, clinic_id, doctor_id, weekday, local_start_time, local_end_time, occurrence_index, active)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           RETURNING id, clinic_id, doctor_id, weekday, local_start_time::text,
+                     local_end_time::text, occurrence_index, active`,
+          [
+            id,
+            scope.clinicId,
+            input.doctorId,
+            input.weekday,
+            input.localStartTime,
+            input.localEndTime,
+            input.occurrenceIndex,
+            active,
+          ],
+        )
+        .catch((error: unknown) => {
+          if (isTemplateOccurrenceUniqueViolation(error))
+            throw new ScheduleTemplateOccurrenceConflictError();
+          throw error;
+        });
       await appendAuditEvent(client, {
         ...scope,
         entityType: 'schedule_template',

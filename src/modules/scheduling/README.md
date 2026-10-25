@@ -58,3 +58,13 @@ that is not an absence is a no-op; each real change writes one
 `doctor_absence.created` / `doctor_absence.removed` audit event with only the
 doctor id and date. Absences store no reason and are removed with the
 doctor-clinic association.
+
+Staff HTTP routes (TAB-P0-02, #657) expose this service under
+`/api/clinics/{clinicId}/`: `schedule-templates` (GET `?doctorId=`, POST),
+`schedule-templates/{templateId}` (PATCH `{ active }`), `schedule-generations`
+(POST `{ doctorId, startDate, daysAhead? }`), `closures` (GET, POST
+`{ closureDate }`) and `closures/{closureDate}` (DELETE). Mutations require a
+same-origin request; all routes require a valid staff session before any
+database access. Authorization is the service's, unchanged. Malformed input is
+400 `invalid_request`, overlaps and closure conflicts are 409 `conflict`, and an
+unknown, malformed or other-clinic template id is the same 404 `not_found`.
