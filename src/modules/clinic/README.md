@@ -6,7 +6,8 @@ server-side membership checks inside the same transaction as every mutation and
 writes metadata-only audit events.
 `updateClinic` accepts only a timezone that is a name in PostgreSQL's
 `pg_timezone_names` (for example `Europe/Paris`); anything else is rejected with
-`InvalidClinicTimezoneError` before any write.
+`InvalidClinicTimezoneError` before any write. Every field of `updateClinic`,
+including `name`, is optional; an omitted field keeps its stored value.
 `setMembership` (clinic admins only) serializes role changes per clinic by locking
 the clinic row and re-checking the actor's admin role under that lock. It rejects
 removing a clinic's last `clinic_admin` (`LastClinicAdminError`), accepts the

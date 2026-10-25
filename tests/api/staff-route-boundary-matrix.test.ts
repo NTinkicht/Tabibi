@@ -40,6 +40,7 @@ type Handler = (
 // Deliberate inventory: a new staff route (or a new method on an existing
 // one) must be added here, which pulls it into the boundary matrix below.
 const EXPECTED: Record<string, readonly Method[]> = {
+  '': ['GET', 'PATCH'],
   closures: ['GET', 'POST'],
   'closures/[closureDate]': ['DELETE'],
   'consultation-types': ['GET', 'POST'],
@@ -187,8 +188,8 @@ describe('staff clinic route inventory', () => {
       );
     }
     expect(discovered).toEqual(EXPECTED);
-    expect(mutations).toHaveLength(20);
-    expect(reads).toHaveLength(10);
+    expect(mutations).toHaveLength(21);
+    expect(reads).toHaveLength(11);
   });
 });
 

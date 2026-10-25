@@ -4,6 +4,7 @@ import {
 } from '@/modules/appointment';
 import {
   DoctorMembershipRequiresAssociationError,
+  InvalidClinicTimezoneError,
   LastClinicAdminError,
   MembershipNotFoundError,
   MembershipUserNotFoundError,
@@ -74,6 +75,7 @@ export async function operationalJson(
       error instanceof AppointmentValidationError ||
       error instanceof SessionValidationError ||
       error instanceof QueueValidationError ||
+      error instanceof InvalidClinicTimezoneError ||
       error instanceof ZodError ||
       error instanceof SyntaxError
     ) {
