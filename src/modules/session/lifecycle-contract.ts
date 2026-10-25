@@ -6,7 +6,7 @@
  * behaviour change and must bump SESSION_LIFECYCLE_CONTRACT_VERSION.
  */
 
-export const SESSION_LIFECYCLE_CONTRACT_VERSION = 'session-lifecycle/v3';
+export const SESSION_LIFECYCLE_CONTRACT_VERSION = 'session-lifecycle/v4';
 
 export const SESSION_STATUSES = [
   'planned',
@@ -55,6 +55,21 @@ export const SESSION_COMMAND_TARGET: Readonly<
   cancel: 'cancelled',
 };
 
+/**
+ * Statuses each command may be issued from. Two commands target `open`, so
+ * the target alone cannot tell them apart: `open` starts a planned session
+ * and `resume` restarts a paused one; neither stands in for the other.
+ */
+export const SESSION_COMMAND_SOURCES: Readonly<
+  Record<SessionCommand, readonly SessionStatus[]>
+> = {
+  open: ['planned'],
+  pause: ['open'],
+  resume: ['paused'],
+  close: ['open', 'paused'],
+  cancel: ['planned', 'open', 'paused'],
+};
+
 /** Queue-entry states cancelled together with their session. */
 export const SESSION_CANCELLATION_CASCADE_QUEUE_STATES = [
   'waiting',
@@ -85,7 +100,7 @@ export function sessionCancellationBlockedBy(
  * Queue-entry states that block closing a session: every non-terminal entry
  * must be resolved first (served, cancelled, or no-show via the TAB-P0-07
  * close-time resolution). Mirrors the database guard
- * enforce_session_queue_terminal_transition(). v3 added this precondition.
+ * enforce_session_queue_terminal_transition(). v4 added this precondition.
  */
 export const SESSION_CLOSE_BLOCKING_QUEUE_STATES = [
   'waiting',
@@ -118,7 +133,10 @@ export function applySessionCommand(
   from: SessionStatus,
 ): SessionStatus | null {
   const target = SESSION_COMMAND_TARGET[command];
-  return canTransitionSession(from, target) ? target : null;
+  return SESSION_COMMAND_SOURCES[command].includes(from) &&
+    canTransitionSession(from, target)
+    ? target
+    : null;
 }
 
 export function sessionCommandRequiresReason(command: SessionCommand): boolean {

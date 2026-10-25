@@ -12,6 +12,8 @@ import {
   SESSION_CANCELLATION_BLOCKING_QUEUE_STATES,
   SESSION_CANCELLATION_CASCADE_QUEUE_STATES,
   SESSION_CLOSE_BLOCKING_QUEUE_STATES,
+  SESSION_COMMAND_SOURCES,
+  SESSION_COMMAND_TARGET,
   SESSION_COMMANDS,
   SESSION_LIFECYCLE_CONTRACT_VERSION,
   SESSION_STATUSES,
@@ -26,7 +28,7 @@ import * as sessionModule from '@/modules/session';
 
 describe('session lifecycle contract (TAB-P0-04)', () => {
   it('is versioned and re-exported by the session module', () => {
-    expect(SESSION_LIFECYCLE_CONTRACT_VERSION).toBe('session-lifecycle/v3');
+    expect(SESSION_LIFECYCLE_CONTRACT_VERSION).toBe('session-lifecycle/v4');
     expect(sessionModule.canTransitionSession).toBe(canTransitionSession);
     expect(sessionModule.MAX_DELAY_MINUTES).toBe(MAX_DELAY_MINUTES);
     expect(MAX_DELAY_MINUTES).toBe(720);
@@ -63,9 +65,9 @@ describe('session lifecycle contract (TAB-P0-04)', () => {
   // Rows: command; columns: from status, in SESSION_STATUSES order.
   const commandMatrix: Record<SessionCommand, (SessionStatus | null)[]> = {
     //       planned      open         paused       closed cancelled
-    open: ['open', null, 'open', null, null],
+    open: ['open', null, null, null, null],
     pause: [null, 'paused', null, null, null],
-    resume: ['open', null, 'open', null, null],
+    resume: [null, null, 'open', null, null],
     close: [null, 'closed', 'closed', null, null],
     cancel: ['cancelled', 'cancelled', 'cancelled', null, null],
   };
@@ -79,6 +81,23 @@ describe('session lifecycle contract (TAB-P0-04)', () => {
           commandMatrix[command][index],
         ]),
       );
+  });
+
+  it('never lets open stand in for resume or resume for open', () => {
+    expect(applySessionCommand('open', 'paused')).toBeNull();
+    expect(applySessionCommand('resume', 'planned')).toBeNull();
+    expect(SESSION_COMMAND_SOURCES.open).toEqual(['planned']);
+    expect(SESSION_COMMAND_SOURCES.resume).toEqual(['paused']);
+  });
+
+  it('declares only legal transitions as command sources', () => {
+    for (const command of SESSION_COMMANDS)
+      for (const from of SESSION_COMMAND_SOURCES[command])
+        expect([
+          command,
+          from,
+          canTransitionSession(from, SESSION_COMMAND_TARGET[command]),
+        ]).toEqual([command, from, true]);
   });
 
   it('requires a reason only for cancel and the doctor lock only for open/resume', () => {
@@ -133,7 +152,7 @@ describe('session lifecycle contract (TAB-P0-04)', () => {
       ).toBe(false);
   });
 
-  it('blocks closing while any non-terminal queue entry remains (v3)', () => {
+  it('blocks closing while any non-terminal queue entry remains (v4)', () => {
     expect([...SESSION_CLOSE_BLOCKING_QUEUE_STATES]).toEqual([
       'waiting',
       'checked_in',

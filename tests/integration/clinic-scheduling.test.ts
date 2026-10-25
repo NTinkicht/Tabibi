@@ -665,6 +665,67 @@ describe('reception session operations', () => {
     );
   });
 
+  it('refuses open on a paused session and resume on a planned one without writing', async () => {
+    const sessions = new SessionService(pool);
+    const paused = await seedSession(ids.clinicA, '2026-09-16', 'paused');
+    const planned = await seedSession(ids.clinicA, '2026-09-17');
+    const snapshot = async (id: string) => ({
+      status: (
+        await pool.query<{ status: string }>(
+          `SELECT status FROM consultation_sessions WHERE id=$1`,
+          [id],
+        )
+      ).rows[0]?.status,
+      audit: (
+        await pool.query(`SELECT 1 FROM audit_events WHERE entity_id=$1`, [id])
+      ).rowCount,
+    });
+    const refusals = [
+      [paused, 'open', 'paused'],
+      [planned, 'resume', 'planned'],
+    ] as const;
+    for (const [id, command, status] of refusals) {
+      const input = {
+        command,
+        idempotencyKey: `wrong-${command}-${id}`,
+        correlationId: `wrong-${command}-${id}`,
+      };
+      await expect(sessions.command(scopeA, id, input)).rejects.toThrow(
+        SessionConflictError,
+      );
+      await expect(sessions.command(scopeA, id, input)).rejects.toThrow(
+        `Cannot transition session from ${status} to open (${command})`,
+      );
+      expect(await snapshot(id)).toEqual({ status, audit: 0 });
+    }
+    const resumed = await sessions.command(scopeA, paused, {
+      command: 'resume',
+      idempotencyKey: 'right-resume',
+      correlationId: 'right-resume',
+    });
+    expect(resumed.status).toBe('open');
+    await sessions.command(scopeA, paused, {
+      command: 'close',
+      idempotencyKey: 'right-close',
+      correlationId: 'right-close',
+    });
+    const opened = await sessions.command(scopeA, planned, {
+      command: 'open',
+      idempotencyKey: 'right-open',
+      correlationId: 'right-open',
+    });
+    expect(opened.status).toBe('open');
+    const audit = await pool.query<{ action: string }>(
+      `SELECT action FROM audit_events WHERE entity_id = ANY($1::uuid[]) ORDER BY id`,
+      [[paused, planned]],
+    );
+    expect(audit.rows.map((row) => row.action)).toEqual([
+      'consultation_session.resume',
+      'consultation_session.close',
+      'consultation_session.open',
+    ]);
+  });
+
   it('re-authorizes on every idempotent retry and rejects replay after membership revocation', async () => {
     const id = await seedSession(ids.clinicA, '2026-09-15');
     const sessions = new SessionService(pool);
