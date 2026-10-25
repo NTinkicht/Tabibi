@@ -9,6 +9,7 @@ import {
   ClinicClosureConflictError,
   ScheduleCollisionError,
   ScheduleTemplateNotFoundError,
+  ScheduleTemplateOccurrenceConflictError,
 } from '@/modules/scheduling';
 import {
   SessionConflictError,
@@ -71,6 +72,7 @@ export async function operationalJson(
       error instanceof SessionConflictError ||
       error instanceof QueueConflictError ||
       error instanceof ScheduleCollisionError ||
+      error instanceof ScheduleTemplateOccurrenceConflictError ||
       error instanceof ClinicClosureConflictError ||
       isPostgresCheckConflict(error)
     ) {

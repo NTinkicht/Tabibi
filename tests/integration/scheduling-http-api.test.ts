@@ -191,6 +191,31 @@ describe('schedule template routes', () => {
     expect(count.rows[0].n).toBe(1);
   });
 
+  it('maps a reused weekday/occurrence index to 409, even for an adjacent range or a deactivated template', async () => {
+    const created = await createTemplate();
+    const id = (created.json.template as { id: string }).id;
+    const adjacent = await createTemplate('http-admin', {
+      localStartTime: '12:00',
+      localEndTime: '15:00',
+    });
+    expect(adjacent.status).toBe(409);
+    expect(adjacent.json).toMatchObject({
+      error: 'conflict',
+      message:
+        'Doctor already has a template with this weekday and occurrence index',
+    });
+    expect((await setActive(id, false)).status).toBe(200);
+    const replacement = await createTemplate('http-admin', {
+      localStartTime: '14:00',
+      localEndTime: '17:00',
+    });
+    expect(replacement.status).toBe(409);
+    const count = await pool.query(
+      'SELECT count(*)::int AS n FROM schedule_templates',
+    );
+    expect(count.rows[0].n).toBe(1);
+  });
+
   it('answers unknown, malformed and other-clinic template ids with the same 404', async () => {
     const created = await createTemplate();
     const id = (created.json.template as { id: string }).id;
