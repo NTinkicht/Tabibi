@@ -2,17 +2,19 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
+import {
+  applyQueueCommand,
+  planPriorityPlacement,
+  type QueueCommand,
+  type QueueEntryState,
+  queueCommandSessionGate,
+  selectNextCallableEntry,
+} from '@/modules/queue/lifecycle-contract';
 import { queueOrderingAuditMetadata } from '@/modules/queue/ordering-contract';
+import type { SessionStatus } from '@/modules/session';
 import { inTransaction } from '@/platform/database/transaction';
 
-export type QueueEntryState =
-  | 'waiting'
-  | 'checked_in'
-  | 'called'
-  | 'in_consultation'
-  | 'completed'
-  | 'cancelled'
-  | 'no_show';
+export type { QueueCommand, QueueEntryState };
 
 export interface WalkInRegistrationInput {
   privateDisplayName: string;
@@ -51,14 +53,6 @@ export interface StaffWaitingEntry {
   preferredLocale: 'ar' | 'fr';
   hasContact: boolean;
 }
-
-export type QueueCommand =
-  | 'check_in'
-  | 'call'
-  | 'no_show'
-  | 'cancel'
-  | 'start_consultation'
-  | 'complete_consultation';
 
 export interface StaffQueueEntry extends StaffWaitingEntry {
   eligibilityOrder: number | null;
@@ -559,16 +553,17 @@ export class QueueService {
         throw new QueueConflictError(
           'Consultation session doctor changed during command execution',
         );
-      if (!['open', 'paused'].includes(session.rows[0].status))
+      // Reception can resolve and check in on a paused session, but may not
+      // call or START another consultation until the doctor resumes service.
+      const gate = queueCommandSessionGate(
+        session.rows[0].status as SessionStatus,
+        rawInput.command,
+      );
+      if (gate === 'session_not_active')
         throw new QueueConflictError(
           'Queue lifecycle commands require an open or paused session',
         );
-      // Reception can resolve and check in on a paused session, but may not
-      // call or START another consultation until the doctor resumes service.
-      if (
-        session.rows[0].status === 'paused' &&
-        ['call', 'start_consultation'].includes(rawInput.command)
-      )
+      if (gate === 'session_paused')
         throw new QueueConflictError(
           'Cannot call or start a consultation while the session is paused',
         );
@@ -586,40 +581,41 @@ export class QueueService {
         throw new QueueConflictError(
           'Queue entry was not found in this clinic and session',
         );
-      const allowed: Record<QueueCommand, readonly QueueEntryState[]> = {
-        check_in: ['waiting'],
-        call: ['checked_in'],
-        no_show: ['checked_in', 'called'],
-        cancel: ['waiting', 'checked_in', 'called'],
-        start_consultation: ['called'],
-        complete_consultation: ['in_consultation'],
-      };
-      if (!allowed[rawInput.command].includes(prior))
+      const targetState = applyQueueCommand(rawInput.command, prior);
+      if (targetState === null)
         throw new QueueConflictError(
           `Cannot apply ${rawInput.command} to queue entry in ${prior}`,
         );
       if (rawInput.command === 'call') {
-        const next = await client.query<{ id: string }>(
-          `SELECT id FROM queue_entries
-            WHERE session_id=$1 AND clinic_id=$2 AND state='checked_in'
-            ORDER BY CASE WHEN priority_order IS NULL THEN 1 ELSE 0 END,
-                     priority_order NULLS LAST, eligibility_order, registration_order
-            LIMIT 1`,
+        const callable = await client.query<{
+          id: string;
+          priority_order: string | null;
+          eligibility_order: string | null;
+          registration_order: string;
+        }>(
+          `SELECT id,priority_order,eligibility_order,registration_order
+             FROM queue_entries
+            WHERE session_id=$1 AND clinic_id=$2 AND state='checked_in'`,
           [sessionId, scope.clinicId],
         );
-        if (next.rows[0]?.id !== entryId)
+        const next = selectNextCallableEntry(
+          callable.rows.map((row) => ({
+            id: row.id,
+            state: 'checked_in' as const,
+            priorityOrder:
+              row.priority_order === null ? null : Number(row.priority_order),
+            eligibilityOrder:
+              row.eligibility_order === null
+                ? null
+                : Number(row.eligibility_order),
+            registrationOrder: Number(row.registration_order),
+          })),
+        );
+        if (next?.id !== entryId)
           throw new QueueConflictError(
             'This entry is not next in the committed service order',
           );
       }
-      const target: Record<QueueCommand, QueueEntryState> = {
-        check_in: 'checked_in',
-        call: 'called',
-        no_show: 'no_show',
-        cancel: 'cancelled',
-        start_consultation: 'in_consultation',
-        complete_consultation: 'completed',
-      };
       let eligibilityOrder: number | null = null;
       if (rawInput.command === 'check_in') {
         const next = await client.query<{ value: string }>(
@@ -657,13 +653,7 @@ export class QueueService {
              entry.registration_order, entry.eligibility_order, entry.priority_order,
              entry.public_display_label, patient.private_display_name,
              patient.preferred_locale, patient.contact_phone, patient.contact_email`,
-          [
-            entryId,
-            sessionId,
-            scope.clinicId,
-            target[rawInput.command],
-            eligibilityOrder,
-          ],
+          [entryId, sessionId, scope.clinicId, targetState, eligibilityOrder],
         );
       } catch (error) {
         if (
@@ -689,7 +679,7 @@ export class QueueService {
       if (
         current.rows[0]!.priority_order !== null &&
         (prior === 'waiting' || prior === 'checked_in') &&
-        !['waiting', 'checked_in'].includes(target[rawInput.command])
+        !['waiting', 'checked_in'].includes(targetState)
       ) {
         const priorityCohort = await client.query<{ id: string }>(
           `SELECT id FROM queue_entries
@@ -869,7 +859,6 @@ export class QueueService {
           FOR UPDATE`,
         [sessionId, scope.clinicId],
       );
-      const sourceIndex = ordered.rows.findIndex((row) => row.id === entryId);
       const candidate = await client.query<{
         id: string;
         state: QueueEntryState;
@@ -889,35 +878,33 @@ export class QueueService {
         throw new QueueConflictError(
           'Only waiting or checked-in entries are eligible for priority',
         );
-      const maximumPosition =
-        sourceIndex < 0 ? ordered.rows.length + 1 : ordered.rows.length;
-      if (rawInput.targetPosition > maximumPosition)
+      const placement = planPriorityPlacement(
+        ordered.rows.map((row) => row.id),
+        entryId,
+        rawInput.targetPosition,
+      );
+      if (!placement.ok)
         throw new QueueConflictError(
-          `Target position exceeds the allowed maximum of ${maximumPosition}`,
+          `Target position exceeds the allowed maximum of ${placement.maximumPosition}`,
         );
 
       const previousOrder = ordered.rows.map((row) => ({
         entryId: row.id,
         priorityOrder: Number(row.priority_order),
       }));
-      const reordered = [...ordered.rows];
-      const [moved] =
-        sourceIndex < 0
-          ? [candidate.rows[0]]
-          : reordered.splice(sourceIndex, 1);
-      reordered.splice(rawInput.targetPosition - 1, 0, moved!);
+      const reordered = placement.orderedIds;
       try {
         // Clear the locked cohort out of the unique partial index before assigning
         // the canonical contiguous priority slots.
         await client.query(
           `UPDATE queue_entries SET priority_order=NULL
             WHERE id = ANY($1::uuid[])`,
-          [reordered.map((item) => item.id)],
+          [reordered],
         );
         for (let index = 0; index < reordered.length; index++)
           await client.query(
             'UPDATE queue_entries SET priority_order=$2,updated_at=now() WHERE id=$1',
-            [reordered[index]!.id, index + 1],
+            [reordered[index]!, index + 1],
           );
       } catch (error) {
         if (
@@ -979,14 +966,14 @@ export class QueueService {
         hasContact:
           movedRow.contact_phone !== null || movedRow.contact_email !== null,
       };
-      const resultingOrder = reordered.map((item, index) => ({
-        entryId: item.id,
+      const resultingOrder = reordered.map((id, index) => ({
+        entryId: id,
         priorityOrder: index + 1,
       }));
       const response = {
         entry,
         queueOrderVersion: nextVersion,
-        orderedEntryIds: reordered.map((item) => item.id),
+        orderedEntryIds: [...reordered],
       };
       await appendAuditEvent(client, {
         ...scope,
