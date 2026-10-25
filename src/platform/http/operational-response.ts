@@ -7,6 +7,8 @@ import { QueueConflictError, QueueValidationError } from '@/modules/queue';
 import { ReceptionistDashboardNotFoundError } from '@/modules/receptionist-dashboard';
 import {
   ClinicClosureConflictError,
+  ConsultationTypeConflictError,
+  ConsultationTypeNotFoundError,
   DoctorAbsenceConflictError,
   ScheduleCollisionError,
   ScheduleTemplateNotFoundError,
@@ -55,7 +57,8 @@ export async function operationalJson(
       code = 'csrf_rejected';
     } else if (
       error instanceof ReceptionistDashboardNotFoundError ||
-      error instanceof ScheduleTemplateNotFoundError
+      error instanceof ScheduleTemplateNotFoundError ||
+      error instanceof ConsultationTypeNotFoundError
     ) {
       status = 404;
       code = 'not_found';
@@ -76,6 +79,7 @@ export async function operationalJson(
       error instanceof ScheduleTemplateOccurrenceConflictError ||
       error instanceof ClinicClosureConflictError ||
       error instanceof DoctorAbsenceConflictError ||
+      error instanceof ConsultationTypeConflictError ||
       isPostgresCheckConflict(error)
     ) {
       status = 409;
