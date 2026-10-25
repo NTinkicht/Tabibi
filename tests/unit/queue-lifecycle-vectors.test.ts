@@ -1,23 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-
-type QueueState =
-  | 'waiting'
-  | 'checked_in'
-  | 'called'
-  | 'in_consultation'
-  | 'completed'
-  | 'cancelled'
-  | 'no_show';
-
-type QueueCommand =
-  | 'check_in'
-  | 'call'
-  | 'no_show'
-  | 'cancel'
-  | 'start_consultation'
-  | 'complete_consultation';
+import {
+  applyQueueCommand,
+  QUEUE_COMMANDS,
+  QUEUE_LIFECYCLE_CONTRACT_VERSION,
+} from '@/modules/queue/lifecycle-contract';
 
 const fixture = JSON.parse(
   readFileSync(
@@ -26,32 +14,14 @@ const fixture = JSON.parse(
   ),
 );
 
-const allowed: Record<QueueCommand, readonly QueueState[]> = {
-  check_in: ['waiting'],
-  call: ['checked_in'],
-  no_show: ['checked_in', 'called'],
-  cancel: ['waiting', 'checked_in', 'called'],
-  start_consultation: ['called'],
-  complete_consultation: ['in_consultation'],
-};
-
-const target: Record<QueueCommand, QueueState> = {
-  check_in: 'checked_in',
-  call: 'called',
-  no_show: 'no_show',
-  cancel: 'cancelled',
-  start_consultation: 'in_consultation',
-  complete_consultation: 'completed',
-};
-
-function transition(
-  command: QueueCommand,
-  state: QueueState,
-): QueueState | null {
-  return allowed[command].includes(state) ? target[command] : null;
-}
+// The fixture runs against the production contract, not a test-local copy.
+const transition = applyQueueCommand;
 
 describe('queue-lifecycle/v1 executable vectors', () => {
+  it('is the fixture of the production contract version', () => {
+    expect(fixture.contractVersion).toBe(QUEUE_LIFECYCLE_CONTRACT_VERSION);
+  });
+
   it('executes every canonical positive transition', () => {
     for (const vector of fixture.transitions) {
       expect(transition(vector.command, vector.from)).toBe(vector.to);
@@ -66,7 +36,7 @@ describe('queue-lifecycle/v1 executable vectors', () => {
 
   it('keeps terminal outcomes terminal', () => {
     for (const state of fixture.terminalStates) {
-      for (const command of Object.keys(allowed) as QueueCommand[]) {
+      for (const command of QUEUE_COMMANDS) {
         expect(transition(command, state)).toBeNull();
       }
     }
