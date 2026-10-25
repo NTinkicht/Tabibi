@@ -7,6 +7,7 @@ import { QueueConflictError, QueueValidationError } from '@/modules/queue';
 import { ReceptionistDashboardNotFoundError } from '@/modules/receptionist-dashboard';
 import {
   ClinicClosureConflictError,
+  DoctorAbsenceConflictError,
   ScheduleCollisionError,
   ScheduleTemplateNotFoundError,
   ScheduleTemplateOccurrenceConflictError,
@@ -74,6 +75,7 @@ export async function operationalJson(
       error instanceof ScheduleCollisionError ||
       error instanceof ScheduleTemplateOccurrenceConflictError ||
       error instanceof ClinicClosureConflictError ||
+      error instanceof DoctorAbsenceConflictError ||
       isPostgresCheckConflict(error)
     ) {
       status = 409;

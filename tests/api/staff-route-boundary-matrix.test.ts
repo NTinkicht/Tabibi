@@ -24,6 +24,8 @@ const ids = {
   entryId: '33333333-3333-4333-8333-333333333333',
   templateId: '44444444-4444-4444-8444-444444444444',
   closureDate: '2026-10-24',
+  doctorId: '55555555-5555-4555-8555-555555555555',
+  absenceDate: '2026-10-26',
 };
 const ROUTES_ROOT = join(__dirname, '..', '..', 'src', 'app', 'api', 'clinics');
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
@@ -38,6 +40,8 @@ type Handler = (
 const EXPECTED: Record<string, readonly Method[]> = {
   closures: ['GET', 'POST'],
   'closures/[closureDate]': ['DELETE'],
+  'doctors/[doctorId]/absences': ['GET', 'POST'],
+  'doctors/[doctorId]/absences/[absenceDate]': ['DELETE'],
   'notifications/dead-letters': ['GET'],
   'notifications/dispatch': ['POST'],
   'schedule-generations': ['POST'],
@@ -101,7 +105,9 @@ function url(key: string): string {
     .replace('[appointmentId]', ids.appointmentId)
     .replace('[entryId]', ids.entryId)
     .replace('[templateId]', ids.templateId)
-    .replace('[closureDate]', ids.closureDate);
+    .replace('[closureDate]', ids.closureDate)
+    .replace('[doctorId]', ids.doctorId)
+    .replace('[absenceDate]', ids.absenceDate);
   return `http://localhost/api/clinics/${ids.clinicId}/${path}?date=2026-10-24&limit=5`;
 }
 
@@ -172,8 +178,8 @@ describe('staff clinic route inventory', () => {
       );
     }
     expect(discovered).toEqual(EXPECTED);
-    expect(mutations).toHaveLength(15);
-    expect(reads).toHaveLength(6);
+    expect(mutations).toHaveLength(17);
+    expect(reads).toHaveLength(7);
   });
 });
 

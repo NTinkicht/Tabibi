@@ -6,6 +6,7 @@ import { isCalendarDay } from '@/modules/scheduling';
 // malformed ids, impossible calendar days and out-of-range values with 400
 // before the service or PostgreSQL sees them.
 export const clinicIdSchema = z.string().uuid();
+export const doctorIdSchema = z.string().uuid();
 export const calendarDaySchema = z
   .string()
   .refine(isCalendarDay, 'must be a real YYYY-MM-DD calendar day');
@@ -38,4 +39,8 @@ export const generationSchema = z
 
 export const closureSchema = z
   .object({ closureDate: calendarDaySchema })
+  .strict();
+
+export const absenceSchema = z
+  .object({ absenceDate: calendarDaySchema })
   .strict();
