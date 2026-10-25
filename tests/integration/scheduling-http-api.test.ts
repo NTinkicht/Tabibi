@@ -185,7 +185,9 @@ describe('schedule template routes', () => {
     });
     expect(denied.status).toBe(403);
     expect(denied.json.error).toBe('forbidden');
-    const count = await pool.query('SELECT count(*)::int AS n FROM schedule_templates');
+    const count = await pool.query(
+      'SELECT count(*)::int AS n FROM schedule_templates',
+    );
     expect(count.rows[0].n).toBe(1);
   });
 
@@ -217,7 +219,9 @@ describe('schedule template routes', () => {
     const response = await createTemplate('http-admin', overrides);
     expect(response.status).toBe(400);
     expect(response.json.error).toBe('invalid_request');
-    const count = await pool.query('SELECT count(*)::int AS n FROM schedule_templates');
+    const count = await pool.query(
+      'SELECT count(*)::int AS n FROM schedule_templates',
+    );
     expect(count.rows[0].n).toBe(0);
   });
 
@@ -364,7 +368,9 @@ describe('clinic closure routes', () => {
     const rows = await pool.query(
       'SELECT clinic_id, closure_date::text FROM clinic_closures',
     );
-    expect(rows.rows).toEqual([{ clinic_id: ids.clinic, closure_date: MONDAY }]);
+    expect(rows.rows).toEqual([
+      { clinic_id: ids.clinic, closure_date: MONDAY },
+    ]);
   });
 
   it('rejects impossible or malformed days with 400', async () => {

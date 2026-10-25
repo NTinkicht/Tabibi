@@ -26,9 +26,7 @@ export const createTemplateSchema = z
     message: 'localEndTime must be after localStartTime',
   });
 
-export const templateActiveSchema = z
-  .object({ active: z.boolean() })
-  .strict();
+export const templateActiveSchema = z.object({ active: z.boolean() }).strict();
 
 export const generationSchema = z
   .object({

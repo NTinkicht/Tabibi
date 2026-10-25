@@ -1,7 +1,10 @@
 import { SchedulingService } from '@/modules/scheduling';
 import { getPool } from '@/platform/database/pool';
 import { operationalJson } from '@/platform/http/operational-response';
-import { clinicIdSchema, closureSchema } from '@/platform/http/scheduling-input';
+import {
+  clinicIdSchema,
+  closureSchema,
+} from '@/platform/http/scheduling-input';
 import {
   authenticatedClinicScope,
   requireSameOrigin,
