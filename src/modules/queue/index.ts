@@ -653,13 +653,7 @@ export class QueueService {
              entry.registration_order, entry.eligibility_order, entry.priority_order,
              entry.public_display_label, patient.private_display_name,
              patient.preferred_locale, patient.contact_phone, patient.contact_email`,
-          [
-            entryId,
-            sessionId,
-            scope.clinicId,
-            targetState,
-            eligibilityOrder,
-          ],
+          [entryId, sessionId, scope.clinicId, targetState, eligibilityOrder],
         );
       } catch (error) {
         if (
