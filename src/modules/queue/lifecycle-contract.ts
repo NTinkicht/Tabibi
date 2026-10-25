@@ -180,3 +180,35 @@ export function planPriorityPlacement(
   orderedIds.splice(targetPosition - 1, 0, entryId);
   return { ok: true, orderedIds };
 }
+
+/** Queue states that may hold a priority slot (TAB-P0-04 priority cohort). */
+export const PRIORITY_COHORT_STATES: readonly QueueEntryState[] = [
+  'waiting',
+  'checked_in',
+];
+
+/**
+ * True when a transition from `prior` to `target` takes an entry out of the
+ * priority cohort: the source state may hold a slot and the target may not.
+ */
+export function exitsPriorityCohort(
+  prior: QueueEntryState,
+  target: QueueEntryState,
+): boolean {
+  return (
+    PRIORITY_COHORT_STATES.includes(prior) &&
+    !PRIORITY_COHORT_STATES.includes(target)
+  );
+}
+
+/**
+ * Contiguous slot renumber on exit: removes `exitingIds` from the current
+ * cohort (ids in slot order) and returns the remaining ids in the same relative
+ * order, whose new slot is index+1. Ids not in the cohort are ignored.
+ */
+export function planPriorityExitCompaction(
+  cohortIds: readonly string[],
+  exitingIds: readonly string[],
+): string[] {
+  return cohortIds.filter((id) => !exitingIds.includes(id));
+}

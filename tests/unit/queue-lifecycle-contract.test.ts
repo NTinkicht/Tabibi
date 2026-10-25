@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyQueueCommand,
+  exitsPriorityCohort,
   isTerminalQueueState,
+  planPriorityExitCompaction,
   planPriorityPlacement,
+  PRIORITY_COHORT_STATES,
   QUEUE_COMMANDS,
   QUEUE_ENTRY_STATES,
   type QueueCommand,
@@ -252,5 +255,61 @@ describe('priority placement', () => {
     const input = ['a', 'b'];
     planPriorityPlacement(input, 'b', 1);
     expect(input).toEqual(['a', 'b']);
+  });
+});
+
+describe('priority exit compaction', () => {
+  const cohort = ['p1', 'p2', 'p3', 'p4'];
+
+  it('holds priority slots only in waiting and checked_in', () => {
+    expect([...PRIORITY_COHORT_STATES]).toEqual(['waiting', 'checked_in']);
+  });
+
+  it('classifies every legal transition of the matrix as cohort exit or not', () => {
+    for (const state of QUEUE_ENTRY_STATES)
+      for (const command of QUEUE_COMMANDS) {
+        const target = MATRIX[state][command];
+        if (target === null) continue;
+        const expected =
+          (state === 'waiting' || state === 'checked_in') &&
+          target !== 'waiting' &&
+          target !== 'checked_in';
+        expect(exitsPriorityCohort(state, target), `${state}/${command}`).toBe(
+          expected,
+        );
+      }
+  });
+
+  it('keeps check-in inside the cohort and exits on call, cancel and no-show', () => {
+    expect(exitsPriorityCohort('waiting', 'checked_in')).toBe(false);
+    expect(exitsPriorityCohort('checked_in', 'called')).toBe(true);
+    expect(exitsPriorityCohort('waiting', 'cancelled')).toBe(true);
+    expect(exitsPriorityCohort('checked_in', 'no_show')).toBe(true);
+    expect(exitsPriorityCohort('called', 'in_consultation')).toBe(false);
+  });
+
+  it.each([
+    [['p1'], ['p2', 'p3', 'p4']],
+    [['p3'], ['p1', 'p2', 'p4']],
+    [['p4'], ['p1', 'p2', 'p3']],
+    [
+      ['p1', 'p3'],
+      ['p2', 'p4'],
+    ],
+    [cohort, []],
+    [['unknown'], cohort],
+    [[], cohort],
+  ])(
+    'removes %j and keeps the rest in slot order (new slot = index + 1)',
+    (exiting, expected) => {
+      const remaining = planPriorityExitCompaction(cohort, exiting);
+      expect(remaining).toEqual(expected);
+    },
+  );
+
+  it('never mutates the input cohort', () => {
+    const input = Object.freeze([...cohort]);
+    planPriorityExitCompaction(input, ['p2']);
+    expect(input).toEqual(cohort);
   });
 });
