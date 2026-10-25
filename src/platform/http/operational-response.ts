@@ -6,6 +6,15 @@ import { AuthorizationError } from '@/modules/identity';
 import { QueueConflictError, QueueValidationError } from '@/modules/queue';
 import { ReceptionistDashboardNotFoundError } from '@/modules/receptionist-dashboard';
 import {
+  ClinicClosureConflictError,
+  ConsultationTypeConflictError,
+  ConsultationTypeNotFoundError,
+  DoctorAbsenceConflictError,
+  ScheduleCollisionError,
+  ScheduleTemplateNotFoundError,
+  ScheduleTemplateOccurrenceConflictError,
+} from '@/modules/scheduling';
+import {
   SessionConflictError,
   SessionValidationError,
 } from '@/modules/session';
@@ -46,7 +55,11 @@ export async function operationalJson(
     } else if (error instanceof StaffCsrfError) {
       status = 403;
       code = 'csrf_rejected';
-    } else if (error instanceof ReceptionistDashboardNotFoundError) {
+    } else if (
+      error instanceof ReceptionistDashboardNotFoundError ||
+      error instanceof ScheduleTemplateNotFoundError ||
+      error instanceof ConsultationTypeNotFoundError
+    ) {
       status = 404;
       code = 'not_found';
     } else if (
@@ -62,6 +75,11 @@ export async function operationalJson(
       error instanceof AppointmentConflictError ||
       error instanceof SessionConflictError ||
       error instanceof QueueConflictError ||
+      error instanceof ScheduleCollisionError ||
+      error instanceof ScheduleTemplateOccurrenceConflictError ||
+      error instanceof ClinicClosureConflictError ||
+      error instanceof DoctorAbsenceConflictError ||
+      error instanceof ConsultationTypeConflictError ||
       isPostgresCheckConflict(error)
     ) {
       status = 409;

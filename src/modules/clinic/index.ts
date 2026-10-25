@@ -122,6 +122,45 @@ export class PublicDiscoveryService {
   }
 }
 
+// A clinic timezone must be a named IANA zone known to PostgreSQL: every
+// clinic-local computation (session generation, service dates) runs
+// `AT TIME ZONE clinics.timezone`, so an unknown value would break the clinic
+// for all later scheduling. Offset strings and abbreviations are not names in
+// pg_timezone_names and are rejected too.
+export class InvalidClinicTimezoneError extends Error {
+  constructor() {
+    super('Clinic timezone must be a known IANA timezone name');
+    this.name = 'InvalidClinicTimezoneError';
+  }
+}
+
+// A clinic must always keep at least one clinic_admin: there is no platform
+// bypass in requireClinicRole, so a clinic without an admin could never again
+// change memberships, schedules or settings.
+export class LastClinicAdminError extends Error {
+  constructor() {
+    super('A clinic must keep at least one clinic admin');
+    this.name = 'LastClinicAdminError';
+  }
+}
+
+// The doctor role is only meaningful together with a doctor profile associated
+// with the clinic (requireDoctorIdentity checks all three); addDoctor creates
+// them together.
+export class DoctorMembershipRequiresAssociationError extends Error {
+  constructor() {
+    super('The doctor role requires a doctor associated with this clinic');
+    this.name = 'DoctorMembershipRequiresAssociationError';
+  }
+}
+
+export class MembershipUserNotFoundError extends Error {
+  constructor() {
+    super('User not found');
+    this.name = 'MembershipUserNotFoundError';
+  }
+}
+
 export class ClinicService {
   constructor(private readonly pool: Pool) {}
 
@@ -152,6 +191,13 @@ export class ClinicService {
   ): Promise<Clinic> {
     return inTransaction(this.pool, async (client) => {
       await requireClinicRole(client, scope, ['clinic_admin']);
+      if (update.timezone != null) {
+        const known = await client.query(
+          'SELECT 1 FROM pg_timezone_names WHERE name = $1',
+          [update.timezone],
+        );
+        if (!known.rowCount) throw new InvalidClinicTimezoneError();
+      }
       const result = await client.query<ClinicRow>(
         `UPDATE clinics SET name = $2, timezone = COALESCE($3, timezone),
            default_locale = COALESCE($4, default_locale),
@@ -216,6 +262,11 @@ export class ClinicService {
     }));
   }
 
+  // Staff-assignment integrity. The clinic row is locked so that concurrent
+  // role changes in one clinic serialize: two admins demoting each other at
+  // the same time cannot both succeed and leave the clinic without an admin.
+  // The actor's own admin role is re-checked under that lock, because a
+  // concurrent change may have just demoted them.
   async setMembership(
     scope: ClinicScope,
     userId: string,
@@ -223,6 +274,40 @@ export class ClinicService {
   ): Promise<void> {
     return inTransaction(this.pool, async (client) => {
       await requireClinicRole(client, scope, ['clinic_admin']);
+      await client.query('SELECT 1 FROM clinics WHERE id = $1 FOR UPDATE', [
+        scope.clinicId,
+      ]);
+      await requireClinicRole(client, scope, ['clinic_admin']);
+      const user = await client.query('SELECT 1 FROM users WHERE id = $1', [
+        userId,
+      ]);
+      if (user.rowCount !== 1) throw new MembershipUserNotFoundError();
+      const current = await client.query<{ role: ClinicRole }>(
+        `SELECT role FROM clinic_memberships
+          WHERE clinic_id = $1 AND user_id = $2`,
+        [scope.clinicId, userId],
+      );
+      const currentRole = current.rows[0]?.role;
+      if (currentRole === role) return;
+      if (currentRole === 'clinic_admin') {
+        const otherAdmins = await client.query(
+          `SELECT 1 FROM clinic_memberships
+            WHERE clinic_id = $1 AND role = 'clinic_admin' AND user_id <> $2`,
+          [scope.clinicId, userId],
+        );
+        if (otherAdmins.rowCount === 0) throw new LastClinicAdminError();
+      }
+      if (role === 'doctor') {
+        const association = await client.query(
+          `SELECT 1 FROM doctor_profiles doctor
+             JOIN doctor_clinics association ON association.doctor_id = doctor.id
+            WHERE doctor.user_id = $1 AND association.clinic_id = $2`,
+          [userId, scope.clinicId],
+        );
+        if (association.rowCount !== 1) {
+          throw new DoctorMembershipRequiresAssociationError();
+        }
+      }
       await client.query(
         `INSERT INTO clinic_memberships (clinic_id, user_id, role)
          VALUES ($1, $2, $3)

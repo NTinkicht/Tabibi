@@ -22,6 +22,11 @@ const ids = {
   sessionId: '11111111-1111-4111-8111-111111111111',
   appointmentId: '22222222-2222-4222-8222-222222222222',
   entryId: '33333333-3333-4333-8333-333333333333',
+  templateId: '44444444-4444-4444-8444-444444444444',
+  closureDate: '2026-10-24',
+  doctorId: '55555555-5555-4555-8555-555555555555',
+  absenceDate: '2026-10-26',
+  consultationTypeId: '66666666-6666-4666-8666-666666666666',
 };
 const ROUTES_ROOT = join(__dirname, '..', '..', 'src', 'app', 'api', 'clinics');
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
@@ -34,8 +39,17 @@ type Handler = (
 // Deliberate inventory: a new staff route (or a new method on an existing
 // one) must be added here, which pulls it into the boundary matrix below.
 const EXPECTED: Record<string, readonly Method[]> = {
+  closures: ['GET', 'POST'],
+  'closures/[closureDate]': ['DELETE'],
+  'consultation-types': ['GET', 'POST'],
+  'consultation-types/[consultationTypeId]': ['PATCH'],
+  'doctors/[doctorId]/absences': ['GET', 'POST'],
+  'doctors/[doctorId]/absences/[absenceDate]': ['DELETE'],
   'notifications/dead-letters': ['GET'],
   'notifications/dispatch': ['POST'],
+  'schedule-generations': ['POST'],
+  'schedule-templates': ['GET', 'POST'],
+  'schedule-templates/[templateId]': ['PATCH'],
   sessions: ['GET', 'POST'],
   'sessions/[sessionId]/appointments': ['POST'],
   'sessions/[sessionId]/appointments/[appointmentId]': ['PATCH'],
@@ -92,7 +106,12 @@ function url(key: string): string {
   const path = key
     .replace('[sessionId]', ids.sessionId)
     .replace('[appointmentId]', ids.appointmentId)
-    .replace('[entryId]', ids.entryId);
+    .replace('[entryId]', ids.entryId)
+    .replace('[templateId]', ids.templateId)
+    .replace('[closureDate]', ids.closureDate)
+    .replace('[doctorId]', ids.doctorId)
+    .replace('[absenceDate]', ids.absenceDate)
+    .replace('[consultationTypeId]', ids.consultationTypeId);
   return `http://localhost/api/clinics/${ids.clinicId}/${path}?date=2026-10-24&limit=5`;
 }
 
@@ -163,8 +182,8 @@ describe('staff clinic route inventory', () => {
       );
     }
     expect(discovered).toEqual(EXPECTED);
-    expect(mutations).toHaveLength(10);
-    expect(reads).toHaveLength(4);
+    expect(mutations).toHaveLength(19);
+    expect(reads).toHaveLength(8);
   });
 });
 
