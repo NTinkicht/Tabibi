@@ -182,7 +182,7 @@ export class ClinicService {
   async updateClinic(
     scope: ClinicScope,
     update: {
-      name: string;
+      name?: string;
       timezone?: string;
       defaultLocale?: 'ar' | 'fr';
       enabledLocales?: Array<'ar' | 'fr'>;
@@ -199,7 +199,7 @@ export class ClinicService {
         if (!known.rowCount) throw new InvalidClinicTimezoneError();
       }
       const result = await client.query<ClinicRow>(
-        `UPDATE clinics SET name = $2, timezone = COALESCE($3, timezone),
+        `UPDATE clinics SET name = COALESCE($2, name), timezone = COALESCE($3, timezone),
            default_locale = COALESCE($4, default_locale),
            enabled_locales = COALESCE($5, enabled_locales),
            status = COALESCE($6, status), updated_at = now()
@@ -207,7 +207,7 @@ export class ClinicService {
          RETURNING id, tenant_key, name, timezone, default_locale, enabled_locales, status`,
         [
           scope.clinicId,
-          update.name,
+          update.name ?? null,
           update.timezone ?? null,
           update.defaultLocale ?? null,
           update.enabledLocales ?? null,

@@ -2,6 +2,7 @@ import {
   AppointmentConflictError,
   AppointmentValidationError,
 } from '@/modules/appointment';
+import { InvalidClinicTimezoneError } from '@/modules/clinic';
 import { AuthorizationError } from '@/modules/identity';
 import { QueueConflictError, QueueValidationError } from '@/modules/queue';
 import { ReceptionistDashboardNotFoundError } from '@/modules/receptionist-dashboard';
@@ -66,6 +67,7 @@ export async function operationalJson(
       error instanceof AppointmentValidationError ||
       error instanceof SessionValidationError ||
       error instanceof QueueValidationError ||
+      error instanceof InvalidClinicTimezoneError ||
       error instanceof ZodError ||
       error instanceof SyntaxError
     ) {
