@@ -6,7 +6,7 @@
  * behaviour change and must bump SESSION_LIFECYCLE_CONTRACT_VERSION.
  */
 
-export const SESSION_LIFECYCLE_CONTRACT_VERSION = 'session-lifecycle/v2';
+export const SESSION_LIFECYCLE_CONTRACT_VERSION = 'session-lifecycle/v3';
 
 export const SESSION_STATUSES = [
   'planned',

@@ -26,7 +26,7 @@ import * as sessionModule from '@/modules/session';
 
 describe('session lifecycle contract (TAB-P0-04)', () => {
   it('is versioned and re-exported by the session module', () => {
-    expect(SESSION_LIFECYCLE_CONTRACT_VERSION).toBe('session-lifecycle/v2');
+    expect(SESSION_LIFECYCLE_CONTRACT_VERSION).toBe('session-lifecycle/v3');
     expect(sessionModule.canTransitionSession).toBe(canTransitionSession);
     expect(sessionModule.MAX_DELAY_MINUTES).toBe(MAX_DELAY_MINUTES);
     expect(MAX_DELAY_MINUTES).toBe(720);
