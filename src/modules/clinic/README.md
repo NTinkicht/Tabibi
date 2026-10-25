@@ -24,3 +24,14 @@ Staff HTTP routes (#663): `GET /api/clinics/{clinicId}/doctors` (`listDoctors`),
 `PATCH /api/clinics/{clinicId}/memberships/{userId}` with `{ role }`
 (`setMembership` with `existingMemberOnly`). Unknown/non-member users are 404,
 `LastClinicAdminError` and `DoctorMembershipRequiresAssociationError` are 409.
+
+`addDoctor` (#667, clinic admins only, `POST /api/clinics/{clinicId}/doctors`
+with `{ userId, displayName }`) associates an existing member of this clinic as
+one of its doctors and sets their role to `doctor`. It serializes with
+`setMembership` on the clinic row, never adds a member (unknown, malformed or
+other-clinic users are `MembershipNotFoundError`, 404), refuses to turn the last
+`clinic_admin` into a doctor (`LastClinicAdminError`, 409) and generates the
+profile id itself. A doctor profile is shared by every clinic the doctor works
+in, so an existing profile keeps its display name; `displayName` only names a
+new profile. The route returns 201 `{ doctor }` when the association or role is
+new and 200 with no audit event when nothing changed.
