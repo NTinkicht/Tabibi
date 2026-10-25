@@ -4,6 +4,8 @@ import { appendAuditEvent } from '@/modules/audit';
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
 import {
   applyQueueCommand,
+  exitsPriorityCohort,
+  planPriorityExitCompaction,
   planPriorityPlacement,
   type QueueCommand,
   type QueueEntryState,
@@ -678,8 +680,7 @@ export class QueueService {
         (current.rows[0]!.priority_order !== null && prior === 'waiting');
       if (
         current.rows[0]!.priority_order !== null &&
-        (prior === 'waiting' || prior === 'checked_in') &&
-        !['waiting', 'checked_in'].includes(targetState)
+        exitsPriorityCohort(prior, targetState)
       ) {
         const priorityCohort = await client.query<{ id: string }>(
           `SELECT id FROM queue_entries
@@ -688,7 +689,10 @@ export class QueueService {
             ORDER BY priority_order,registration_order FOR UPDATE`,
           [sessionId, scope.clinicId],
         );
-        const cohortIds = priorityCohort.rows.map((item) => item.id);
+        const cohortIds = planPriorityExitCompaction(
+          priorityCohort.rows.map((item) => item.id),
+          [entryId],
+        );
         if (cohortIds.length > 0) {
           await client.query(
             `UPDATE queue_entries SET priority_order=NULL
