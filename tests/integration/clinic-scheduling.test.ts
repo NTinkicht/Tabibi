@@ -677,9 +677,7 @@ describe('reception session operations', () => {
         )
       ).rows[0]?.status,
       audit: (
-        await pool.query(`SELECT 1 FROM audit_events WHERE entity_id=$1`, [
-          id,
-        ])
+        await pool.query(`SELECT 1 FROM audit_events WHERE entity_id=$1`, [id])
       ).rowCount,
     });
     const refusals = [
