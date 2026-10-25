@@ -14,15 +14,36 @@ import {
 } from '@/modules/scheduling';
 import { inTransaction } from '@/platform/database/transaction';
 
-export type SessionStatus =
-  | 'planned'
-  | 'open'
-  | 'paused'
-  | 'closed'
-  | 'cancelled';
-export type SessionCommand = 'open' | 'pause' | 'resume' | 'close' | 'cancel';
-export type DelayCommand = 'declare_delay' | 'update_delay' | 'clear_delay';
-export const MAX_DELAY_MINUTES = 720;
+import {
+  applySessionCommand,
+  type DelayCommand,
+  type DelayRefusal,
+  isValidDelayMinutes,
+  MAX_DELAY_MINUTES,
+  planDelayCommand,
+  SESSION_CANCELLATION_CASCADE_QUEUE_STATES,
+  SESSION_COMMAND_TARGET,
+  type SessionCommand,
+  sessionCommandRequiresDoctorLock,
+  sessionCommandRequiresReason,
+  type SessionStatus,
+} from './lifecycle-contract';
+
+export {
+  canTransitionSession,
+  type DelayCommand,
+  MAX_DELAY_MINUTES,
+  type SessionCommand,
+  type SessionStatus,
+} from './lifecycle-contract';
+
+const delayRefusalMessages: Readonly<Record<DelayRefusal, string>> = {
+  terminal_session: 'Delay cannot change on a terminal session',
+  stale_version: 'Delay version is stale',
+  already_declared: 'Delay is already declared',
+  no_delay_to_update: 'No delay exists to update',
+  no_delay_to_clear: 'No delay exists to clear',
+};
 
 export interface ConsultationSession {
   id: string;
@@ -63,21 +84,6 @@ const selection = `session.id, session.clinic_id, session.doctor_id,
   session.service_date::text, session.starts_at, session.ends_at, session.status,
   session.opened_at, session.closed_at, session.declared_delay_minutes,
   session.delay_version, session.delay_updated_at`;
-
-const transitions: Readonly<Record<SessionStatus, readonly SessionStatus[]>> = {
-  planned: ['open', 'cancelled'],
-  open: ['paused', 'closed', 'cancelled'],
-  paused: ['open', 'closed', 'cancelled'],
-  closed: [],
-  cancelled: [],
-};
-
-export function canTransitionSession(
-  from: SessionStatus,
-  to: SessionStatus,
-): boolean {
-  return transitions[from].includes(to);
-}
 
 export class SessionConflictError extends Error {
   constructor(message = 'Session command conflicts with committed state') {
@@ -371,7 +377,7 @@ export class SessionService {
       correlationId: string;
     },
   ): Promise<ConsultationSession> {
-    if (input.command === 'cancel' && !input.reason?.trim())
+    if (sessionCommandRequiresReason(input.command) && !input.reason?.trim())
       throw new SessionValidationError('Cancellation reason is required');
     return inTransaction(this.pool, (client) => {
       let doctorId = '';
@@ -396,14 +402,8 @@ export class SessionService {
           await requireSessionAccess(client, scope, doctorId);
         },
         async () => {
-          const target: SessionStatus = {
-            open: 'open',
-            pause: 'paused',
-            resume: 'open',
-            close: 'closed',
-            cancel: 'cancelled',
-          }[input.command] as SessionStatus;
-          if (target === 'open')
+          const target = SESSION_COMMAND_TARGET[input.command];
+          if (sessionCommandRequiresDoctorLock(input.command))
             await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
               doctorId,
             ]);
@@ -412,7 +412,7 @@ export class SessionService {
             [sessionId, scope.clinicId],
           );
           const current = selected.rows[0]!;
-          if (!canTransitionSession(current.status, target))
+          if (applySessionCommand(input.command, current.status) === null)
             throw new SessionConflictError(
               `Cannot transition session from ${current.status} to ${target} (${input.command})`,
             );
@@ -426,10 +426,14 @@ export class SessionService {
                     `SELECT id, state AS prior_state
                        FROM queue_entries
                       WHERE clinic_id = $1 AND session_id = $2
-                        AND state IN ('waiting', 'checked_in', 'called')
+                        AND state = ANY($3::queue_entry_status[])
                       ORDER BY registration_order
                       FOR UPDATE`,
-                    [scope.clinicId, sessionId],
+                    [
+                      scope.clinicId,
+                      sessionId,
+                      [...SESSION_CANCELLATION_CASCADE_QUEUE_STATES],
+                    ],
                   )
                 : { rows: [] };
             const updated = await client.query<SessionRow>(
@@ -510,13 +514,7 @@ export class SessionService {
       correlationId: string;
     },
   ): Promise<ConsultationSession> {
-    if (
-      input.command !== 'clear_delay' &&
-      (!Number.isFinite(input.minutes) ||
-        !Number.isInteger(input.minutes) ||
-        input.minutes! <= 0 ||
-        input.minutes! > MAX_DELAY_MINUTES)
-    )
+    if (!isValidDelayMinutes(input.command, input.minutes))
       throw new SessionValidationError(
         `Delay minutes must be a positive whole number no greater than ${MAX_DELAY_MINUTES}`,
       );
@@ -549,29 +547,18 @@ export class SessionService {
           const current = selected.rows[0];
           if (!current)
             throw new SessionConflictError('Session not found in clinic');
-          if (!['planned', 'open', 'paused'].includes(current.status))
-            throw new SessionConflictError(
-              'Delay cannot change on a terminal session',
-            );
-          if (current.delay_version !== input.expectedVersion)
-            throw new SessionConflictError('Delay version is stale');
-          if (
-            input.command === 'declare_delay' &&
-            current.declared_delay_minutes !== null
-          )
-            throw new SessionConflictError('Delay is already declared');
-          if (
-            input.command === 'update_delay' &&
-            current.declared_delay_minutes === null
-          )
-            throw new SessionConflictError('No delay exists to update');
-          if (
-            input.command === 'clear_delay' &&
-            current.declared_delay_minutes === null
-          )
-            throw new SessionConflictError('No delay exists to clear');
-          const minutes =
-            input.command === 'clear_delay' ? null : input.minutes!;
+          const plan = planDelayCommand(
+            input.command,
+            {
+              status: current.status,
+              declaredDelayMinutes: current.declared_delay_minutes,
+              delayVersion: current.delay_version,
+            },
+            input,
+          );
+          if (!plan.ok)
+            throw new SessionConflictError(delayRefusalMessages[plan.refusal]);
+          const minutes = plan.minutes;
           const updated = await client.query<SessionRow>(
             `UPDATE consultation_sessions session SET declared_delay_minutes=$3,
              delay_version=delay_version+1, delay_updated_at=CASE WHEN $3::integer IS NULL THEN NULL ELSE now() END,
@@ -590,7 +577,7 @@ export class SessionService {
               minutes,
               from: current.declared_delay_minutes,
               to: minutes,
-              version: current.delay_version + 1,
+              version: plan.nextVersion,
               correlationId: input.correlationId,
               idempotencyKey: input.idempotencyKey,
             },
