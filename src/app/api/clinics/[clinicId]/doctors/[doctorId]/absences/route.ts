@@ -24,9 +24,10 @@ export async function GET(
     const scope = await authenticatedClinicScope(request, clinicId);
     clinicIdSchema.parse(scope.clinicId);
     const doctor = doctorIdSchema.parse(doctorId);
-    const absences = await new SchedulingService(
-      getPool(),
-    ).listDoctorAbsences(scope, doctor);
+    const absences = await new SchedulingService(getPool()).listDoctorAbsences(
+      scope,
+      doctor,
+    );
     return { status: 200, body: { absences } };
   });
 }

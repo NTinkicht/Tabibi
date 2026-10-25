@@ -135,7 +135,11 @@ function add(
   );
 }
 
-function list(subject: string, doctorId: string = ids.doctor, clinicId: string = ids.clinic) {
+function list(
+  subject: string,
+  doctorId: string = ids.doctor,
+  clinicId: string = ids.clinic,
+) {
   return call(
     absences.GET,
     subject,
@@ -145,7 +149,11 @@ function list(subject: string, doctorId: string = ids.doctor, clinicId: string =
   );
 }
 
-function remove(subject: string, absenceDate: string, doctorId: string = ids.doctor) {
+function remove(
+  subject: string,
+  absenceDate: string,
+  doctorId: string = ids.doctor,
+) {
   return call(
     absenceItem.DELETE,
     subject,
@@ -208,15 +216,19 @@ describe('doctor absence routes', () => {
   });
 
   it('denies receptionist writes, other-clinic admins and non-associated doctors with 403', async () => {
-    expect((await add('abs-receptionist', { absenceDate: MONDAY })).status).toBe(
-      403,
-    );
+    expect(
+      (await add('abs-receptionist', { absenceDate: MONDAY })).status,
+    ).toBe(403);
     expect((await add('abs-other-admin', { absenceDate: MONDAY })).status).toBe(
       403,
     );
     expect((await list('abs-other-admin')).status).toBe(403);
     // Another clinic's doctor, addressed through this clinic.
-    const foreign = await add('abs-admin', { absenceDate: MONDAY }, ids.otherDoctor);
+    const foreign = await add(
+      'abs-admin',
+      { absenceDate: MONDAY },
+      ids.otherDoctor,
+    );
     expect(foreign.status).toBe(403);
     expect(foreign.json.error).toBe('forbidden');
     expect((await list('abs-admin', ids.otherDoctor)).status).toBe(403);
@@ -276,9 +288,9 @@ describe('doctor absence routes', () => {
   });
 
   it('rejects malformed doctor ids, clinic ids and removal days with 400', async () => {
-    expect((await add('abs-admin', { absenceDate: MONDAY }, 'nope')).status).toBe(
-      400,
-    );
+    expect(
+      (await add('abs-admin', { absenceDate: MONDAY }, 'nope')).status,
+    ).toBe(400);
     expect((await list('abs-admin', 'nope')).status).toBe(400);
     expect((await list('abs-admin', ids.doctor, 'not-a-clinic')).status).toBe(
       400,
