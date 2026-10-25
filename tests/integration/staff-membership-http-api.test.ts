@@ -209,6 +209,33 @@ describe('staff membership HTTP API (#663)', () => {
     expect(await membershipAudits()).toBe(0);
   });
 
+  it('allows the doctor role only for a member associated as this clinic doctor', async () => {
+    // The association rule is checked on the requested role, not the
+    // current one: the associated doctor can return to doctor, while a
+    // former doctor whose association is gone cannot.
+    expect(
+      (await setRole('sm-admin', ids.doctorUser, { role: 'receptionist' }))
+        .status,
+    ).toBe(200);
+    const back = await setRole('sm-admin', ids.doctorUser, { role: 'doctor' });
+    expect(back.status).toBe(200);
+    expect(back.json).toEqual({
+      membership: { userId: ids.doctorUser, role: 'doctor' },
+    });
+    await setRole('sm-admin', ids.doctorUser, { role: 'receptionist' });
+    await pool.query('DELETE FROM doctor_clinics WHERE clinic_id = $1', [
+      ids.clinic,
+    ]);
+    const before = await memberships();
+    const unassociated = await setRole('sm-admin', ids.doctorUser, {
+      role: 'doctor',
+    });
+    expect(unassociated.status).toBe(409);
+    expect(unassociated.json).toMatchObject({ error: 'conflict' });
+    expect(await memberships()).toEqual(before);
+    expect(await membershipAudits()).toBe(3);
+  });
+
   it('never adds a member: non-member, unknown and malformed users are the same 404', async () => {
     const before = await memberships();
     for (const userId of [ids.outsider, ids.otherAdmin, randomUUID(), 'nope']) {
