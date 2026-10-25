@@ -6,7 +6,7 @@
  * behaviour change and must bump SESSION_LIFECYCLE_CONTRACT_VERSION.
  */
 
-export const SESSION_LIFECYCLE_CONTRACT_VERSION = 'session-lifecycle/v2';
+export const SESSION_LIFECYCLE_CONTRACT_VERSION = 'session-lifecycle/v3';
 
 export const SESSION_STATUSES = [
   'planned',
@@ -78,6 +78,26 @@ export function sessionCancellationBlockedBy(
     (SESSION_CANCELLATION_BLOCKING_QUEUE_STATES as readonly string[]).includes(
       state,
     ),
+  );
+}
+
+/**
+ * Queue-entry states that block closing a session: every non-terminal entry
+ * must be resolved first (served, cancelled, or no-show via the TAB-P0-07
+ * close-time resolution). Mirrors the database guard
+ * enforce_session_queue_terminal_transition(). v3 added this precondition.
+ */
+export const SESSION_CLOSE_BLOCKING_QUEUE_STATES = [
+  'waiting',
+  'checked_in',
+  'called',
+  'in_consultation',
+] as const;
+
+/** True when any of the session's queue-entry states blocks closing. */
+export function sessionCloseBlockedBy(queueStates: readonly string[]): boolean {
+  return queueStates.some((state) =>
+    (SESSION_CLOSE_BLOCKING_QUEUE_STATES as readonly string[]).includes(state),
   );
 }
 
