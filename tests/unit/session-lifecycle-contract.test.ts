@@ -125,9 +125,9 @@ describe('session lifecycle contract (TAB-P0-04)', () => {
     // Blocking and cascading states never overlap.
     for (const state of SESSION_CANCELLATION_BLOCKING_QUEUE_STATES)
       expect(
-        (SESSION_CANCELLATION_CASCADE_QUEUE_STATES as readonly string[]).includes(
-          state,
-        ),
+        (
+          SESSION_CANCELLATION_CASCADE_QUEUE_STATES as readonly string[]
+        ).includes(state),
       ).toBe(false);
   });
 

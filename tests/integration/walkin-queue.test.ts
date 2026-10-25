@@ -426,7 +426,14 @@ describe('walk-in registration foundation', () => {
       `UPDATE consultation_sessions SET status = 'open' WHERE id = $1`,
       [ids.session],
     );
-    const step = (entry: string, command: 'check_in' | 'call' | 'start_consultation' | 'complete_consultation') =>
+    const step = (
+      entry: string,
+      command:
+        | 'check_in'
+        | 'call'
+        | 'start_consultation'
+        | 'complete_consultation',
+    ) =>
       queue.command(scopeA, ids.session, entry, {
         command,
         idempotencyKey: `cancel-active-${command}-${entry}`,
@@ -494,7 +501,9 @@ describe('walk-in registration foundation', () => {
     await step(active!, 'complete_consultation');
     expect((await cancel()).status).toBe('cancelled');
     const after = await snapshot();
-    expect(Object.fromEntries(after.entries.map((e) => [e.id, e.state]))).toEqual({
+    expect(
+      Object.fromEntries(after.entries.map((e) => [e.id, e.state])),
+    ).toEqual({
       [active!]: 'completed',
       [waiting!]: 'cancelled',
       [checkedIn!]: 'cancelled',
