@@ -6,7 +6,7 @@
  * behaviour change and must bump SESSION_LIFECYCLE_CONTRACT_VERSION.
  */
 
-export const SESSION_LIFECYCLE_CONTRACT_VERSION = 'session-lifecycle/v1';
+export const SESSION_LIFECYCLE_CONTRACT_VERSION = 'session-lifecycle/v2';
 
 export const SESSION_STATUSES = [
   'planned',
@@ -61,6 +61,25 @@ export const SESSION_CANCELLATION_CASCADE_QUEUE_STATES = [
   'checked_in',
   'called',
 ] as const;
+
+/**
+ * Queue-entry states that block whole-session cancellation (TAB-P0-05:
+ * "cancellation rejects active consultation"). v2 added this precondition.
+ */
+export const SESSION_CANCELLATION_BLOCKING_QUEUE_STATES = [
+  'in_consultation',
+] as const;
+
+/** True when any of the session's queue-entry states blocks cancellation. */
+export function sessionCancellationBlockedBy(
+  queueStates: readonly string[],
+): boolean {
+  return queueStates.some((state) =>
+    (SESSION_CANCELLATION_BLOCKING_QUEUE_STATES as readonly string[]).includes(
+      state,
+    ),
+  );
+}
 
 export function canTransitionSession(
   from: SessionStatus,

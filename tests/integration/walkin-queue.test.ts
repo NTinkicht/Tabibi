@@ -407,4 +407,98 @@ describe('walk-in registration foundation', () => {
       true,
     );
   });
+  it('refuses session cancellation while a consultation is active and writes nothing', async () => {
+    const queue = new QueueService(pool);
+    const sessions = new SessionService(pool);
+    const registrations = await Promise.all(
+      ['active', 'waiting', 'checked-in'].map((label, index) =>
+        queue.registerWalkIn(
+          scopeA,
+          ids.session,
+          input(label, `cancel-active-${index}`),
+        ),
+      ),
+    );
+    const [active, waiting, checkedIn] = registrations.map(
+      (registration) => registration.entry.id,
+    );
+    await pool.query(
+      `UPDATE consultation_sessions SET status = 'open' WHERE id = $1`,
+      [ids.session],
+    );
+    const step = (entry: string, command: 'check_in' | 'call' | 'start_consultation' | 'complete_consultation') =>
+      queue.command(scopeA, ids.session, entry, {
+        command,
+        idempotencyKey: `cancel-active-${command}-${entry}`,
+        correlationId: `cancel-active-${command}`,
+      });
+    await step(active!, 'check_in');
+    await step(active!, 'call');
+    expect((await step(active!, 'start_consultation')).state).toBe(
+      'in_consultation',
+    );
+    await step(checkedIn!, 'check_in');
+
+    const snapshot = async () => {
+      const session = await pool.query<{ status: string }>(
+        `SELECT status FROM consultation_sessions WHERE id = $1`,
+        [ids.session],
+      );
+      const entries = await pool.query<{ id: string; state: string }>(
+        `SELECT id, state FROM queue_entries WHERE session_id = $1 ORDER BY registration_order`,
+        [ids.session],
+      );
+      const audits = await pool.query<{ count: string }>(
+        `SELECT count(*) FROM audit_events
+          WHERE action IN ('consultation_session.cancel', 'queue_entry.cancelled_by_session')`,
+      );
+      return {
+        status: session.rows[0]!.status,
+        entries: entries.rows,
+        cancelAudits: audits.rows[0]!.count,
+      };
+    };
+    const before = await snapshot();
+    expect(before.status).toBe('open');
+    expect(before.cancelAudits).toBe('0');
+
+    const cancel = () =>
+      sessions.command(scopeA, ids.session, {
+        command: 'cancel',
+        reason: 'Doctor unavailable',
+        idempotencyKey: 'cancel-with-active-consultation',
+        correlationId: 'cancel-with-active-consultation',
+      });
+    await expect(cancel()).rejects.toThrow(
+      'Cannot cancel a session with an active consultation',
+    );
+    expect(await snapshot()).toEqual(before);
+    // The refusal stored no receipt: the same key is still refused, not replayed.
+    await expect(cancel()).rejects.toThrow(
+      'Cannot cancel a session with an active consultation',
+    );
+    expect(await snapshot()).toEqual(before);
+
+    // Pause and close are unaffected by the cancellation precondition.
+    expect(
+      (
+        await sessions.command(scopeA, ids.session, {
+          command: 'pause',
+          idempotencyKey: 'pause-with-active-consultation',
+          correlationId: 'pause-with-active-consultation',
+        })
+      ).status,
+    ).toBe('paused');
+
+    // Once the consultation completes the same request cancels and cascades.
+    await step(active!, 'complete_consultation');
+    expect((await cancel()).status).toBe('cancelled');
+    const after = await snapshot();
+    expect(Object.fromEntries(after.entries.map((e) => [e.id, e.state]))).toEqual({
+      [active!]: 'completed',
+      [waiting!]: 'cancelled',
+      [checkedIn!]: 'cancelled',
+    });
+    expect(after.cancelAudits).toBe('3');
+  });
 });
