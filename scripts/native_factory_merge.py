@@ -19,8 +19,10 @@ MISTRAL_NATIVE_REVIEW = re.compile(
     r"<!-- tabibi-mistral-native-v1 run=([0-9]{1,15}) "
     r"report=([0-9]{1,15}) sha=([a-f0-9]{40}) -->"
 )
+# CodeRabbit review authority is retired (owner governance approval,
+# OneCompany #282): its approvals never satisfy this gate. Its actor alias in
+# REVIEWER_ACTORS is kept so authorship separation still recognizes it.
 TRUSTED_EXTERNAL_REVIEWERS = frozenset({
-    "coderabbitai[bot]",
     "copilot-pull-request-reviewer[bot]",
 })
 MATERIAL_AUTHOR_TRAILER = re.compile(r"(?im)^Material-Author:\s*([a-z0-9_-]+)\s*$")
@@ -534,6 +536,8 @@ def selftest_authenticated_review_gate():
         assert not authenticated_mistral_approval(review, number, sha)
         untrusted_bot = dict(review, user={"login": "unknown-review-bot[bot]", "type": "Bot"})
         assert not eligible_approval(untrusted_bot, number, sha, {"chatgpt"})
+        retired_coderabbit = dict(review, user={"login": "coderabbitai[bot]", "type": "Bot"})
+        assert not eligible_approval(retired_coderabbit, number, sha, {"chatgpt"})
     finally:
         globals()["gh"] = original_gh
         globals()["mistral_proof_reader"] = original_reader
