@@ -351,32 +351,66 @@ export class ClinicService {
     });
   }
 
+  // Associate an existing member of this clinic as one of its doctors
+  // (TAB-P0-02, #667). Never adds a member (inviting staff is TAB-P1-07):
+  // unknown, malformed and other-clinic users are the same
+  // MembershipNotFoundError. Serialized with setMembership on the clinic row,
+  // the actor's admin role is re-checked under that lock and the last
+  // clinic_admin cannot be turned into a doctor. A doctor profile is shared by
+  // every clinic the doctor works in, so an existing profile's display name is
+  // never overwritten here; displayName only names a new profile. Already
+  // associated and already a doctor is a no-op without an audit event.
   async addDoctor(
     scope: ClinicScope,
-    doctor: { userId: string; displayName: string; doctorId?: string },
-  ): Promise<string> {
+    doctor: { userId: string; displayName: string },
+  ): Promise<{ doctor: ClinicDoctor; changed: boolean }> {
     return inTransaction(this.pool, async (client) => {
       await requireClinicRole(client, scope, ['clinic_admin']);
-      const doctorId = doctor.doctorId ?? randomUUID();
+      if (!UUID_PATTERN.test(doctor.userId)) {
+        throw new MembershipNotFoundError();
+      }
+      await client.query('SELECT 1 FROM clinics WHERE id = $1 FOR UPDATE', [
+        scope.clinicId,
+      ]);
+      await requireClinicRole(client, scope, ['clinic_admin']);
+      const current = await client.query<{ role: ClinicRole }>(
+        `SELECT role FROM clinic_memberships
+          WHERE clinic_id = $1 AND user_id = $2`,
+        [scope.clinicId, doctor.userId],
+      );
+      const currentRole = current.rows[0]?.role;
+      if (!currentRole) throw new MembershipNotFoundError();
+      if (currentRole === 'clinic_admin') {
+        const otherAdmins = await client.query(
+          `SELECT 1 FROM clinic_memberships
+            WHERE clinic_id = $1 AND role = 'clinic_admin' AND user_id <> $2`,
+          [scope.clinicId, doctor.userId],
+        );
+        if (otherAdmins.rowCount === 0) throw new LastClinicAdminError();
+      }
       await client.query(
         `INSERT INTO doctor_profiles (id, user_id, display_name) VALUES ($1, $2, $3)
-         ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name, updated_at = now()`,
-        [doctorId, doctor.userId, doctor.displayName],
+         ON CONFLICT (user_id) DO NOTHING`,
+        [randomUUID(), doctor.userId, doctor.displayName],
       );
-      const profile = await client.query<{ id: string }>(
-        'SELECT id FROM doctor_profiles WHERE user_id = $1',
+      const profile = await client.query<{ id: string; display_name: string }>(
+        'SELECT id, display_name FROM doctor_profiles WHERE user_id = $1',
         [doctor.userId],
       );
-      const id = profile.rows[0]!.id;
-      await client.query(
+      const { id, display_name: displayName } = profile.rows[0]!;
+      const association = await client.query(
         `INSERT INTO doctor_clinics (clinic_id, doctor_id) VALUES ($1, $2)
          ON CONFLICT DO NOTHING`,
         [scope.clinicId, id],
       );
+      const result = {
+        doctor: { id, userId: doctor.userId, displayName },
+        changed: association.rowCount === 1 || currentRole !== 'doctor',
+      };
+      if (!result.changed) return result;
       await client.query(
-        `INSERT INTO clinic_memberships (clinic_id, user_id, role)
-         VALUES ($1, $2, 'doctor')
-         ON CONFLICT (clinic_id, user_id) DO UPDATE SET role = 'doctor', updated_at = now()`,
+        `UPDATE clinic_memberships SET role = 'doctor', updated_at = now()
+          WHERE clinic_id = $1 AND user_id = $2`,
         [scope.clinicId, doctor.userId],
       );
       await appendAuditEvent(client, {
@@ -385,7 +419,7 @@ export class ClinicService {
         entityId: id,
         action: 'doctor.associated',
       });
-      return id;
+      return result;
     });
   }
 }
