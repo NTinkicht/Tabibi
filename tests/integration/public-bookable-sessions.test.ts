@@ -273,9 +273,7 @@ describe('public bookable sessions (TAB-P0-03)', () => {
         clinic.doctors[0]!.sessions.length === BOOKABLE_SESSIONS_PER_DOCTOR,
     )!;
     expect(busy.doctors[0]!.sessions.map((s) => s.startsAt)).toEqual(
-      starts
-        .slice(0, BOOKABLE_SESSIONS_PER_DOCTOR)
-        .map((d) => d.toISOString()),
+      starts.slice(0, BOOKABLE_SESSIONS_PER_DOCTOR).map((d) => d.toISOString()),
     );
   });
 

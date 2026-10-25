@@ -139,7 +139,10 @@ export class PublicBookableSessionService {
         WHERE doctor_rank <= $2::int
         ORDER BY clinic_name, clinic_id, doctor_display_name, doctor_id,
                  starts_at, session_id`;
-    const values = [BOOKABLE_SESSION_HORIZON_DAYS, BOOKABLE_SESSIONS_PER_DOCTOR];
+    const values = [
+      BOOKABLE_SESSION_HORIZON_DAYS,
+      BOOKABLE_SESSIONS_PER_DOCTOR,
+    ];
     const result = await abortableQuery<PublicBookableSessionRow>(
       this.pool,
       text,
