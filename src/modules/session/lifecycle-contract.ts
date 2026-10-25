@@ -6,7 +6,7 @@
  * behaviour change and must bump SESSION_LIFECYCLE_CONTRACT_VERSION.
  */
 
-export const SESSION_LIFECYCLE_CONTRACT_VERSION = 'session-lifecycle/v1';
+export const SESSION_LIFECYCLE_CONTRACT_VERSION = 'session-lifecycle/v2';
 
 export const SESSION_STATUSES = [
   'planned',
@@ -55,6 +55,21 @@ export const SESSION_COMMAND_TARGET: Readonly<
   cancel: 'cancelled',
 };
 
+/**
+ * Statuses each command may be issued from. Two commands target `open`, so
+ * the target alone cannot tell them apart: `open` starts a planned session
+ * and `resume` restarts a paused one; neither stands in for the other.
+ */
+export const SESSION_COMMAND_SOURCES: Readonly<
+  Record<SessionCommand, readonly SessionStatus[]>
+> = {
+  open: ['planned'],
+  pause: ['open'],
+  resume: ['paused'],
+  close: ['open', 'paused'],
+  cancel: ['planned', 'open', 'paused'],
+};
+
 /** Queue-entry states cancelled together with their session. */
 export const SESSION_CANCELLATION_CASCADE_QUEUE_STATES = [
   'waiting',
@@ -79,7 +94,10 @@ export function applySessionCommand(
   from: SessionStatus,
 ): SessionStatus | null {
   const target = SESSION_COMMAND_TARGET[command];
-  return canTransitionSession(from, target) ? target : null;
+  return SESSION_COMMAND_SOURCES[command].includes(from) &&
+    canTransitionSession(from, target)
+    ? target
+    : null;
 }
 
 export function sessionCommandRequiresReason(command: SessionCommand): boolean {
