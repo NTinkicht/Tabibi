@@ -292,14 +292,20 @@ describe('priority exit compaction', () => {
     [['p1'], ['p2', 'p3', 'p4']],
     [['p3'], ['p1', 'p2', 'p4']],
     [['p4'], ['p1', 'p2', 'p3']],
-    [['p1', 'p3'], ['p2', 'p4']],
+    [
+      ['p1', 'p3'],
+      ['p2', 'p4'],
+    ],
     [cohort, []],
     [['unknown'], cohort],
     [[], cohort],
-  ])('removes %j and keeps the rest in slot order (new slot = index + 1)', (exiting, expected) => {
-    const remaining = planPriorityExitCompaction(cohort, exiting);
-    expect(remaining).toEqual(expected);
-  });
+  ])(
+    'removes %j and keeps the rest in slot order (new slot = index + 1)',
+    (exiting, expected) => {
+      const remaining = planPriorityExitCompaction(cohort, exiting);
+      expect(remaining).toEqual(expected);
+    },
+  );
 
   it('never mutates the input cohort', () => {
     const input = Object.freeze([...cohort]);
