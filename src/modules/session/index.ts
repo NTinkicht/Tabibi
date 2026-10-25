@@ -620,8 +620,19 @@ export class SessionService {
     sessionId: string,
     target: SessionStatus,
   ): Promise<ConsultationSession> {
-    const command: SessionCommand =
-      target === 'paused'
+    // `open` and `resume` both reach `open`; pick the one legal from the
+    // current status. The locked command path still re-checks it.
+    const resuming =
+      target === 'open' &&
+      (
+        await this.pool.query<{ status: SessionStatus }>(
+          `SELECT status FROM consultation_sessions WHERE id=$1 AND clinic_id=$2`,
+          [sessionId, scope.clinicId],
+        )
+      ).rows[0]?.status === 'paused';
+    const command: SessionCommand = resuming
+      ? 'resume'
+      : target === 'paused'
         ? 'pause'
         : target === 'closed'
           ? 'close'
