@@ -68,3 +68,10 @@ same-origin request; all routes require a valid staff session before any
 database access. Authorization is the service's, unchanged. Malformed input is
 400 `invalid_request`, overlaps and closure conflicts are 409 `conflict`, and an
 unknown, malformed or other-clinic template id is the same 404 `not_found`.
+
+Doctor absence days (#659) are exposed under
+`/api/clinics/{clinicId}/doctors/{doctorId}/absences` (GET, POST
+`{ absenceDate }` → 201 created / 200 existing) and
+`…/absences/{absenceDate}` (DELETE, idempotent). A malformed doctor id or day is
+400, an absence over a day with non-cancelled sessions is 409 `conflict`, and a
+doctor not associated with the clinic is 403 like every other service denial.
