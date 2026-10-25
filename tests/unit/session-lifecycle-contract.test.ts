@@ -111,9 +111,11 @@ describe('session lifecycle contract (TAB-P0-04)', () => {
     ];
     for (const command of ['declare_delay', 'update_delay'] as const)
       for (const [minutes, valid] of vectors)
-        expect([command, minutes, isValidDelayMinutes(command, minutes)]).toEqual(
-          [command, minutes, valid],
-        );
+        expect([
+          command,
+          minutes,
+          isValidDelayMinutes(command, minutes),
+        ]).toEqual([command, minutes, valid]);
     for (const [minutes] of vectors)
       expect(isValidDelayMinutes('clear_delay', minutes)).toBe(true);
   });
@@ -124,10 +126,13 @@ describe('session lifecycle contract (TAB-P0-04)', () => {
     hasDelay: boolean,
     fresh: boolean,
   ): DelayRefusal | 'ok' {
-    if (status === 'closed' || status === 'cancelled') return 'terminal_session';
+    if (status === 'closed' || status === 'cancelled')
+      return 'terminal_session';
     if (!fresh) return 'stale_version';
-    if (command === 'declare_delay') return hasDelay ? 'already_declared' : 'ok';
-    if (command === 'update_delay') return hasDelay ? 'ok' : 'no_delay_to_update';
+    if (command === 'declare_delay')
+      return hasDelay ? 'already_declared' : 'ok';
+    if (command === 'update_delay')
+      return hasDelay ? 'ok' : 'no_delay_to_update';
     return hasDelay ? 'ok' : 'no_delay_to_clear';
   }
 
