@@ -1,0 +1,137 @@
+{
+  "version": "queue-mutation-audit/v1",
+  "positive": [
+    {
+      "id": "check-in",
+      "prelude": [],
+      "command": "check_in",
+      "reason": null,
+      "cancellationSource": null,
+      "expected": {
+        "action": "queue_entry.check_in",
+        "from": "waiting",
+        "to": "checked_in",
+        "reason": null,
+        "cancellationSource": null,
+        "metadataKeys": [
+          "cancellationSource",
+          "command",
+          "correlationId",
+          "from",
+          "idempotencyKey",
+          "outcome",
+          "reason",
+          "sessionId",
+          "to"
+        ]
+      }
+    },
+    {
+      "id": "call",
+      "prelude": ["check_in"],
+      "command": "call",
+      "reason": null,
+      "cancellationSource": null,
+      "expected": {
+        "action": "queue_entry.call",
+        "from": "checked_in",
+        "to": "called",
+        "reason": null,
+        "cancellationSource": null,
+        "queueOrderingContractVersion": "queue-ordering/v1",
+        "metadataKeys": [
+          "cancellationSource",
+          "command",
+          "correlationId",
+          "from",
+          "idempotencyKey",
+          "outcome",
+          "queueOrderingContractVersion",
+          "reason",
+          "sessionId",
+          "to"
+        ]
+      }
+    },
+    {
+      "id": "no-show",
+      "prelude": ["check_in"],
+      "command": "no_show",
+      "reason": "Absent after call window",
+      "cancellationSource": null,
+      "expected": {
+        "action": "queue_entry.no_show",
+        "from": "checked_in",
+        "to": "no_show",
+        "reason": "Absent after call window",
+        "cancellationSource": null,
+        "metadataKeys": [
+          "cancellationSource",
+          "command",
+          "correlationId",
+          "from",
+          "idempotencyKey",
+          "outcome",
+          "reason",
+          "sessionId",
+          "to"
+        ]
+      }
+    },
+    {
+      "id": "cancel-patient",
+      "prelude": [],
+      "command": "cancel",
+      "reason": "Patient requested",
+      "cancellationSource": "patient",
+      "expected": {
+        "action": "queue_entry.cancel",
+        "from": "waiting",
+        "to": "cancelled",
+        "reason": "Patient requested",
+        "cancellationSource": "patient",
+        "metadataKeys": [
+          "cancellationSource",
+          "command",
+          "correlationId",
+          "from",
+          "idempotencyKey",
+          "outcome",
+          "reason",
+          "sessionId",
+          "to"
+        ]
+      }
+    }
+  ],
+  "negative": [
+    {
+      "id": "no-show-without-reason",
+      "prelude": ["check_in"],
+      "command": "no_show",
+      "reason": null,
+      "cancellationSource": null
+    },
+    {
+      "id": "cancel-without-reason",
+      "prelude": [],
+      "command": "cancel",
+      "reason": null,
+      "cancellationSource": "patient"
+    },
+    {
+      "id": "unknown-command",
+      "prelude": [],
+      "command": "teleport",
+      "reason": null,
+      "cancellationSource": null
+    },
+    {
+      "id": "call-from-waiting",
+      "prelude": [],
+      "command": "call",
+      "reason": null,
+      "cancellationSource": null
+    }
+  ]
+}
