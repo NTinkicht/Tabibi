@@ -152,6 +152,39 @@ function compareServiceOrder(
   return a.registrationOrder - b.registrationOrder;
 }
 
+/**
+ * Display rank of each active state in the displayed service order: the
+ * entries being served (called or in consultation) first, then the callable
+ * `checked_in` entries, then registered-but-not-yet-eligible `waiting` entries.
+ * Terminal states have no display rank.
+ */
+export const QUEUE_DISPLAY_STATE_RANK: Readonly<
+  Partial<Record<QueueEntryState, number>>
+> = {
+  called: 0,
+  in_consultation: 0,
+  checked_in: 1,
+  waiting: 2,
+};
+
+/**
+ * The displayed service order of the active (non-terminal) entries: display
+ * rank, then the committed service order (priority slot, eligibility,
+ * registration). Pure and non-mutating; terminal entries are dropped. The
+ * first `checked_in` entry of the result is always `selectNextCallableEntry`.
+ */
+export function orderQueueForDisplay<T extends ServiceOrderCandidate>(
+  entries: readonly T[],
+): T[] {
+  return entries
+    .filter((entry) => QUEUE_DISPLAY_STATE_RANK[entry.state] !== undefined)
+    .sort(
+      (a, b) =>
+        QUEUE_DISPLAY_STATE_RANK[a.state]! -
+          QUEUE_DISPLAY_STATE_RANK[b.state]! || compareServiceOrder(a, b),
+    );
+}
+
 export type PriorityPlacement =
   | { ok: true; orderedIds: string[] }
   | { ok: false; maximumPosition: number };
