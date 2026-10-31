@@ -5,6 +5,7 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import { SPECIALTIES } from '@/modules/clinic/specialties';
+import { WILAYAS } from '@/modules/clinic/wilayas';
 
 const client = new Client({ connectionString: process.env.DATABASE_URL });
 const committedMigrations = [
@@ -47,6 +48,7 @@ const committedMigrations = [
   '0037_clinic_closures.sql',
   '0038_consultation_types.sql',
   '0039_doctor_absences.sql',
+  '0040_clinic_location.sql',
   '0041_clinic_doctor_specialties.sql',
 ];
 
@@ -72,6 +74,63 @@ describe('committed migration chain', () => {
       'SELECT count(*)::text count FROM schema_migrations',
     );
     expect(rerun.rows[0]!.count).toBe(String(committedMigrations.length));
+  });
+
+  it('constrains clinic locations to the versioned wilaya list and never stores a commune or address without a wilaya (#686)', async () => {
+    const attempt = async (
+      wilaya: string | null,
+      commune: string | null,
+      address: string | null,
+    ): Promise<string> => {
+      await client.query('SAVEPOINT location_attempt');
+      try {
+        await client.query(
+          `INSERT INTO clinics (id, tenant_key, name, wilaya_code, commune, address_line)
+           VALUES ($1, $2, 'Location', $3, $4, $5)`,
+          [
+            randomUUID(),
+            `loc-${randomUUID().slice(0, 8)}`,
+            wilaya,
+            commune,
+            address,
+          ],
+        );
+        await client.query('RELEASE SAVEPOINT location_attempt');
+        return 'ok';
+      } catch (error) {
+        await client.query('ROLLBACK TO SAVEPOINT location_attempt');
+        return (error as { constraint?: string }).constraint ?? 'error';
+      }
+    };
+    await client.query('BEGIN');
+    try {
+      for (const wilaya of WILAYAS) {
+        expect(await attempt(wilaya.code, null, null)).toBe('ok');
+      }
+      expect(await attempt(null, null, null)).toBe('ok');
+      expect(await attempt('16', 'Bab Ezzouar', 'Rue 1')).toBe('ok');
+      for (const code of ['00', '59', '1', '016', 'Alger']) {
+        expect(await attempt(code, null, null)).toBe(
+          'clinics_wilaya_code_known',
+        );
+      }
+      expect(await attempt(null, 'Bab Ezzouar', null)).toBe(
+        'clinics_location_requires_wilaya',
+      );
+      expect(await attempt(null, null, 'Rue 1')).toBe(
+        'clinics_location_requires_wilaya',
+      );
+      expect(await attempt('16', '', null)).toBe('clinics_commune_length');
+      expect(await attempt('16', ' x', null)).toBe('clinics_commune_length');
+      expect(await attempt('16', 'c'.repeat(101), null)).toBe(
+        'clinics_commune_length',
+      );
+      expect(await attempt('16', null, 'a'.repeat(201))).toBe(
+        'clinics_address_line_length',
+      );
+    } finally {
+      await client.query('ROLLBACK');
+    }
   });
 
   it('bounds the v1 priority-change audit lookup with a valid session-scoped partial index', async () => {

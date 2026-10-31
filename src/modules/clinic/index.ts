@@ -9,6 +9,13 @@ import {
 import { abortableQuery } from '@/platform/database/abortable-query';
 import { inTransaction } from '@/platform/database/transaction';
 
+export {
+  WILAYA_LIST_VERSION,
+  WILAYAS,
+  type Wilaya,
+  isWilayaCode,
+} from './wilayas';
+
 export interface Clinic {
   id: string;
   tenantKey: string;
@@ -17,6 +24,16 @@ export interface Clinic {
   defaultLocale: 'ar' | 'fr';
   enabledLocales: Array<'ar' | 'fr'>;
   status: 'active' | 'inactive';
+  // TAB-P0-02 (#686): the clinic's single location; all null when unset.
+  wilayaCode: string | null;
+  commune: string | null;
+  addressLine: string | null;
+}
+
+export interface ClinicLocation {
+  wilayaCode: string | null;
+  commune: string | null;
+  addressLine: string | null;
 }
 
 export interface ClinicMembership {
@@ -52,7 +69,13 @@ interface ClinicRow {
   default_locale: 'ar' | 'fr';
   enabled_locales: Array<'ar' | 'fr'>;
   status: 'active' | 'inactive';
+  wilaya_code: string | null;
+  commune: string | null;
+  address_line: string | null;
 }
+
+const CLINIC_COLUMNS = `id, tenant_key, name, timezone, default_locale, enabled_locales, status,
+  wilaya_code, commune, address_line`;
 
 interface PublicDiscoveryRow {
   clinic_id: string;
@@ -71,6 +94,9 @@ function clinicFromRow(row: ClinicRow): Clinic {
     defaultLocale: row.default_locale,
     enabledLocales: row.enabled_locales,
     status: row.status,
+    wilayaCode: row.wilaya_code,
+    commune: row.commune,
+    addressLine: row.address_line,
   };
 }
 
@@ -197,8 +223,7 @@ export class ClinicService {
       'clinic_admin',
     ]);
     const result = await this.pool.query<ClinicRow>(
-      `SELECT id, tenant_key, name, timezone, default_locale, enabled_locales, status
-         FROM clinics WHERE id = $1`,
+      `SELECT ${CLINIC_COLUMNS} FROM clinics WHERE id = $1`,
       [scope.clinicId],
     );
     if (!result.rows[0]) throw new Error('Clinic not found');
@@ -213,8 +238,14 @@ export class ClinicService {
       defaultLocale?: 'ar' | 'fr';
       enabledLocales?: Array<'ar' | 'fr'>;
       status?: 'active' | 'inactive';
-    },
+    } & Partial<ClinicLocation>,
   ): Promise<Clinic> {
+    // The location is replaced as a whole when any part of it is given
+    // (clinic-input.ts requires all three keys together); absent keys keep it.
+    const setLocation =
+      update.wilayaCode !== undefined ||
+      update.commune !== undefined ||
+      update.addressLine !== undefined;
     return inTransaction(this.pool, async (client) => {
       await requireClinicRole(client, scope, ['clinic_admin']);
       if (update.timezone != null) {
@@ -228,9 +259,13 @@ export class ClinicService {
         `UPDATE clinics SET name = COALESCE($2, name), timezone = COALESCE($3, timezone),
            default_locale = COALESCE($4, default_locale),
            enabled_locales = COALESCE($5, enabled_locales),
-           status = COALESCE($6, status), updated_at = now()
+           status = COALESCE($6, status),
+           wilaya_code = CASE WHEN $7::boolean THEN $8 ELSE wilaya_code END,
+           commune = CASE WHEN $7::boolean THEN $9 ELSE commune END,
+           address_line = CASE WHEN $7::boolean THEN $10 ELSE address_line END,
+           updated_at = now()
          WHERE id = $1
-         RETURNING id, tenant_key, name, timezone, default_locale, enabled_locales, status`,
+         RETURNING ${CLINIC_COLUMNS}`,
         [
           scope.clinicId,
           update.name ?? null,
@@ -238,6 +273,10 @@ export class ClinicService {
           update.defaultLocale ?? null,
           update.enabledLocales ?? null,
           update.status ?? null,
+          setLocation,
+          update.wilayaCode ?? null,
+          update.commune ?? null,
+          update.addressLine ?? null,
         ],
       );
       if (!result.rows[0]) throw new Error('Clinic not found');
