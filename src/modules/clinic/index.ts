@@ -1,4 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import {
+  PUBLIC_DISCOVERY_MAX_PAGE,
+  PUBLIC_DISCOVERY_PAGE_SIZE,
+} from './discovery-page';
 import type { Pool } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
 import {
@@ -78,6 +82,16 @@ export interface PublicDiscoveryClinic {
 // at least one session the public bookable-sessions listing would offer
 // (same predicate and horizon), and omits clinics left with no such doctor.
 // It is a filter only: no session data is added to the projection.
+export {
+  PUBLIC_DISCOVERY_MAX_PAGE,
+  PUBLIC_DISCOVERY_PAGE_SIZE,
+} from './discovery-page';
+
+export interface PublicDiscoveryPage {
+  clinics: PublicDiscoveryClinic[];
+  hasMore: boolean;
+}
+
 export interface PublicDiscoveryFilters {
   wilayaCode?: string;
   specialtyCode?: string;
@@ -144,6 +158,46 @@ export class PublicDiscoveryService {
     signal?: AbortSignal,
     filters: PublicDiscoveryFilters = {},
   ): Promise<PublicDiscoveryClinic[]> {
+    return this.queryClinics(queryTimeoutMs, signal, filters, null, 0);
+  }
+
+  // TAB-P0-03 (#694): one server-fixed page of discovery. Clinics are paged
+  // before their doctors are joined, so a clinic is never split across pages;
+  // one look-ahead clinic tells whether a further page exists. No count or
+  // identifier is returned.
+  async listClinicsPage(
+    queryTimeoutMs: number | undefined,
+    signal: AbortSignal | undefined,
+    filters: PublicDiscoveryFilters,
+    page: number,
+  ): Promise<PublicDiscoveryPage> {
+    if (
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      page > PUBLIC_DISCOVERY_MAX_PAGE
+    ) {
+      throw new InvalidDiscoveryFilterError();
+    }
+    const clinics = await this.queryClinics(
+      queryTimeoutMs,
+      signal,
+      filters,
+      PUBLIC_DISCOVERY_PAGE_SIZE + 1,
+      (page - 1) * PUBLIC_DISCOVERY_PAGE_SIZE,
+    );
+    return {
+      clinics: clinics.slice(0, PUBLIC_DISCOVERY_PAGE_SIZE),
+      hasMore: clinics.length > PUBLIC_DISCOVERY_PAGE_SIZE,
+    };
+  }
+
+  private async queryClinics(
+    queryTimeoutMs: number | undefined,
+    signal: AbortSignal | undefined,
+    filters: PublicDiscoveryFilters,
+    clinicLimit: number | null,
+    clinicOffset: number,
+  ): Promise<PublicDiscoveryClinic[]> {
     const { wilayaCode, specialtyCode, availableOnly } = filters;
     // Fail closed: a filter value outside the controlled lists is refused
     // here as well as at the HTTP boundary, never silently ignored.
@@ -159,6 +213,8 @@ export class PublicDiscoveryService {
       specialtyCode ?? null,
       availableOnly === true,
       BOOKABLE_SESSION_HORIZON_DAYS,
+      clinicLimit,
+      clinicOffset,
     ];
     // A doctor matches at a clinic when the association holds the requested
     // specialty and, if availability is requested, has a session that
@@ -172,7 +228,19 @@ export class PublicDiscoveryService {
                    AND session.status IN ('planned', 'open', 'paused')
                    AND session.starts_at > now()
                    AND session.starts_at < now() + make_interval(days => $4::int)))`;
-    const text = `SELECT clinic.id AS clinic_id,
+    // `LIMIT NULL` is no limit: the unpaged listing keeps every clinic.
+    const text = `WITH page_clinics AS (
+           SELECT clinic.id
+             FROM clinics clinic
+            WHERE clinic.status = 'active'
+              AND ($1::text IS NULL OR clinic.wilaya_code = $1::text)
+              AND (($2::text IS NULL AND NOT $3::boolean) OR EXISTS (
+                    SELECT 1 FROM doctor_clinics matching
+                     WHERE matching.clinic_id = clinic.id
+                       AND ${matchesDoctor('matching')}))
+            ORDER BY clinic.name, clinic.id
+            LIMIT $5::int OFFSET $6::int)
+       SELECT clinic.id AS clinic_id,
               clinic.name AS clinic_name,
               clinic.default_locale,
               clinic.enabled_locales,
@@ -181,16 +249,11 @@ export class PublicDiscoveryService {
               clinic.address_line,
               doctor.display_name AS doctor_display_name,
               association.specialty_codes AS doctor_specialty_codes
-         FROM clinics clinic
+         FROM page_clinics
+         JOIN clinics clinic ON clinic.id = page_clinics.id
          LEFT JOIN doctor_clinics association ON association.clinic_id = clinic.id
           AND ${matchesDoctor('association')}
          LEFT JOIN doctor_profiles doctor ON doctor.id = association.doctor_id
-        WHERE clinic.status = 'active'
-          AND ($1::text IS NULL OR clinic.wilaya_code = $1::text)
-          AND (($2::text IS NULL AND NOT $3::boolean) OR EXISTS (
-                SELECT 1 FROM doctor_clinics matching
-                 WHERE matching.clinic_id = clinic.id
-                   AND ${matchesDoctor('matching')}))
         ORDER BY clinic.name, clinic.id, doctor.display_name, doctor.id`;
     const result = signal
       ? await abortableQuery<PublicDiscoveryRow>(

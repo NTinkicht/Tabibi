@@ -1,3 +1,4 @@
+import { PUBLIC_DISCOVERY_MAX_PAGE } from '@/modules/clinic/discovery-page';
 import { isSpecialtyCode } from '@/modules/clinic/specialties';
 import { isWilayaCode } from '@/modules/clinic/wilayas';
 
@@ -7,12 +8,17 @@ import { isWilayaCode } from '@/modules/clinic/wilayas';
 // ignored, so a malformed filter never silently returns an unfiltered list.
 // TAB-P0-03 (#692): `available` accepts exactly `true`; any other value
 // (`false`, `1`, empty) is refused, never read as "no filter".
-const FILTER_KEYS = new Set(['wilaya', 'specialty', 'available']);
+// TAB-P0-03 (#694): `page` is a canonical decimal 1..PUBLIC_DISCOVERY_MAX_PAGE
+// (no sign, leading zero, fraction or exponent); the page size is fixed by
+// the server and cannot be chosen by the caller.
+const FILTER_KEYS = new Set(['wilaya', 'specialty', 'available', 'page']);
+const PAGE_PATTERN = /^[1-9][0-9]{0,2}$/;
 
 export interface DiscoveryFilterInput {
   wilayaCode?: string;
   specialtyCode?: string;
   availableOnly?: true;
+  page?: number;
 }
 
 export function parseDiscoveryFilters(
@@ -39,6 +45,13 @@ export function parseDiscoveryFilters(
   if (available !== null) {
     if (available !== 'true') return null;
     filters.availableOnly = true;
+  }
+  const page = params.get('page');
+  if (page !== null) {
+    if (!PAGE_PATTERN.test(page)) return null;
+    const value = Number(page);
+    if (value > PUBLIC_DISCOVERY_MAX_PAGE) return null;
+    filters.page = value;
   }
   return filters;
 }
