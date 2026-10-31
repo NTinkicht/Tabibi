@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import {
@@ -370,6 +370,265 @@ describe('public clinic and doctor discovery', () => {
         'Kouba',
       ]) {
         expect(serialized).not.toContain(forbidden);
+      }
+    });
+  });
+  describe('TAB-P0-03 available-session filter (#692)', () => {
+    const available = { availableOnly: true } as const;
+    const names = (
+      clinics: Awaited<ReturnType<PublicDiscoveryService['listClinics']>>,
+    ) =>
+      clinics.map((clinic) => [
+        clinic.name,
+        clinic.doctors.map((doctor) => doctor.displayName),
+      ]);
+
+    // Two active clinics (Algiers, Oran), one inactive; Dr Cardio works at
+    // both active clinics, Dr Kids only in Algiers, Dr Hidden at the
+    // inactive clinic. No sessions yet.
+    async function seed() {
+      const ids = Array.from({ length: 9 }, () => randomUUID());
+      const [algiers, oran, hidden, u1, u2, u3, cardio, kids, hiddenDoctor] =
+        ids;
+      await pool.query(
+        `INSERT INTO users (id, auth_subject, display_name) VALUES
+          ($1, 'p692-u1', 'U1'), ($2, 'p692-u2', 'U2'), ($3, 'p692-u3', 'U3')`,
+        [u1, u2, u3],
+      );
+      await pool.query(
+        `INSERT INTO clinics (id, tenant_key, name, status, wilaya_code) VALUES
+          ($1, 'p692-alg', 'Alger Centre', 'active', '16'),
+          ($2, 'p692-ora', 'Oran Clinic', 'active', '31'),
+          ($3, 'p692-hidden', 'Hidden Clinic', 'inactive', '16')`,
+        [algiers, oran, hidden],
+      );
+      await pool.query(
+        `INSERT INTO doctor_profiles (id, user_id, display_name) VALUES
+          ($1, $4, 'Dr Cardio'), ($2, $5, 'Dr Kids'), ($3, $6, 'Dr Hidden')`,
+        [cardio, kids, hiddenDoctor, u1, u2, u3],
+      );
+      await pool.query(
+        `INSERT INTO doctor_clinics (clinic_id, doctor_id, specialty_codes) VALUES
+          ($1, $4, ARRAY['cardiology']),
+          ($1, $5, ARRAY['pediatrics']),
+          ($2, $4, ARRAY['cardiology']),
+          ($3, $6, ARRAY['cardiology'])`,
+        [algiers, oran, hidden, cardio, kids, hiddenDoctor],
+      );
+      return { ids, algiers, oran, hidden, cardio, kids, hiddenDoctor };
+    }
+
+    // `startsAt` is a SQL expression evaluated by PostgreSQL so it is
+    // relative to the same clock as the discovery predicate.
+    async function session(
+      db: Pool | PoolClient,
+      clinicId: string,
+      doctorId: string,
+      startsAt: string,
+      status = 'planned',
+    ) {
+      const id = randomUUID();
+      await db.query(
+        `INSERT INTO consultation_sessions
+           (id, clinic_id, doctor_id, service_date, starts_at, ends_at, status)
+         SELECT $1, $2, $3, (s.at)::date, s.at, s.at + interval '2 hours', $4::session_status
+           FROM (SELECT ${startsAt} AS at) s`,
+        [id, clinicId, doctorId, status],
+      );
+      return id;
+    }
+
+    const service = () => new PublicDiscoveryService(pool);
+
+    it('returns nothing when no doctor has a bookable session, and leaves unfiltered discovery unchanged', async () => {
+      await seed();
+      expect(
+        await service().listClinics(undefined, undefined, available),
+      ).toEqual([]);
+      expect(names(await service().listClinics())).toEqual([
+        ['Alger Centre', ['Dr Cardio', 'Dr Kids']],
+        ['Oran Clinic', ['Dr Cardio']],
+      ]);
+      expect(
+        names(
+          await service().listClinics(undefined, undefined, {
+            availableOnly: false,
+          }),
+        ),
+      ).toEqual(names(await service().listClinics()));
+    });
+
+    it('matches planned, open and paused sessions inside the horizon', async () => {
+      for (const status of ['planned', 'open', 'paused']) {
+        await pool.query(
+          'TRUNCATE consultation_sessions, doctor_clinics, doctor_profiles, clinics, users CASCADE',
+        );
+        const { algiers, kids } = await seed();
+        await session(pool, algiers, kids, `now() + interval '3 days'`, status);
+        expect(
+          names(await service().listClinics(undefined, undefined, available)),
+          status,
+        ).toEqual([['Alger Centre', ['Dr Kids']]]);
+      }
+    });
+
+    it('ignores closed and cancelled, past and beyond-horizon sessions', async () => {
+      const { algiers, oran, cardio, kids } = await seed();
+      await session(pool, algiers, kids, `now() + interval '1 day'`, 'closed');
+      await session(
+        pool,
+        algiers,
+        kids,
+        `now() + interval '1 day'`,
+        'cancelled',
+      );
+      await session(pool, algiers, cardio, `now() - interval '1 minute'`);
+      await session(pool, oran, cardio, `now() + interval '15 days'`);
+      expect(
+        await service().listClinics(undefined, undefined, available),
+      ).toEqual([]);
+    });
+
+    it('excludes a session starting exactly now or exactly at the horizon', async () => {
+      const { algiers, kids } = await seed();
+      const client = await pool.connect();
+      try {
+        // Inside one transaction now() is fixed, so the boundaries are exact.
+        await client.query('BEGIN');
+        const inTransaction = new PublicDiscoveryService(
+          client as unknown as Pool,
+        );
+        await session(client, algiers, kids, 'now()');
+        await session(client, algiers, kids, `now() + interval '14 days'`);
+        expect(
+          await inTransaction.listClinics(undefined, undefined, available),
+        ).toEqual([]);
+        await session(
+          client,
+          algiers,
+          kids,
+          `now() + interval '14 days' - interval '1 second'`,
+        );
+        expect(
+          names(
+            await inTransaction.listClinics(undefined, undefined, available),
+          ),
+        ).toEqual([['Alger Centre', ['Dr Kids']]]);
+      } finally {
+        await client.query('ROLLBACK');
+        client.release();
+      }
+    });
+
+    it('never matches an inactive clinic and scopes availability to the clinic of the session', async () => {
+      const { hidden, oran, cardio, hiddenDoctor } = await seed();
+      await session(pool, hidden, hiddenDoctor, `now() + interval '1 day'`);
+      // Dr Cardio's session is at Oran only: Alger Centre must not list them.
+      await session(pool, oran, cardio, `now() + interval '1 day'`);
+      expect(
+        names(await service().listClinics(undefined, undefined, available)),
+      ).toEqual([['Oran Clinic', ['Dr Cardio']]]);
+    });
+
+    it('lists only the available doctors of a clinic and composes with wilaya and specialty', async () => {
+      const { algiers, oran, cardio, kids } = await seed();
+      await session(pool, algiers, kids, `now() + interval '2 days'`);
+      await session(pool, oran, cardio, `now() + interval '2 days'`);
+      expect(
+        names(await service().listClinics(undefined, undefined, available)),
+      ).toEqual([
+        ['Alger Centre', ['Dr Kids']],
+        ['Oran Clinic', ['Dr Cardio']],
+      ]);
+      expect(
+        names(
+          await service().listClinics(undefined, undefined, {
+            ...available,
+            wilayaCode: '16',
+          }),
+        ),
+      ).toEqual([['Alger Centre', ['Dr Kids']]]);
+      // Dr Cardio holds cardiology in Algiers but is only available in Oran;
+      // the specialty and availability must hold for the same doctor.
+      expect(
+        names(
+          await service().listClinics(undefined, undefined, {
+            ...available,
+            specialtyCode: 'cardiology',
+          }),
+        ),
+      ).toEqual([['Oran Clinic', ['Dr Cardio']]]);
+      expect(
+        await service().listClinics(undefined, undefined, {
+          ...available,
+          wilayaCode: '16',
+          specialtyCode: 'cardiology',
+        }),
+      ).toEqual([]);
+      // Abortable query path applies the same filter.
+      expect(
+        names(
+          await service().listClinics(undefined, new AbortController().signal, {
+            ...available,
+            specialtyCode: 'pediatrics',
+          }),
+        ),
+      ).toEqual([['Alger Centre', ['Dr Kids']]]);
+    });
+
+    it('keeps the projection allow-list and leaks no identifier or session time', async () => {
+      const { ids, algiers, kids } = await seed();
+      const sessionId = await session(
+        pool,
+        algiers,
+        kids,
+        `now() + interval '4 days'`,
+      );
+      const {
+        rows: [row],
+      } = await pool.query<{ starts_at: Date; service_date: string }>(
+        `SELECT starts_at, service_date::text AS service_date
+           FROM consultation_sessions WHERE id = $1`,
+        [sessionId],
+      );
+      const result = await service().listClinics(
+        undefined,
+        undefined,
+        available,
+      );
+      expect(result).toEqual([
+        {
+          name: 'Alger Centre',
+          defaultLocale: 'ar',
+          enabledLocales: ['ar', 'fr'],
+          wilayaCode: '16',
+          commune: null,
+          addressLine: null,
+          doctors: [{ displayName: 'Dr Kids', specialtyCodes: ['pediatrics'] }],
+        },
+      ]);
+      const serialized = JSON.stringify(result);
+      for (const forbidden of [
+        ...ids,
+        sessionId,
+        row.starts_at.toISOString(),
+        row.service_date,
+        'p692-',
+        'Hidden Clinic',
+        'Dr Hidden',
+      ]) {
+        expect(serialized).not.toContain(forbidden);
+      }
+    });
+
+    it('refuses a non-boolean availability flag', async () => {
+      await seed();
+      for (const availableOnly of ['true', 1, null]) {
+        await expect(
+          service().listClinics(undefined, undefined, {
+            availableOnly,
+          } as unknown as { availableOnly: boolean }),
+        ).rejects.toBeInstanceOf(InvalidDiscoveryFilterError);
       }
     });
   });
