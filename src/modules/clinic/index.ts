@@ -45,6 +45,9 @@ export interface ClinicDoctor {
   id: string;
   userId: string;
   displayName: string;
+  // TAB-P0-03 (#687): this clinic's specialty codes for the doctor (the
+  // association's, never the shared profile's); empty means not yet set.
+  specialtyCodes: string[];
 }
 
 export interface PublicDiscoveryDoctor {
@@ -190,6 +193,16 @@ export class MembershipUserNotFoundError extends Error {
 // setMembership with existingMemberOnly: the user is not a member of this
 // clinic (unknown, malformed or only a member elsewhere). Same error for all
 // of them, so the staff route is not a cross-clinic membership oracle.
+// setDoctorSpecialties: the doctor is not associated with this clinic
+// (unknown, malformed or only associated elsewhere). One error for all of
+// them, so the staff route is not a cross-clinic doctor oracle.
+export class ClinicDoctorNotFoundError extends Error {
+  constructor() {
+    super('Doctor not found');
+    this.name = 'ClinicDoctorNotFoundError';
+  }
+}
+
 export class MembershipNotFoundError extends Error {
   constructor() {
     super('Membership not found');
@@ -300,8 +313,10 @@ export class ClinicService {
       id: string;
       user_id: string;
       display_name: string;
+      specialty_codes: string[];
     }>(
-      `SELECT doctor.id, doctor.user_id, doctor.display_name
+      `SELECT doctor.id, doctor.user_id, doctor.display_name,
+              association.specialty_codes
          FROM doctor_profiles doctor
          JOIN doctor_clinics association ON association.doctor_id = doctor.id
         WHERE association.clinic_id = $1 ORDER BY doctor.display_name, doctor.id`,
@@ -311,7 +326,62 @@ export class ClinicService {
       id: row.id,
       userId: row.user_id,
       displayName: row.display_name,
+      specialtyCodes: row.specialty_codes,
     }));
+  }
+
+  // TAB-P0-03 (#687, #669 Q2 = A): replace this clinic's specialty codes for
+  // one of its doctors. Only the clinic_admin of this clinic, only on this
+  // clinic's association row: the shared doctor_profiles row and the doctor's
+  // associations with other clinics are never written. The codes (1 to 3,
+  // unique, known) are validated at the HTTP boundary and again by the
+  // database CHECKs. Unchanged codes are a no-op without an audit event.
+  async setDoctorSpecialties(
+    scope: ClinicScope,
+    doctorId: string,
+    specialtyCodes: string[],
+  ): Promise<{ doctor: ClinicDoctor; changed: boolean }> {
+    return inTransaction(this.pool, async (client) => {
+      await requireClinicRole(client, scope, ['clinic_admin']);
+      if (!UUID_PATTERN.test(doctorId)) throw new ClinicDoctorNotFoundError();
+      const current = await client.query<{
+        user_id: string;
+        display_name: string;
+        specialty_codes: string[];
+      }>(
+        `SELECT doctor.user_id, doctor.display_name, association.specialty_codes
+           FROM doctor_clinics association
+           JOIN doctor_profiles doctor ON doctor.id = association.doctor_id
+          WHERE association.clinic_id = $1 AND association.doctor_id = $2
+          FOR UPDATE OF association`,
+        [scope.clinicId, doctorId],
+      );
+      const row = current.rows[0];
+      if (!row) throw new ClinicDoctorNotFoundError();
+      const doctor: ClinicDoctor = {
+        id: doctorId,
+        userId: row.user_id,
+        displayName: row.display_name,
+        specialtyCodes: [...specialtyCodes],
+      };
+      const unchanged =
+        row.specialty_codes.length === specialtyCodes.length &&
+        row.specialty_codes.every((code, i) => code === specialtyCodes[i]);
+      if (unchanged) return { doctor, changed: false };
+      await client.query(
+        `UPDATE doctor_clinics SET specialty_codes = $3
+          WHERE clinic_id = $1 AND doctor_id = $2`,
+        [scope.clinicId, doctorId, specialtyCodes],
+      );
+      await appendAuditEvent(client, {
+        ...scope,
+        entityType: 'doctor',
+        entityId: doctorId,
+        action: 'doctor.specialties_set',
+        metadata: { specialtyCodes },
+      });
+      return { doctor, changed: true };
+    });
   }
 
   // Staff-assignment integrity. The clinic row is locked so that concurrent
@@ -442,8 +512,18 @@ export class ClinicService {
          ON CONFLICT DO NOTHING`,
         [scope.clinicId, id],
       );
+      const codes = await client.query<{ specialty_codes: string[] }>(
+        `SELECT specialty_codes FROM doctor_clinics
+          WHERE clinic_id = $1 AND doctor_id = $2`,
+        [scope.clinicId, id],
+      );
       const result = {
-        doctor: { id, userId: doctor.userId, displayName },
+        doctor: {
+          id,
+          userId: doctor.userId,
+          displayName,
+          specialtyCodes: codes.rows[0]!.specialty_codes,
+        },
         changed: association.rowCount === 1 || currentRole !== 'doctor',
       };
       if (!result.changed) return result;
