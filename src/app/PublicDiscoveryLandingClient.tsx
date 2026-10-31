@@ -1,17 +1,19 @@
 'use client';
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  type PublicClinic,
+  type PublicLocale,
+  clinicLocation,
+  doctorSpecialties,
+  parsePublicClinics,
+} from './public-discovery-clinics';
 import { fetchAllDiscoveryPages } from './public-discovery-pages';
 
-type Locale = 'ar' | 'fr';
+type Locale = PublicLocale;
 type ClinicLanguageFilter = Locale | 'all';
 type ClinicSort = 'original' | 'ascending' | 'descending';
-export type PublicClinic = {
-  name: string;
-  defaultLocale: Locale;
-  enabledLocales: Locale[];
-  doctors: { displayName: string }[];
-};
+export type { PublicClinic };
 type LoadState = 'loading' | 'ready' | 'error';
 
 function subscribeToBrowserLocale(onChange: () => void) {
@@ -83,6 +85,8 @@ const copy = {
       `${count} médecin${count === 1 ? '' : 's'} affiché${count === 1 ? '' : 's'}`,
     noDoctors: 'Aucun médecin affiché pour le moment.',
     languages: 'Langues',
+    location: 'Adresse',
+    specialties: 'Spécialités',
     empty: 'Aucune clinique à afficher pour le moment.',
     error: 'Le répertoire est momentanément indisponible.',
     retry: 'Réessayer',
@@ -144,6 +148,8 @@ const copy = {
           : `${count} أطباء في القائمة`,
     noDoctors: 'لا يوجد أطباء معروضون حاليًا.',
     languages: 'اللغات',
+    location: 'العنوان',
+    specialties: 'التخصصات',
     empty: 'لا توجد عيادات معروضة حاليًا.',
     error: 'دليل العيادات غير متاح مؤقتًا.',
     retry: 'إعادة المحاولة',
@@ -172,48 +178,6 @@ function doctorsVisibleForQuery(
   return clinic.doctors.filter((doctor) =>
     normalizeSearch(doctor.displayName).includes(query),
   );
-}
-
-function parseClinics(value: unknown): PublicClinic[] | null {
-  if (typeof value !== 'object' || value === null || !('clinics' in value)) {
-    return null;
-  }
-  const clinics = value.clinics;
-  if (!Array.isArray(clinics)) return null;
-  const result: PublicClinic[] = [];
-  for (const clinic of clinics) {
-    if (
-      typeof clinic !== 'object' ||
-      clinic === null ||
-      typeof clinic.name !== 'string' ||
-      (clinic.defaultLocale !== 'ar' && clinic.defaultLocale !== 'fr') ||
-      !Array.isArray(clinic.enabledLocales) ||
-      !clinic.enabledLocales.every(
-        (entry: unknown) => entry === 'ar' || entry === 'fr',
-      ) ||
-      !Array.isArray(clinic.doctors)
-    ) {
-      return null;
-    }
-    const doctors: { displayName: string }[] = [];
-    for (const doctor of clinic.doctors) {
-      if (
-        typeof doctor !== 'object' ||
-        doctor === null ||
-        typeof doctor.displayName !== 'string'
-      ) {
-        return null;
-      }
-      doctors.push({ displayName: doctor.displayName });
-    }
-    result.push({
-      name: clinic.name,
-      defaultLocale: clinic.defaultLocale,
-      enabledLocales: [...clinic.enabledLocales],
-      doctors,
-    });
-  }
-  return result;
 }
 
 /**
@@ -322,7 +286,7 @@ export default function PublicDiscoveryLandingClient({
         const publicClinics = await fetchAllDiscoveryPages(
           fetch,
           controller.signal,
-          parseClinics,
+          parsePublicClinics,
         );
         if (controller.signal.aborted) return;
         setClinics(publicClinics);
@@ -721,6 +685,11 @@ export default function PublicDiscoveryLandingClient({
                       .map((value) => (value === 'ar' ? 'العربية' : 'Français'))
                       .join(' · ')}
                   </p>
+                  {clinicLocation(clinic, locale) !== null && (
+                    <p className="publicLocation">
+                      {t.location}: {clinicLocation(clinic, locale)}
+                    </p>
+                  )}
                   <h4>{t.doctors}</h4>
                   {visibleDoctors.length > 0 && (
                     <p className="publicDoctorCount">
@@ -732,7 +701,16 @@ export default function PublicDiscoveryLandingClient({
                   ) : (
                     <ul>
                       {visibleDoctors.map((doctor, doctorIndex) => (
-                        <li key={doctorIndex}>{doctor.displayName}</li>
+                        <li key={doctorIndex}>
+                          {doctor.displayName}
+                          {doctorSpecialties(doctor, locale) !== null && (
+                            <span className="publicDoctorSpecialties">
+                              {' '}
+                              ({t.specialties}:{' '}
+                              {doctorSpecialties(doctor, locale)})
+                            </span>
+                          )}
+                        </li>
                       ))}
                     </ul>
                   )}

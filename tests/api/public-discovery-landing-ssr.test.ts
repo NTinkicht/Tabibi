@@ -35,11 +35,15 @@ describe('WU85 public discovery initial server render', () => {
         name: 'Clinique de l’Espoir',
         defaultLocale: 'fr',
         enabledLocales: ['fr', 'ar'],
+        wilayaCode: null,
+        commune: null,
+        addressLine: null,
         id: 'never-serialize-clinic',
         tenantKey: 'never-serialize-tenant',
         doctors: [
           {
             displayName: 'Dr. Nadia',
+            specialtyCodes: [],
             id: 'never-serialize-doctor',
             userId: 'never-serialize-user',
           },
@@ -59,6 +63,56 @@ describe('WU85 public discovery initial server render', () => {
     }
     expect(listClinics).toHaveBeenCalledWith(2_000, expect.any(AbortSignal));
     expect(logError).not.toHaveBeenCalled();
+  });
+
+  // TAB-P0-03 (#698): the clinic location and doctor specialties the API
+  // already publishes are rendered as localized labels; raw codes and
+  // identifiers never reach the HTML.
+  it('renders clinic location and doctor specialties as localized labels', async () => {
+    listClinics.mockResolvedValue([
+      {
+        name: 'Clinique des Pins',
+        defaultLocale: 'fr',
+        enabledLocales: ['fr'],
+        wilayaCode: '16',
+        commune: 'Hydra',
+        addressLine: '12 rue des Pins',
+        id: 'never-serialize-clinic',
+        doctors: [
+          {
+            displayName: 'Dr. Amel',
+            specialtyCodes: ['cardiology', 'internal_medicine'],
+            id: 'never-serialize-doctor',
+          },
+          { displayName: 'Dr. Karim', specialtyCodes: [] },
+        ],
+      },
+      {
+        name: 'Cabinet sans adresse',
+        defaultLocale: 'fr',
+        enabledLocales: ['fr'],
+        wilayaCode: null,
+        commune: null,
+        addressLine: null,
+        doctors: [],
+      },
+    ]);
+    const html = renderToStaticMarkup(await Home());
+    expect(html).toContain('Adresse: 12 rue des Pins, Hydra, Alger');
+    expect(html).toContain(
+      'Dr. Amel<span class="publicDoctorSpecialties"> (Spécialités: Cardiologie, Médecine interne)</span>',
+    );
+    expect(html).toContain('<li>Dr. Karim</li>');
+    // Only the first clinic has a location line.
+    expect(html.match(/class="publicLocation"/g)).toHaveLength(1);
+    for (const raw of [
+      'cardiology',
+      'internal_medicine',
+      'never-serialize-clinic',
+      'never-serialize-doctor',
+    ]) {
+      expect(html).not.toContain(raw);
+    }
   });
 
   it('logs rejected SSR discovery and renders the privacy-safe retry UI', async () => {

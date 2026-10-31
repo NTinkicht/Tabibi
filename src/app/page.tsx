@@ -36,8 +36,12 @@ export default async function Home() {
       name: clinic.name,
       defaultLocale: clinic.defaultLocale,
       enabledLocales: [...clinic.enabledLocales],
+      wilayaCode: clinic.wilayaCode,
+      commune: clinic.commune,
+      addressLine: clinic.addressLine,
       doctors: clinic.doctors.map((doctor) => ({
         displayName: doctor.displayName,
+        specialtyCodes: [...doctor.specialtyCodes],
       })),
     }));
   } catch (error) {
