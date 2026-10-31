@@ -635,6 +635,177 @@ describe('public clinic and doctor discovery', () => {
 
   // TAB-P0-03 (#694): server-fixed pages of 20 clinics, paged before doctors
   // are joined, ordered by (name, id), with a look-ahead hasMore only.
+  describe('TAB-P0-03 language filter (#696)', () => {
+    const service = () => new PublicDiscoveryService(pool);
+    const summary = (
+      clinics: Awaited<ReturnType<PublicDiscoveryService['listClinics']>>,
+    ) =>
+      clinics.map((clinic) => [
+        clinic.name,
+        clinic.doctors.map((doctor) => doctor.displayName),
+      ]);
+
+    async function seed() {
+      const ids = Array.from({ length: 10 }, () => randomUUID());
+      const [arOnly, frOnly, both, hiddenFr] = ids;
+      const users = ids.slice(4, 7);
+      const doctors = ids.slice(7, 10);
+      await pool.query(
+        `INSERT INTO clinics
+          (id, tenant_key, name, default_locale, enabled_locales, status, wilaya_code)
+         VALUES
+          ($1, 'p696-ar', 'Arabic Only', 'ar', ARRAY['ar'], 'active', '16'),
+          ($2, 'p696-fr', 'French Only', 'fr', ARRAY['fr'], 'active', '31'),
+          ($3, 'p696-both', 'Bilingual', 'fr', ARRAY['ar', 'fr'], 'active', '16'),
+          ($4, 'p696-hidden', 'Hidden French', 'fr', ARRAY['fr'], 'inactive', '16')`,
+        [arOnly, frOnly, both, hiddenFr],
+      );
+      await pool.query(
+        `INSERT INTO users (id, auth_subject, display_name) VALUES
+          ($1, 'p696-u1', 'U1'), ($2, 'p696-u2', 'U2'), ($3, 'p696-u3', 'U3')`,
+        users,
+      );
+      await pool.query(
+        `INSERT INTO doctor_profiles (id, user_id, display_name) VALUES
+          ($1, $4, 'Dr Cardio'), ($2, $5, 'Dr Kids'), ($3, $6, 'Dr Hidden')`,
+        [...doctors, ...users],
+      );
+      await pool.query(
+        `INSERT INTO doctor_clinics (clinic_id, doctor_id, specialty_codes) VALUES
+          ($1, $5, ARRAY['cardiology']),
+          ($2, $6, ARRAY['pediatrics']),
+          ($3, $5, ARRAY['cardiology']),
+          ($3, $6, ARRAY['pediatrics']),
+          ($4, $7, ARRAY['cardiology'])`,
+        [arOnly, frOnly, both, hiddenFr, ...doctors],
+      );
+      return ids;
+    }
+
+    it('keeps only active clinics whose enabled locales include the language', async () => {
+      await seed();
+      expect(
+        summary(
+          await service().listClinics(undefined, undefined, {
+            languageCode: 'ar',
+          }),
+        ),
+      ).toEqual([
+        ['Arabic Only', ['Dr Cardio']],
+        ['Bilingual', ['Dr Cardio', 'Dr Kids']],
+      ]);
+      expect(
+        summary(
+          await service().listClinics(undefined, undefined, {
+            languageCode: 'fr',
+          }),
+        ),
+      ).toEqual([
+        ['Bilingual', ['Dr Cardio', 'Dr Kids']],
+        ['French Only', ['Dr Kids']],
+      ]);
+      // Unfiltered discovery is unchanged by the new predicate.
+      expect(
+        summary(await service().listClinics()).map(([name]) => name),
+      ).toEqual(['Arabic Only', 'Bilingual', 'French Only']);
+    });
+
+    it('composes with wilaya and specialty filters, through both query paths', async () => {
+      await seed();
+      expect(
+        summary(
+          await service().listClinics(undefined, undefined, {
+            languageCode: 'fr',
+            wilayaCode: '16',
+          }),
+        ),
+      ).toEqual([['Bilingual', ['Dr Cardio', 'Dr Kids']]]);
+      expect(
+        summary(
+          await service().listClinics(undefined, new AbortController().signal, {
+            languageCode: 'ar',
+            specialtyCode: 'pediatrics',
+          }),
+        ),
+      ).toEqual([['Bilingual', ['Dr Kids']]]);
+      expect(
+        await service().listClinics(undefined, undefined, {
+          languageCode: 'ar',
+          wilayaCode: '31',
+        }),
+      ).toEqual([]);
+    });
+
+    it('pages only the clinics in the requested language', async () => {
+      const ids = Array.from({ length: 45 }, () => randomUUID());
+      await pool.query(
+        `INSERT INTO clinics
+          (id, tenant_key, name, default_locale, enabled_locales, status)
+         SELECT id, 'p696-' || id::text, name, loc, ARRAY[loc], 'active'
+           FROM unnest($1::uuid[], $2::text[], $3::text[]) AS input(id, name, loc)`,
+        [
+          ids,
+          ids.map((_, i) => `Clinique ${String(i).padStart(2, '0')}`),
+          ids.map((_, i) => (i % 2 === 0 ? 'fr' : 'ar')),
+        ],
+      );
+      const first = await service().listClinicsPage(
+        undefined,
+        undefined,
+        { languageCode: 'fr' },
+        1,
+      );
+      const second = await service().listClinicsPage(
+        undefined,
+        undefined,
+        { languageCode: 'fr' },
+        2,
+      );
+      expect([first.hasMore, second.hasMore]).toEqual([true, false]);
+      expect(
+        [...first.clinics, ...second.clinics].map((clinic) => clinic.name),
+      ).toEqual(
+        Array.from(
+          { length: 23 },
+          (_, i) => `Clinique ${String(i * 2).padStart(2, '0')}`,
+        ),
+      );
+      for (const clinic of [...first.clinics, ...second.clinics]) {
+        expect(clinic.enabledLocales).toEqual(['fr']);
+      }
+    });
+
+    it('keeps the projection allow-list and leaks no identifier', async () => {
+      const ids = await seed();
+      const result = await service().listClinics(undefined, undefined, {
+        languageCode: 'fr',
+      });
+      expect(result.find((clinic) => clinic.name === 'French Only')).toEqual({
+        name: 'French Only',
+        defaultLocale: 'fr',
+        enabledLocales: ['fr'],
+        wilayaCode: '31',
+        commune: null,
+        addressLine: null,
+        doctors: [{ displayName: 'Dr Kids', specialtyCodes: ['pediatrics'] }],
+      });
+      const serialized = JSON.stringify(result);
+      for (const forbidden of [...ids, 'p696-', 'Hidden French', 'Dr Hidden']) {
+        expect(serialized).not.toContain(forbidden);
+      }
+    });
+
+    it('refuses an uncontrolled language without querying', async () => {
+      for (const languageCode of ['en', 'AR', '', "fr' OR 1=1 --", 1, null]) {
+        await expect(
+          service().listClinics(undefined, undefined, {
+            languageCode,
+          } as unknown as { languageCode: 'ar' }),
+        ).rejects.toBeInstanceOf(InvalidDiscoveryFilterError);
+      }
+    });
+  });
+
   describe('pagination', () => {
     const service = () => new PublicDiscoveryService(pool);
 

@@ -35,3 +35,31 @@ describe('parseDiscoveryFilters page parameter', () => {
     }
   });
 });
+
+describe('parseDiscoveryFilters language parameter (#696)', () => {
+  it('accepts exactly ar or fr and composes with the other filters', () => {
+    expect(parse('?language=ar')).toEqual({ languageCode: 'ar' });
+    expect(parse('?language=fr')).toEqual({ languageCode: 'fr' });
+    expect(parse('?page=2&language=fr&wilaya=16')).toEqual({
+      page: 2,
+      wilayaCode: '16',
+      languageCode: 'fr',
+    });
+  });
+
+  it('refuses unknown, mis-cased, empty, combined or repeated languages', () => {
+    for (const query of [
+      '?language=en',
+      '?language=AR',
+      '?language=Fr',
+      '?language=',
+      '?language',
+      '?language=ar,fr',
+      '?language=ar%20',
+      '?language=fr&language=ar',
+      '?language=ar&language=ar',
+    ]) {
+      expect(parse(query), query).toBeNull();
+    }
+  });
+});

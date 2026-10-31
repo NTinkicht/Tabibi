@@ -13,6 +13,10 @@ import {
 import { BOOKABLE_SESSION_HORIZON_DAYS } from '@/modules/public-availability';
 import { abortableQuery } from '@/platform/database/abortable-query';
 import { inTransaction } from '@/platform/database/transaction';
+import {
+  type DiscoveryLanguageCode,
+  isDiscoveryLanguageCode,
+} from './languages';
 import { isSpecialtyCode } from './specialties';
 import { isWilayaCode } from './wilayas';
 
@@ -92,16 +96,25 @@ export interface PublicDiscoveryPage {
   hasMore: boolean;
 }
 
+// TAB-P0-03 (#696): `languageCode` keeps only the clinics whose enabled
+// locales include that language. The locales are already public in the
+// projection, so the filter adds no field.
+export {
+  type DiscoveryLanguageCode,
+  isDiscoveryLanguageCode,
+} from './languages';
+
 export interface PublicDiscoveryFilters {
   wilayaCode?: string;
   specialtyCode?: string;
   availableOnly?: boolean;
+  languageCode?: DiscoveryLanguageCode;
 }
 
 export class InvalidDiscoveryFilterError extends Error {
   constructor() {
     super(
-      'Discovery filters must be known wilaya and specialty codes and a boolean availability flag',
+      'Discovery filters must be known wilaya, specialty and language codes and a boolean availability flag',
     );
     this.name = 'InvalidDiscoveryFilterError';
   }
@@ -198,13 +211,14 @@ export class PublicDiscoveryService {
     clinicLimit: number | null,
     clinicOffset: number,
   ): Promise<PublicDiscoveryClinic[]> {
-    const { wilayaCode, specialtyCode, availableOnly } = filters;
+    const { wilayaCode, specialtyCode, availableOnly, languageCode } = filters;
     // Fail closed: a filter value outside the controlled lists is refused
     // here as well as at the HTTP boundary, never silently ignored.
     if (
       (wilayaCode !== undefined && !isWilayaCode(wilayaCode)) ||
       (specialtyCode !== undefined && !isSpecialtyCode(specialtyCode)) ||
-      (availableOnly !== undefined && typeof availableOnly !== 'boolean')
+      (availableOnly !== undefined && typeof availableOnly !== 'boolean') ||
+      (languageCode !== undefined && !isDiscoveryLanguageCode(languageCode))
     ) {
       throw new InvalidDiscoveryFilterError();
     }
@@ -215,6 +229,7 @@ export class PublicDiscoveryService {
       BOOKABLE_SESSION_HORIZON_DAYS,
       clinicLimit,
       clinicOffset,
+      languageCode ?? null,
     ];
     // A doctor matches at a clinic when the association holds the requested
     // specialty and, if availability is requested, has a session that
@@ -234,6 +249,7 @@ export class PublicDiscoveryService {
              FROM clinics clinic
             WHERE clinic.status = 'active'
               AND ($1::text IS NULL OR clinic.wilaya_code = $1::text)
+              AND ($7::text IS NULL OR $7::text = ANY (clinic.enabled_locales))
               AND (($2::text IS NULL AND NOT $3::boolean) OR EXISTS (
                     SELECT 1 FROM doctor_clinics matching
                      WHERE matching.clinic_id = clinic.id
