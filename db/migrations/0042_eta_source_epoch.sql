@@ -81,13 +81,16 @@ FOR EACH ROW
 EXECUTE FUNCTION bump_queue_entry_eta_source_epoch();
 
 CREATE CONSTRAINT TRIGGER queue_entries_eta_source_epoch_update
-AFTER UPDATE OF state, session_id, registration_order, eligibility_order, priority_order
+AFTER UPDATE OF state, session_id, registration_order, eligibility_order, priority_order,
+  in_consultation_started_at, completed_at
 ON queue_entries
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW
 WHEN (
-  (OLD.state, OLD.session_id, OLD.registration_order, OLD.eligibility_order, OLD.priority_order)
+  (OLD.state, OLD.session_id, OLD.registration_order, OLD.eligibility_order, OLD.priority_order,
+   OLD.in_consultation_started_at, OLD.completed_at)
   IS DISTINCT FROM
-  (NEW.state, NEW.session_id, NEW.registration_order, NEW.eligibility_order, NEW.priority_order)
+  (NEW.state, NEW.session_id, NEW.registration_order, NEW.eligibility_order, NEW.priority_order,
+   NEW.in_consultation_started_at, NEW.completed_at)
 )
 EXECUTE FUNCTION bump_queue_entry_eta_source_epoch();

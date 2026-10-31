@@ -198,6 +198,26 @@ describe('session eta_source_epoch (real PostgreSQL)', () => {
     expect((await epochs())[ids.session]).toBe(before + 1);
   });
 
+  it('bumps for a consultation timestamp correction without a state change', async () => {
+    await sessionCommand('open');
+    const entryId = await register('Timing epoch');
+    for (const step of ['check_in', 'call', 'start_consultation'] as const)
+      await entryCommand(entryId, step);
+    const before = (await epochs())[ids.session]!;
+    await pool.query(
+      `UPDATE queue_entries SET in_consultation_started_at = in_consultation_started_at - interval '5 minutes' WHERE id = $1`,
+      [entryId],
+    );
+    expect((await epochs())[ids.session]).toBe(before + 1);
+    await entryCommand(entryId, 'complete_consultation');
+    const afterComplete = (await epochs())[ids.session]!;
+    await pool.query(
+      `UPDATE queue_entries SET completed_at = completed_at + interval '1 minute' WHERE id = $1`,
+      [entryId],
+    );
+    expect((await epochs())[ids.session]).toBe(afterComplete + 1);
+  });
+
   it('does not bump for an irrelevant column write', async () => {
     await sessionCommand('open');
     const entryId = await register('Quiet epoch');
