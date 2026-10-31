@@ -172,10 +172,16 @@ describe('doctor association HTTP API (#667)', () => {
     expect(added.res.headers.get('cache-control')).toBe('no-store');
     expect(Object.keys(added.json)).toEqual(['doctor']);
     const doctor = added.json.doctor as Record<string, unknown>;
-    expect(Object.keys(doctor).sort()).toEqual(['displayName', 'id', 'userId']);
+    expect(Object.keys(doctor).sort()).toEqual([
+      'displayName',
+      'id',
+      'specialtyCodes',
+      'userId',
+    ]);
     expect(doctor).toMatchObject({
       userId: ids.receptionist,
       displayName: 'Dr Amina',
+      specialtyCodes: [],
     });
     const state = await snapshot();
     expect(state.audits).toBe(1);
@@ -222,6 +228,7 @@ describe('doctor association HTTP API (#667)', () => {
         id: ids.sharedDoctor,
         userId: ids.sharedDoctorUser,
         displayName: 'Dr Yacine',
+        specialtyCodes: [],
       },
     });
     const state = await snapshot();
@@ -239,6 +246,7 @@ describe('doctor association HTTP API (#667)', () => {
             id: ids.sharedDoctor,
             userId: ids.sharedDoctorUser,
             displayName: 'Dr Yacine',
+            specialtyCodes: [],
           },
         ],
       },

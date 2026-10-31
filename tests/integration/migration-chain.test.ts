@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
+import { SPECIALTIES } from '@/modules/clinic/specialties';
 
 const client = new Client({ connectionString: process.env.DATABASE_URL });
 const committedMigrations = [
@@ -46,6 +47,7 @@ const committedMigrations = [
   '0037_clinic_closures.sql',
   '0038_consultation_types.sql',
   '0039_doctor_absences.sql',
+  '0041_clinic_doctor_specialties.sql',
 ];
 
 beforeAll(async () => {
@@ -405,5 +407,76 @@ describe('committed migration chain', () => {
     );
     expect(recovered.rows[0]?.canonical).toContain('next_attempt_at');
     expect(recovered.rows[0]?.temporary).toBeNull();
+  });
+  it('0041: doctor_clinics.specialty_codes accepts exactly 0 to 3 unique codes of the TypeScript list', async () => {
+    const user = randomUUID();
+    const clinic = randomUUID();
+    const doctor = randomUUID();
+    await client.query('BEGIN');
+    try {
+      await client.query(
+        `INSERT INTO users (id, auth_subject, display_name)
+         VALUES ($1, $2, 'Chain Doctor')`,
+        [user, `chain-0041-${user}`],
+      );
+      await client.query(
+        `INSERT INTO clinics (id, tenant_key, name) VALUES ($1, $2, 'Chain')`,
+        [clinic, `chain-0041-${clinic}`],
+      );
+      await client.query(
+        `INSERT INTO doctor_profiles (id, user_id, display_name)
+         VALUES ($1, $2, 'Dr Chain')`,
+        [doctor, user],
+      );
+      await client.query(
+        'INSERT INTO doctor_clinics (clinic_id, doctor_id) VALUES ($1, $2)',
+        [clinic, doctor],
+      );
+      const stored = await client.query<{ specialty_codes: string[] }>(
+        'SELECT specialty_codes FROM doctor_clinics WHERE clinic_id = $1',
+        [clinic],
+      );
+      expect(stored.rows[0]!.specialty_codes).toEqual([]);
+
+      const attempt = async (codes: unknown) => {
+        await client.query('SAVEPOINT specialty_vector');
+        try {
+          await client.query(
+            `UPDATE doctor_clinics SET specialty_codes = $2::text[]
+              WHERE clinic_id = $1`,
+            [clinic, codes],
+          );
+          await client.query('RELEASE SAVEPOINT specialty_vector');
+          return 'accepted';
+        } catch (error) {
+          await client.query('ROLLBACK TO SAVEPOINT specialty_vector');
+          return (error as { constraint?: string }).constraint ?? 'error';
+        }
+      };
+
+      for (const { code } of SPECIALTIES) {
+        expect(await attempt([code])).toBe('accepted');
+      }
+      expect(await attempt(['pediatrics', 'ent', 'dentistry'])).toBe(
+        'accepted',
+      );
+      expect(await attempt([])).toBe('accepted');
+      expect(
+        await attempt(['pediatrics', 'ent', 'dentistry', 'cardiology']),
+      ).toBe('doctor_clinics_specialty_codes_count');
+      expect(await attempt(['pediatrics', null])).toBe(
+        'doctor_clinics_specialty_codes_count',
+      );
+      expect(await attempt(['ent', 'ent'])).toBe(
+        'doctor_clinics_specialty_codes_unique',
+      );
+      for (const unknown of ['astrology', 'Pediatrics', ' ent', '']) {
+        expect(await attempt([unknown])).toBe(
+          'doctor_clinics_specialty_codes_known',
+        );
+      }
+    } finally {
+      await client.query('ROLLBACK');
+    }
   });
 });

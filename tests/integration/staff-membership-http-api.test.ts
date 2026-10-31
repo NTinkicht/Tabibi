@@ -160,7 +160,12 @@ describe('staff membership HTTP API (#663)', () => {
     expect(docs.res.headers.get('cache-control')).toBe('no-store');
     expect(docs.json).toEqual({
       doctors: [
-        { id: ids.doctor, userId: ids.doctorUser, displayName: 'Dr Amina' },
+        {
+          id: ids.doctor,
+          userId: ids.doctorUser,
+          displayName: 'Dr Amina',
+          specialtyCodes: [],
+        },
       ],
     });
   });

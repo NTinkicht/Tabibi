@@ -3,6 +3,7 @@ import {
   AppointmentValidationError,
 } from '@/modules/appointment';
 import {
+  ClinicDoctorNotFoundError,
   DoctorMembershipRequiresAssociationError,
   InvalidClinicTimezoneError,
   LastClinicAdminError,
@@ -67,7 +68,8 @@ export async function operationalJson(
       error instanceof ScheduleTemplateNotFoundError ||
       error instanceof ConsultationTypeNotFoundError ||
       error instanceof MembershipNotFoundError ||
-      error instanceof MembershipUserNotFoundError
+      error instanceof MembershipUserNotFoundError ||
+      error instanceof ClinicDoctorNotFoundError
     ) {
       status = 404;
       code = 'not_found';

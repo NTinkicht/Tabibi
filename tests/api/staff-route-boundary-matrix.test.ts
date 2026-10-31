@@ -46,6 +46,7 @@ const EXPECTED: Record<string, readonly Method[]> = {
   'consultation-types': ['GET', 'POST'],
   'consultation-types/[consultationTypeId]': ['PATCH'],
   doctors: ['GET', 'POST'],
+  'doctors/[doctorId]': ['PATCH'],
   'doctors/[doctorId]/absences': ['GET', 'POST'],
   'doctors/[doctorId]/absences/[absenceDate]': ['DELETE'],
   memberships: ['GET'],
@@ -188,7 +189,7 @@ describe('staff clinic route inventory', () => {
       );
     }
     expect(discovered).toEqual(EXPECTED);
-    expect(mutations).toHaveLength(22);
+    expect(mutations).toHaveLength(23);
     expect(reads).toHaveLength(11);
   });
 });
