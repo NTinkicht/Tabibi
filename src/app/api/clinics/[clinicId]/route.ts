@@ -21,6 +21,9 @@ function staffClinic(clinic: Clinic) {
     defaultLocale: clinic.defaultLocale,
     enabledLocales: clinic.enabledLocales,
     status: clinic.status,
+    wilayaCode: clinic.wilayaCode,
+    commune: clinic.commune,
+    addressLine: clinic.addressLine,
   };
 }
 
