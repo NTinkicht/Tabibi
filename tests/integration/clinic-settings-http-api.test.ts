@@ -21,12 +21,15 @@ const ids = {
 };
 const ORIGIN = 'http://localhost';
 const CLINIC_KEYS = [
+  'addressLine',
+  'commune',
   'defaultLocale',
   'enabledLocales',
   'id',
   'name',
   'status',
   'timezone',
+  'wilayaCode',
 ];
 
 beforeAll(async () => {
@@ -95,7 +98,8 @@ async function call(
 
 async function storedClinic() {
   const result = await pool.query(
-    `SELECT name, timezone, default_locale, enabled_locales, status
+    `SELECT name, timezone, default_locale, enabled_locales, status,
+            wilaya_code, commune, address_line
        FROM clinics WHERE id = $1`,
     [ids.clinic],
   );
@@ -118,6 +122,9 @@ const DEFAULT_ROW = {
   default_locale: 'ar',
   enabled_locales: ['ar', 'fr'],
   status: 'active',
+  wilaya_code: null,
+  commune: null,
+  address_line: null,
 };
 
 describe('clinic settings HTTP API (#665)', () => {
@@ -137,6 +144,9 @@ describe('clinic settings HTTP API (#665)', () => {
         defaultLocale: 'ar',
         enabledLocales: ['ar', 'fr'],
         status: 'active',
+        wilayaCode: null,
+        commune: null,
+        addressLine: null,
       });
       expect(JSON.stringify(json)).not.toContain('cs-clinic');
     },
@@ -262,5 +272,144 @@ describe('clinic settings HTTP API (#665)', () => {
       clinicId: 'not-a-uuid',
     });
     expect(status).toBe(400);
+  });
+});
+
+const LOCATION = {
+  wilayaCode: '16',
+  commune: 'Bab Ezzouar',
+  addressLine: 'Cité 5 Juillet, Bt 12',
+};
+
+describe('clinic location over the settings API (#686)', () => {
+  it('lets the clinic admin set the location and every staff role read it back', async () => {
+    const { status, json } = await call('PATCH', 'cs-admin', {
+      body: {
+        wilayaCode: '16',
+        commune: '  Bab Ezzouar ',
+        addressLine: ' Cité 5 Juillet, Bt 12 ',
+      },
+    });
+    expect(status).toBe(200);
+    expect(Object.keys(json.clinic as object).sort()).toEqual(CLINIC_KEYS);
+    expect(json.clinic).toEqual({
+      id: ids.clinic,
+      name: 'Clinic',
+      timezone: 'Africa/Algiers',
+      defaultLocale: 'ar',
+      enabledLocales: ['ar', 'fr'],
+      status: 'active',
+      ...LOCATION,
+    });
+    expect(await storedClinic()).toEqual({
+      ...DEFAULT_ROW,
+      wilaya_code: '16',
+      commune: 'Bab Ezzouar',
+      address_line: 'Cité 5 Juillet, Bt 12',
+    });
+    expect(await clinicAudits()).toBe(1);
+    for (const subject of ['cs-receptionist', 'cs-doctor']) {
+      const read = await call('GET', subject);
+      expect(read.status).toBe(200);
+      expect(read.json.clinic).toMatchObject(LOCATION);
+    }
+  });
+
+  it('keeps the location on unrelated updates, replaces it as a whole and clears it', async () => {
+    await call('PATCH', 'cs-admin', { body: LOCATION });
+    const rename = await call('PATCH', 'cs-admin', { body: { name: 'C2' } });
+    expect(rename.json.clinic).toMatchObject({ name: 'C2', ...LOCATION });
+
+    const wilayaOnly = await call('PATCH', 'cs-admin', {
+      body: { wilayaCode: '31', commune: null, addressLine: null },
+    });
+    expect(wilayaOnly.status).toBe(200);
+    expect(wilayaOnly.json.clinic).toMatchObject({
+      wilayaCode: '31',
+      commune: null,
+      addressLine: null,
+    });
+
+    const cleared = await call('PATCH', 'cs-admin', {
+      body: { wilayaCode: null, commune: null, addressLine: null },
+    });
+    expect(cleared.status).toBe(200);
+    expect(await storedClinic()).toEqual({ ...DEFAULT_ROW, name: 'C2' });
+    expect(await clinicAudits()).toBe(4);
+  });
+
+  it.each([
+    ['an unknown wilaya code', { ...LOCATION, wilayaCode: '59' }],
+    ['the zero wilaya code', { ...LOCATION, wilayaCode: '00' }],
+    ['an unpadded wilaya code', { ...LOCATION, wilayaCode: '1' }],
+    ['a wilaya name instead of a code', { ...LOCATION, wilayaCode: 'Alger' }],
+    ['a numeric wilaya code', { ...LOCATION, wilayaCode: 16 }],
+    ['a blank commune', { ...LOCATION, commune: '   ' }],
+    ['an overlong commune', { ...LOCATION, commune: 'c'.repeat(101) }],
+    ['a blank address', { ...LOCATION, addressLine: '' }],
+    ['an overlong address', { ...LOCATION, addressLine: 'a'.repeat(201) }],
+    ['a wilaya without commune and address keys', { wilayaCode: '16' }],
+    [
+      'a commune without the wilaya key',
+      { commune: 'Bab Ezzouar', addressLine: null },
+    ],
+    [
+      'a commune without a wilaya',
+      { wilayaCode: null, commune: 'Bab Ezzouar', addressLine: null },
+    ],
+    [
+      'an address without a wilaya',
+      { wilayaCode: null, commune: null, addressLine: 'Rue 1' },
+    ],
+    ['a nested location object', { location: LOCATION }],
+  ])('rejects %s with 400 and writes nothing', async (_label, body) => {
+    const { status, json } = await call('PATCH', 'cs-admin', { body });
+    expect(status).toBe(400);
+    expect(json.error).toBe('invalid_request');
+    expect(await storedClinic()).toEqual(DEFAULT_ROW);
+    expect(await clinicAudits()).toBe(0);
+  });
+
+  it('accepts the maximum commune and address lengths', async () => {
+    const { status } = await call('PATCH', 'cs-admin', {
+      body: {
+        wilayaCode: '58',
+        commune: 'c'.repeat(100),
+        addressLine: 'a'.repeat(200),
+      },
+    });
+    expect(status).toBe(200);
+    expect(await storedClinic()).toMatchObject({
+      wilaya_code: '58',
+      commune: 'c'.repeat(100),
+      address_line: 'a'.repeat(200),
+    });
+  });
+
+  it.each(['cs-receptionist', 'cs-doctor', 'cs-other-admin'])(
+    'denies a location change to %s with 403 and writes nothing',
+    async (subject) => {
+      const { status } = await call('PATCH', subject, { body: LOCATION });
+      expect(status).toBe(403);
+      expect(await storedClinic()).toEqual(DEFAULT_ROW);
+      expect(await clinicAudits()).toBe(0);
+    },
+  );
+
+  it("does not let an admin set another clinic's location through its id", async () => {
+    const { status } = await call('PATCH', 'cs-admin', {
+      clinicId: ids.otherClinic,
+      body: LOCATION,
+    });
+    expect(status).toBe(403);
+    const other = await pool.query(
+      'SELECT wilaya_code, commune, address_line FROM clinics WHERE id = $1',
+      [ids.otherClinic],
+    );
+    expect(other.rows[0]).toEqual({
+      wilaya_code: null,
+      commune: null,
+      address_line: null,
+    });
   });
 });
