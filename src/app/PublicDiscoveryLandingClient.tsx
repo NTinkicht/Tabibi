@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { fetchAllDiscoveryPages } from './public-discovery-pages';
 
 type Locale = 'ar' | 'fr';
 type ClinicLanguageFilter = Locale | 'all';
@@ -316,16 +317,13 @@ export default function PublicDiscoveryLandingClient({
     }, REFRESH_TIMEOUT_MS);
     async function load() {
       try {
-        const response = await fetch('/api/public/discovery', {
-          signal: controller.signal,
-          cache: 'no-store',
-          credentials: 'omit',
-          referrerPolicy: 'no-referrer',
-        });
-        if (!response.ok) throw new Error('Discovery unavailable');
-        const result: unknown = await response.json();
-        const publicClinics = parseClinics(result);
-        if (publicClinics === null) throw new Error('Invalid discovery shape');
+        // The API is paged (#694): follow every page so a refresh keeps the
+        // whole directory the unpaged server render showed.
+        const publicClinics = await fetchAllDiscoveryPages(
+          fetch,
+          controller.signal,
+          parseClinics,
+        );
         if (controller.signal.aborted) return;
         setClinics(publicClinics);
         setRefreshCount(publicClinics.length);

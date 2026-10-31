@@ -632,4 +632,200 @@ describe('public clinic and doctor discovery', () => {
       }
     });
   });
+
+  // TAB-P0-03 (#694): server-fixed pages of 20 clinics, paged before doctors
+  // are joined, ordered by (name, id), with a look-ahead hasMore only.
+  describe('pagination', () => {
+    const service = () => new PublicDiscoveryService(pool);
+
+    async function seedClinics(
+      count: number,
+      name: (index: number) => string,
+      wilaya = '16',
+    ): Promise<string[]> {
+      const ids = Array.from({ length: count }, () => randomUUID());
+      await pool.query(
+        `INSERT INTO clinics
+          (id, tenant_key, name, default_locale, enabled_locales, status, wilaya_code)
+         SELECT id, 'wu694-' || id::text, name, 'fr', ARRAY['fr'], 'active', $3
+           FROM unnest($1::uuid[], $2::text[]) AS input(id, name)`,
+        [ids, ids.map((_, index) => name(index)), wilaya],
+      );
+      return ids;
+    }
+
+    async function seedDoctors(clinicId: string, count: number) {
+      const users = Array.from({ length: count }, () => randomUUID());
+      const doctors = Array.from({ length: count }, () => randomUUID());
+      await pool.query(
+        `INSERT INTO users (id, auth_subject, display_name)
+         SELECT id, 'wu694-' || id::text, 'Internal' FROM unnest($1::uuid[]) AS u(id)`,
+        [users],
+      );
+      await pool.query(
+        `INSERT INTO doctor_profiles (id, user_id, display_name)
+         SELECT d, u, 'Dr ' || lpad(n::text, 2, '0')
+           FROM unnest($1::uuid[], $2::uuid[]) WITH ORDINALITY AS x(d, u, n)`,
+        [doctors, users],
+      );
+      await pool.query(
+        `INSERT INTO doctor_clinics (clinic_id, doctor_id, specialty_codes)
+         SELECT $1, d, ARRAY['cardiology'] FROM unnest($2::uuid[]) AS x(d)`,
+        [clinicId, doctors],
+      );
+    }
+
+    const pad = (index: number) => `Clinique ${String(index).padStart(2, '0')}`;
+    const names = (page: { clinics: { name: string }[] }) =>
+      page.clinics.map((clinic) => clinic.name);
+
+    it('returns an empty first page without hasMore when nothing matches', async () => {
+      expect(
+        await service().listClinicsPage(undefined, undefined, {}, 1),
+      ).toEqual({ clinics: [], hasMore: false });
+    });
+
+    it('fills exactly one page of 20 without hasMore', async () => {
+      await seedClinics(20, pad);
+      const first = await service().listClinicsPage(
+        undefined,
+        undefined,
+        {},
+        1,
+      );
+      expect(names(first)).toEqual(
+        Array.from({ length: 20 }, (_, i) => pad(i)),
+      );
+      expect(first.hasMore).toBe(false);
+      expect(
+        await service().listClinicsPage(undefined, undefined, {}, 2),
+      ).toEqual({ clinics: [], hasMore: false });
+    });
+
+    it('splits 41 clinics into 20, 20 and 1 with stable ordering', async () => {
+      await seedClinics(41, pad);
+      const pages = [];
+      for (const page of [1, 2, 3, 4]) {
+        pages.push(
+          await service().listClinicsPage(undefined, undefined, {}, page),
+        );
+      }
+      expect(pages.map((page) => page.clinics.length)).toEqual([20, 20, 1, 0]);
+      expect(pages.map((page) => page.hasMore)).toEqual([
+        true,
+        true,
+        false,
+        false,
+      ]);
+      expect(pages.flatMap(names)).toEqual(
+        Array.from({ length: 41 }, (_, i) => pad(i)),
+      );
+      expect(pages.flatMap(names)).toEqual(
+        names({ clinics: await service().listClinics() }),
+      );
+    });
+
+    it('orders equal names by clinic id so no clinic repeats or disappears', async () => {
+      const ids = await seedClinics(21, () => 'Clinique Homonyme');
+      for (const id of ids.slice(0, 5)) await seedDoctors(id, 1);
+      const first = await service().listClinicsPage(
+        undefined,
+        undefined,
+        {},
+        1,
+      );
+      const second = await service().listClinicsPage(
+        undefined,
+        undefined,
+        {},
+        2,
+      );
+      expect([first.clinics.length, second.clinics.length]).toEqual([20, 1]);
+      const unpaged = await service().listClinics();
+      expect([...first.clinics, ...second.clinics]).toEqual(unpaged);
+    });
+
+    it('never splits a clinic with many doctors across pages', async () => {
+      const [crowded] = await seedClinics(1, () => 'Clinique 00 Crowded');
+      await seedClinics(20, (i) => pad(i + 1));
+      await seedDoctors(crowded!, 25);
+      const first = await service().listClinicsPage(
+        undefined,
+        undefined,
+        {},
+        1,
+      );
+      expect(first.clinics).toHaveLength(20);
+      expect(first.hasMore).toBe(true);
+      expect(first.clinics[0]!.name).toBe('Clinique 00 Crowded');
+      expect(first.clinics[0]!.doctors.map((d) => d.displayName)).toEqual(
+        Array.from(
+          { length: 25 },
+          (_, i) => `Dr ${String(i + 1).padStart(2, '0')}`,
+        ),
+      );
+      const second = await service().listClinicsPage(
+        undefined,
+        undefined,
+        {},
+        2,
+      );
+      expect(names(second)).toEqual([pad(20)]);
+      expect(second.hasMore).toBe(false);
+    });
+
+    it('pages only the clinics that match the filters', async () => {
+      await seedClinics(25, pad, '16');
+      await seedClinics(25, (i) => `Oran ${String(i).padStart(2, '0')}`, '31');
+      const oranFirst = await service().listClinicsPage(
+        undefined,
+        undefined,
+        { wilayaCode: '31' },
+        1,
+      );
+      const oranSecond = await service().listClinicsPage(
+        undefined,
+        undefined,
+        { wilayaCode: '31' },
+        2,
+      );
+      expect([...names(oranFirst), ...names(oranSecond)]).toEqual(
+        Array.from(
+          { length: 25 },
+          (_, i) => `Oran ${String(i).padStart(2, '0')}`,
+        ),
+      );
+      expect([oranFirst.hasMore, oranSecond.hasMore]).toEqual([true, false]);
+      expect(
+        await service().listClinicsPage(
+          undefined,
+          undefined,
+          { wilayaCode: '16', specialtyCode: 'cardiology' },
+          1,
+        ),
+      ).toEqual({ clinics: [], hasMore: false });
+    });
+
+    it('serializes no identifier, count or tenant key in a page', async () => {
+      const ids = await seedClinics(21, pad);
+      await seedDoctors(ids[0]!, 2);
+      const serialized = JSON.stringify(
+        await service().listClinicsPage(undefined, undefined, {}, 1),
+      );
+      for (const id of ids) expect(serialized).not.toContain(id);
+      expect(serialized).not.toContain('wu694-');
+      expect(Object.keys(JSON.parse(serialized)).sort()).toEqual([
+        'clinics',
+        'hasMore',
+      ]);
+    });
+
+    it('refuses pages outside 1..500 before querying', async () => {
+      for (const page of [0, -1, 1.5, 501, Number.NaN, Infinity]) {
+        await expect(
+          service().listClinicsPage(undefined, undefined, {}, page),
+        ).rejects.toBeInstanceOf(InvalidDiscoveryFilterError);
+      }
+    });
+  });
 });

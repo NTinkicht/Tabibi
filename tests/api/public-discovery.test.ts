@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const listClinics = vi.fn();
+const listClinicsPage = vi.fn();
+const mockPage = (clinics: unknown[], hasMore = false) =>
+  listClinicsPage.mockResolvedValue({ clinics, hasMore });
 
 vi.mock('@/modules/clinic', () => ({
   PublicDiscoveryService: class {
-    listClinics(...args: unknown[]) {
-      return listClinics(...args);
+    listClinicsPage(...args: unknown[]) {
+      return listClinicsPage(...args);
     }
   },
 }));
@@ -25,11 +27,11 @@ function request(query = ''): Request {
 
 describe('GET /api/public/discovery', () => {
   beforeEach(() => {
-    listClinics.mockReset();
+    listClinicsPage.mockReset();
   });
 
   it('returns only the public discovery allow-list and no-store headers', async () => {
-    listClinics.mockResolvedValue([
+    mockPage([
       {
         name: 'Clinique El Amal',
         defaultLocale: 'fr',
@@ -82,16 +84,19 @@ describe('GET /api/public/discovery', () => {
           ],
         },
       ],
+      page: 1,
+      hasMore: false,
     });
-    expect(listClinics).toHaveBeenCalledWith(
+    expect(listClinicsPage).toHaveBeenCalledWith(
       undefined,
       expect.any(AbortSignal),
       {},
+      1,
     );
   });
 
   it('serializes an unset clinic location as explicit nulls', async () => {
-    listClinics.mockResolvedValue([
+    mockPage([
       {
         name: 'Clinique Sans Adresse',
         defaultLocale: 'ar',
@@ -117,11 +122,13 @@ describe('GET /api/public/discovery', () => {
           doctors: [],
         },
       ],
+      page: 1,
+      hasMore: false,
     });
   });
 
   it('passes validated wilaya and specialty filters to the discovery service', async () => {
-    listClinics.mockResolvedValue([]);
+    mockPage([]);
 
     for (const [query, filters] of [
       ['?wilaya=16', { wilayaCode: '16' }],
@@ -136,14 +143,19 @@ describe('GET /api/public/discovery', () => {
         { wilayaCode: '16', specialtyCode: 'ent', availableOnly: true },
       ],
     ] as const) {
-      listClinics.mockClear();
+      listClinicsPage.mockClear();
       const response = await GET(request(query));
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ clinics: [] });
-      expect(listClinics).toHaveBeenCalledWith(
+      expect(await response.json()).toEqual({
+        clinics: [],
+        page: 1,
+        hasMore: false,
+      });
+      expect(listClinicsPage).toHaveBeenCalledWith(
         undefined,
         expect.any(AbortSignal),
         filters,
+        1,
       );
     }
   });
@@ -159,7 +171,6 @@ describe('GET /api/public/discovery', () => {
       '?specialty=cardiology&specialty=ent',
       '?speciality=cardiology',
       '?language=fr',
-      '?wilaya=16&page=2',
       '?available=false',
       '?available=1',
       '?available=TRUE',
@@ -177,11 +188,70 @@ describe('GET /api/public/discovery', () => {
         requestId: 'wu74-public-discovery-1',
       });
     }
-    expect(listClinics).not.toHaveBeenCalled();
+    expect(listClinicsPage).not.toHaveBeenCalled();
+  });
+
+  it('passes a validated page and reports only page and hasMore', async () => {
+    mockPage([], true);
+
+    for (const [query, filters, page] of [
+      ['?page=1', {}, 1],
+      ['?page=2', {}, 2],
+      ['?page=500', {}, 500],
+      [
+        '?wilaya=16&page=7&available=true',
+        { wilayaCode: '16', availableOnly: true },
+        7,
+      ],
+    ] as const) {
+      listClinicsPage.mockClear();
+      const response = await GET(request(query));
+      expect(response.status, query).toBe(200);
+      expect(await response.json()).toEqual({
+        clinics: [],
+        page,
+        hasMore: true,
+      });
+      expect(listClinicsPage).toHaveBeenCalledWith(
+        undefined,
+        expect.any(AbortSignal),
+        filters,
+        page,
+      );
+    }
+  });
+
+  it('rejects malformed, repeated or out-of-range pages without querying', async () => {
+    for (const query of [
+      '?page=0',
+      '?page=-1',
+      '?page=+1',
+      '?page=01',
+      '?page=1.0',
+      '?page=1e2',
+      '?page=0x10',
+      '?page= 1',
+      '?page=',
+      '?page',
+      '?page=501',
+      '?page=1000',
+      '?page=1&page=2',
+      '?pageSize=50',
+      '?limit=50',
+      '?offset=20',
+    ]) {
+      const response = await GET(request(query));
+      expect(response.status, query).toBe(400);
+      expect(await response.json()).toEqual({
+        status: 'rejected',
+        requestId: 'wu74-public-discovery-1',
+      });
+    }
+    expect(listClinicsPage).not.toHaveBeenCalled();
   });
 
   it('never serializes sensitive fields added by the discovery service', async () => {
-    listClinics.mockResolvedValue([
+    mockPage([
       {
         name: 'Public Clinic',
         defaultLocale: 'en',
@@ -220,20 +290,26 @@ describe('GET /api/public/discovery', () => {
   });
 
   it('returns a successful empty discovery result', async () => {
-    listClinics.mockResolvedValue([]);
+    mockPage([]);
 
     const response = await GET(request());
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ clinics: [] });
+    expect(await response.json()).toEqual({
+      clinics: [],
+      page: 1,
+      hasMore: false,
+    });
   });
 
   it('bounds a stalled discovery query and returns a retryable privacy-safe error', async () => {
     let querySignal: AbortSignal | undefined;
-    listClinics.mockImplementation((_timeout: unknown, signal: AbortSignal) => {
-      querySignal = signal;
-      return new Promise<never>(() => {});
-    });
+    listClinicsPage.mockImplementation(
+      (_timeout: unknown, signal: AbortSignal) => {
+        querySignal = signal;
+        return new Promise<never>(() => {});
+      },
+    );
 
     vi.useFakeTimers();
     try {

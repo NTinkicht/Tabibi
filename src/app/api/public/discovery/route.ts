@@ -29,17 +29,19 @@ export async function GET(request: Request): Promise<Response> {
 
   try {
     const response = await observedJson(request, async (requestId) => {
-      const filters = parseDiscoveryFilters(request.url);
-      if (filters === null) {
+      const parsed = parseDiscoveryFilters(request.url);
+      if (parsed === null) {
         return { status: 400, body: { status: 'rejected', requestId } };
       }
       // Bound the HTTP response even if a query implementation ignores abort.
       // The signal also tears down real in-flight PostgreSQL work.
-      const clinics = await Promise.race([
-        new PublicDiscoveryService(getPool('public-discovery')).listClinics(
+      const { page = 1, ...filters } = parsed;
+      const { clinics, hasMore } = await Promise.race([
+        new PublicDiscoveryService(getPool('public-discovery')).listClinicsPage(
           undefined,
           controller.signal,
           filters,
+          page,
         ),
         deadline,
       ]);
@@ -59,6 +61,8 @@ export async function GET(request: Request): Promise<Response> {
               specialtyCodes: [...doctor.specialtyCodes],
             })),
           })),
+          page,
+          hasMore: hasMore === true,
         },
       };
     });
