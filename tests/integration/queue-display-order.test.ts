@@ -132,7 +132,9 @@ describe('displayed service order projections follow the pure contract', () => {
     );
     const publicStates = ['waiting', 'checked_in', 'called'];
     expect(
-      snapshot.entries.map((publicEntry) => label[publicEntry.publicDisplayLabel]),
+      snapshot.entries.map(
+        (publicEntry) => label[publicEntry.publicDisplayLabel],
+      ),
     ).toEqual(
       names(
         orderQueueForDisplay([...entries].reverse()).filter((e) =>
@@ -140,8 +142,12 @@ describe('displayed service order projections follow the pure contract', () => {
         ),
       ),
     );
-    expect(
-      snapshot.entries.map((publicEntry) => publicEntry.state),
-    ).toEqual(['called', 'checked_in', 'checked_in', 'waiting', 'waiting']);
+    expect(snapshot.entries.map((publicEntry) => publicEntry.state)).toEqual([
+      'called',
+      'checked_in',
+      'checked_in',
+      'waiting',
+      'waiting',
+    ]);
   });
 });
