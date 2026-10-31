@@ -5,11 +5,14 @@ import { isWilayaCode } from '@/modules/clinic/wilayas';
 // accepts. Anything else (an unknown or misspelt key, a repeated key, an
 // empty value or a code outside the versioned lists) is refused rather than
 // ignored, so a malformed filter never silently returns an unfiltered list.
-const FILTER_KEYS = new Set(['wilaya', 'specialty']);
+// TAB-P0-03 (#692): `available` accepts exactly `true`; any other value
+// (`false`, `1`, empty) is refused, never read as "no filter".
+const FILTER_KEYS = new Set(['wilaya', 'specialty', 'available']);
 
 export interface DiscoveryFilterInput {
   wilayaCode?: string;
   specialtyCode?: string;
+  availableOnly?: true;
 }
 
 export function parseDiscoveryFilters(
@@ -31,6 +34,11 @@ export function parseDiscoveryFilters(
   if (specialty !== null) {
     if (!isSpecialtyCode(specialty)) return null;
     filters.specialtyCode = specialty;
+  }
+  const available = params.get('available');
+  if (available !== null) {
+    if (available !== 'true') return null;
+    filters.availableOnly = true;
   }
   return filters;
 }

@@ -6,6 +6,7 @@ import {
   type ClinicScope,
   requireClinicRole,
 } from '@/modules/identity';
+import { BOOKABLE_SESSION_HORIZON_DAYS } from '@/modules/public-availability';
 import { abortableQuery } from '@/platform/database/abortable-query';
 import { inTransaction } from '@/platform/database/transaction';
 import { isSpecialtyCode } from './specialties';
@@ -73,14 +74,21 @@ export interface PublicDiscoveryClinic {
 // versioned controlled lists. A specialty filter keeps only the clinics with
 // at least one doctor holding that specialty at that clinic, and lists only
 // those doctors; a wilaya filter never matches a clinic without a location.
+// TAB-P0-03 (#692): `availableOnly` keeps only the clinic-doctor pairs with
+// at least one session the public bookable-sessions listing would offer
+// (same predicate and horizon), and omits clinics left with no such doctor.
+// It is a filter only: no session data is added to the projection.
 export interface PublicDiscoveryFilters {
   wilayaCode?: string;
   specialtyCode?: string;
+  availableOnly?: boolean;
 }
 
 export class InvalidDiscoveryFilterError extends Error {
   constructor() {
-    super('Discovery filters must be known wilaya and specialty codes');
+    super(
+      'Discovery filters must be known wilaya and specialty codes and a boolean availability flag',
+    );
     this.name = 'InvalidDiscoveryFilterError';
   }
 }
@@ -136,16 +144,34 @@ export class PublicDiscoveryService {
     signal?: AbortSignal,
     filters: PublicDiscoveryFilters = {},
   ): Promise<PublicDiscoveryClinic[]> {
-    const { wilayaCode, specialtyCode } = filters;
+    const { wilayaCode, specialtyCode, availableOnly } = filters;
     // Fail closed: a filter value outside the controlled lists is refused
     // here as well as at the HTTP boundary, never silently ignored.
     if (
       (wilayaCode !== undefined && !isWilayaCode(wilayaCode)) ||
-      (specialtyCode !== undefined && !isSpecialtyCode(specialtyCode))
+      (specialtyCode !== undefined && !isSpecialtyCode(specialtyCode)) ||
+      (availableOnly !== undefined && typeof availableOnly !== 'boolean')
     ) {
       throw new InvalidDiscoveryFilterError();
     }
-    const values = [wilayaCode ?? null, specialtyCode ?? null];
+    const values = [
+      wilayaCode ?? null,
+      specialtyCode ?? null,
+      availableOnly === true,
+      BOOKABLE_SESSION_HORIZON_DAYS,
+    ];
+    // A doctor matches at a clinic when the association holds the requested
+    // specialty and, if availability is requested, has a session that
+    // PublicBookableSessionService.list would offer (keep the two in sync).
+    const matchesDoctor = (association: string) => `
+          ($2::text IS NULL OR $2::text = ANY (${association}.specialty_codes))
+          AND (NOT $3::boolean OR EXISTS (
+                SELECT 1 FROM consultation_sessions session
+                 WHERE session.clinic_id = ${association}.clinic_id
+                   AND session.doctor_id = ${association}.doctor_id
+                   AND session.status IN ('planned', 'open', 'paused')
+                   AND session.starts_at > now()
+                   AND session.starts_at < now() + make_interval(days => $4::int)))`;
     const text = `SELECT clinic.id AS clinic_id,
               clinic.name AS clinic_name,
               clinic.default_locale,
@@ -157,14 +183,14 @@ export class PublicDiscoveryService {
               association.specialty_codes AS doctor_specialty_codes
          FROM clinics clinic
          LEFT JOIN doctor_clinics association ON association.clinic_id = clinic.id
-          AND ($2::text IS NULL OR $2::text = ANY (association.specialty_codes))
+          AND ${matchesDoctor('association')}
          LEFT JOIN doctor_profiles doctor ON doctor.id = association.doctor_id
         WHERE clinic.status = 'active'
           AND ($1::text IS NULL OR clinic.wilaya_code = $1::text)
-          AND ($2::text IS NULL OR EXISTS (
+          AND (($2::text IS NULL AND NOT $3::boolean) OR EXISTS (
                 SELECT 1 FROM doctor_clinics matching
                  WHERE matching.clinic_id = clinic.id
-                   AND $2::text = ANY (matching.specialty_codes)))
+                   AND ${matchesDoctor('matching')}))
         ORDER BY clinic.name, clinic.id, doctor.display_name, doctor.id`;
     const result = signal
       ? await abortableQuery<PublicDiscoveryRow>(
