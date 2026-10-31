@@ -1,5 +1,6 @@
 import { PublicDiscoveryService } from '@/modules/clinic';
 import { getPool } from '@/platform/database/pool';
+import { parseDiscoveryFilters } from '@/platform/http/discovery-input';
 import { observedJson } from '@/platform/http/request-context';
 
 const DISCOVERY_DEADLINE_MS = 2_000;
@@ -27,13 +28,18 @@ export async function GET(request: Request): Promise<Response> {
   });
 
   try {
-    const response = await observedJson(request, async () => {
+    const response = await observedJson(request, async (requestId) => {
+      const filters = parseDiscoveryFilters(request.url);
+      if (filters === null) {
+        return { status: 400, body: { status: 'rejected', requestId } };
+      }
       // Bound the HTTP response even if a query implementation ignores abort.
       // The signal also tears down real in-flight PostgreSQL work.
       const clinics = await Promise.race([
         new PublicDiscoveryService(getPool('public-discovery')).listClinics(
           undefined,
           controller.signal,
+          filters,
         ),
         deadline,
       ]);
@@ -45,8 +51,12 @@ export async function GET(request: Request): Promise<Response> {
             name: clinic.name,
             defaultLocale: clinic.defaultLocale,
             enabledLocales: clinic.enabledLocales,
+            wilayaCode: clinic.wilayaCode,
+            commune: clinic.commune,
+            addressLine: clinic.addressLine,
             doctors: clinic.doctors.map((doctor) => ({
               displayName: doctor.displayName,
+              specialtyCodes: [...doctor.specialtyCodes],
             })),
           })),
         },

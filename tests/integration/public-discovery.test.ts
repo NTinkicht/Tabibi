@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
-import { PublicDiscoveryService } from '@/modules/clinic';
+import {
+  InvalidDiscoveryFilterError,
+  PublicDiscoveryService,
+} from '@/modules/clinic';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
 
@@ -71,13 +74,19 @@ describe('public clinic and doctor discovery', () => {
         name: 'Clinique B',
         defaultLocale: 'fr',
         enabledLocales: ['fr', 'ar'],
-        doctors: [{ displayName: 'Dr Zed' }],
+        wilayaCode: null,
+        commune: null,
+        addressLine: null,
+        doctors: [{ displayName: 'Dr Zed', specialtyCodes: [] }],
       },
       {
         name: 'عيادة أ',
         defaultLocale: 'ar',
         enabledLocales: ['ar', 'fr'],
-        doctors: [{ displayName: 'Dr Alpha' }],
+        wilayaCode: null,
+        commune: null,
+        addressLine: null,
+        doctors: [{ displayName: 'Dr Alpha', specialtyCodes: [] }],
       },
     ]);
 
@@ -136,10 +145,10 @@ describe('public clinic and doctor discovery', () => {
     const result = await new PublicDiscoveryService(pool).listClinics();
     expect(
       result.find((clinic) => clinic.name === 'Alpha Clinic')?.doctors,
-    ).toEqual([{ displayName: 'Doctor Alpha' }]);
+    ).toEqual([{ displayName: 'Doctor Alpha', specialtyCodes: [] }]);
     expect(
       result.find((clinic) => clinic.name === 'Beta Clinic')?.doctors,
-    ).toEqual([{ displayName: 'Doctor Beta' }]);
+    ).toEqual([{ displayName: 'Doctor Beta', specialtyCodes: [] }]);
   });
 
   it('keeps same-name clinics separate by internal clinic identity', async () => {
@@ -180,8 +189,8 @@ describe('public clinic and doctor discovery', () => {
     );
     expect(result.map((clinic) => clinic.doctors)).toEqual(
       expect.arrayContaining([
-        [{ displayName: 'Doctor One' }],
-        [{ displayName: 'Doctor Two' }],
+        [{ displayName: 'Doctor One', specialtyCodes: [] }],
+        [{ displayName: 'Doctor Two', specialtyCodes: [] }],
       ]),
     );
 
@@ -189,5 +198,179 @@ describe('public clinic and doctor discovery', () => {
     for (const forbidden of [clinicA, clinicB, doctorA, doctorB]) {
       expect(serialized).not.toContain(forbidden);
     }
+  });
+
+  describe('TAB-P0-03 wilaya and specialty filters (#688)', () => {
+    async function seed() {
+      const ids = Array.from({ length: 12 }, () => randomUUID());
+      const [algiers, oran, unlocated, hidden] = ids;
+      const users = ids.slice(4, 8);
+      const doctors = ids.slice(8, 12);
+      await pool.query(
+        `INSERT INTO users (id, auth_subject, display_name) VALUES
+          ($1, 'p003-u1', 'U1'), ($2, 'p003-u2', 'U2'),
+          ($3, 'p003-u3', 'U3'), ($4, 'p003-u4', 'U4')`,
+        users,
+      );
+      await pool.query(
+        `INSERT INTO clinics
+          (id, tenant_key, name, status, wilaya_code, commune, address_line)
+         VALUES
+          ($1, 'p003-alg', 'Alger Centre', 'active', '16', 'Bab Ezzouar', '12 rue A'),
+          ($2, 'p003-ora', 'Oran Clinic', 'active', '31', 'Es Senia', NULL),
+          ($3, 'p003-none', 'No Location', 'active', NULL, NULL, NULL),
+          ($4, 'p003-hidden', 'Hidden Algiers', 'inactive', '16', 'Kouba', NULL)`,
+        [algiers, oran, unlocated, hidden],
+      );
+      await pool.query(
+        `INSERT INTO doctor_profiles (id, user_id, display_name) VALUES
+          ($1, $5, 'Dr Cardio'), ($2, $6, 'Dr Kids'),
+          ($3, $7, 'Dr Oran'), ($4, $8, 'Dr Hidden')`,
+        [...doctors, ...users],
+      );
+      // The same doctor (Dr Cardio) holds different specialties at two clinics.
+      await pool.query(
+        `INSERT INTO doctor_clinics (clinic_id, doctor_id, specialty_codes) VALUES
+          ($1, $5, ARRAY['cardiology', 'internal_medicine']),
+          ($1, $6, ARRAY['pediatrics']),
+          ($2, $5, ARRAY['general_medicine']),
+          ($2, $7, ARRAY['cardiology']),
+          ($3, $6, ARRAY['cardiology']),
+          ($4, $8, ARRAY['cardiology'])`,
+        [algiers, oran, unlocated, hidden, ...doctors],
+      );
+      return ids;
+    }
+
+    const service = () => new PublicDiscoveryService(pool);
+    const summary = (
+      clinics: Awaited<ReturnType<PublicDiscoveryService['listClinics']>>,
+    ) =>
+      clinics.map((clinic) => [
+        clinic.name,
+        clinic.doctors.map((doctor) => doctor.displayName),
+      ]);
+
+    it('lists each clinic location and per-association specialty codes', async () => {
+      await seed();
+      const result = await service().listClinics();
+      expect(result.find((c) => c.name === 'Alger Centre')).toEqual({
+        name: 'Alger Centre',
+        defaultLocale: 'ar',
+        enabledLocales: ['ar', 'fr'],
+        wilayaCode: '16',
+        commune: 'Bab Ezzouar',
+        addressLine: '12 rue A',
+        doctors: [
+          {
+            displayName: 'Dr Cardio',
+            specialtyCodes: ['cardiology', 'internal_medicine'],
+          },
+          { displayName: 'Dr Kids', specialtyCodes: ['pediatrics'] },
+        ],
+      });
+      expect(result.find((c) => c.name === 'Oran Clinic')?.doctors).toEqual([
+        { displayName: 'Dr Cardio', specialtyCodes: ['general_medicine'] },
+        { displayName: 'Dr Oran', specialtyCodes: ['cardiology'] },
+      ]);
+    });
+
+    it('filters by wilaya and never matches a clinic without a location', async () => {
+      await seed();
+      expect(
+        summary(
+          await service().listClinics(undefined, undefined, {
+            wilayaCode: '16',
+          }),
+        ),
+      ).toEqual([['Alger Centre', ['Dr Cardio', 'Dr Kids']]]);
+      expect(
+        summary(
+          await service().listClinics(undefined, undefined, {
+            wilayaCode: '05',
+          }),
+        ),
+      ).toEqual([]);
+    });
+
+    it('filters by specialty at the clinic, listing only the matching doctors', async () => {
+      await seed();
+      expect(
+        summary(
+          await service().listClinics(undefined, undefined, {
+            specialtyCode: 'cardiology',
+          }),
+        ),
+      ).toEqual([
+        ['Alger Centre', ['Dr Cardio']],
+        ['No Location', ['Dr Kids']],
+        ['Oran Clinic', ['Dr Oran']],
+      ]);
+      expect(
+        summary(
+          await service().listClinics(undefined, undefined, {
+            specialtyCode: 'dermatology',
+          }),
+        ),
+      ).toEqual([]);
+    });
+
+    it('combines both filters', async () => {
+      await seed();
+      expect(
+        summary(
+          await service().listClinics(undefined, undefined, {
+            wilayaCode: '31',
+            specialtyCode: 'cardiology',
+          }),
+        ),
+      ).toEqual([['Oran Clinic', ['Dr Oran']]]);
+      expect(
+        summary(
+          await service().listClinics(undefined, undefined, {
+            wilayaCode: '31',
+            specialtyCode: 'pediatrics',
+          }),
+        ),
+      ).toEqual([]);
+    });
+
+    it('applies filters through the abortable query path too', async () => {
+      await seed();
+      const result = await service().listClinics(
+        undefined,
+        new AbortController().signal,
+        { wilayaCode: '16', specialtyCode: 'pediatrics' },
+      );
+      expect(summary(result)).toEqual([['Alger Centre', ['Dr Kids']]]);
+    });
+
+    it('refuses uncontrolled filter values without querying and leaks no identifiers', async () => {
+      const ids = await seed();
+      for (const filters of [
+        { wilayaCode: '59' },
+        { wilayaCode: '' },
+        { specialtyCode: 'Cardiology' },
+        { specialtyCode: "cardiology' OR 1=1 --" },
+      ]) {
+        await expect(
+          service().listClinics(undefined, undefined, filters),
+        ).rejects.toBeInstanceOf(InvalidDiscoveryFilterError);
+      }
+      const serialized = JSON.stringify(
+        await service().listClinics(undefined, undefined, {
+          specialtyCode: 'cardiology',
+        }),
+      );
+      for (const forbidden of [
+        ...ids,
+        'p003-',
+        'Hidden Algiers',
+        'Dr Hidden',
+        'Kouba',
+      ]) {
+        expect(serialized).not.toContain(forbidden);
+      }
+    });
   });
 });

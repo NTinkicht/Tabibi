@@ -8,6 +8,8 @@ import {
 } from '@/modules/identity';
 import { abortableQuery } from '@/platform/database/abortable-query';
 import { inTransaction } from '@/platform/database/transaction';
+import { isSpecialtyCode } from './specialties';
+import { isWilayaCode } from './wilayas';
 
 export {
   WILAYA_LIST_VERSION,
@@ -52,13 +54,35 @@ export interface ClinicDoctor {
 
 export interface PublicDiscoveryDoctor {
   displayName: string;
+  // TAB-P0-03 (#688): this clinic's specialty codes for the doctor.
+  specialtyCodes: string[];
 }
 
 export interface PublicDiscoveryClinic {
   name: string;
   defaultLocale: 'ar' | 'fr';
   enabledLocales: Array<'ar' | 'fr'>;
+  // TAB-P0-03 (#688): the clinic's public location; all null when unset.
+  wilayaCode: string | null;
+  commune: string | null;
+  addressLine: string | null;
   doctors: PublicDiscoveryDoctor[];
+}
+
+// TAB-P0-03 (#688): optional public discovery filters, each a code from the
+// versioned controlled lists. A specialty filter keeps only the clinics with
+// at least one doctor holding that specialty at that clinic, and lists only
+// those doctors; a wilaya filter never matches a clinic without a location.
+export interface PublicDiscoveryFilters {
+  wilayaCode?: string;
+  specialtyCode?: string;
+}
+
+export class InvalidDiscoveryFilterError extends Error {
+  constructor() {
+    super('Discovery filters must be known wilaya and specialty codes');
+    this.name = 'InvalidDiscoveryFilterError';
+  }
 }
 
 interface ClinicRow {
@@ -82,7 +106,11 @@ interface PublicDiscoveryRow {
   clinic_name: string;
   default_locale: 'ar' | 'fr';
   enabled_locales: Array<'ar' | 'fr'>;
+  wilaya_code: string | null;
+  commune: string | null;
+  address_line: string | null;
   doctor_display_name: string | null;
+  doctor_specialty_codes: string[] | null;
 }
 
 function clinicFromRow(row: ClinicRow): Clinic {
@@ -106,21 +134,48 @@ export class PublicDiscoveryService {
   async listClinics(
     queryTimeoutMs?: number,
     signal?: AbortSignal,
+    filters: PublicDiscoveryFilters = {},
   ): Promise<PublicDiscoveryClinic[]> {
+    const { wilayaCode, specialtyCode } = filters;
+    // Fail closed: a filter value outside the controlled lists is refused
+    // here as well as at the HTTP boundary, never silently ignored.
+    if (
+      (wilayaCode !== undefined && !isWilayaCode(wilayaCode)) ||
+      (specialtyCode !== undefined && !isSpecialtyCode(specialtyCode))
+    ) {
+      throw new InvalidDiscoveryFilterError();
+    }
+    const values = [wilayaCode ?? null, specialtyCode ?? null];
     const text = `SELECT clinic.id AS clinic_id,
               clinic.name AS clinic_name,
               clinic.default_locale,
               clinic.enabled_locales,
-              doctor.display_name AS doctor_display_name
+              clinic.wilaya_code,
+              clinic.commune,
+              clinic.address_line,
+              doctor.display_name AS doctor_display_name,
+              association.specialty_codes AS doctor_specialty_codes
          FROM clinics clinic
          LEFT JOIN doctor_clinics association ON association.clinic_id = clinic.id
+          AND ($2::text IS NULL OR $2::text = ANY (association.specialty_codes))
          LEFT JOIN doctor_profiles doctor ON doctor.id = association.doctor_id
         WHERE clinic.status = 'active'
+          AND ($1::text IS NULL OR clinic.wilaya_code = $1::text)
+          AND ($2::text IS NULL OR EXISTS (
+                SELECT 1 FROM doctor_clinics matching
+                 WHERE matching.clinic_id = clinic.id
+                   AND $2::text = ANY (matching.specialty_codes)))
         ORDER BY clinic.name, clinic.id, doctor.display_name, doctor.id`;
     const result = signal
-      ? await abortableQuery<PublicDiscoveryRow>(this.pool, text, [], signal)
+      ? await abortableQuery<PublicDiscoveryRow>(
+          this.pool,
+          text,
+          values,
+          signal,
+        )
       : await this.pool.query<PublicDiscoveryRow>({
           text,
+          values,
           ...(queryTimeoutMs === undefined
             ? {}
             : { query_timeout: queryTimeoutMs }),
@@ -137,13 +192,19 @@ export class PublicDiscoveryService {
           name: row.clinic_name,
           defaultLocale: row.default_locale,
           enabledLocales: row.enabled_locales,
+          wilayaCode: row.wilaya_code,
+          commune: row.commune,
+          addressLine: row.address_line,
           doctors: [],
         };
         clinics.push(current);
         currentKey = key;
       }
       if (row.doctor_display_name !== null) {
-        current!.doctors.push({ displayName: row.doctor_display_name });
+        current!.doctors.push({
+          displayName: row.doctor_display_name,
+          specialtyCodes: [...(row.doctor_specialty_codes ?? [])],
+        });
       }
     }
 

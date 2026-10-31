@@ -17,8 +17,8 @@ vi.mock('@/platform/observability/logger', () => ({
 
 import { GET } from '@/app/api/public/discovery/route';
 
-function request(): Request {
-  return new Request('https://tabibi.test/api/public/discovery', {
+function request(query = ''): Request {
+  return new Request(`https://tabibi.test/api/public/discovery${query}`, {
     headers: { 'x-request-id': 'wu74-public-discovery-1' },
   });
 }
@@ -36,14 +36,20 @@ describe('GET /api/public/discovery', () => {
         enabledLocales: ['fr', 'ar'],
         tenantKey: 'must-never-serialize',
         id: 'private-clinic-id',
+        wilayaCode: '16',
+        commune: 'Bab Ezzouar',
+        addressLine: '12 rue des Frères Bouadou',
+        timezone: 'Africa/Algiers',
         doctors: [
           {
             displayName: 'Dr. Amel Benali',
+            specialtyCodes: ['cardiology', 'internal_medicine'],
             id: 'private-doctor-id',
             userId: 'private-user-id',
           },
           {
             displayName: 'د. سارة',
+            specialtyCodes: [],
             membershipRole: 'clinic_admin',
           },
         ],
@@ -64,13 +70,102 @@ describe('GET /api/public/discovery', () => {
           name: 'Clinique El Amal',
           defaultLocale: 'fr',
           enabledLocales: ['fr', 'ar'],
+          wilayaCode: '16',
+          commune: 'Bab Ezzouar',
+          addressLine: '12 rue des Frères Bouadou',
           doctors: [
-            { displayName: 'Dr. Amel Benali' },
-            { displayName: 'د. سارة' },
+            {
+              displayName: 'Dr. Amel Benali',
+              specialtyCodes: ['cardiology', 'internal_medicine'],
+            },
+            { displayName: 'د. سارة', specialtyCodes: [] },
           ],
         },
       ],
     });
+    expect(listClinics).toHaveBeenCalledWith(
+      undefined,
+      expect.any(AbortSignal),
+      {},
+    );
+  });
+
+  it('serializes an unset clinic location as explicit nulls', async () => {
+    listClinics.mockResolvedValue([
+      {
+        name: 'Clinique Sans Adresse',
+        defaultLocale: 'ar',
+        enabledLocales: ['ar'],
+        wilayaCode: null,
+        commune: null,
+        addressLine: null,
+        doctors: [],
+      },
+    ]);
+
+    const response = await GET(request());
+
+    expect(await response.json()).toEqual({
+      clinics: [
+        {
+          name: 'Clinique Sans Adresse',
+          defaultLocale: 'ar',
+          enabledLocales: ['ar'],
+          wilayaCode: null,
+          commune: null,
+          addressLine: null,
+          doctors: [],
+        },
+      ],
+    });
+  });
+
+  it('passes validated wilaya and specialty filters to the discovery service', async () => {
+    listClinics.mockResolvedValue([]);
+
+    for (const [query, filters] of [
+      ['?wilaya=16', { wilayaCode: '16' }],
+      ['?specialty=pediatrics', { specialtyCode: 'pediatrics' }],
+      [
+        '?specialty=cardiology&wilaya=31',
+        { wilayaCode: '31', specialtyCode: 'cardiology' },
+      ],
+    ] as const) {
+      listClinics.mockClear();
+      const response = await GET(request(query));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ clinics: [] });
+      expect(listClinics).toHaveBeenCalledWith(
+        undefined,
+        expect.any(AbortSignal),
+        filters,
+      );
+    }
+  });
+
+  it('rejects unknown, repeated, empty or uncontrolled filters without querying', async () => {
+    for (const query of [
+      '?wilaya=59',
+      '?wilaya=1',
+      '?wilaya=',
+      '?wilaya=16&wilaya=31',
+      '?specialty=Cardiology',
+      '?specialty=',
+      '?specialty=cardiology&specialty=ent',
+      '?speciality=cardiology',
+      '?language=fr',
+      '?wilaya=16&page=2',
+    ]) {
+      const response = await GET(request(query));
+      expect(response.status, query).toBe(400);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+      expect(await response.json()).toEqual({
+        status: 'rejected',
+        requestId: 'wu74-public-discovery-1',
+      });
+    }
+    expect(listClinics).not.toHaveBeenCalled();
   });
 
   it('never serializes sensitive fields added by the discovery service', async () => {
