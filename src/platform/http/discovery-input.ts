@@ -1,4 +1,8 @@
 import { PUBLIC_DISCOVERY_MAX_PAGE } from '@/modules/clinic/discovery-page';
+import {
+  type DiscoveryLanguageCode,
+  isDiscoveryLanguageCode,
+} from '@/modules/clinic/languages';
 import { isSpecialtyCode } from '@/modules/clinic/specialties';
 import { isWilayaCode } from '@/modules/clinic/wilayas';
 
@@ -11,13 +15,21 @@ import { isWilayaCode } from '@/modules/clinic/wilayas';
 // TAB-P0-03 (#694): `page` is a canonical decimal 1..PUBLIC_DISCOVERY_MAX_PAGE
 // (no sign, leading zero, fraction or exponent); the page size is fixed by
 // the server and cannot be chosen by the caller.
-const FILTER_KEYS = new Set(['wilaya', 'specialty', 'available', 'page']);
+// TAB-P0-03 (#696): `language` is exactly `ar` or `fr` (lower case).
+const FILTER_KEYS = new Set([
+  'wilaya',
+  'specialty',
+  'available',
+  'language',
+  'page',
+]);
 const PAGE_PATTERN = /^[1-9][0-9]{0,2}$/;
 
 export interface DiscoveryFilterInput {
   wilayaCode?: string;
   specialtyCode?: string;
   availableOnly?: true;
+  languageCode?: DiscoveryLanguageCode;
   page?: number;
 }
 
@@ -45,6 +57,11 @@ export function parseDiscoveryFilters(
   if (available !== null) {
     if (available !== 'true') return null;
     filters.availableOnly = true;
+  }
+  const language = params.get('language');
+  if (language !== null) {
+    if (!isDiscoveryLanguageCode(language)) return null;
+    filters.languageCode = language;
   }
   const page = params.get('page');
   if (page !== null) {

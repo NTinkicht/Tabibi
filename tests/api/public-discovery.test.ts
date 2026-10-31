@@ -142,6 +142,16 @@ describe('GET /api/public/discovery', () => {
         '?wilaya=16&available=true&specialty=ent',
         { wilayaCode: '16', specialtyCode: 'ent', availableOnly: true },
       ],
+      ['?language=ar', { languageCode: 'ar' }],
+      [
+        '?language=fr&wilaya=31&specialty=ent&available=true',
+        {
+          wilayaCode: '31',
+          specialtyCode: 'ent',
+          availableOnly: true,
+          languageCode: 'fr',
+        },
+      ],
     ] as const) {
       listClinicsPage.mockClear();
       const response = await GET(request(query));
@@ -170,7 +180,16 @@ describe('GET /api/public/discovery', () => {
       '?specialty=',
       '?specialty=cardiology&specialty=ent',
       '?speciality=cardiology',
-      '?language=fr',
+      '?language=en',
+      '?language=AR',
+      '?language=Fr',
+      '?language=',
+      '?language',
+      '?language=ar,fr',
+      '?language=fr&language=ar',
+      '?language=fr&language=fr',
+      '?lang=fr',
+      '?locale=fr',
       '?available=false',
       '?available=1',
       '?available=TRUE',
