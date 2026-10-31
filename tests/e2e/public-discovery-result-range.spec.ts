@@ -15,7 +15,7 @@ async function mockDirectory(page: Page, locale: 'fr' | 'ar', count: number) {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ clinics }),
+      body: JSON.stringify({ clinics, page: 1, hasMore: false }),
     }),
   );
 }
@@ -49,7 +49,7 @@ async function mockMixedDirectory(
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ clinics }),
+      body: JSON.stringify({ clinics, page: 1, hasMore: false }),
     }),
   );
 }

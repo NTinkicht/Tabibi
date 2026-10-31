@@ -16,7 +16,7 @@ async function mockClinics(page: Page, locale: 'fr' | 'ar') {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ clinics }),
+      body: JSON.stringify({ clinics, page: 1, hasMore: false }),
     }),
   );
 }

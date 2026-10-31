@@ -9,7 +9,7 @@ async function mockDirectory(page: Page, clinics: unknown[]) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ clinics }),
+      body: JSON.stringify({ clinics, page: 1, hasMore: false }),
     });
   });
 }
@@ -87,6 +87,8 @@ test('a failed discovery read is retryable on the same page', async ({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        page: 1,
+        hasMore: false,
         clinics: [
           {
             name: 'Clinique du Centre',
@@ -128,6 +130,8 @@ test('a stalled directory refresh times out and the retry can recover', async ({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        page: 1,
+        hasMore: false,
         clinics: [
           {
             name: 'Clinique du Renouveau',
@@ -1391,7 +1395,7 @@ test('Arabic mobile visible total updates after refresh', async ({ page }) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ clinics }),
+      body: JSON.stringify({ clinics, page: 1, hasMore: false }),
     });
   });
   await page.goto('/');

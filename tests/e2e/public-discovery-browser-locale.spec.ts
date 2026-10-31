@@ -9,6 +9,8 @@ async function mockPublicDirectory(page: Page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        page: 1,
+        hasMore: false,
         clinics: [
           {
             name: 'Clinique publique',
