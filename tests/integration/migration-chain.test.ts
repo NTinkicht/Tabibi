@@ -50,6 +50,7 @@ const committedMigrations = [
   '0039_doctor_absences.sql',
   '0040_clinic_location.sql',
   '0041_clinic_doctor_specialties.sql',
+  '0042_eta_source_epoch.sql',
 ];
 
 beforeAll(async () => {
