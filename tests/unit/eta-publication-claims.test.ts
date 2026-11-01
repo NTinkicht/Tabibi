@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import {
   EtaClaimDigestConflictError,
+  canonicalEtaInstant,
   EtaPublicationClaimService,
   EtaPublicationStaleError,
   computeEtaEvidenceDigest,
@@ -50,6 +51,39 @@ describe('computeEtaEvidenceDigest', () => {
         snap({ evaluatedAt: '2026-09-20T10:30:00+01:00' }),
       ),
     ).toBe(computeEtaEvidenceDigest(snap()));
+  });
+  it('rejects offset-free and impossible-calendar instants (no local-time guessing)', () => {
+    for (const bad of [
+      '2026-09-20T09:30:00',
+      '2026-02-31T09:30:00.000Z',
+      '2026-09-20 09:30:00Z',
+      '2026-09-20T09:30:00.1234567Z',
+    ]) {
+      expect(() =>
+        computeEtaEvidenceDigest(snap({ evaluatedAt: bad })),
+      ).toThrow(TypeError);
+      expect(() => canonicalEtaInstant(bad)).toThrow(TypeError);
+    }
+  });
+  it('preserves microseconds so distinct instants never share a digest or key', () => {
+    expect(canonicalEtaInstant('2026-09-20T09:30:00.000001Z')).toBe(
+      '2026-09-20T09:30:00.000001Z',
+    );
+    expect(canonicalEtaInstant('2026-09-20T09:30:00Z')).toBe(
+      '2026-09-20T09:30:00.000000Z',
+    );
+    expect(canonicalEtaInstant('2026-09-20T10:30:00.5+01:00')).toBe(
+      '2026-09-20T09:30:00.500000Z',
+    );
+    expect(
+      computeEtaEvidenceDigest(
+        snap({ evaluatedAt: '2026-09-20T09:30:00.000001Z' }),
+      ),
+    ).not.toBe(
+      computeEtaEvidenceDigest(
+        snap({ evaluatedAt: '2026-09-20T09:30:00.000002Z' }),
+      ),
+    );
   });
   it('rejects a non-absolute instant', () => {
     expect(() =>
@@ -135,6 +169,38 @@ describe('EtaPublicationClaimService (mocked pool)', () => {
     await expect(
       malformed.svc.claim(target(), { sessionEpoch: 0, priorEpoch: 0 }, snap()),
     ).rejects.toThrow(/malformed/);
+  });
+  it('rejects a created/existing row with a foreign digest or non-UUID id, and a stale row carrying data', async () => {
+    const run = (row: Record<string, unknown>) => {
+      const m = service((sql) =>
+        /claim_eta_publication/.test(sql) ? { rows: [row] } : { rows: [] },
+      );
+      return m.svc.claim(target(), { sessionEpoch: 0, priorEpoch: 0 }, snap());
+    };
+    const good = computeEtaEvidenceDigest(snap());
+    await expect(
+      run({
+        outcome: 'created',
+        claim_id: randomUUID(),
+        claimed_digest: 'b'.repeat(64),
+      }),
+    ).rejects.toThrow(/malformed/);
+    await expect(
+      run({
+        outcome: 'existing',
+        claim_id: 'not-a-uuid',
+        claimed_digest: good,
+      }),
+    ).rejects.toThrow(/malformed/);
+    await expect(
+      run({ outcome: 'stale', claim_id: randomUUID(), claimed_digest: null }),
+    ).rejects.toThrow(/malformed/);
+    await expect(
+      run({ outcome: 'stale', claim_id: null, claimed_digest: good }),
+    ).rejects.toThrow(/malformed/);
+    await expect(
+      run({ outcome: 'created', claim_id: randomUUID(), claimed_digest: good }),
+    ).resolves.toMatchObject({ outcome: 'created', evidenceDigest: good });
   });
   it('publish gives up with a stale error after bounded recomputation', async () => {
     const { svc } = service((sql) =>

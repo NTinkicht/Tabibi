@@ -238,6 +238,37 @@ describe('EtaPublicationClaimService (real PostgreSQL)', () => {
     expect(await claimCount()).toBe(0);
   });
 
+  it('keeps distinct microsecond evaluations as distinct claims', async () => {
+    await openSession();
+    const entry = await register('Svc micro');
+    const target = {
+      clinicId: ids.clinic,
+      sessionId: ids.session,
+      entryId: entry,
+    };
+    const epochs = (await svc().readSourceEpochs(ids.clinic, ids.session))!;
+    const a = await svc().claim(
+      target,
+      epochs,
+      snap({ evaluatedAt: '2026-09-20T09:30:00.000001Z' }),
+    );
+    const b = await svc().claim(
+      target,
+      epochs,
+      snap({ evaluatedAt: '2026-09-20T09:30:00.000002Z' }),
+    );
+    expect(a.outcome).toBe('created');
+    expect(b.outcome).toBe('created');
+    expect(a.claimId).not.toBe(b.claimId);
+    const again = await svc().claim(
+      target,
+      epochs,
+      snap({ evaluatedAt: '2026-09-20T09:30:00.000001Z' }),
+    );
+    expect(again.outcome).toBe('existing');
+    expect(await claimCount()).toBe(2);
+  });
+
   it('concurrent identical publishes converge on one claim', async () => {
     await openSession();
     const entry = await register('Svc seven');

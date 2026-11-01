@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
 import { inTransaction } from '@/platform/database/transaction';
+import { absoluteTimestampMs } from './index';
 import type { EtaUncertaintySnapshot } from './uncertainty-v1';
 
 /**
@@ -44,6 +45,23 @@ export class EtaClaimDigestConflictError extends Error {
   }
 }
 
+/**
+ * One canonical UTC instant for hashing and SQL: strict ISO-8601 with an
+ * explicit offset (no local-time or impossible-calendar input), preserved to
+ * the PostgreSQL microsecond. Fractions finer than a microsecond are refused
+ * rather than silently truncated into a shared claim key.
+ */
+export function canonicalEtaInstant(value: string): string {
+  const ms = absoluteTimestampMs(value);
+  if (!Number.isFinite(ms))
+    throw new TypeError('evaluatedAt must be an absolute instant');
+  const fraction = /\.(\d+)/.exec(value)?.[1] ?? '';
+  if (fraction.length > 6)
+    throw new TypeError('evaluatedAt must not exceed microsecond precision');
+  const micros = fraction.padEnd(6, '0').slice(3);
+  return new Date(ms).toISOString().replace(/Z$/, `${micros}Z`);
+}
+
 function assertUuid(value: string, label: string): void {
   if (!UUID.test(value)) throw new TypeError(`${label} must be a UUID`);
 }
@@ -67,15 +85,12 @@ function parseEpoch(value: unknown, label: string): number {
 export function computeEtaEvidenceDigest(
   snapshot: EtaUncertaintySnapshot,
 ): string {
-  const evaluatedMs = Date.parse(snapshot.evaluatedAt);
-  if (!Number.isFinite(evaluatedMs))
-    throw new TypeError('evaluatedAt must be an absolute instant');
-  // Normalized so equal instants in different notations share one digest,
-  // matching the database tuple key (timestamptz).
+  // Canonical so equal instants in different notations share one digest,
+  // matching the database tuple key (timestamptz, microsecond precision).
   const canonical = JSON.stringify([
     'tabibi:eta-evidence:v1',
     snapshot.estimateVersion,
-    new Date(evaluatedMs).toISOString(),
+    canonicalEtaInstant(snapshot.evaluatedAt),
     snapshot.queueRevision,
     snapshot.earliestMinutes,
     snapshot.expectedMinutes,
@@ -136,9 +151,7 @@ export class EtaPublicationClaimService {
     assertUuid(target.entryId, 'entryId');
     assertEpoch(expected.sessionEpoch, 'expected session epoch');
     assertEpoch(expected.priorEpoch, 'expected prior epoch');
-    const evaluatedMs = Date.parse(snapshot.evaluatedAt);
-    if (!Number.isFinite(evaluatedMs))
-      throw new TypeError('evaluatedAt must be an absolute instant');
+    const evaluatedAt = canonicalEtaInstant(snapshot.evaluatedAt);
     const evidenceDigest = computeEtaEvidenceDigest(snapshot);
     try {
       const result = await inTransaction(this.pool, (client) =>
@@ -156,7 +169,7 @@ export class EtaPublicationClaimService {
             expected.sessionEpoch,
             expected.priorEpoch,
             snapshot.estimateVersion,
-            new Date(evaluatedMs).toISOString(),
+            evaluatedAt,
             evidenceDigest,
           ],
         ),
@@ -169,11 +182,17 @@ export class EtaPublicationClaimService {
         row.outcome !== 'stale'
       )
         throw new Error('claim_eta_publication returned an unknown outcome');
-      if (
-        row.outcome !== 'stale' &&
-        (!row.claim_id || !DIGEST.test(row.claimed_digest ?? ''))
-      )
+      if (row.outcome === 'stale') {
+        if (row.claim_id !== null || row.claimed_digest !== null)
+          throw new Error('claim_eta_publication returned a malformed claim');
+      } else if (
+        typeof row.claim_id !== 'string' ||
+        !UUID.test(row.claim_id) ||
+        row.claimed_digest !== evidenceDigest ||
+        !DIGEST.test(row.claimed_digest)
+      ) {
         throw new Error('claim_eta_publication returned a malformed claim');
+      }
       return {
         outcome: row.outcome,
         claimId: row.claim_id,
