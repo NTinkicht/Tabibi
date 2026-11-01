@@ -24,6 +24,10 @@ describe('ETA uncertainty contract: snapshot reads vs atomic publication', () =>
       'never relabelled',
       'fails closed',
       'never returned to a guest or patient',
+      'The returned outcome decides, not the inserted row count',
+      'read before the ETA inputs are fetched',
+      'checks queue-order freshness only',
+      'same committed inputs',
     ]) {
       expect(doc).toContain(term);
     }
