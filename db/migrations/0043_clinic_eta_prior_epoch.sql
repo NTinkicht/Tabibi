@@ -66,52 +66,65 @@ EXECUTE FUNCTION guard_clinic_doctor_eta_prior_epoch();
 CREATE FUNCTION bump_queue_entry_eta_prior_epoch()
 RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
-  affected uuid;
+  old_session uuid;
+  new_session uuid;
+  pair record;
 BEGIN
-  -- A row is a duration sample only with both consultation timestamps. Lock
-  -- doctors in id order so mirrored attributions cannot deadlock.
-  FOR affected IN
-    SELECT DISTINCT d FROM (
-      SELECT (SELECT s.doctor_id FROM consultation_sessions s
-               WHERE s.id = OLD.session_id AND s.clinic_id = OLD.clinic_id) AS d
-       WHERE TG_OP <> 'INSERT'
-         AND OLD.completed_at IS NOT NULL
-         AND OLD.in_consultation_started_at IS NOT NULL
-      UNION ALL
-      SELECT (SELECT s.doctor_id FROM consultation_sessions s
-               WHERE s.id = NEW.session_id AND s.clinic_id = NEW.clinic_id) AS d
-       WHERE TG_OP <> 'DELETE'
-         AND NEW.completed_at IS NOT NULL
-         AND NEW.in_consultation_started_at IS NOT NULL
-    ) sampled WHERE d IS NOT NULL ORDER BY d
+  -- Runs inline (not deferred) so the doctor a sample belongs to is read at the
+  -- moment of the mutation, before a later re-attribution or deletion in the
+  -- same transaction can hide it. A row is a sample only with both timestamps.
+  IF TG_OP <> 'INSERT'
+     AND OLD.completed_at IS NOT NULL
+     AND OLD.in_consultation_started_at IS NOT NULL THEN
+    old_session := OLD.session_id;
+  END IF;
+  IF TG_OP <> 'DELETE'
+     AND NEW.completed_at IS NOT NULL
+     AND NEW.in_consultation_started_at IS NOT NULL THEN
+    new_session := NEW.session_id;
+  END IF;
+  -- Lock order everywhere is session row first, then prior row, sessions in id
+  -- order and prior rows in key order, so concurrent writers cannot deadlock.
+  PERFORM 1 FROM consultation_sessions s
+   WHERE s.id IN (old_session, new_session)
+   ORDER BY s.id FOR UPDATE;
+  FOR pair IN
+    SELECT DISTINCT s.clinic_id, s.doctor_id FROM consultation_sessions s
+     WHERE s.id IN (old_session, new_session)
+     ORDER BY s.clinic_id, s.doctor_id
   LOOP
-    PERFORM bump_clinic_doctor_eta_prior_epoch(
-      CASE WHEN TG_OP = 'DELETE' THEN OLD.clinic_id ELSE NEW.clinic_id END,
-      affected);
+    PERFORM bump_clinic_doctor_eta_prior_epoch(pair.clinic_id, pair.doctor_id);
   END LOOP;
   RETURN NULL;
 END;
 $$;
 
 -- No UPDATE OF column list: the consultation timestamps are set by an earlier
--- BEFORE trigger, so they are not in the statement's SET list. The WHEN clause
--- compares the real row values instead.
--- Deferred to commit so the prior row lock is held only briefly and the bump
--- is idempotent per transaction.
-CREATE CONSTRAINT TRIGGER queue_entries_eta_prior_epoch_write
-AFTER INSERT OR DELETE ON queue_entries
-DEFERRABLE INITIALLY DEFERRED
+-- BEFORE trigger, so they are not in the statement's SET list. The WHEN clauses
+-- compare the real row values instead, and skip rows that are not samples.
+CREATE TRIGGER queue_entries_eta_prior_epoch_insert
+AFTER INSERT ON queue_entries
 FOR EACH ROW
+WHEN (NEW.completed_at IS NOT NULL AND NEW.in_consultation_started_at IS NOT NULL)
 EXECUTE FUNCTION bump_queue_entry_eta_prior_epoch();
 
-CREATE CONSTRAINT TRIGGER queue_entries_eta_prior_epoch_update
+CREATE TRIGGER queue_entries_eta_prior_epoch_delete
+AFTER DELETE ON queue_entries
+FOR EACH ROW
+WHEN (OLD.completed_at IS NOT NULL AND OLD.in_consultation_started_at IS NOT NULL)
+EXECUTE FUNCTION bump_queue_entry_eta_prior_epoch();
+
+CREATE TRIGGER queue_entries_eta_prior_epoch_update
 AFTER UPDATE ON queue_entries
-DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW
 WHEN (
-  (OLD.session_id, OLD.in_consultation_started_at, OLD.completed_at)
-  IS DISTINCT FROM
-  (NEW.session_id, NEW.in_consultation_started_at, NEW.completed_at)
+  (
+    (OLD.completed_at IS NOT NULL AND OLD.in_consultation_started_at IS NOT NULL)
+    OR (NEW.completed_at IS NOT NULL AND NEW.in_consultation_started_at IS NOT NULL)
+  )
+  AND (OLD.session_id, OLD.in_consultation_started_at, OLD.completed_at)
+      IS DISTINCT FROM
+      (NEW.session_id, NEW.in_consultation_started_at, NEW.completed_at)
 )
 EXECUTE FUNCTION bump_queue_entry_eta_prior_epoch();
 

@@ -219,15 +219,7 @@ describe('clinic/doctor eta_prior_epoch (real PostgreSQL)', () => {
     const b = await register('Prior eight');
     await runToStart(a);
     await entryCommand(a, 'complete_consultation');
-    await queue()
-      .command(scope, ids.session, b, {
-        command: 'check_in',
-        reason: 'x',
-        cancellationSource: 'clinic',
-        idempotencyKey: key(),
-        correlationId: key(),
-      })
-      .catch(() => undefined);
+    await entryCommand(b, 'check_in');
     const before = await priorEpoch(ids.doctor);
     const client = await pool.connect();
     try {
@@ -261,6 +253,52 @@ describe('clinic/doctor eta_prior_epoch (real PostgreSQL)', () => {
       committing.release();
     }
     expect(await priorEpoch(ids.doctor)).toBe(before + 1);
+  });
+
+  it('keeps the original doctor when the last sample is deleted then the session is re-attributed', async () => {
+    await openSession();
+    const entry = await register('Prior ten');
+    await runToStart(entry);
+    await entryCommand(entry, 'complete_consultation');
+    expect(await priorEpoch(ids.doctor)).toBe(1);
+    await pool.query(`DELETE FROM queue_command_receipts`);
+    await pool.query(`DELETE FROM queue_registration_receipts`);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`DELETE FROM queue_entries WHERE id=$1`, [entry]);
+      await client.query(
+        `UPDATE consultation_sessions SET doctor_id=$2 WHERE id=$1`,
+        [ids.session, ids.doctor2],
+      );
+      await client.query('COMMIT');
+    } finally {
+      client.release();
+    }
+    expect(await priorEpoch(ids.doctor)).toBe(2);
+    expect(await priorEpoch(ids.doctor2)).toBe(0);
+  });
+
+  it('does not deadlock a timestamp correction against a concurrent re-attribution', async () => {
+    await openSession();
+    const entry = await register('Prior eleven');
+    await runToStart(entry);
+    await entryCommand(entry, 'complete_consultation');
+    for (let round = 0; round < 5; round += 1) {
+      await Promise.all([
+        pool.query(
+          `UPDATE queue_entries SET completed_at = completed_at + interval '1 minute' WHERE id=$1`,
+          [entry],
+        ),
+        pool.query(
+          `UPDATE consultation_sessions SET doctor_id = CASE WHEN doctor_id=$2 THEN $3::uuid ELSE $2::uuid END WHERE id=$1`,
+          [ids.session, ids.doctor, ids.doctor2],
+        ),
+      ]);
+    }
+    expect(
+      (await priorEpoch(ids.doctor)) + (await priorEpoch(ids.doctor2)),
+    ).toBeGreaterThan(5);
   });
 
   it('refuses direct writes, deletes and decreases of the prior epoch', async () => {
