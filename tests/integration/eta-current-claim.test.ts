@@ -154,6 +154,19 @@ describe('EtaPublicationClaimService.readCurrentClaim (real PostgreSQL)', () => 
     expect(await svc().readCurrentClaim(t, 'eta-uncertainty/v2')).toBeNull();
   });
 
+  it('preserves microsecond precision of the evaluation instant', async () => {
+    const t = await target();
+    const epochs = (await svc().readSourceEpochs(ids.clinic, ids.session))!;
+    await svc().claim(
+      t,
+      epochs,
+      snap({ evaluatedAt: '2026-09-20T09:30:00.000002Z' }),
+    );
+    expect((await svc().readCurrentClaim(t))!.evaluatedAt).toBe(
+      '2026-09-20T09:30:00.000002Z',
+    );
+  });
+
   it('is null once a session source changed, never relabelling the old claim', async () => {
     const t = await target();
     await svc().publish(t, async () => snap());

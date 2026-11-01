@@ -166,9 +166,11 @@ export class EtaPublicationClaimService {
     const result = await this.pool.query<{
       id: string;
       evidence_digest: string;
-      evaluated_at: Date;
+      evaluated_at: string;
     }>(
-      `SELECT c.id, c.evidence_digest, c.evaluated_at
+      `SELECT c.id, c.evidence_digest,
+              to_char(c.evaluated_at AT TIME ZONE 'UTC',
+                      'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS evaluated_at
          FROM consultation_sessions s
          LEFT JOIN clinic_doctor_eta_prior_epochs pe
            ON pe.clinic_id = s.clinic_id AND pe.doctor_id = s.doctor_id
@@ -192,13 +194,13 @@ export class EtaPublicationClaimService {
     if (
       !UUID.test(row.id) ||
       !DIGEST.test(row.evidence_digest) ||
-      !(row.evaluated_at instanceof Date)
+      typeof row.evaluated_at !== 'string'
     )
       throw new Error('eta_publication_claims returned a malformed claim');
     return {
       claimId: row.id,
       evidenceDigest: row.evidence_digest,
-      evaluatedAt: canonicalEtaInstant(row.evaluated_at.toISOString()),
+      evaluatedAt: canonicalEtaInstant(row.evaluated_at),
     };
   }
 
