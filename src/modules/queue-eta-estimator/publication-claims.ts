@@ -17,6 +17,7 @@ import type { EtaUncertaintySnapshot } from './uncertainty-v1';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DIGEST = /^[0-9a-f]{64}$/;
+const CONTRACT_VERSION = /^[a-z][a-z0-9-]*\/v[0-9]+$/;
 
 export type EtaClaimOutcome = 'created' | 'existing' | 'stale';
 
@@ -101,6 +102,12 @@ export function computeEtaEvidenceDigest(
   return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 
+export interface EtaCurrentClaim {
+  claimId: string;
+  evidenceDigest: string;
+  evaluatedAt: string;
+}
+
 export interface EtaPublicationTarget {
   clinicId: string;
   sessionId: string;
@@ -134,6 +141,66 @@ export class EtaPublicationClaimService {
     return {
       sessionEpoch: parseEpoch(row.session_epoch, 'session epoch'),
       priorEpoch: parseEpoch(row.prior_epoch, 'prior epoch'),
+    };
+  }
+
+  /**
+   * The newest claim for the entry that is still current: both of its epochs
+   * equal the epochs now, in one statement (one consistent snapshot). Returns
+   * null when there is none, when any source epoch moved after the claim (an
+   * older claim is never relabelled as current) or when the tuple is not in
+   * the clinic. Epochs and keys are never returned.
+   */
+  async readCurrentClaim(
+    target: EtaPublicationTarget,
+    contractVersion?: string,
+  ): Promise<EtaCurrentClaim | null> {
+    assertUuid(target.clinicId, 'clinicId');
+    assertUuid(target.sessionId, 'sessionId');
+    assertUuid(target.entryId, 'entryId');
+    if (
+      contractVersion !== undefined &&
+      !CONTRACT_VERSION.test(contractVersion)
+    )
+      throw new RangeError('contractVersion is malformed');
+    const result = await this.pool.query<{
+      id: string;
+      evidence_digest: string;
+      evaluated_at: string;
+    }>(
+      `SELECT c.id, c.evidence_digest,
+              to_char(c.evaluated_at AT TIME ZONE 'UTC',
+                      'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS evaluated_at
+         FROM consultation_sessions s
+         LEFT JOIN clinic_doctor_eta_prior_epochs pe
+           ON pe.clinic_id = s.clinic_id AND pe.doctor_id = s.doctor_id
+         JOIN eta_publication_claims c
+           ON c.clinic_id = s.clinic_id AND c.session_id = s.id
+          AND c.session_epoch = s.eta_source_epoch
+          AND c.prior_epoch = COALESCE(pe.eta_prior_epoch, 0)
+        WHERE s.id = $1 AND s.clinic_id = $2 AND c.entry_id = $3
+          AND ($4::text IS NULL OR c.contract_version = $4)
+        ORDER BY c.evaluated_at DESC, c.created_at DESC, c.id DESC
+        LIMIT 1`,
+      [
+        target.sessionId,
+        target.clinicId,
+        target.entryId,
+        contractVersion ?? null,
+      ],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    if (
+      !UUID.test(row.id) ||
+      !DIGEST.test(row.evidence_digest) ||
+      typeof row.evaluated_at !== 'string'
+    )
+      throw new Error('eta_publication_claims returned a malformed claim');
+    return {
+      claimId: row.id,
+      evidenceDigest: row.evidence_digest,
+      evaluatedAt: canonicalEtaInstant(row.evaluated_at),
     };
   }
 
