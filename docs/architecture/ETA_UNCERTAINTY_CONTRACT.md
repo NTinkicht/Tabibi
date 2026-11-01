@@ -60,7 +60,7 @@ Each estimate is an immutable versioned tuple:
 - `evaluated_at`: absolute timestamp used for active-consultation remaining-time calculation;
 - `explanation_codes`: deterministic reason codes for material range/position inputs.
 
-A stored or published estimate is valid only for the exact tuple `(clinic, session, target_entry, queue_revision, estimate_version, evaluated_at)`. Retrying the same request with the same tuple returns byte-equivalent normalized estimate data. A retry that observes a different queue revision must recompute rather than overwrite or relabel the older estimate.
+A snapshot read (the `eta-uncertainty/v1` projection returned by a guest or receptionist read) is valid only for the exact tuple `(clinic, session, target_entry, queue_revision, estimate_version, evaluated_at)`. Retrying the same request with the same tuple returns byte-equivalent normalized estimate data only when it is computed from the same committed inputs (including declared delay, session state and duration priors) and the same evaluation instant; the tuple does not identify those inputs, so any changed ETA input requires recomputation. A retry that observes a different queue revision must recompute rather than overwrite or relabel the older estimate. A snapshot read is not a persisted publication.
 
 ## Recompute and refresh policy
 
@@ -74,7 +74,11 @@ If the session is paused or otherwise not currently advancing, explanation codes
 
 No random sampling, process-local clock drift, unordered collection traversal, or hidden model state may influence the result. The same committed history, configuration version, queue revision, and evaluation instant must yield identical output.
 
-Computation may occur outside the mutation transaction, but publication must compare-and-swap against the exact `queue_revision` used to compute it. If the revision changed before publication, discard the stale candidate and recompute from the new committed state. Concurrent retries for the same immutable input tuple must converge on the same result.
+Computation may occur outside the mutation transaction. Atomic persisted publication is distinct from a snapshot read and compares-and-swaps against the canonical source epochs, never against `queue_revision`. `queue_revision` orders the queue only; it is not an ETA epoch, because declared delay, pause/resume, active completion, historical duration priors and cross-session transfer change an estimate without changing it.
+
+The expected epochs are read before the ETA inputs are fetched (or together with them in one consistent snapshot), and exactly those epochs are used for the claim; computing first and reading epochs afterwards could claim stale evidence. A persisted publication is a claim bound to the full source tuple `(clinic, session, target_entry, session epoch, clinic/doctor prior epoch, contract version, evaluation instant)` plus a digest of the published evidence. The claim is inserted atomically only while both expected epochs are still current (`claim_eta_publication`). The returned outcome decides, not the inserted row count: `created` and `existing` (an identical retry inserts no new row) are both successful publications, while only `stale` means discard the candidate, read the epochs again, recompute from fresh committed state and retry a bounded number of times. A stale candidate is never relabelled with newer epochs, and exhausting the retries fails closed. Claims are immutable. Concurrent identical retries converge on the existing claim, and a different digest for the same tuple is refused. Epochs and claim keys stay inside the service and database layer and are never returned to a guest or patient.
+
+The queue-revision equality in the executable vectors (`eta-executable-vectors-v1`, `stale-revision`) checks queue-order freshness only; it is not a model of persisted publication, which is governed by the epoch rules above.
 
 ## Explainability
 
@@ -90,5 +94,5 @@ Every estimate must retain explanation codes sufficient to show whether the rang
 - With `D=0.8`, `A=0`, `N=1`, and `M=1`, the distinct raw bounds are normalized outward rather than collapsed to one point.
 - A same-day observed slowdown changes `M` and may move all three range values while preserving `earliest <= expected <= latest`.
 - Replaying the same committed history with the same `evaluated_at` produces byte-equivalent normalized estimate data for the same configuration version.
-- A retry computed from queue revision 41 cannot be published as revision 42; it must be discarded and recomputed.
+- A candidate computed under source epochs that have since moved cannot be published; it must be discarded and recomputed, and a queue revision that did not change does not make it current.
 - Missing or invalid `evaluated_at`, source policy, queue revision, or session scope fails closed rather than using process-local defaults.
