@@ -327,31 +327,129 @@ describe('eta_publication_claims (real PostgreSQL)', () => {
     expect(await claimCount()).toBe(1);
   });
 
-  it('orders a concurrent source change after an in-flight claim and then reports stale', async () => {
+  it('refuses a direct insert pairing an entry with another session', async () => {
     await openSession();
-    const entry = await register('Claim eleven');
-    const se = await sessionEpoch();
+    const entry = await register('Claim twelve');
+    const sibling = await pool.query<{ e: string }>(
+      `SELECT eta_source_epoch::text AS e FROM consultation_sessions WHERE id=$1`,
+      [ids.sibling],
+    );
+    await expect(
+      pool.query(
+        `INSERT INTO eta_publication_claims(clinic_id,session_id,entry_id,session_epoch,prior_epoch,contract_version,evaluated_at,evidence_digest)
+         VALUES($1,$2,$3,$4,0,$5,$6,$7)`,
+        [
+          ids.clinic,
+          ids.sibling,
+          entry,
+          sibling.rows[0]!.e,
+          V1,
+          T0,
+          digest('a'),
+        ],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+    expect(await claimCount()).toBe(0);
+  });
+
+  async function waitForBlockedWriter(): Promise<void> {
+    for (let i = 0; i < 100; i += 1) {
+      const r = await pool.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM pg_stat_activity
+          WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+      );
+      if (Number(r.rows[0]!.n) > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error('writer never blocked on the in-flight claim');
+  }
+
+  async function inFlightClaim(
+    entry: string,
+    sessionEpochValue: number,
+    run: () => Promise<unknown>,
+    direct = false,
+  ): Promise<void> {
     const a = await pool.connect();
+    let writer: Promise<unknown> | undefined;
     try {
       await a.query('BEGIN');
-      const inflight = await claim(
-        entry,
-        se,
-        0,
-        digest('a'),
-        {},
-        a as unknown as Pool,
-      );
-      expect(inflight.outcome).toBe('created');
-      // The writer commits its epoch bump only after the claim's share lock is released.
-      const writer = entryCommand(entry, 'check_in');
-      await new Promise((r) => setTimeout(r, 200));
+      if (direct) {
+        await a.query(
+          `INSERT INTO eta_publication_claims(clinic_id,session_id,entry_id,session_epoch,prior_epoch,contract_version,evaluated_at,evidence_digest)
+           VALUES($1,$2,$3,$4,0,$5,$6,$7)`,
+          [
+            ids.clinic,
+            ids.session,
+            entry,
+            sessionEpochValue,
+            V1,
+            T0,
+            digest('a'),
+          ],
+        );
+      } else {
+        const r = await a.query<Outcome>(
+          `SELECT * FROM claim_eta_publication($1,$2,$3,$4,0,$5,$6,$7)`,
+          [
+            ids.clinic,
+            ids.session,
+            entry,
+            sessionEpochValue,
+            V1,
+            T0,
+            digest('a'),
+          ],
+        );
+        expect(r.rows[0]!.outcome).toBe('created');
+      }
+      let writerDone = false;
+      writer = run().then(() => {
+        writerDone = true;
+      });
+      await waitForBlockedWriter();
+      expect(writerDone).toBe(false);
       await a.query('COMMIT');
-      await writer;
+    } catch (error) {
+      await a.query('ROLLBACK').catch(() => undefined);
+      throw error;
     } finally {
       a.release();
     }
+    await writer;
+  }
+
+  it('blocks a session source change until an in-flight claim commits, then reports stale', async () => {
+    await openSession();
+    const entry = await register('Claim eleven');
+    const se = await sessionEpoch();
+    await inFlightClaim(entry, se, () => entryCommand(entry, 'check_in'));
     expect((await claim(entry, se, 0)).outcome).toBe('stale');
     expect(await claimCount()).toBe(1);
+  });
+
+  it('blocks first prior-epoch creation until an in-flight epoch-0 claim commits', async () => {
+    await openSession();
+    const sample = await register('Claim thirteen');
+    const waiting = await register('Claim fourteen');
+    await runToStart(sample);
+    const se = await sessionEpoch();
+    expect(await priorEpoch()).toBe(0);
+    await inFlightClaim(waiting, se, () =>
+      entryCommand(sample, 'complete_consultation'),
+    );
+    expect(await priorEpoch()).toBe(1);
+    expect(
+      (await claim(waiting, await sessionEpoch(), 0, digest('e'))).outcome,
+    ).toBe('stale');
+  });
+
+  it('also serializes a direct insert against concurrent source changes', async () => {
+    await openSession();
+    const entry = await register('Claim fifteen');
+    const se = await sessionEpoch();
+    await inFlightClaim(entry, se, () => entryCommand(entry, 'check_in'), true);
+    expect(await claimCount()).toBe(1);
+    expect((await claim(entry, se, 0, digest('a'))).outcome).toBe('stale');
   });
 });

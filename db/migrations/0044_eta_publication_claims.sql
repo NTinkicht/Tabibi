@@ -28,6 +28,60 @@ CREATE TABLE eta_publication_claims (
 COMMENT ON TABLE eta_publication_claims IS
   'Immutable claim-only ETA publication evidence; epochs and keys are never patient-visible.';
 
+-- Lock order for claims and for prior-epoch writers: the per-(clinic, doctor)
+-- advisory lock first, then the session row. The advisory lock gives the
+-- absent-row case (no prior epoch row yet) a stable lock target. Claims take it
+-- shared; the prior-epoch bump takes it exclusive, so a source change orders
+-- after any in-flight claim and a claim never commits an outdated prior.
+CREATE FUNCTION eta_prior_lock_key(target_clinic uuid, target_doctor uuid)
+RETURNS bigint LANGUAGE sql IMMUTABLE AS $$
+  SELECT hashtextextended('eta_prior:' || target_clinic::text || ':' || target_doctor::text, 0)
+$$;
+
+CREATE OR REPLACE FUNCTION bump_clinic_doctor_eta_prior_epoch(target_clinic uuid, target_doctor uuid)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM pg_advisory_xact_lock(eta_prior_lock_key(target_clinic, target_doctor));
+  INSERT INTO clinic_doctor_eta_prior_epochs
+    (clinic_id, doctor_id, eta_prior_epoch, eta_prior_epoch_xact)
+  VALUES (target_clinic, target_doctor, 1, pg_current_xact_id())
+  ON CONFLICT (clinic_id, doctor_id) DO UPDATE
+     SET eta_prior_epoch = clinic_doctor_eta_prior_epochs.eta_prior_epoch + 1,
+         eta_prior_epoch_xact = pg_current_xact_id()
+   WHERE clinic_doctor_eta_prior_epochs.eta_prior_epoch_xact
+         IS DISTINCT FROM pg_current_xact_id();
+END;
+$$;
+
+-- Share-locks everything a claim depends on and returns the current epochs.
+-- A doctor re-attribution racing the lock acquisition raises 40001 (retry).
+CREATE FUNCTION lock_eta_claim_sources(
+  p_clinic_id uuid, p_session_id uuid,
+  OUT current_session_epoch bigint, OUT current_prior_epoch bigint)
+LANGUAGE plpgsql AS $$
+DECLARE
+  doctor_before uuid;
+  doctor_after uuid;
+BEGIN
+  SELECT doctor_id INTO doctor_before FROM consultation_sessions
+   WHERE id = p_session_id AND clinic_id = p_clinic_id;
+  IF doctor_before IS NULL THEN
+    RETURN;
+  END IF;
+  PERFORM pg_advisory_xact_lock_shared(eta_prior_lock_key(p_clinic_id, doctor_before));
+  SELECT doctor_id, eta_source_epoch INTO doctor_after, current_session_epoch
+    FROM consultation_sessions
+   WHERE id = p_session_id AND clinic_id = p_clinic_id FOR SHARE;
+  IF doctor_after IS DISTINCT FROM doctor_before THEN
+    RAISE EXCEPTION 'eta claim sources changed while locking'
+      USING ERRCODE = '40001';
+  END IF;
+  SELECT COALESCE((SELECT p.eta_prior_epoch FROM clinic_doctor_eta_prior_epochs p
+                    WHERE p.clinic_id = p_clinic_id AND p.doctor_id = doctor_after), 0)
+    INTO current_prior_epoch;
+END;
+$$;
+
 CREATE FUNCTION guard_eta_publication_claim()
 RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
@@ -38,13 +92,17 @@ BEGIN
     RAISE EXCEPTION 'eta_publication_claims rows are immutable'
       USING ERRCODE = '23514';
   END IF;
-  -- Table-level CAS so no writer can record a claim for an outdated tuple.
-  SELECT s.eta_source_epoch,
-         COALESCE((SELECT p.eta_prior_epoch FROM clinic_doctor_eta_prior_epochs p
-                    WHERE p.clinic_id = s.clinic_id AND p.doctor_id = s.doctor_id), 0)
+  -- Table-level CAS under the same locks as claim_eta_publication, so no
+  -- writer can record or commit a claim for an outdated or mismatched tuple.
+  SELECT l.current_session_epoch, l.current_prior_epoch
     INTO current_session_epoch, current_prior_epoch
-    FROM consultation_sessions s
-   WHERE s.id = NEW.session_id AND s.clinic_id = NEW.clinic_id;
+    FROM lock_eta_claim_sources(NEW.clinic_id, NEW.session_id) l;
+  IF NOT EXISTS (SELECT 1 FROM queue_entries q
+                  WHERE q.id = NEW.entry_id AND q.session_id = NEW.session_id
+                    AND q.clinic_id = NEW.clinic_id) THEN
+    RAISE EXCEPTION 'eta publication claim entry does not belong to session'
+      USING ERRCODE = '23514';
+  END IF;
   IF current_session_epoch IS DISTINCT FROM NEW.session_epoch
      OR current_prior_epoch IS DISTINCT FROM NEW.prior_epoch THEN
     RAISE EXCEPTION 'eta publication claim is stale'
@@ -79,13 +137,9 @@ DECLARE
   found_id uuid;
   found_digest text;
 BEGIN
-  -- Share-lock the epoch rows so a writer's commit-time bump orders after this
-  -- claim instead of interleaving with it. A missing prior row is epoch 0.
-  PERFORM 1 FROM consultation_sessions
-   WHERE id = p_session_id AND clinic_id = p_clinic_id FOR SHARE;
-  PERFORM 1 FROM clinic_doctor_eta_prior_epochs p
-    JOIN consultation_sessions s ON s.clinic_id = p.clinic_id AND s.doctor_id = p.doctor_id
-   WHERE s.id = p_session_id AND s.clinic_id = p_clinic_id FOR SHARE OF p;
+  -- Same locks as the table guard, taken up front so the claim orders before
+  -- any writer's commit-time bump (absent prior rows included).
+  PERFORM lock_eta_claim_sources(p_clinic_id, p_session_id);
 
   INSERT INTO eta_publication_claims
     (clinic_id, session_id, entry_id, session_epoch, prior_epoch,
