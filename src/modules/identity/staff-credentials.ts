@@ -73,7 +73,7 @@ export function validatePasswordPolicy(
   if (length < PASSWORD_MIN_LENGTH) throw new PasswordPolicyError('too_short');
   if (length > PASSWORD_MAX_LENGTH) throw new PasswordPolicyError('too_long');
   const candidate = password.normalize('NFKC').trim().toLowerCase();
-  const subject = authSubject.trim().toLowerCase();
+  const subject = authSubject.normalize('NFKC').trim().toLowerCase();
   const local = subject.includes('@') ? subject.split('@')[0]! : subject;
   if (candidate === subject || (local !== '' && candidate === local)) {
     throw new PasswordPolicyError('matches_identity');
@@ -200,8 +200,8 @@ export async function verifyStaffPassword(
            THEN now() + make_interval(secs => $3::int)
          ELSE NULL END,
        updated_at = now()
-     WHERE user_id = $1`,
-    [row.user_id, max, seconds],
+     WHERE user_id = $1 AND password_hash = $4`,
+    [row.user_id, max, seconds, row.password_hash],
   );
   return { ok: false };
 }

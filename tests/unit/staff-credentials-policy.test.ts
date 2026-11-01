@@ -51,4 +51,14 @@ describe('staff password policy (#723)', () => {
       expect((error as Error).message).not.toContain(secret);
     }
   });
+
+  it('compares identities after Unicode normalization on both sides', () => {
+    const decomposed = 'me\u0301decin@clinic.example';
+    expect(() => validatePasswordPolicy(decomposed, decomposed)).toThrowError(
+      PasswordPolicyError,
+    );
+    expect(() =>
+      validatePasswordPolicy('m\u00e9decin@clinic.example', decomposed),
+    ).toThrowError(PasswordPolicyError);
+  });
 });

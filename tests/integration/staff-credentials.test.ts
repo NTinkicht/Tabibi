@@ -151,4 +151,32 @@ describe('staff credentials (#723)', () => {
       verifyStaffPassword(pool, SUBJECT, GOOD, { maxFailedAttempts: 0 }),
     ).rejects.toBeInstanceOf(RangeError);
   });
+
+  it('does not let failures of an old password lock a credential replaced mid-verification', async () => {
+    await setStaffPassword(pool, alice, GOOD);
+    const opts = { maxFailedAttempts: 1, lockoutSeconds: 300 };
+    let replaced = false;
+    const racing = {
+      async query(text: string, values?: readonly unknown[]) {
+        if (!replaced && text.includes('failed_attempts = CASE')) {
+          replaced = true;
+          await setStaffPassword(pool, alice, 'a brand new password');
+        }
+        return pool.query(text, values as unknown[]);
+      },
+    };
+    await verifyStaffPassword(
+      racing as never,
+      SUBJECT,
+      'wrong password!!',
+      opts,
+    );
+    expect(replaced).toBe(true);
+    const s = await state();
+    expect(s.failed_attempts).toBe(0);
+    expect(s.locked_until).toBeNull();
+    expect(
+      await verifyStaffPassword(pool, SUBJECT, 'a brand new password', opts),
+    ).toMatchObject({ ok: true });
+  });
 });
