@@ -20,7 +20,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Cross-tenant denial on membership administration | src: src/modules/identity/index.ts | test: tests/integration/staff-membership-http-api.test.ts :: "denies non-admin staff and other clinics" | pr: review: not audited
 - [COVERED] Secure configuration fails fast | src: src/platform/config/env.ts | test: tests/unit/env.test.ts :: "fails fast when the database URL is absent" | pr: review: not audited
 - [PARTIAL] Cross-tenant IDOR matrix over all read/write routes | src: src/modules/identity/index.ts | test: tests/integration/queue-lifecycle.test.ts :: "enforces clinic isolation and one called/consulting patient under concurrent commands" | pr: review: not audited
-- [COVERED] First clinic_admin bootstrap and staff invites: verifier-only token, admin-only create/revoke, cross-clinic denied | src: src/modules/identity/bootstrap-admin.ts, src/modules/identity/staff-invites.ts | test: tests/integration/staff-invites.test.ts :: "only a clinic_admin of that clinic can create or revoke; cross-clinic is denied" | pr: #739 (merged; ntk-reviewer verdict not audited)
+- [COVERED] First clinic_admin bootstrap and staff invites: verifier-only token, admin-only create/revoke, cross-clinic denied | src: src/modules/identity/bootstrap-admin.ts, src/modules/identity/staff-invites.ts | test: tests/integration/staff-invites.test.ts :: "limits grantable roles: clinic_admin and unknown roles are refused" | pr: #739 (merged; ntk-reviewer verdict not audited)
 
 ## TAB-P0-02 Scheduling, availability, deterministic sessions
 
