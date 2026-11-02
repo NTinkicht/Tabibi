@@ -76,6 +76,15 @@ test('sign-in returns to a safe path, rejects open redirects, and sign-out works
     await expect(page).toHaveURL(new RegExp(`/operations/${clinicId}`));
     expect(new URL(page.url()).host).toBe('127.0.0.1:3000');
 
+    // A failed logout keeps the user on the page with a retry message.
+    await page.route('**/api/staff/session/logout', (route) =>
+      route.fulfill({ status: 500, body: '{}' }),
+    );
+    await page.getByTestId('sign-out').click();
+    await expect(page.getByTestId('sign-out-error')).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/operations/${clinicId}`));
+    await page.unroute('**/api/staff/session/logout');
+
     // Sign-out revokes the session and returns to the sign-in page.
     await page.getByTestId('sign-out').click();
     await expect(page).toHaveURL(/\/staff\/sign-in/);
