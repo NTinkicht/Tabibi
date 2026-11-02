@@ -67,7 +67,8 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Priority insert/move bounds, roles, tenants | src: src/modules/queue/index.ts, db/migrations/0006_queue_priority_order.sql | test: tests/integration/queue-priority.test.ts :: "supports waiting inserts, enforces insert/move bounds, roles, and tenants" | pr: #683 (ntk-reviewer APPROVED f0b3c3424c4a)
 - [COVERED] Bulk no-show only after grace, never reclassifies arrived | src: src/modules/appointment/index.ts, db/migrations/0031_appointment_bulk_no_show.sql | test: tests/integration/appointment-bulk-no-show.test.ts :: "never reclassifies cancelled or arrived appointments and leaves queue revision unchanged" | pr: review: not audited
 - [COVERED] Arabic/French keyboard-operable receptionist UI | src: src/app/operations | test: tests/e2e/receptionist-bilingual-accessibility.spec.ts :: "receptionist queue stays clinic-scoped, private, bilingual, and keyboard operable" | pr: review: not audited
-- [PARTIAL] Transfer and restore are tested inside lifecycle/dashboard suites; no single named transfer-vs-cancel race test was located | src: src/modules/queue/index.ts | test: tests/integration/receptionist-dashboard-concurrency.test.ts :: "pins doctor-delay update fields across a concurrent commit" | pr: review: not audited
+- [COVERED] Transfer is serialized ahead of a queued cancellation without split state | src: src/modules/queue/index.ts, src/modules/appointment/index.ts | test: tests/integration/appointment-recovery-race.test.ts :: "serializes transfer ahead of a queued cancellation without split state" | pr: review: not audited
+- [PARTIAL] Restore-versus-cancel/call and priority-insert-versus-transfer races were not located as named tests | src: src/modules/queue/index.ts | test: tests/integration/receptionist-dashboard-concurrency.test.ts :: "pins doctor-delay update fields across a concurrent commit" | pr: review: not audited
 
 ## TAB-P0-08 Guest status access and encrypted exchange link
 
@@ -141,7 +142,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 | TAB-P0-04 | VERIFY | all COVERED; ready once P0-01..03 pass |
 | TAB-P0-05 | VERIFY | one PARTIAL (outbox atomicity per transition) |
 | TAB-P0-06 | VERIFY | receipt cleanup PARTIAL |
-| TAB-P0-07 | VERIFY | transfer/restore race PARTIAL |
+| TAB-P0-07 | VERIFY | restore race PARTIAL |
 | TAB-P0-08 | VERIFY | encrypted-envelope intents MISSING |
 | TAB-P0-09 | VERIFY | COVERED; review evidence not audited |
 | TAB-P0-10 | VERIFY | COVERED; review evidence partly audited |
@@ -159,5 +160,5 @@ No row is proposed as VERIFIED: the protocol also requires per-row independent r
 2. Ciphertext scrub and external-provider worker lifecycle (P0-13).
 3. Secret scan in CI and penetration checklist (P0-15).
 4. Doctor-facing bilingual Playwright journey (P0-14).
-5. Named transfer/restore race and 15-minute terminal-grace tests (P0-07, P0-12).
+5. Named restore race and 15-minute terminal-grace tests (P0-07, P0-12).
 6. Replay-receipt ciphertext retention/scrub audit (P0-06).
