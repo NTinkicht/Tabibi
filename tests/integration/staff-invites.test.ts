@@ -31,7 +31,7 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   await pool.query(
-    'TRUNCATE staff_invites, staff_credentials, audit_events, clinic_memberships, users, clinics CASCADE',
+    'TRUNCATE doctor_clinics, doctor_profiles, staff_invites, staff_credentials, audit_events, clinic_memberships, users, clinics CASCADE',
   );
   for (const [id, key] of [
     [clinicA, 'invite-a'],
@@ -237,6 +237,65 @@ describe('staff invites (#727)', () => {
         )
       ).rowCount,
     ).toBe(1);
+  });
+
+  it('a doctor invite creates the doctor profile and clinic association', async () => {
+    const { token } = await invite('doc@x.example', 'doctor');
+    const out = await service.accept(token, {
+      displayName: 'Doc',
+      password: GOOD,
+    });
+    const row = await pool.query(
+      `SELECT 1 FROM doctor_profiles p JOIN doctor_clinics c ON c.doctor_id=p.id
+        WHERE p.user_id=$1 AND c.clinic_id=$2`,
+      [out.userId, clinicA],
+    );
+    expect(row.rowCount).toBe(1);
+  });
+
+  it('concurrent acceptances from two clinics for one passwordless user set the password once', async () => {
+    const userId = randomUUID();
+    await pool.query(
+      `INSERT INTO users(id,auth_subject,display_name) VALUES ($1,'shared@x.example','S')`,
+      [userId],
+    );
+    const a = await invite('shared@x.example', 'receptionist');
+    const b = await service.create(
+      { clinicId: clinicB, actorUserId: adminB },
+      { email: 'shared@x.example', role: 'receptionist' },
+    );
+    const [ra, rb] = await Promise.all([
+      service.accept(a.token, {
+        displayName: 'S',
+        password: 'first winner password',
+      }),
+      service.accept(b.token, {
+        displayName: 'S',
+        password: 'second loser password',
+      }),
+    ]);
+    expect(ra.userId).toBe(userId);
+    expect(rb.userId).toBe(userId);
+    const ok1 = (
+      await verifyStaffPassword(
+        pool,
+        'shared@x.example',
+        'first winner password',
+      )
+    ).ok;
+    const ok2 = (
+      await verifyStaffPassword(
+        pool,
+        'shared@x.example',
+        'second loser password',
+      )
+    ).ok;
+    expect([ok1, ok2].filter(Boolean)).toHaveLength(1);
+    const changed = await pool.query(
+      'SELECT 1 FROM staff_credentials WHERE user_id=$1 AND password_changed_at > created_at',
+      [userId],
+    );
+    expect(changed.rowCount).toBe(0);
   });
 
   it('never overwrites an existing account password and never changes an existing membership', async () => {

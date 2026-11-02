@@ -220,12 +220,8 @@ export class StaffInviteService {
       }
       validatePasswordPolicy(input.password, invite.email);
 
-      const existing = await client.query<{
-        id: string;
-        has_password: boolean;
-      }>(
-        `SELECT u.id, EXISTS (SELECT 1 FROM staff_credentials c WHERE c.user_id = u.id) AS has_password
-           FROM users u WHERE u.auth_subject = $1 FOR UPDATE OF u`,
+      const existing = await client.query<{ id: string }>(
+        'SELECT id FROM users WHERE auth_subject = $1 FOR UPDATE',
         [invite.email],
       );
       let userId = existing.rows[0]?.id;
@@ -236,8 +232,29 @@ export class StaffInviteService {
           [userId, invite.email, displayName],
         );
       }
-      if (!existing.rows[0]?.has_password) {
+      // Separate statement after the user lock: under READ COMMITTED it sees a
+      // credential committed by a concurrent acceptance that held the lock.
+      const credential = await client.query(
+        'SELECT 1 FROM staff_credentials WHERE user_id = $1',
+        [userId],
+      );
+      if (credential.rowCount === 0) {
         await setStaffPassword(client, userId, input.password);
+      }
+      if (invite.role === 'doctor') {
+        // Same invariant as ClinicService.addDoctor: a doctor membership needs
+        // the shared profile and this clinic's association.
+        await client.query(
+          `INSERT INTO doctor_profiles (id, user_id, display_name) VALUES ($1, $2, $3)
+           ON CONFLICT (user_id) DO NOTHING`,
+          [randomUUID(), userId, displayName],
+        );
+        await client.query(
+          `INSERT INTO doctor_clinics (clinic_id, doctor_id)
+           SELECT $1, id FROM doctor_profiles WHERE user_id = $2
+           ON CONFLICT DO NOTHING`,
+          [invite.clinic_id, userId],
+        );
       }
       const membership = await client.query(
         `INSERT INTO clinic_memberships (clinic_id, user_id, role)
