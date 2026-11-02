@@ -54,6 +54,7 @@ const committedMigrations = [
   '0043_clinic_eta_prior_epoch.sql',
   '0044_eta_publication_claims.sql',
   '0045_staff_credentials.sql',
+  '0046_staff_sign_in_rate_limits.sql',
 ];
 
 beforeAll(async () => {

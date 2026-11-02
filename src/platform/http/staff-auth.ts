@@ -151,6 +151,15 @@ export async function revokeStaffSession(request: Request): Promise<void> {
   );
 }
 
+// Set-Cookie value for a freshly issued session. Max-Age mirrors the signed
+// expiry so the browser drops the cookie when the server would reject it.
+export function staffSessionSetCookie(
+  token: string,
+  maxAgeSeconds: number,
+): string {
+  return `${STAFF_SESSION_COOKIE}=${token}; Path=/; Max-Age=${Math.floor(maxAgeSeconds)}; HttpOnly; Secure; SameSite=Strict`;
+}
+
 export const CLEARED_STAFF_SESSION_COOKIE = `${STAFF_SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
 
 export function requireSameOrigin(request: Request): void {
