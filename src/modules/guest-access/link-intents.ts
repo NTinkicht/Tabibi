@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
-import { GuestLinkEnvelope, type GuestLinkIntentKind } from './link-envelope';
+import {
+  GuestLinkEnvelope,
+  GuestLinkEnvelopeError,
+  type GuestLinkIntentKind,
+} from './link-envelope';
 
 /**
  * Persisted guest-link notification intents (TAB-P0-13 slice, #743).
@@ -19,6 +23,39 @@ export interface CreateGuestLinkIntent {
   /** Plaintext link material; sealed immediately, never stored or logged. */
   material: string;
   exchangeExpiresAt: Date;
+}
+
+export type DispatchOutcome =
+  | 'none'
+  | 'delivered'
+  | 'retry_scheduled'
+  | 'dead_letter';
+
+export interface DispatchContext {
+  intentId: string;
+  /** Stable across retries so the provider can deduplicate. */
+  idempotencyKey: string;
+}
+
+export type LinkSender = (
+  material: string,
+  context: DispatchContext,
+) => Promise<void>;
+
+export interface DispatchOptions {
+  leaseMs?: number;
+  maxAttempts?: number;
+  backoffMs?: number;
+}
+
+interface ClaimedRow {
+  id: string;
+  clinic_id: string;
+  queue_entry_id: string;
+  intent: GuestLinkIntentKind;
+  envelope_ciphertext: string;
+  attempts: number;
+  expires_at: Date;
 }
 
 export class GuestLinkIntentStore {
@@ -89,5 +126,73 @@ export class GuestLinkIntentStore {
       [now],
     );
     return result.rowCount ?? 0;
+  }
+
+  /**
+   * Worker step: claim one due, unexpired pending intent under a lease, open
+   * its envelope only now, and hand the material to the sender. The sender is
+   * never called for expired, tampered or wrong-key intents, which dead-letter
+   * without any plaintext fallback.
+   */
+  async dispatchNext(
+    sender: LinkSender,
+    options: DispatchOptions = {},
+  ): Promise<DispatchOutcome> {
+    const leaseMs = options.leaseMs ?? 60_000;
+    const maxAttempts = options.maxAttempts ?? 5;
+    const backoffMs = options.backoffMs ?? 30_000;
+    const now = this.clock();
+    const claim = await this.pool.query<ClaimedRow>(
+      `UPDATE guest_link_intents
+          SET attempts = attempts + 1, claimed_until = $2
+        WHERE id = (
+          SELECT id FROM guest_link_intents
+           WHERE state = 'pending' AND expires_at > $1
+             AND (next_attempt_at IS NULL OR next_attempt_at <= $1)
+             AND (claimed_until IS NULL OR claimed_until <= $1)
+           ORDER BY next_attempt_at NULLS FIRST, created_at
+           LIMIT 1 FOR UPDATE SKIP LOCKED)
+        RETURNING id, clinic_id, queue_entry_id, intent,
+                  envelope_ciphertext, attempts, expires_at`,
+      [now, new Date(now.getTime() + leaseMs)],
+    );
+    const row = claim.rows[0];
+    if (!row) return 'none';
+    let material: string;
+    try {
+      material = this.envelope.open(
+        {
+          intent: row.intent,
+          intentId: row.id,
+          entryId: row.queue_entry_id,
+          clinicId: row.clinic_id,
+        },
+        row.envelope_ciphertext,
+      );
+    } catch (error) {
+      if (!(error instanceof GuestLinkEnvelopeError)) throw error;
+      await this.markTerminal(row.clinic_id, row.id, 'dead_letter');
+      return 'dead_letter';
+    }
+    try {
+      await sender(material, { intentId: row.id, idempotencyKey: row.id });
+    } catch {
+      const retryAt = new Date(
+        this.clock().getTime() + backoffMs * 2 ** (row.attempts - 1),
+      );
+      if (row.attempts >= maxAttempts || retryAt >= row.expires_at) {
+        await this.markTerminal(row.clinic_id, row.id, 'dead_letter');
+        return 'dead_letter';
+      }
+      await this.pool.query(
+        `UPDATE guest_link_intents
+            SET next_attempt_at = $3, claimed_until = NULL
+          WHERE id = $2 AND clinic_id = $1 AND state = 'pending'`,
+        [row.clinic_id, row.id, retryAt],
+      );
+      return 'retry_scheduled';
+    }
+    await this.markTerminal(row.clinic_id, row.id, 'delivered');
+    return 'delivered';
   }
 }
