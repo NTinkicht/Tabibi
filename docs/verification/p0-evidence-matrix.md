@@ -4,7 +4,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 
 ## Method and limits
 
-- Baseline: `main` at `7450a943` (PR #738). Latest green `CI` run on that commit: `41414559219` (format, lint, typecheck, unit+api, build, PostgreSQL integration, recovery rehearsal, clinic-day load, full Playwright suite).
+- Baseline: `main` at `7450a943` (PR #738; #739 merged afterwards, so TAB-P0-01 cites it). Latest green `CI` run on that commit: `41414559219` (format, lint, typecheck, unit+api, build, PostgreSQL integration, recovery rehearsal, clinic-day load, full Playwright suite).
 - Each evidence line is machine-checkable: `node scripts/verify-p0-evidence-matrix.mjs` fails if a cited `src:` path or `test:` file/title no longer exists. `npm run test:unit` runs the same check (`tests/unit/p0-evidence-matrix.test.ts`).
 - Verdicts: COVERED = implementation and a requirement-specific test were both located and the test title matches the criterion; PARTIAL = part of the criterion is evidenced or only indirectly; MISSING = no implementation or test found. A document alone never yields COVERED. Test bodies were located, not re-derived line by line; the green `main` run is the execution evidence.
 - Independent review: every cited PR was approved by `ntk-reviewer[bot]` on its exact merged head (listed as `pr:`). PRs older than the cited ones (WU1..WU190 era) were not individually audited here and are marked `review: not audited`.
@@ -20,7 +20,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Cross-tenant denial on membership administration | src: src/modules/identity/index.ts | test: tests/integration/staff-membership-http-api.test.ts :: "denies non-admin staff and other clinics" | pr: review: not audited
 - [COVERED] Secure configuration fails fast | src: src/platform/config/env.ts | test: tests/unit/env.test.ts :: "fails fast when the database URL is absent" | pr: review: not audited
 - [PARTIAL] Cross-tenant IDOR matrix over all read/write routes | src: src/modules/identity/index.ts | test: tests/integration/queue-lifecycle.test.ts :: "enforces clinic isolation and one called/consulting patient under concurrent commands" | pr: review: not audited
-- [MISSING] First clinic_admin bootstrap (no way to create the first admin on main) | src: package.json | pr: open PR #739 (issue #727), not merged
+- [COVERED] First clinic_admin bootstrap and staff invites: verifier-only token, admin-only create/revoke, cross-clinic denied | src: src/modules/identity/bootstrap-admin.ts, src/modules/identity/staff-invites.ts | test: tests/integration/staff-invites.test.ts :: "only a clinic_admin of that clinic can create or revoke; cross-clinic is denied" | pr: #739 (merged; ntk-reviewer verdict not audited)
 
 ## TAB-P0-02 Scheduling, availability, deterministic sessions
 
@@ -135,7 +135,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 
 | Row | Proposed | Why |
 | --- | --- | --- |
-| TAB-P0-01 | VERIFY | bootstrap admin (#727/#739) unmerged; IDOR matrix partial |
+| TAB-P0-01 | VERIFY | cross-tenant IDOR matrix over all routes is PARTIAL |
 | TAB-P0-02 | VERIFY | all criteria COVERED but review of pre-#600 PRs not audited |
 | TAB-P0-03 | VERIFY | all COVERED; review evidence present for recent PRs only |
 | TAB-P0-04 | VERIFY | all COVERED; ready once P0-01..03 pass |
