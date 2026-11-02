@@ -56,6 +56,7 @@ const committedMigrations = [
   '0045_staff_credentials.sql',
   '0046_staff_sign_in_rate_limits.sql',
   '0047_staff_invites.sql',
+  '0048_guest_link_intents.sql',
 ];
 
 beforeAll(async () => {
