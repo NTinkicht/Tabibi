@@ -142,19 +142,31 @@ export class GuestLinkIntentStore {
     const maxAttempts = options.maxAttempts ?? 5;
     const backoffMs = options.backoffMs ?? 30_000;
     const now = this.clock();
+    // Exhausted attempt budget (e.g. repeated worker crashes): never decrypt
+    // or send again; dead-letter and scrub atomically.
+    await this.pool.query(
+      `UPDATE guest_link_intents
+          SET state = 'dead_letter', envelope_ciphertext = NULL,
+              scrubbed_at = $1, claimed_until = NULL, claim_token = NULL
+        WHERE state = 'pending' AND attempts >= $2
+          AND (claimed_until IS NULL OR claimed_until <= $1)`,
+      [now, maxAttempts],
+    );
+    const claimToken = randomUUID();
     const claim = await this.pool.query<ClaimedRow>(
       `UPDATE guest_link_intents
-          SET attempts = attempts + 1, claimed_until = $2
+          SET attempts = attempts + 1, claimed_until = $2, claim_token = $3
         WHERE id = (
           SELECT id FROM guest_link_intents
            WHERE state = 'pending' AND expires_at > $1
              AND (next_attempt_at IS NULL OR next_attempt_at <= $1)
              AND (claimed_until IS NULL OR claimed_until <= $1)
+             AND attempts < $4
            ORDER BY next_attempt_at NULLS FIRST, created_at
            LIMIT 1 FOR UPDATE SKIP LOCKED)
         RETURNING id, clinic_id, queue_entry_id, intent,
                   envelope_ciphertext, attempts, expires_at`,
-      [now, new Date(now.getTime() + leaseMs)],
+      [now, new Date(now.getTime() + leaseMs), claimToken, maxAttempts],
     );
     const row = claim.rows[0];
     if (!row) return 'none';
@@ -171,8 +183,9 @@ export class GuestLinkIntentStore {
       );
     } catch (error) {
       if (!(error instanceof GuestLinkEnvelopeError)) throw error;
-      await this.markTerminal(row.clinic_id, row.id, 'dead_letter');
-      return 'dead_letter';
+      return (await this.finishClaim(row, claimToken, 'dead_letter'))
+        ? 'dead_letter'
+        : 'none';
     }
     try {
       await sender(material, { intentId: row.id, idempotencyKey: row.id });
@@ -181,18 +194,38 @@ export class GuestLinkIntentStore {
         this.clock().getTime() + backoffMs * 2 ** (row.attempts - 1),
       );
       if (row.attempts >= maxAttempts || retryAt >= row.expires_at) {
-        await this.markTerminal(row.clinic_id, row.id, 'dead_letter');
-        return 'dead_letter';
+        return (await this.finishClaim(row, claimToken, 'dead_letter'))
+          ? 'dead_letter'
+          : 'none';
       }
-      await this.pool.query(
+      const retried = await this.pool.query(
         `UPDATE guest_link_intents
-            SET next_attempt_at = $3, claimed_until = NULL
-          WHERE id = $2 AND clinic_id = $1 AND state = 'pending'`,
-        [row.clinic_id, row.id, retryAt],
+            SET next_attempt_at = $3, claimed_until = NULL, claim_token = NULL
+          WHERE id = $2 AND clinic_id = $1 AND state = 'pending'
+            AND claim_token = $4`,
+        [row.clinic_id, row.id, retryAt, claimToken],
       );
-      return 'retry_scheduled';
+      return retried.rowCount === 1 ? 'retry_scheduled' : 'none';
     }
-    await this.markTerminal(row.clinic_id, row.id, 'delivered');
-    return 'delivered';
+    return (await this.finishClaim(row, claimToken, 'delivered'))
+      ? 'delivered'
+      : 'none';
+  }
+
+  /** Terminal update fenced to the claim that owns the lease. */
+  private async finishClaim(
+    row: ClaimedRow,
+    claimToken: string,
+    state: TerminalIntentState,
+  ): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE guest_link_intents
+          SET state = $3, envelope_ciphertext = NULL, scrubbed_at = $4,
+              claimed_until = NULL, claim_token = NULL
+        WHERE id = $2 AND clinic_id = $1 AND state = 'pending'
+          AND claim_token = $5`,
+      [row.clinic_id, row.id, state, this.clock(), claimToken],
+    );
+    return result.rowCount === 1;
   }
 }

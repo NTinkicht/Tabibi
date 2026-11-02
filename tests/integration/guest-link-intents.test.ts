@@ -311,4 +311,52 @@ describe('guest link intent dispatch, real PostgreSQL (#745)', () => {
     now = new Date(now.getTime() + 61_000);
     expect(await store.dispatchNext(ok)).toBe('delivered');
   });
+
+  it('dead-letters without sending when a crashed claim exhausted attempts', async () => {
+    const id = await store.create(input());
+    await pool.query(
+      `UPDATE guest_link_intents SET attempts = 2, claimed_until = $2 WHERE id = $1`,
+      [id, new Date(now.getTime() + 1000)],
+    );
+    now = new Date(now.getTime() + 2000);
+    let called = 0;
+    const out = await store.dispatchNext(
+      async () => {
+        called += 1;
+      },
+      { maxAttempts: 2 },
+    );
+    expect(out).toBe('none');
+    expect(called).toBe(0);
+    const r = await row(id);
+    expect(r.state).toBe('dead_letter');
+    expect(r.envelope_ciphertext).toBeNull();
+  });
+
+  it('fences a slow sender so a replaced worker cannot clobber the new claim', async () => {
+    const id = await store.create(input());
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow = store.dispatchNext(
+      async () => {
+        await gate;
+        throw new Error('late failure');
+      },
+      { leaseMs: 1000, maxAttempts: 1 + 1 },
+    );
+    await new Promise((r) => setTimeout(r, 100));
+    now = new Date(now.getTime() + 2000);
+    const fresh = store.dispatchNext(
+      async () => {
+        release();
+        await slow;
+      },
+      { leaseMs: 60_000, maxAttempts: 5 },
+    );
+    expect(await fresh).toBe('delivered');
+    expect(await slow).toBe('none');
+    const r = await row(id);
+    expect(r.state).toBe('delivered');
+    expect(r.envelope_ciphertext).toBeNull();
+  });
 });

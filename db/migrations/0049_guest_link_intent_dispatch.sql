@@ -4,7 +4,8 @@
 ALTER TABLE guest_link_intents
   ADD COLUMN attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   ADD COLUMN next_attempt_at timestamptz,
-  ADD COLUMN claimed_until timestamptz;
+  ADD COLUMN claimed_until timestamptz,
+  ADD COLUMN claim_token uuid;
 
 CREATE INDEX guest_link_intents_due_idx
   ON guest_link_intents (next_attempt_at NULLS FIRST, created_at)
