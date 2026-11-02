@@ -33,6 +33,8 @@ export type GuestLinkIntentKind = (typeof GUEST_LINK_INTENT_KINDS)[number];
 
 export interface GuestLinkBinding {
   intent: GuestLinkIntentKind;
+  /** Unique notification intent ID; prevents ciphertext swaps between intents. */
+  intentId: string;
   entryId: string;
   clinicId: string;
 }
@@ -65,6 +67,8 @@ function deriveKey(secret: string): Buffer {
 function aad(binding: GuestLinkBinding): Buffer {
   if (
     !(GUEST_LINK_INTENT_KINDS as readonly string[]).includes(binding.intent) ||
+    typeof binding.intentId !== 'string' ||
+    binding.intentId === '' ||
     typeof binding.entryId !== 'string' ||
     binding.entryId === '' ||
     typeof binding.clinicId !== 'string' ||
@@ -76,6 +80,7 @@ function aad(binding: GuestLinkBinding): Buffer {
     JSON.stringify([
       VERSION,
       binding.intent,
+      binding.intentId,
       binding.entryId,
       binding.clinicId,
     ]),
@@ -97,13 +102,23 @@ export class GuestLinkEnvelope {
     }
   }
 
-  seal(binding: GuestLinkBinding, material: string): string {
+  seal(
+    binding: GuestLinkBinding,
+    material: string,
+    exchangeExpiresAt: Date,
+  ): string {
     if (typeof material !== 'string' || material === '') {
+      throw new GuestLinkEnvelopeError();
+    }
+    const now = this.clock().getTime();
+    const exchangeDeadline =
+      exchangeExpiresAt instanceof Date ? exchangeExpiresAt.getTime() : NaN;
+    if (!Number.isFinite(exchangeDeadline) || exchangeDeadline <= now) {
       throw new GuestLinkEnvelopeError();
     }
     const claims: Claims = {
       v: 1,
-      expiresAt: this.clock().getTime() + this.ttlMs,
+      expiresAt: Math.min(now + this.ttlMs, exchangeDeadline),
       material,
     };
     const iv = randomBytes(IV_BYTES);
