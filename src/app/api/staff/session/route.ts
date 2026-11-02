@@ -20,7 +20,10 @@ const MIN_TTL_SECONDS = 5 * 60;
 const MAX_TTL_SECONDS = 24 * 60 * 60;
 const RATE_WINDOW_SECONDS = 15 * 60;
 const ACCOUNT_LIMIT = 10;
-const SOURCE_LIMIT = 40;
+// No forwarding header is trusted (callers control them), so the source limit
+// is one conservative deployment-wide ingress bucket, like the guest routes.
+const INGRESS_LIMIT = 300;
+const INGRESS_BUCKET = 'staff-signin:ingress';
 
 const bodySchema = z
   .object({
@@ -75,31 +78,22 @@ function digest(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 32);
 }
 
-function sourceOf(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  return (
-    forwarded?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown'
-  );
-}
-
 async function consume(key: string, limit: number): Promise<boolean> {
   const result = await getPool().query<{ allowed: boolean }>(
     `WITH upserted AS (
-       INSERT INTO guest_status_rate_limit_buckets
+       INSERT INTO staff_sign_in_rate_limit_buckets
          (bucket_key, window_started_at, request_count, updated_at)
        VALUES ($1, now(), 1, now())
        ON CONFLICT (bucket_key) DO UPDATE
          SET window_started_at = CASE
-               WHEN guest_status_rate_limit_buckets.window_started_at < now() - ($3::int * interval '1 second')
-                 THEN now() ELSE guest_status_rate_limit_buckets.window_started_at END,
+               WHEN staff_sign_in_rate_limit_buckets.window_started_at < now() - ($3::int * interval '1 second')
+                 THEN now() ELSE staff_sign_in_rate_limit_buckets.window_started_at END,
              request_count = CASE
-               WHEN guest_status_rate_limit_buckets.window_started_at < now() - ($3::int * interval '1 second')
-                 THEN 1 ELSE guest_status_rate_limit_buckets.request_count + 1 END,
+               WHEN staff_sign_in_rate_limit_buckets.window_started_at < now() - ($3::int * interval '1 second')
+                 THEN 1 ELSE staff_sign_in_rate_limit_buckets.request_count + 1 END,
              updated_at = now()
-         WHERE guest_status_rate_limit_buckets.window_started_at < now() - ($3::int * interval '1 second')
-            OR guest_status_rate_limit_buckets.request_count < $2
+         WHERE staff_sign_in_rate_limit_buckets.window_started_at < now() - ($3::int * interval '1 second')
+            OR staff_sign_in_rate_limit_buckets.request_count < $2
        RETURNING true
      )
      SELECT EXISTS(SELECT 1 FROM upserted) AS allowed`,
@@ -115,10 +109,7 @@ export async function POST(request: Request): Promise<Response> {
     requireSameOrigin(request);
     const body = await parseBody(request);
     const subject = body.subject.normalize('NFKC');
-    const withinSource = await consume(
-      `staff-signin:source:${digest(sourceOf(request))}`,
-      SOURCE_LIMIT,
-    );
+    const withinSource = await consume(INGRESS_BUCKET, INGRESS_LIMIT);
     const withinAccount = await consume(
       `staff-signin:account:${digest(subject)}`,
       ACCOUNT_LIMIT,

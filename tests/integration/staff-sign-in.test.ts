@@ -64,7 +64,7 @@ beforeEach(async () => {
   delete process.env.STAFF_SESSION_TTL_SECONDS;
   await pool.query(
     `TRUNCATE staff_credentials, clinic_memberships, clinics, users,
-       guest_status_rate_limit_buckets CASCADE`,
+       guest_status_rate_limit_buckets, staff_sign_in_rate_limit_buckets CASCADE`,
   );
   await pool.query(
     `INSERT INTO users(id,auth_subject,display_name) VALUES
@@ -157,7 +157,7 @@ describe('staff sign-in route (#725)', () => {
     expect((await signIn(body, {}, 'https://evil.example')).status).toBe(403);
     expect((await pool.query('SELECT 1 FROM staff_sessions')).rowCount).toBe(0);
     expect(
-      (await pool.query('SELECT 1 FROM guest_status_rate_limit_buckets'))
+      (await pool.query('SELECT 1 FROM staff_sign_in_rate_limit_buckets'))
         .rowCount,
     ).toBe(0);
   });
@@ -263,21 +263,49 @@ describe('staff sign-in route (#725)', () => {
     expect(statuses.slice(10)).toEqual([429, 429]);
     expect(last!.headers.get('retry-after')).toBe('900');
     const buckets = await pool.query<{ bucket_key: string }>(
-      'SELECT bucket_key FROM guest_status_rate_limit_buckets',
+      'SELECT bucket_key FROM staff_sign_in_rate_limit_buckets',
     );
     expect(JSON.stringify(buckets.rows)).not.toContain('ghost');
   });
 
-  it('rate-limits per source across accounts', async () => {
-    let limited = 0;
-    for (let i = 0; i < 42; i++) {
+  it('rotating x-forwarded-for cannot bypass the ingress limit', async () => {
+    await pool.query(
+      `INSERT INTO staff_sign_in_rate_limit_buckets
+         (bucket_key, window_started_at, request_count)
+       VALUES ('staff-signin:ingress', now(), 299)`,
+    );
+    const statuses: number[] = [];
+    for (let i = 0; i < 3; i++) {
       const r = await signIn(
         { subject: `user${i}@x.test`, password: GOOD },
-        { 'x-forwarded-for': '203.0.113.9' },
+        {
+          'x-forwarded-for': `198.51.100.${i}`,
+          'x-real-ip': `10.1.${i}.1`,
+        },
       );
-      if (r.status === 429) limited++;
+      statuses.push(r.status);
     }
-    expect(limited).toBe(2);
+    expect(statuses).toEqual([401, 429, 429]);
+  });
+
+  it('guest-route bucket cleanup cannot reset a sign-in window', async () => {
+    for (let i = 0; i < 10; i++)
+      await signIn({ subject: 'ghost@x.test', password: GOOD });
+    expect(
+      (await signIn({ subject: 'ghost@x.test', password: GOOD })).status,
+    ).toBe(429);
+    // Age every row past the guest cleanup horizon, then run the guest
+    // routes' exact cleanup statement (no namespace filter) against the pool.
+    await pool.query(
+      `UPDATE staff_sign_in_rate_limit_buckets SET window_started_at = now() - interval '5 minutes'`,
+    );
+    await pool.query(
+      `DELETE FROM guest_status_rate_limit_buckets
+        WHERE bucket_key <> 'x' AND window_started_at < now() - interval '60 seconds'`,
+    );
+    expect(
+      (await signIn({ subject: 'ghost@x.test', password: GOOD })).status,
+    ).toBe(429);
   });
 
   it('writes no body, cookie or subject to request logs', async () => {
