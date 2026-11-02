@@ -160,6 +160,7 @@ export class GuestLinkEnvelope {
         claims.v !== 1 ||
         typeof claims.material !== 'string' ||
         typeof claims.expiresAt !== 'number' ||
+        !Number.isFinite(claims.expiresAt) ||
         claims.expiresAt <= this.clock().getTime()
       ) {
         throw new GuestLinkEnvelopeError();

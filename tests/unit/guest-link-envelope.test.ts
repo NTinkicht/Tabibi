@@ -1,4 +1,10 @@
-import { createDecipheriv, createHash } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  hkdfSync,
+  randomBytes,
+} from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   EXCHANGE_TTL_MS,
@@ -117,6 +123,43 @@ describe('GuestLinkEnvelope', () => {
     const a = env.seal({ ...binding, intentId: 'resend-a' }, MATERIAL, FAR);
     const b = { ...binding, intentId: 'resend-b' };
     expect(() => env.open(b, a)).toThrow(GuestLinkEnvelopeError);
+  });
+
+  it('rejects authentic envelopes whose expiry is not a finite number', () => {
+    const { env } = envelope();
+    const key = Buffer.from(
+      hkdfSync(
+        'sha256',
+        SECRET,
+        Buffer.alloc(0),
+        'tabibi/guest-link-envelope/v1',
+        32,
+      ),
+    );
+    for (const raw of ['1e999', '-1e999', '"x"', 'null']) {
+      const iv = randomBytes(12);
+      const c = createCipheriv('aes-256-gcm', key, iv);
+      c.setAAD(
+        Buffer.from(
+          JSON.stringify([
+            'gle1',
+            'initial',
+            'intent-1',
+            'entry-1',
+            'clinic-1',
+          ]),
+        ),
+      );
+      const body = `{"v":1,"expiresAt":${raw},"material":"m"}`;
+      const ct = Buffer.concat([c.update(body, 'utf8'), c.final()]);
+      const sealed = [
+        'gle1',
+        iv.toString('base64url'),
+        ct.toString('base64url'),
+        c.getAuthTag().toString('base64url'),
+      ].join('.');
+      expect(() => env.open(binding, sealed)).toThrow(GuestLinkEnvelopeError);
+    }
   });
 
   it('rejects invalid bindings and empty material on seal', () => {
