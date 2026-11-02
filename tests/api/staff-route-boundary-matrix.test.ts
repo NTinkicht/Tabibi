@@ -66,6 +66,7 @@ const EXPECTED: Record<string, readonly Method[]> = {
   'sessions/[sessionId]/queue': ['GET', 'POST'],
   'sessions/[sessionId]/queue/[entryId]/commands': ['POST'],
   'sessions/[sessionId]/queue/[entryId]/reorder': ['POST'],
+  'sessions/[sessionId]/queue/[entryId]/status-link': ['POST'],
 };
 
 function discoverRouteFiles(dir: string): string[] {
@@ -189,7 +190,7 @@ describe('staff clinic route inventory', () => {
       );
     }
     expect(discovered).toEqual(EXPECTED);
-    expect(mutations).toHaveLength(23);
+    expect(mutations).toHaveLength(24);
     expect(reads).toHaveLength(11);
   });
 });
