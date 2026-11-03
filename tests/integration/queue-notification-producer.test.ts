@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import {
+  EtaNotificationGate,
   QueueNotificationProducer,
   QueueNotificationProducerValidationError,
   type QueueNotificationSourceEvent,
@@ -236,5 +237,56 @@ describe('queue notification producer with PostgreSQL outbox', () => {
         [ids.clinicA],
       ),
     ).resolves.toMatchObject({ rows: [{ count: 0 }] });
+  });
+
+  it('gates ETA changes: duplicate revision enqueues one row, epoch mismatch none', async () => {
+    const outbox = new NotificationOutboxRepository(pool);
+    const gate = new EtaNotificationGate(new QueueNotificationProducer(outbox));
+    const base = {
+      queueEntryId: ids.queueEntryA,
+      revision: 1,
+      estimatorVersion: 'eta/v1',
+      sessionEpoch: 1,
+      priorEpoch: 0,
+      minWaitMinutes: 20,
+      maxWaitMinutes: 40,
+      queuePosition: 5,
+    };
+    const cur = { sessionEpoch: 1, priorEpoch: 0 };
+    const latest = { ...base, revision: 2, queuePosition: 3 };
+    const first = await gate.submit({
+      clinicId: ids.clinicA,
+      lastDelivered: base,
+      latest,
+      currentEpochs: cur,
+    });
+    const replay = await gate.submit({
+      clinicId: ids.clinicA,
+      lastDelivered: base,
+      latest,
+      currentEpochs: cur,
+    });
+    expect(
+      first.enqueued && replay.enqueued && replay.intent.id === first.intent.id,
+    ).toBe(true);
+    const stale = await gate.submit({
+      clinicId: ids.clinicA,
+      lastDelivered: base,
+      latest: { ...latest, revision: 3, sessionEpoch: 2 },
+      currentEpochs: cur,
+    });
+    expect(stale).toEqual({ enqueued: false, reason: 'source_epoch_mismatch' });
+    const { rows } = await pool.query(
+      `SELECT count(*)::int AS count, min(idempotency_key) AS key,
+              min(payload::text) AS payload
+         FROM notification_outbox WHERE clinic_id=$1 AND event_key='estimate_changed_materially'`,
+      [ids.clinicA],
+    );
+    expect(rows[0].count).toBe(1);
+    expect(rows[0].key).toBe(`queue-event:eta:${ids.queueEntryA}:2`);
+    expect(JSON.parse(rows[0].payload)).toEqual({
+      windowStartMinutes: 20,
+      windowEndMinutes: 40,
+    });
   });
 });
