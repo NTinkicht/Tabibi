@@ -68,7 +68,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Bulk no-show only after grace, never reclassifies arrived | src: src/modules/appointment/index.ts, db/migrations/0031_appointment_bulk_no_show.sql | test: tests/integration/appointment-bulk-no-show.test.ts :: "never reclassifies cancelled or arrived appointments and leaves queue revision unchanged" | pr: review: not audited
 - [COVERED] Arabic/French keyboard-operable receptionist UI | src: src/app/operations | test: tests/e2e/receptionist-bilingual-accessibility.spec.ts :: "receptionist queue stays clinic-scoped, private, bilingual, and keyboard operable" | pr: review: not audited
 - [COVERED] Transfer is serialized ahead of a queued cancellation without split state | src: src/modules/queue/index.ts, src/modules/appointment/index.ts | test: tests/integration/appointment-recovery-race.test.ts :: "serializes transfer ahead of a queued cancellation without split state" | pr: review: not audited
-- [PARTIAL] Restore-versus-cancel/call and priority-insert-versus-transfer races were not located as named tests | src: src/modules/queue/index.ts | test: tests/integration/receptionist-dashboard-concurrency.test.ts :: "pins doctor-delay update fields across a concurrent commit" | pr: review: not audited
+- [PARTIAL] Restore-versus-cancel and priority-insert-versus-transfer races are now named tests (restore versus call is still not located) | src: src/modules/appointment/recovery.ts, src/modules/queue/index.ts | test: tests/integration/queue-restore-race.test.ts :: "applies a restore queued ahead of a competing cancel, then the cancel"; tests/integration/queue-restore-race.test.ts :: "rejects a restore queued behind a cancel that no longer has anything to restore"; tests/integration/queue-restore-race.test.ts :: "rejects a priority insert queued behind a transfer of the same entry without leaving priority state" | pr: pending (#759)
 
 ## TAB-P0-08 Guest status access and encrypted exchange link
 
@@ -160,5 +160,5 @@ No row is proposed as VERIFIED: the protocol also requires per-row independent r
 2. (done: #744, #746; external provider and escalation remain, see owner decision #730) Ciphertext scrub and provider worker lifecycle (P0-13).
 3. Secret scan in CI and penetration checklist (P0-15).
 4. Doctor-facing bilingual Playwright journey (P0-14).
-5. (15-minute grace done: #748; restore race remains) Named restore race and terminal-grace tests (P0-07, P0-12).
+5. (15-minute grace done: #748; restore-vs-cancel and priority-vs-transfer done: #759; restore-vs-call remains) Named restore race and terminal-grace tests (P0-07, P0-12).
 6. Replay-receipt ciphertext retention/scrub audit (P0-06).
