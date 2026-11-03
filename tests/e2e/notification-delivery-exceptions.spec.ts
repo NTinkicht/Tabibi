@@ -400,7 +400,9 @@ test('a failing guest-link endpoint shows the error state instead of an empty li
   });
 
   await page.goto(`/operations/${clinicId}/notifications?locale=fr`);
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Impossible de charger' }),
+  ).toBeVisible();
   await expect(
     page.getByText('Aucun lien de suivi en échec de livraison.'),
   ).toHaveCount(0);
