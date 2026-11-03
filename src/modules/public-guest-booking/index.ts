@@ -314,6 +314,27 @@ export class PublicGuestBookingService {
     ) => Promise<void>,
   ) {}
 
+  /**
+   * Scrubs the encrypted replay copy of every completed receipt whose linked
+   * guest credential is expired or revoked. Idempotent; keeps the receipt row
+   * (idempotency fingerprint) so a later replay fails closed instead of
+   * re-booking.
+   */
+  async scrubExpiredReceipts(): Promise<number> {
+    const now = this.clock();
+    const result = await this.pool.query(
+      `UPDATE public_guest_booking_receipts receipt
+          SET access_ciphertext = NULL, scrubbed_at = $1
+         FROM guest_credentials credential
+        WHERE credential.id = receipt.credential_id
+          AND credential.clinic_id = receipt.clinic_id
+          AND receipt.access_ciphertext IS NOT NULL
+          AND (credential.expires_at <= $1 OR credential.revoked_at IS NOT NULL)`,
+      [now],
+    );
+    return result.rowCount ?? 0;
+  }
+
   async book(
     rawInput: PublicGuestBookingInput,
   ): Promise<PublicGuestBookingResult> {

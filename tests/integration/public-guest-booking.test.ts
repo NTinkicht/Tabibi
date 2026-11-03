@@ -550,4 +550,59 @@ describe('public guest booking transaction', () => {
     ).rejects.toThrow('injected late failure');
     expect(await counts()).toEqual(zeroCounts);
   });
+
+  it('scrubs replay ciphertext only after the credential expires or is revoked', async () => {
+    const now = new Date('2099-02-01T00:00:00.000Z');
+    const seeded = await seed(now);
+    const service = new PublicGuestBookingService(
+      pool,
+      seeded.selections,
+      () => now,
+    );
+    await service.book(input(seeded.reference, 'scrub-live'));
+    expect(await service.scrubExpiredReceipts()).toBe(0);
+    const live = await pool.query(
+      `SELECT access_ciphertext, scrubbed_at FROM public_guest_booking_receipts`,
+    );
+    expect(live.rows[0].access_ciphertext).toEqual(expect.any(String));
+    expect(live.rows[0].scrubbed_at).toBeNull();
+
+    const later = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+    const lateService = new PublicGuestBookingService(
+      pool,
+      seeded.selections,
+      () => later,
+    );
+    const before = await counts();
+    expect(await lateService.scrubExpiredReceipts()).toBe(1);
+    expect(await lateService.scrubExpiredReceipts()).toBe(0);
+    const scrubbed = await pool.query(
+      `SELECT access_ciphertext, scrubbed_at FROM public_guest_booking_receipts`,
+    );
+    expect(scrubbed.rows[0].access_ciphertext).toBeNull();
+    expect(scrubbed.rows[0].scrubbed_at).toEqual(later);
+    expect(await counts()).toEqual(before);
+    await expect(
+      service.book(input(seeded.reference, 'scrub-live')),
+    ).rejects.toBeInstanceOf(PublicGuestBookingRejectedError);
+    expect(await counts()).toEqual(before);
+  });
+
+  it('scrubs a revoked credential early and rejects half-scrubbed receipt rows', async () => {
+    const now = new Date('2099-02-01T00:00:00.000Z');
+    const seeded = await seed(now);
+    const service = new PublicGuestBookingService(
+      pool,
+      seeded.selections,
+      () => now,
+    );
+    await service.book(input(seeded.reference, 'scrub-revoked'));
+    await expect(
+      pool.query(
+        `UPDATE public_guest_booking_receipts SET access_ciphertext = NULL`,
+      ),
+    ).rejects.toThrow(/public_guest_booking_receipts_state_check/);
+    await pool.query(`UPDATE guest_credentials SET revoked_at = $1`, [now]);
+    expect(await service.scrubExpiredReceipts()).toBe(1);
+  });
 });

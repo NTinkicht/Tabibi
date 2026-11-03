@@ -59,6 +59,7 @@ const committedMigrations = [
   '0048_guest_link_intents.sql',
   '0049_guest_link_intent_dispatch.sql',
   '0050_eta_notification_baselines.sql',
+  '0051_booking_receipt_ciphertext_scrub.sql',
 ];
 
 beforeAll(async () => {
