@@ -20,6 +20,7 @@ const base: EtaNotificationSnapshot = {
   maxWaitMinutes: 40,
   queuePosition: 5,
 };
+const cur = { sessionEpoch: 3, priorEpoch: 1 };
 const next = (
   o: Partial<EtaNotificationSnapshot>,
 ): EtaNotificationSnapshot => ({
@@ -33,6 +34,7 @@ describe('decideEtaNotification', () => {
     const at = decideEtaNotification(
       base,
       next({ minWaitMinutes: 30, maxWaitMinutes: 50 }),
+      cur,
     );
     expect(at).toEqual({
       notify: true,
@@ -43,6 +45,7 @@ describe('decideEtaNotification', () => {
       decideEtaNotification(
         base,
         next({ minWaitMinutes: 29, maxWaitMinutes: 49 }),
+        cur,
       ),
     ).toEqual({ notify: false, reason: 'not_material' });
   });
@@ -53,21 +56,25 @@ describe('decideEtaNotification', () => {
       decideEtaNotification(
         base,
         next({ minWaitMinutes: 12.5, maxWaitMinutes: 47.5 }),
+        cur,
       ).notify,
     ).toBe(true);
     expect(
       decideEtaNotification(
         base,
         next({ minWaitMinutes: 13, maxWaitMinutes: 47 }),
+        cur,
       ),
     ).toEqual({ notify: false, reason: 'not_material' });
   });
 
   it('notifies at exactly 2 queue positions, not 1', () => {
-    expect(decideEtaNotification(base, next({ queuePosition: 3 })).notify).toBe(
-      true,
-    );
-    expect(decideEtaNotification(base, next({ queuePosition: 4 }))).toEqual({
+    expect(
+      decideEtaNotification(base, next({ queuePosition: 3 }), cur).notify,
+    ).toBe(true);
+    expect(
+      decideEtaNotification(base, next({ queuePosition: 4 }), cur),
+    ).toEqual({
       notify: false,
       reason: 'not_material',
     });
@@ -75,7 +82,9 @@ describe('decideEtaNotification', () => {
 
   it('fails closed on stale, equal, version, epoch, entry and baseline problems', () => {
     const big = { minWaitMinutes: 60, maxWaitMinutes: 80 };
-    expect(decideEtaNotification(base, next({ ...big, revision: 1 }))).toEqual({
+    expect(
+      decideEtaNotification(base, next({ ...big, revision: 1 }), cur),
+    ).toEqual({
       notify: false,
       reason: 'duplicate_revision',
     });
@@ -83,25 +92,36 @@ describe('decideEtaNotification', () => {
       decideEtaNotification(
         { ...base, revision: 5 },
         next({ ...big, revision: 4 }),
+        cur,
       ),
     ).toEqual({ notify: false, reason: 'stale_revision' });
     expect(
-      decideEtaNotification(base, next({ ...big, estimatorVersion: 'eta/v2' })),
+      decideEtaNotification(
+        base,
+        next({ ...big, estimatorVersion: 'eta/v2' }),
+        cur,
+      ),
     ).toEqual({ notify: false, reason: 'estimator_version_mismatch' });
     expect(
-      decideEtaNotification(base, next({ ...big, sessionEpoch: 4 })),
+      decideEtaNotification(base, next({ ...big, sessionEpoch: 4 }), cur),
     ).toEqual({ notify: false, reason: 'source_epoch_mismatch' });
     expect(
-      decideEtaNotification(base, next({ ...big, priorEpoch: 2 })),
+      decideEtaNotification(base, next({ ...big, priorEpoch: 2 }), cur),
     ).toEqual({ notify: false, reason: 'source_epoch_mismatch' });
     expect(
-      decideEtaNotification(base, next({ ...big, queueEntryId: 'entry-2' })),
+      decideEtaNotification(
+        base,
+        next({ ...big, queueEntryId: 'entry-2' }),
+        cur,
+      ),
     ).toEqual({ notify: false, reason: 'entry_mismatch' });
-    expect(decideEtaNotification(null, next(big))).toEqual({
+    expect(decideEtaNotification(null, next(big), cur)).toEqual({
       notify: false,
       reason: 'no_baseline',
     });
-    expect(decideEtaNotification(base, next({ ...big, revision: 0 }))).toEqual({
+    expect(
+      decideEtaNotification(base, next({ ...big, revision: 0 }), cur),
+    ).toEqual({
       notify: false,
       reason: 'invalid_snapshot',
     });
@@ -109,11 +129,22 @@ describe('decideEtaNotification', () => {
       decideEtaNotification(
         base,
         next({ minWaitMinutes: 50, maxWaitMinutes: 10 }),
+        cur,
       ),
     ).toEqual({ notify: false, reason: 'invalid_snapshot' });
     expect(
-      decideEtaNotification({ ...base, estimatorVersion: ' ' }, next(big)),
+      decideEtaNotification({ ...base, estimatorVersion: ' ' }, next(big), cur),
     ).toEqual({ notify: false, reason: 'invalid_snapshot' });
+  });
+
+  it('notifies when epochs advanced since the baseline but the latest snapshot is current', () => {
+    const advanced = { sessionEpoch: 9, priorEpoch: 4 };
+    const latest = next({ queuePosition: 3, ...advanced });
+    expect(decideEtaNotification(base, latest, advanced).notify).toBe(true);
+    expect(decideEtaNotification(base, latest, cur)).toEqual({
+      notify: false,
+      reason: 'source_epoch_mismatch',
+    });
   });
 
   it('builds a deterministic key that fits the producer source-event bound', () => {
@@ -139,6 +170,7 @@ describe('EtaNotificationGate', () => {
         clinicId: 'c1',
         lastDelivered: base,
         latest: next({ queuePosition: 3 }),
+        currentEpochs: cur,
         locale: 'fr',
       }),
     ).resolves.toMatchObject({ enqueued: true });
@@ -158,6 +190,7 @@ describe('EtaNotificationGate', () => {
         clinicId: 'c1',
         lastDelivered: base,
         latest: next({ sessionEpoch: 9, queuePosition: 1 }),
+        currentEpochs: cur,
       }),
     ).resolves.toEqual({ enqueued: false, reason: 'source_epoch_mismatch' });
     expect(enqueue).not.toHaveBeenCalled();

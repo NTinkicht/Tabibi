@@ -252,16 +252,19 @@ describe('queue notification producer with PostgreSQL outbox', () => {
       maxWaitMinutes: 40,
       queuePosition: 5,
     };
+    const cur = { sessionEpoch: 1, priorEpoch: 0 };
     const latest = { ...base, revision: 2, queuePosition: 3 };
     const first = await gate.submit({
       clinicId: ids.clinicA,
       lastDelivered: base,
       latest,
+      currentEpochs: cur,
     });
     const replay = await gate.submit({
       clinicId: ids.clinicA,
       lastDelivered: base,
       latest,
+      currentEpochs: cur,
     });
     expect(
       first.enqueued && replay.enqueued && replay.intent.id === first.intent.id,
@@ -270,6 +273,7 @@ describe('queue notification producer with PostgreSQL outbox', () => {
       clinicId: ids.clinicA,
       lastDelivered: base,
       latest: { ...latest, revision: 3, sessionEpoch: 2 },
+      currentEpochs: cur,
     });
     expect(stale).toEqual({ enqueued: false, reason: 'source_epoch_mismatch' });
     const { rows } = await pool.query(

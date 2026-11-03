@@ -39,6 +39,7 @@ export {
   EtaNotificationGate,
   decideEtaNotification,
   etaNotificationDedupKey,
+  type EtaCurrentSourceEpochs,
   type EtaNotificationDecision,
   type EtaNotificationGateResult,
   type EtaNotificationReasonCode,

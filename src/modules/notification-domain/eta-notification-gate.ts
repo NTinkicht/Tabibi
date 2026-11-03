@@ -21,6 +21,12 @@ export interface EtaNotificationSnapshot extends QueueEstimateSnapshot {
   priorEpoch: number;
 }
 
+/** Authoritative source epochs read now (e.g. EtaClaimService.readSourceEpochs). */
+export interface EtaCurrentSourceEpochs {
+  sessionEpoch: number;
+  priorEpoch: number;
+}
+
 export type EtaNotificationReasonCode =
   | 'material_change'
   | 'no_baseline'
@@ -80,6 +86,7 @@ export function etaNotificationDedupKey(
 export function decideEtaNotification(
   lastDelivered: EtaNotificationSnapshot | null,
   latest: EtaNotificationSnapshot,
+  currentEpochs: EtaCurrentSourceEpochs | null,
   thresholds: MaterialEstimateChangeThresholds = DEFAULT_MATERIAL_ESTIMATE_CHANGE_THRESHOLDS,
 ): EtaNotificationDecision {
   if (!validSnapshot(latest))
@@ -100,9 +107,12 @@ export function decideEtaNotification(
   if (latest.estimatorVersion !== lastDelivered.estimatorVersion) {
     return { notify: false, reason: 'estimator_version_mismatch' };
   }
+  // Epochs advance legitimately on queue mutations and delays, so the baseline's
+  // epochs are not compared; the latest snapshot must instead be current.
   if (
-    latest.sessionEpoch !== lastDelivered.sessionEpoch ||
-    latest.priorEpoch !== lastDelivered.priorEpoch
+    currentEpochs === null ||
+    latest.sessionEpoch !== currentEpochs.sessionEpoch ||
+    latest.priorEpoch !== currentEpochs.priorEpoch
   ) {
     return { notify: false, reason: 'source_epoch_mismatch' };
   }
@@ -138,11 +148,13 @@ export class EtaNotificationGate {
     clinicId: string;
     lastDelivered: EtaNotificationSnapshot | null;
     latest: EtaNotificationSnapshot;
+    currentEpochs: EtaCurrentSourceEpochs | null;
     locale?: string | null;
   }): Promise<EtaNotificationGateResult> {
     const decision = decideEtaNotification(
       input.lastDelivered,
       input.latest,
+      input.currentEpochs,
       this.thresholds,
     );
     if (!decision.notify) return { enqueued: false, reason: decision.reason };
