@@ -68,7 +68,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Bulk no-show only after grace, never reclassifies arrived | src: src/modules/appointment/index.ts, db/migrations/0031_appointment_bulk_no_show.sql | test: tests/integration/appointment-bulk-no-show.test.ts :: "never reclassifies cancelled or arrived appointments and leaves queue revision unchanged" | pr: review: not audited
 - [COVERED] Arabic/French keyboard-operable receptionist UI | src: src/app/operations | test: tests/e2e/receptionist-bilingual-accessibility.spec.ts :: "receptionist queue stays clinic-scoped, private, bilingual, and keyboard operable" | pr: review: not audited
 - [COVERED] Transfer is serialized ahead of a queued cancellation without split state | src: src/modules/queue/index.ts, src/modules/appointment/index.ts | test: tests/integration/appointment-recovery-race.test.ts :: "serializes transfer ahead of a queued cancellation without split state" | pr: review: not audited
-- [PARTIAL] Restore-versus-cancel and priority-insert-versus-transfer races are now named tests (restore versus call is still not located) | src: src/modules/appointment/recovery.ts, src/modules/queue/index.ts | test: tests/integration/queue-restore-race.test.ts :: "applies a restore queued ahead of a competing cancel, then the cancel"; tests/integration/queue-restore-race.test.ts :: "rejects a second restore queued behind a first restore that already restored the appointment"; tests/integration/queue-restore-race.test.ts :: "applies a cancel queued ahead of a restore of an active appointment, then restores it"; tests/integration/queue-restore-race.test.ts :: "rejects a priority insert queued behind a transfer of the same entry without leaving priority state" | pr: pending (#759)
+- [COVERED] Restore-versus-cancel, restore-versus-call and priority-insert-versus-transfer races are named tests | src: src/modules/appointment/recovery.ts, src/modules/queue/index.ts | test: tests/integration/queue-restore-race.test.ts :: "applies a restore queued ahead of a competing cancel, then the cancel"; tests/integration/queue-restore-race.test.ts :: "rejects a second restore queued behind a first restore that already restored the appointment"; tests/integration/queue-restore-race.test.ts :: "applies a cancel queued ahead of a restore of an active appointment, then restores it"; tests/integration/queue-restore-race.test.ts :: "rejects a priority insert queued behind a transfer of the same entry without leaving priority state"; tests/integration/queue-restore-race.test.ts :: "rejects a call queued ahead of restore_and_check_in of a cancelled entry, then checks the entry in"; tests/integration/queue-restore-race.test.ts :: "calls the entry once restore_and_check_in queued ahead of the call has made it callable" | pr: pending (#759)
 
 ## TAB-P0-08 Guest status access and encrypted exchange link
 
@@ -142,7 +142,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 | TAB-P0-04 | VERIFY | all COVERED; ready once P0-01..03 pass |
 | TAB-P0-05 | VERIFY | one PARTIAL (outbox atomicity per transition) |
 | TAB-P0-06 | VERIFY | receipt cleanup PARTIAL |
-| TAB-P0-07 | VERIFY | restore race PARTIAL |
+| TAB-P0-07 | VERIFY | restore races COVERED (#759, restore-versus-call #761) |
 | TAB-P0-08 | VERIFY | envelope intents COVERED (#742); status-cookie cross-class negatives PARTIAL, review of pre-#600 PRs not audited |
 | TAB-P0-09 | VERIFY | COVERED; review evidence not audited |
 | TAB-P0-10 | VERIFY | COVERED; review evidence partly audited |
@@ -160,5 +160,5 @@ No row is proposed as VERIFIED: the protocol also requires per-row independent r
 2. (done: #744, #746; external provider and escalation remain, see owner decision #730) Ciphertext scrub and provider worker lifecycle (P0-13).
 3. Secret scan in CI and penetration checklist (P0-15).
 4. Doctor-facing bilingual Playwright journey (P0-14).
-5. (15-minute grace done: #748; restore-vs-cancel and priority-vs-transfer done: #759; restore-vs-call remains) Named restore race and terminal-grace tests (P0-07, P0-12).
+5. (15-minute grace done: #748; restore-vs-cancel and priority-vs-transfer done: #759; restore-vs-call done: #761) Named restore race and terminal-grace tests (P0-07, P0-12).
 6. Replay-receipt ciphertext retention/scrub audit (P0-06).

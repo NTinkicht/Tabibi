@@ -440,4 +440,108 @@ describe('restore and priority recovery races', () => {
     );
     expect(receipts.rows[0]?.count).toBe('0');
   });
+
+  it('rejects a call queued ahead of restore_and_check_in of a cancelled entry, then checks the entry in', async () => {
+    const booking = await bookCancelled();
+    const outcome = await withSessionLockHeld(
+      async (racePool, app) => {
+        const call = settle(
+          new QueueService(racePool).command(
+            scope,
+            ids.sourceSession,
+            booking.entry.id,
+            {
+              command: 'call',
+              idempotencyKey: 'rr-call-first',
+              correlationId: 'rr-call-first',
+            },
+          ),
+        );
+        await waitForLockWaiters(app, 1);
+        const restore = settle(
+          new AppointmentRecoveryService(racePool).command(
+            scope,
+            ids.sourceSession,
+            booking.appointment.id,
+            {
+              command: 'restore_and_check_in',
+              reason: 'Restore queued behind the call',
+              idempotencyKey: 'rr-restore-after-call',
+              correlationId: 'rr-restore-after-call',
+            },
+          ),
+        );
+        await waitForLockWaiters(app, 2);
+        return { call, restore };
+      },
+      (blocker) => blocker.query('COMMIT').then(() => undefined),
+      ids.sourceSession,
+    );
+    expect((await outcome.call).status).toBe('rejected');
+    expect((await outcome.restore).status).toBe('fulfilled');
+    expect(
+      await states(booking.appointment.id, booking.entry.id),
+    ).toMatchObject({
+      queue_state: 'checked_in',
+      priority_order: null,
+      session_id: ids.sourceSession,
+    });
+    const leftovers = await pool.query<{ called: string; receipts: string }>(
+      `SELECT
+        (SELECT count(*)::text FROM queue_entries
+          WHERE session_id=$1 AND state='called') called,
+        (SELECT count(*)::text FROM queue_command_receipts
+          WHERE idempotency_key='rr-call-first') receipts`,
+      [ids.sourceSession],
+    );
+    expect(leftovers.rows[0]).toEqual({ called: '0', receipts: '0' });
+  });
+
+  it('calls the entry once restore_and_check_in queued ahead of the call has made it callable', async () => {
+    const booking = await bookCancelled();
+    const outcome = await withSessionLockHeld(
+      async (racePool, app) => {
+        const restore = settle(
+          new AppointmentRecoveryService(racePool).command(
+            scope,
+            ids.sourceSession,
+            booking.appointment.id,
+            {
+              command: 'restore_and_check_in',
+              reason: 'Restore wins the queue',
+              idempotencyKey: 'rr-restore-before-call',
+              correlationId: 'rr-restore-before-call',
+            },
+          ),
+        );
+        await waitForLockWaiters(app, 1);
+        const call = settle(
+          new QueueService(racePool).command(
+            scope,
+            ids.sourceSession,
+            booking.entry.id,
+            {
+              command: 'call',
+              idempotencyKey: 'rr-call-second',
+              correlationId: 'rr-call-second',
+            },
+          ),
+        );
+        await waitForLockWaiters(app, 2);
+        return { restore, call };
+      },
+      (blocker) => blocker.query('COMMIT').then(() => undefined),
+      ids.sourceSession,
+    );
+    expect((await outcome.restore).status).toBe('fulfilled');
+    expect((await outcome.call).status).toBe('fulfilled');
+    expect(
+      await states(booking.appointment.id, booking.entry.id),
+    ).toMatchObject({ queue_state: 'called', session_id: ids.sourceSession });
+    const receipts = await pool.query<{ count: string }>(
+      `SELECT count(*)::text count FROM queue_command_receipts
+        WHERE idempotency_key='rr-call-second'`,
+    );
+    expect(receipts.rows[0]?.count).toBe('1');
+  });
 });
