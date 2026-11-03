@@ -36,6 +36,15 @@ export {
   type NotificationSuppressionReason,
 } from '@/modules/notification-domain/delivery-policy';
 export {
+  EtaNotificationGate,
+  decideEtaNotification,
+  etaNotificationDedupKey,
+  type EtaNotificationDecision,
+  type EtaNotificationGateResult,
+  type EtaNotificationReasonCode,
+  type EtaNotificationSnapshot,
+} from '@/modules/notification-domain/eta-notification-gate';
+export {
   QueueNotificationProducer,
   QueueNotificationProducerValidationError,
   type QueueNotificationIntentStore,
