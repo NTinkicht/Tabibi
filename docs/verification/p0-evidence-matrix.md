@@ -76,7 +76,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Hardened status cookie issued on exchange | src: src/app/api | test: tests/api/guest-exchange.test.ts :: "sets a hardened bearer cookie and redirects without credentials" | pr: review: not audited
 - [COVERED] Rotation/revocation rejects old credential | src: src/modules/guest-status/index.ts | test: tests/integration/guest-status-credential-rotation.test.ts :: "rejects an old bearer when its exact credential is revoked after authorization" | pr: review: not audited
 - [COVERED] Staff-created guest status link audited without link material | src: src/modules/guest-access/index.ts | test: tests/integration/staff-status-link.test.ts :: "mints a link for same-clinic staff, stores only a verifier, and audits without link material" | pr: #738 (merged; reviewer not audited)
-- [MISSING] Envelope-encrypted exchange-link outbox intents (AES-GCM, AAD binding intent/entry/clinic, ciphertext TTL <= exchange TTL, missing-key fail closed): aes-256-gcm appears only in booking receipts and availability selection, not in any notification intent | src: src/modules/notification-outbox/index.ts | pr: none
+- [COVERED] Envelope-encrypted exchange-link outbox intents (AES-GCM, AAD binding intent/entry/clinic, ciphertext TTL capped at the exchange deadline, missing or short key fails closed) | src: src/modules/guest-access/link-envelope.ts | test: tests/unit/guest-link-envelope.test.ts :: "rejects any AAD binding drift (intent, entry, clinic)"; tests/unit/guest-link-envelope.test.ts :: "refuses a missing or short key without a plaintext fallback"; tests/unit/guest-link-envelope.test.ts :: "caps expiry at the exchange absolute deadline and rejects expired ones" | pr: #742 (merged; reviewer not audited)
 - [PARTIAL] Cross-class negative tests (status cookie vs Authorization route) | src: src/modules/guest-status/index.ts | test: tests/integration/guest-status-forwarding-header.test.ts :: "does not let spoofed forwarding headers create independent pre-auth buckets" | pr: review: not audited
 
 ## TAB-P0-09 Guest booking arrival confirmation
@@ -104,7 +104,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Booking-bearer capability read and drift refusal | src: src/modules/public-guest-live-queue-status/index.ts | test: tests/integration/public-guest-live-queue-status.test.ts :: "rejects permitted queue-entry association drift instead of reading the reassigned queue state" | pr: review: not audited
 - [COVERED] Cookie SSE closes on terminal, no bearer in stream | src: src/modules/guest-status/index.ts | test: tests/api/guest-status-stream.test.ts :: "closes an already-terminal stream without transporting the snapshot or bearer"; tests/e2e/guest-status-sse-terminal.spec.ts :: "guest SSE change to terminal closes the stream and does not schedule fallback work" | pr: review: not audited
 - [COVERED] Terminal state stops header polling permanently | src: src/app/guest | test: tests/e2e/guest-live-queue.spec.ts :: "a terminal booking/queue state stops polling permanently" | pr: review: not audited
-- [PARTIAL] 15-minute fake-clock terminal grace at T0, T0+15m, T0+15m+epsilon was not located as one named test | src: src/modules/public-guest-live-queue-status/index.ts | test: tests/e2e/guest-status-sse-lifecycle.spec.ts :: "guest SSE change and error paths canonical-refetch without credential-bearing URLs" | pr: review: not audited
+- [COVERED] 15-minute fake-clock terminal grace at T0, T0+15m, T0+15m+epsilon | src: src/modules/public-guest-live-queue-status/index.ts | test: tests/integration/guest-status.test.ts :: "enforces the 15-minute terminal grace at T0, T0+15m and T0+15m+epsilon" | pr: #748 (merged; reviewer not audited)
 
 ## TAB-P0-13 Notification outbox and dead letters
 
@@ -112,8 +112,8 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Dead-letter after exhaustion without aborting batch | src: src/modules/notification-outbox/observability.ts | test: tests/integration/notification-dispatch-resilience.test.ts :: "dead-letters an exhausted resolver failure without aborting the later batch item" | pr: review: not audited
 - [COVERED] Material-change thresholds | src: src/modules/notification-domain | test: tests/unit/material-estimate-change.test.ts :: "marks a queue-position change at the default threshold as material" | pr: review: not audited
 - [COVERED] Infrastructure faults never reported as delivered | src: src/modules/notification-outbox/dispatch-eligibility.ts | test: tests/unit/notification-fault-injection.test.ts :: "never reports delivered when inbox persistence throws an infrastructure fault" | pr: review: not audited
-- [PARTIAL] Staff escalation and real provider dispatch: only the in-app provider adapter exists; no external provider worker or authenticated-decrypt worker was located | src: src/modules/notification-outbox/index.ts | test: tests/unit/notification-in-app-provider-adapter.test.ts :: "routes repeated adapter use from each per-dispatch authorized subject" | pr: none
-- [MISSING] Ciphertext scrub after delivered/terminal/expired outcomes (no scrub/shred code in src) | src: src/modules/notification-outbox/index.ts | pr: none
+- [PARTIAL] Guest-link intent dispatch worker is COVERED (claim, decrypt-at-dispatch, bounded retry, dead letter, fenced leases); a real external provider adapter and staff escalation of failed deliveries beyond the notifications screen are not located (owner decision #730: in-app plus staff-assisted, no paid provider) | src: src/modules/guest-access/link-intents.ts | test: tests/integration/guest-link-intents.test.ts :: "decrypts only at dispatch and scrubs after delivery"; tests/integration/guest-link-intents.test.ts :: "dead-letters after max attempts and scrubs the ciphertext"; tests/integration/guest-link-intents.test.ts :: "fences a slow sender so a replaced worker cannot clobber the new claim" | pr: #746 (merged; reviewer not audited)
+- [COVERED] Ciphertext scrub after delivered/terminal/expired outcomes, with database constraint against ciphertext on terminal rows | src: src/modules/guest-access/link-intents.ts, db/migrations/0048_guest_link_intents.sql | test: tests/integration/guest-link-intents.test.ts :: "scrubs ciphertext atomically on delivered and dead_letter, once"; tests/integration/guest-link-intents.test.ts :: "database rejects ciphertext on terminal rows and TTL above ten minutes" | pr: #744 (merged; reviewer not audited)
 
 ## TAB-P0-14 Arabic RTL / French LTR and accessibility
 
@@ -130,7 +130,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Container image never bakes secrets | src: Dockerfile | test: tests/unit/container-image.test.ts :: "never sets a value on a secret-looking ENV or ARG" | pr: #736 (ntk-reviewer APPROVED d89d5fea3f06)
 - [PARTIAL] Threat model is a delta document (`docs/release/release-threat-model-delta.md`); no penetration checklist or rollback drill was located | src: docs/release/release-threat-model-delta.md | pr: none
 - [MISSING] Secret scan in CI (only `npm audit` found in `.github/workflows/ci.yml`) | src: .github/workflows/ci.yml | pr: none
-- [MISSING] Inspection of real notification ciphertext at rest and post-terminal scrub (depends on the missing P0-08/P0-13 items) | src: src/modules/notification-outbox/index.ts | pr: none
+- [PARTIAL] Inspection of notification ciphertext at rest and post-terminal scrub: database-level constraint and scrub are tested, but no release-time inspection procedure over a real database was located | src: src/modules/guest-access/link-intents.ts | test: tests/integration/guest-link-intents.test.ts :: "stores only envelope ciphertext, never the plaintext material" | pr: #744 (merged; reviewer not audited)
 
 ## Proposed status per row (owner decides; nothing here edits PRODUCT.md)
 
@@ -143,22 +143,22 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 | TAB-P0-05 | VERIFY | one PARTIAL (outbox atomicity per transition) |
 | TAB-P0-06 | VERIFY | receipt cleanup PARTIAL |
 | TAB-P0-07 | VERIFY | restore race PARTIAL |
-| TAB-P0-08 | VERIFY | encrypted-envelope intents MISSING |
+| TAB-P0-08 | VERIFY | envelope intents COVERED (#742); status-cookie cross-class negatives PARTIAL, review of pre-#600 PRs not audited |
 | TAB-P0-09 | VERIFY | COVERED; review evidence not audited |
 | TAB-P0-10 | VERIFY | COVERED; review evidence partly audited |
 | TAB-P0-11 | VERIFY | COVERED with review evidence on #705/#709/#714/#716 |
-| TAB-P0-12 | VERIFY | 15-minute grace test PARTIAL |
-| TAB-P0-13 | VERIFY | provider worker PARTIAL, ciphertext scrub MISSING |
+| TAB-P0-12 | VERIFY | all criteria COVERED incl. #748 grace test; review of pre-#600 PRs not audited |
+| TAB-P0-13 | VERIFY | scrub and dispatch worker COVERED (#744, #746); external provider and escalation PARTIAL |
 | TAB-P0-14 | VERIFY | doctor flows PARTIAL |
-| TAB-P0-15 | VERIFY | secret scan and ciphertext inspection MISSING |
+| TAB-P0-15 | VERIFY | secret scan MISSING; ciphertext inspection procedure PARTIAL |
 
 No row is proposed as VERIFIED: the protocol also requires per-row independent review of the full implementing history, which this matrix could only confirm for the recent PRs listed.
 
 ## Candidate follow-up issues (one is opened per run)
 
-1. Envelope-encrypted exchange-link outbox intents with AAD binding (P0-08, blocks P0-13/15).
-2. Ciphertext scrub and external-provider worker lifecycle (P0-13).
+1. (done: #742) Envelope-encrypted exchange-link outbox intents with AAD binding (P0-08).
+2. (done: #744, #746; external provider and escalation remain, see owner decision #730) Ciphertext scrub and provider worker lifecycle (P0-13).
 3. Secret scan in CI and penetration checklist (P0-15).
 4. Doctor-facing bilingual Playwright journey (P0-14).
-5. Named restore race and 15-minute terminal-grace tests (P0-07, P0-12).
+5. (15-minute grace done: #748; restore race remains) Named restore race and terminal-grace tests (P0-07, P0-12).
 6. Replay-receipt ciphertext retention/scrub audit (P0-06).
