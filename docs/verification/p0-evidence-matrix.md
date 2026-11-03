@@ -69,6 +69,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Arabic/French keyboard-operable receptionist UI | src: src/app/operations | test: tests/e2e/receptionist-bilingual-accessibility.spec.ts :: "receptionist queue stays clinic-scoped, private, bilingual, and keyboard operable" | pr: review: not audited
 - [COVERED] Transfer is serialized ahead of a queued cancellation without split state | src: src/modules/queue/index.ts, src/modules/appointment/index.ts | test: tests/integration/appointment-recovery-race.test.ts :: "serializes transfer ahead of a queued cancellation without split state" | pr: review: not audited
 - [COVERED] Restore-versus-cancel, restore-versus-call and priority-insert-versus-transfer races are named tests | src: src/modules/appointment/recovery.ts, src/modules/queue/index.ts | test: tests/integration/queue-restore-race.test.ts :: "applies a restore queued ahead of a competing cancel, then the cancel"; tests/integration/queue-restore-race.test.ts :: "rejects a second restore queued behind a first restore that already restored the appointment"; tests/integration/queue-restore-race.test.ts :: "applies a cancel queued ahead of a restore of an active appointment, then restores it"; tests/integration/queue-restore-race.test.ts :: "rejects a priority insert queued behind a transfer of the same entry without leaving priority state"; tests/integration/queue-restore-race.test.ts :: "rejects a call queued ahead of restore_and_check_in of a cancelled entry, then checks the entry in"; tests/integration/queue-restore-race.test.ts :: "calls the entry once restore_and_check_in queued ahead of the call has made it callable" | pr: pending (#759)
+- [COVERED] Priority move versus call-next and cancel races are named held-session-lock tests (stale move rejected behind a call or cancel with no priority state or receipt; move queued ahead of a call applies and the call is rejected as not next) | src: src/modules/queue/index.ts | test: tests/integration/queue-priority-race.test.ts :: "rejects a priority move queued behind a call of another entry as stale"; tests/integration/queue-priority-race.test.ts :: "applies a priority move queued ahead of a call of the former head, then rejects the call as not next"; tests/integration/queue-priority-race.test.ts :: "rejects a priority move queued behind a cancel of the same entry without priority state" | pr: pending (#763)
 
 ## TAB-P0-08 Guest status access and encrypted exchange link
 
@@ -142,7 +143,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 | TAB-P0-04 | VERIFY | all COVERED; ready once P0-01..03 pass |
 | TAB-P0-05 | VERIFY | one PARTIAL (outbox atomicity per transition) |
 | TAB-P0-06 | VERIFY | receipt cleanup PARTIAL |
-| TAB-P0-07 | VERIFY | restore races COVERED (#759, restore-versus-call #761) |
+| TAB-P0-07 | VERIFY | restore races COVERED (#759, restore-versus-call #761); priority move vs call/cancel races COVERED (#763) |
 | TAB-P0-08 | VERIFY | envelope intents COVERED (#742); status-cookie cross-class negatives PARTIAL, review of pre-#600 PRs not audited |
 | TAB-P0-09 | VERIFY | COVERED; review evidence not audited |
 | TAB-P0-10 | VERIFY | COVERED; review evidence partly audited |
