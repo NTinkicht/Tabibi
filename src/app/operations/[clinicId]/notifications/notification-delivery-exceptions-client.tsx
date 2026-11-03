@@ -41,10 +41,30 @@ function categorizeOutcome(code: unknown): OutcomeCategory {
     return 'delivery_storage_error';
   return 'unspecified';
 }
+type GuestLinkIntent = 'initial' | 'transfer' | 'resend' | 'recovery';
+type GuestLinkState = 'dead_letter' | 'expired';
+type GuestLinkFailureView = {
+  intent: GuestLinkIntent | null;
+  state: GuestLinkState;
+  queueLabel: string | null;
+  attempts: number;
+  at: string;
+};
 type LoadState =
   | { kind: 'loading' }
   | { kind: 'error' }
-  | { kind: 'ready'; records: ExceptionView[] };
+  | {
+      kind: 'ready';
+      records: ExceptionView[];
+      guestLinks: GuestLinkFailureView[];
+    };
+
+const GUEST_LINK_INTENTS: readonly GuestLinkIntent[] = [
+  'initial',
+  'transfer',
+  'resend',
+  'recovery',
+];
 
 const copy = {
   fr: {
@@ -55,6 +75,22 @@ const copy = {
     error: 'Impossible de charger les notifications. Veuillez réessayer.',
     empty: 'Aucune notification en échec de livraison.',
     note: 'Une notification non remise ne signifie pas que le patient a été contacté. Si nécessaire, utilisez la procédure habituelle de contact manuel de la clinique.',
+    guestLinksTitle: 'Liens de suivi non remis aux patients',
+    guestLinksNote:
+      'Ces patients n’ont peut-être jamais reçu leur lien de suivi. Contactez-les manuellement ou réémettez un lien depuis la file.',
+    guestLinksEmpty: 'Aucun lien de suivi en échec de livraison.',
+    guestLinkIntents: {
+      initial: 'Premier lien',
+      transfer: 'Lien de transfert',
+      resend: 'Renvoi du lien',
+      recovery: 'Récupération du lien',
+    },
+    guestLinkStates: {
+      dead_letter: 'Livraison abandonnée',
+      expired: 'Lien expiré avant remise',
+    },
+    otherGuestLink: 'Lien de suivi',
+    guestLinkState: 'État',
     attempt: 'Tentatives de livraison',
     at: 'Dernier échec',
     otherEvent: 'Notification de file',
@@ -87,6 +123,22 @@ const copy = {
     error: 'تعذّر تحميل الإشعارات. حاول مرة أخرى.',
     empty: 'لا توجد إشعارات تعذّر تسليمها.',
     note: 'عدم تسليم الإشعار لا يعني التواصل مع المريض. عند الحاجة، اتبع إجراءات العيادة المعتادة للتواصل اليدوي.',
+    guestLinksTitle: 'روابط المتابعة التي لم تصل إلى المرضى',
+    guestLinksNote:
+      'قد لا يكون هؤلاء المرضى قد تلقّوا رابط المتابعة. تواصل معهم يدويًا أو أعد إصدار الرابط من قائمة الانتظار.',
+    guestLinksEmpty: 'لا توجد روابط متابعة تعذّر تسليمها.',
+    guestLinkIntents: {
+      initial: 'الرابط الأول',
+      transfer: 'رابط النقل',
+      resend: 'إعادة إرسال الرابط',
+      recovery: 'استعادة الرابط',
+    },
+    guestLinkStates: {
+      dead_letter: 'توقف التسليم',
+      expired: 'انتهت صلاحية الرابط قبل التسليم',
+    },
+    otherGuestLink: 'رابط المتابعة',
+    guestLinkState: 'الحالة',
     attempt: 'محاولات التسليم',
     at: 'آخر إخفاق',
     otherEvent: 'إشعار قائمة الانتظار',
@@ -146,6 +198,34 @@ function toExceptionViews(payload: unknown): ExceptionView[] {
   });
 }
 
+// Explicit allow-list for guest-link failures: the raw intent id, contact
+// destination and any payload never reach the DOM. Only the enumerated
+// intent/state, the receptionist-facing queue label and counters are kept.
+function toGuestLinkViews(payload: unknown): GuestLinkFailureView[] {
+  if (!isRecord(payload) || !Array.isArray(payload.failures))
+    throw new Error('Invalid response');
+  return payload.failures.map((value: unknown) => {
+    if (
+      !isRecord(value) ||
+      (value.state !== 'dead_letter' && value.state !== 'expired') ||
+      typeof value.intent !== 'string' ||
+      typeof value.outcomeAt !== 'string' ||
+      !Number.isSafeInteger(value.attempts) ||
+      (value.queueLabel !== null && typeof value.queueLabel !== 'string')
+    )
+      throw new Error('Invalid response');
+    return {
+      intent: GUEST_LINK_INTENTS.includes(value.intent as GuestLinkIntent)
+        ? (value.intent as GuestLinkIntent)
+        : null,
+      state: value.state,
+      queueLabel: value.queueLabel as string | null,
+      attempts: value.attempts as number,
+      at: value.outcomeAt,
+    };
+  });
+}
+
 function NotificationDeliveryExceptionsView({
   clinicId,
   initialLocale,
@@ -169,18 +249,23 @@ function NotificationDeliveryExceptionsView({
     const currentRequest = ++requestId.current;
     void (async () => {
       try {
-        const response = await fetch(
-          `/api/clinics/${encodeURIComponent(clinicId)}/notifications/dead-letters?limit=100`,
-          {
-            credentials: 'same-origin',
-            cache: 'no-store',
-            signal: controller.signal,
-          },
-        );
-        if (!response.ok) throw new Error('Rejected');
+        const base = `/api/clinics/${encodeURIComponent(clinicId)}/notifications`;
+        const init = {
+          credentials: 'same-origin' as const,
+          cache: 'no-store' as const,
+          signal: controller.signal,
+        };
+        const [response, guestResponse] = await Promise.all([
+          fetch(`${base}/dead-letters?limit=100`, init),
+          fetch(`${base}/guest-link-failures?limit=100`, init),
+        ]);
+        // Fail closed: if either source is unavailable, show the error state
+        // rather than an empty list that could hide failed deliveries.
+        if (!response.ok || !guestResponse.ok) throw new Error('Rejected');
         const records = toExceptionViews(await response.json());
+        const guestLinks = toGuestLinkViews(await guestResponse.json());
         if (currentRequest === requestId.current && !controller.signal.aborted)
-          setState({ kind: 'ready', records });
+          setState({ kind: 'ready', records, guestLinks });
       } catch {
         if (currentRequest === requestId.current && !controller.signal.aborted)
           setState({ kind: 'error' });
@@ -280,6 +365,48 @@ function NotificationDeliveryExceptionsView({
           </ul>
         ) : null}
       </section>
+      {state.kind === 'ready' ? (
+        <section
+          className="notificationExceptionsGuestLinks"
+          aria-labelledby="guest-link-failures-title"
+        >
+          <h2 id="guest-link-failures-title">{t.guestLinksTitle}</h2>
+          <p>{t.guestLinksNote}</p>
+          {state.guestLinks.length === 0 ? (
+            <p role="status">{t.guestLinksEmpty}</p>
+          ) : (
+            <ul className="notificationExceptionsList">
+              {state.guestLinks.map((failure, index) => {
+                const instant = new Date(failure.at);
+                return (
+                  <li key={index}>
+                    <h3>
+                      {failure.intent
+                        ? t.guestLinkIntents[failure.intent]
+                        : t.otherGuestLink}
+                    </h3>
+                    <p>
+                      {t.queueLabel}: {failure.queueLabel ?? t.noQueueLabel}
+                    </p>
+                    <p>
+                      {t.guestLinkState}: {t.guestLinkStates[failure.state]}
+                    </p>
+                    <p>
+                      {t.at}:{' '}
+                      {Number.isFinite(instant.getTime())
+                        ? instant.toLocaleString(locale === 'ar' ? 'ar' : 'fr')
+                        : '—'}
+                    </p>
+                    <p>
+                      {t.attempt}: {failure.attempts}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      ) : null}
     </main>
   );
 }

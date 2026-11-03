@@ -6,6 +6,7 @@ const MOCKED_STAFF_SESSION = 'mocked-staff-session';
 
 const clinicId = '30000000-0000-4000-8000-000000000001';
 const DEAD_LETTERS_URL = `**/api/clinics/${clinicId}/notifications/dead-letters**`;
+const GUEST_LINKS_URL = `**/api/clinics/${clinicId}/notifications/guest-link-failures**`;
 const rawQueueEntryId = '30000000-0000-4000-8000-000000000099';
 
 async function authenticate(page: Page) {
@@ -22,6 +23,15 @@ async function authenticate(page: Page) {
       sameSite: 'Strict',
     },
   ]);
+  // Default: no guest-link failures. Individual tests register a later route
+  // for the same URL to override it (Playwright prefers the newest route).
+  await page.route(GUEST_LINKS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ failures: [] }),
+    });
+  });
 }
 
 function deadLettersBody(
@@ -311,4 +321,89 @@ test('reception desk links to the notification delivery exceptions page', async 
     'href',
     `/operations/${clinicId}/notifications?locale=fr`,
   );
+});
+
+test('guest-link failures are listed from the staff endpoint without raw identifiers', async ({
+  page,
+}) => {
+  await authenticate(page);
+  await page.route(DEAD_LETTERS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(deadLettersBody([])),
+    });
+  });
+  await page.route(GUEST_LINKS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        failures: [
+          {
+            intentId: rawQueueEntryId,
+            intent: 'resend',
+            state: 'dead_letter',
+            queueLabel: 'B-007',
+            attempts: 4,
+            outcomeAt: '2026-09-13T11:00:00.000Z',
+          },
+          {
+            intentId: rawQueueEntryId,
+            intent: 'some_future_intent',
+            state: 'expired',
+            queueLabel: null,
+            attempts: 1,
+            outcomeAt: '2026-09-13T12:00:00.000Z',
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto(`/operations/${clinicId}/notifications?locale=fr`);
+  await expect(
+    page.getByRole('heading', {
+      name: 'Liens de suivi non remis aux patients',
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('Renvoi du lien')).toBeVisible();
+  await expect(page.getByText('Passage: B-007')).toBeVisible();
+  await expect(page.getByText('Livraison abandonnée')).toBeVisible();
+  await expect(page.getByText('Lien expiré avant remise')).toBeVisible();
+  await expect(page.getByText('Passage: Passage non identifié')).toBeVisible();
+  const bodyText = await page.locator('body').innerText();
+  expect(bodyText).not.toContain(rawQueueEntryId);
+  expect(bodyText).not.toContain('some_future_intent');
+
+  await page.getByRole('button', { name: 'العربية' }).click();
+  await expect(page.locator('main[lang="ar"][dir="rtl"]')).toBeVisible();
+  await expect(
+    page.getByText('روابط المتابعة التي لم تصل إلى المرضى'),
+  ).toBeVisible();
+  await expect(page.getByText('إعادة إرسال الرابط')).toBeVisible();
+});
+
+test('a failing guest-link endpoint shows the error state instead of an empty list', async ({
+  page,
+}) => {
+  await authenticate(page);
+  await page.route(DEAD_LETTERS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(deadLettersBody([])),
+    });
+  });
+  await page.route(GUEST_LINKS_URL, async (route) => {
+    await route.fulfill({ status: 500, body: '{}' });
+  });
+
+  await page.goto(`/operations/${clinicId}/notifications?locale=fr`);
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Impossible de charger' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Aucun lien de suivi en échec de livraison.'),
+  ).toHaveCount(0);
 });
