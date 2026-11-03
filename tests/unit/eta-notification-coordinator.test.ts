@@ -135,4 +135,41 @@ describe('EtaNotificationCoordinator', () => {
     expect(enqueued).toHaveLength(0);
     expect(baselines.rows.get('e1')?.revision).toBe(1);
   });
+
+  it('does not persist a first baseline whose epochs are null or not current', async () => {
+    const { c, baselines } = setup();
+    expect(
+      await c.process({ clinicId: 'c', latest: snap({}), currentEpochs: null }),
+    ).toEqual({ enqueued: false, reason: 'source_epoch_mismatch' });
+    expect(
+      await c.process({
+        clinicId: 'c',
+        latest: snap({}),
+        currentEpochs: { sessionEpoch: 9, priorEpoch: 1 },
+      }),
+    ).toEqual({ enqueued: false, reason: 'source_epoch_mismatch' });
+    expect(baselines.rows.size).toBe(0);
+  });
+
+  it('evaluates against the winning baseline when the initial insert is lost', async () => {
+    const { c, enqueued, baselines } = setup();
+    const realLoad = baselines.load.bind(baselines);
+    let first = true;
+    baselines.load = async (cl, id) => {
+      if (first) {
+        first = false;
+        // A concurrent writer wins the initial insert after our null read.
+        baselines.rows.set('e1', snap({ revision: 1 }));
+        return null;
+      }
+      return realLoad(cl, id);
+    };
+    const r = await c.process({
+      clinicId: 'c',
+      latest: snap({ revision: 2, minWaitMinutes: 40, maxWaitMinutes: 60 }),
+      currentEpochs: cur,
+    });
+    expect(r).toEqual({ status: 'enqueued', baselineAdvanced: true });
+    expect(enqueued).toHaveLength(1);
+  });
 });

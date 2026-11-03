@@ -139,6 +139,21 @@ describe('ETA notification baseline, real PostgreSQL (#751)', () => {
     expect((await store.load(clinicId, entryId))?.revision).toBe(2);
   });
 
+  it('concurrent first submits with different revisions lose no material change', async () => {
+    await Promise.all([
+      coordinator().process({ clinicId, latest: snap({}), currentEpochs: cur }),
+      coordinator().process({
+        clinicId,
+        latest: material(2),
+        currentEpochs: cur,
+      }),
+    ]);
+    // Whichever order won, revision 2 must end as baseline; revision 1 first
+    // means revision 2 was gated against it and notified exactly once.
+    expect((await store.load(clinicId, entryId))?.revision).toBe(2);
+    expect(await outboxCount()).toBeLessThanOrEqual(1);
+  });
+
   it('replays safely when the process crashed after enqueue but before advancing', async () => {
     await coordinator().process({
       clinicId,

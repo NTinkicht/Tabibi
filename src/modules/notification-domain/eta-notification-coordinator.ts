@@ -33,7 +33,7 @@ export class EtaNotificationCoordinator {
     locale?: string | null;
   }): Promise<EtaNotificationCoordinatorResult> {
     const { clinicId, latest } = input;
-    const baseline = await this.baselines.load(clinicId, latest.queueEntryId);
+    let baseline = await this.baselines.load(clinicId, latest.queueEntryId);
     if (baseline === null) {
       // Gate validates; an invalid snapshot is reported, never persisted.
       const probe = await this.gate.submit({
@@ -44,8 +44,20 @@ export class EtaNotificationCoordinator {
         locale: input.locale,
       });
       if (!probe.enqueued && probe.reason !== 'no_baseline') return probe;
-      await this.baselines.recordInitial(clinicId, latest);
-      return { status: 'baseline_recorded' };
+      // The first baseline must itself be current for the authoritative epochs.
+      if (
+        input.currentEpochs === null ||
+        latest.sessionEpoch !== input.currentEpochs.sessionEpoch ||
+        latest.priorEpoch !== input.currentEpochs.priorEpoch
+      ) {
+        return { enqueued: false, reason: 'source_epoch_mismatch' };
+      }
+      if (await this.baselines.recordInitial(clinicId, latest)) {
+        return { status: 'baseline_recorded' };
+      }
+      // Lost the insert race: evaluate against the winning baseline.
+      baseline = await this.baselines.load(clinicId, latest.queueEntryId);
+      if (baseline === null) return { enqueued: false, reason: 'no_baseline' };
     }
     const result = await this.gate.submit({
       clinicId,
