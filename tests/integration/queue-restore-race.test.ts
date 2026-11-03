@@ -224,7 +224,7 @@ describe('restore and priority recovery races', () => {
     );
   });
 
-  it('rejects a restore queued behind a cancel that no longer has anything to restore', async () => {
+  it('rejects a second restore queued behind a first restore that already restored the appointment', async () => {
     const booking = await bookCancelled();
     const outcome = await withSessionLockHeld(
       async (racePool, app) => {
@@ -279,6 +279,84 @@ describe('restore and priority recovery races', () => {
         WHERE idempotency_key IN ('rr-restore-a','rr-restore-b')`,
     );
     expect(receipts.rows[0]?.count).toBe('1');
+  });
+
+  it('applies a cancel queued ahead of a restore of an active appointment, then restores it', async () => {
+    const booking = await new AppointmentService(pool).bookForExistingPatient(
+      scope,
+      ids.sourceSession,
+      {
+        patientId: ids.patient,
+        scheduledStartAt: new Date('2026-09-18T09:30:00Z'),
+        scheduledEndAt: new Date('2026-09-18T09:45:00Z'),
+        contactPreference: 'none',
+        idempotencyKey: 'rr-book-cancel-first',
+        correlationId: 'rr-book-cancel-first',
+      },
+    );
+    const outcome = await withSessionLockHeld(
+      async (racePool, app) => {
+        const cancel = settle(
+          new AppointmentLifecycleService(racePool).command(
+            scope,
+            ids.sourceSession,
+            booking.appointment.id,
+            {
+              command: 'cancel',
+              reason: 'Cancel wins the queue',
+              idempotencyKey: 'rr-cancel-first',
+              correlationId: 'rr-cancel-first',
+            },
+          ),
+        );
+        await waitForLockWaiters(app, 1);
+        const restore = settle(
+          new AppointmentRecoveryService(racePool).command(
+            scope,
+            ids.sourceSession,
+            booking.appointment.id,
+            {
+              command: 'restore',
+              reason: 'Restore queued behind the cancel',
+              idempotencyKey: 'rr-restore-second',
+              correlationId: 'rr-restore-second',
+            },
+          ),
+        );
+        await waitForLockWaiters(app, 2);
+        return { cancel, restore };
+      },
+      (blocker) => blocker.query('COMMIT').then(() => undefined),
+      ids.sourceSession,
+    );
+    expect((await outcome.cancel).status).toBe('fulfilled');
+    expect((await outcome.restore).status).toBe('fulfilled');
+    expect(
+      await states(booking.appointment.id, booking.entry.id),
+    ).toMatchObject({
+      appointment_status: 'confirmed',
+      queue_state: 'waiting',
+      priority_order: null,
+      session_id: ids.sourceSession,
+    });
+    const audit = await pool.query<{ action: string }>(
+      `SELECT action FROM audit_events
+        WHERE entity_id=$1 AND action IN ('appointment.cancel','appointment.restore')
+        ORDER BY id`,
+      [booking.appointment.id],
+    );
+    expect(audit.rows.map((row) => row.action)).toEqual([
+      'appointment.cancel',
+      'appointment.restore',
+    ]);
+    const receipts = await pool.query<{ recovery: string; lifecycle: string }>(
+      `SELECT
+        (SELECT count(*)::text FROM appointment_recovery_receipts
+          WHERE idempotency_key='rr-restore-second') recovery,
+        (SELECT count(*)::text FROM appointment_lifecycle_receipts
+          WHERE idempotency_key='rr-cancel-first') lifecycle`,
+    );
+    expect(receipts.rows[0]).toEqual({ recovery: '1', lifecycle: '1' });
   });
 
   it('rejects a priority insert queued behind a transfer of the same entry without leaving priority state', async () => {
