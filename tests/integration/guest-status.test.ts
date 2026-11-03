@@ -243,6 +243,43 @@ describe('WU17 guest queue-status read', () => {
     ).rejects.toBeInstanceOf(GuestAccessRejectedError);
   });
 
+  it('enforces the 15-minute terminal grace at T0, T0+15m and T0+15m+epsilon', async () => {
+    const credential = await liveBearer();
+    const service = new GuestStatusService(pool);
+    const t0 = new Date('2026-09-10T09:10:00Z');
+    const graceEnd = new Date(t0.getTime() + 15 * 60_000);
+    await pool.query('UPDATE guest_credentials SET expires_at=$1', [
+      new Date('2026-09-11T09:00:00Z'),
+    ]);
+    await pool.query(
+      "UPDATE queue_entries SET state='cancelled',updated_at=$2 WHERE id=$1",
+      [ids.targetEntry, t0],
+    );
+
+    for (const at of [t0, graceEnd]) {
+      await expect(service.getSnapshot(credential.bearer, at)).resolves.toEqual(
+        {
+          generatedAt: at.toISOString(),
+          terminal: true,
+          finalStatus: 'cancelled',
+        },
+      );
+    }
+    await expect(
+      service.getSnapshot(credential.bearer, new Date(graceEnd.getTime() + 1)),
+    ).rejects.toBeInstanceOf(GuestAccessRejectedError);
+
+    // A bearer that expires before T0+15m is denied from its expiry instant on.
+    const expiry = new Date(t0.getTime() + 5 * 60_000);
+    await pool.query('UPDATE guest_credentials SET expires_at=$1', [expiry]);
+    await expect(
+      service.getSnapshot(credential.bearer, new Date(expiry.getTime() - 1)),
+    ).resolves.toMatchObject({ terminal: true });
+    await expect(
+      service.getSnapshot(credential.bearer, expiry),
+    ).rejects.toBeInstanceOf(GuestAccessRejectedError);
+  });
+
   it('serves the cookie-authenticated API as no-store and rejects missing credentials generically', async () => {
     const credential = await liveBearer(new Date());
     const expectedPublicDisplayLabel = await targetPublicDisplayLabel();
