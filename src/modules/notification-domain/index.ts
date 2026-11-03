@@ -46,6 +46,14 @@ export {
   type EtaNotificationSnapshot,
 } from '@/modules/notification-domain/eta-notification-gate';
 export {
+  PgEtaNotificationBaselineStore,
+  type EtaNotificationBaselineStore,
+} from '@/modules/notification-domain/eta-notification-baseline';
+export {
+  EtaNotificationCoordinator,
+  type EtaNotificationCoordinatorResult,
+} from '@/modules/notification-domain/eta-notification-coordinator';
+export {
   QueueNotificationProducer,
   QueueNotificationProducerValidationError,
   type QueueNotificationIntentStore,
