@@ -93,7 +93,34 @@ afterAll(async () => {
   await closePool();
 });
 
+const sources = import.meta.glob<string>('/src/app/api/clinics/**/route.ts', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+
+// Scope: this matrix proves the HTTP layer never succeeds or mutates for a
+// foreign or anonymous caller and that every handler authenticates the staff
+// session before parsing input. Service-level role checks with route-specific
+// valid payloads against seeded clinic-A resources are tracked separately.
 describe('cross-tenant denial matrix over clinic-scoped routes', () => {
+  it('authenticates the clinic scope before reading any request body', () => {
+    for (const [path, src] of Object.entries(sources)) {
+      const auth = src.indexOf('authenticatedClinicScope(');
+      expect(
+        auth,
+        `${path} must call authenticatedClinicScope`,
+      ).toBeGreaterThan(-1);
+      const body = src.indexOf('request.json()');
+      if (body !== -1) {
+        expect(
+          auth,
+          `${path} reads the body before authenticating`,
+        ).toBeLessThan(body);
+      }
+    }
+  });
+
   const routePaths = Object.keys(modules).sort();
 
   it('discovers the clinic-scoped route inventory', () => {
