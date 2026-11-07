@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
 import { safeReturnPath } from './return-path';
 import { signInStrings, type SignInLocale } from './strings';
 
@@ -67,6 +68,7 @@ export function SignInForm({
       dir={locale === 'ar' ? 'rtl' : 'ltr'}
       data-testid="staff-sign-in"
     >
+      <DocumentLocaleSync locale={locale} />
       <h1>{t.title}</h1>
       <p>{t.subtitle}</p>
       {failure ? (

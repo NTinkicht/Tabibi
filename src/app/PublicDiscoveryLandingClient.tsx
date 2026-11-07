@@ -1,5 +1,6 @@
 'use client';
 
+import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   type PublicClinic,
@@ -370,6 +371,7 @@ export default function PublicDiscoveryLandingClient({
       lang={locale}
       dir={locale === 'ar' ? 'rtl' : 'ltr'}
     >
+      <DocumentLocaleSync locale={locale} />
       <header className="publicHeader">
         <div>
           <span className="publicMark" aria-hidden="true">
