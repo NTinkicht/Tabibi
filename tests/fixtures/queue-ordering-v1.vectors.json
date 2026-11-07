@@ -1,0 +1,579 @@
+{
+  "contractVersion": "queue-ordering/v1",
+  "cases": [
+    {
+      "caseId": "eligibility-then-registration",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "eligibility_order then registration_order",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "b",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 3,
+          "priorityOrder": null
+        },
+        {
+          "id": "a",
+          "state": "checked_in",
+          "registrationOrder": 2,
+          "eligibilityOrder": 2,
+          "priorityOrder": null
+        },
+        {
+          "id": "c",
+          "state": "checked_in",
+          "registrationOrder": 3,
+          "eligibilityOrder": 5,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": ["a", "b", "c"],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "late-arrival-after-earlier-registration",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "late registration but earlier check-in is served first",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "early-reg-late-arrival",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 9,
+          "priorityOrder": null
+        },
+        {
+          "id": "late-reg-early-arrival",
+          "state": "checked_in",
+          "registrationOrder": 8,
+          "eligibilityOrder": 2,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": [
+        "late-reg-early-arrival",
+        "early-reg-late-arrival"
+      ],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "priority-before-normal",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "priority bucket precedes ordinary entries",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "n1",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        },
+        {
+          "id": "p1",
+          "state": "checked_in",
+          "registrationOrder": 5,
+          "eligibilityOrder": 7,
+          "priorityOrder": 1
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": ["p1", "n1"],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "priority-slot-order",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "ascending priority_order, arrival does not replace slot",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "p2",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": 2
+        },
+        {
+          "id": "p1",
+          "state": "checked_in",
+          "registrationOrder": 2,
+          "eligibilityOrder": 9,
+          "priorityOrder": 1
+        },
+        {
+          "id": "p3",
+          "state": "checked_in",
+          "registrationOrder": 3,
+          "eligibilityOrder": 2,
+          "priorityOrder": 3
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": ["p1", "p2", "p3"],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "waiting-priority-not-callable",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "waiting entry never selected even with priority",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "w",
+          "state": "waiting",
+          "registrationOrder": 1,
+          "eligibilityOrder": null,
+          "priorityOrder": 1
+        },
+        {
+          "id": "n",
+          "state": "checked_in",
+          "registrationOrder": 2,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": ["n"],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "cancelled-no-show-excluded",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "terminal entries excluded despite best ordering fields",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "x",
+          "state": "cancelled",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": 1
+        },
+        {
+          "id": "y",
+          "state": "no_show",
+          "registrationOrder": 2,
+          "eligibilityOrder": 2,
+          "priorityOrder": 2
+        },
+        {
+          "id": "z",
+          "state": "checked_in",
+          "registrationOrder": 3,
+          "eligibilityOrder": 3,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": ["z"],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "called-in-consultation-excluded",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "called and in_consultation are not selectable",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "c",
+          "state": "called",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        },
+        {
+          "id": "i",
+          "state": "in_consultation",
+          "registrationOrder": 2,
+          "eligibilityOrder": 2,
+          "priorityOrder": null
+        },
+        {
+          "id": "n",
+          "state": "checked_in",
+          "registrationOrder": 3,
+          "eligibilityOrder": 3,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": ["n"],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "completed-excluded",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "completed excluded",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "d",
+          "state": "completed",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        },
+        {
+          "id": "n",
+          "state": "checked_in",
+          "registrationOrder": 2,
+          "eligibilityOrder": 2,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": ["n"],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "source-parity",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "scheduled, walk-in and guest entries order identically (source is not an input)",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "guest",
+          "state": "checked_in",
+          "registrationOrder": 3,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        },
+        {
+          "id": "walkin",
+          "state": "checked_in",
+          "registrationOrder": 2,
+          "eligibilityOrder": 2,
+          "priorityOrder": null
+        },
+        {
+          "id": "scheduled",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 3,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": ["guest", "walkin", "scheduled"],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "empty-queue",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "no entries",
+      "sessionStatus": "open",
+      "entries": [],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "session-planned-yields-nothing",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "checked_in entry not callable when session is planned",
+      "sessionStatus": "planned",
+      "entries": [
+        {
+          "id": "n",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "session-paused-yields-nothing",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "checked_in entry not callable when session is paused",
+      "sessionStatus": "paused",
+      "entries": [
+        {
+          "id": "n",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "session-closed-yields-nothing",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "checked_in entry not callable when session is closed",
+      "sessionStatus": "closed",
+      "entries": [
+        {
+          "id": "n",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "session-cancelled-yields-nothing",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "checked_in entry not callable when session is cancelled",
+      "sessionStatus": "cancelled",
+      "entries": [
+        {
+          "id": "n",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "input-order-independent",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "shuffled input yields same order",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "c",
+          "state": "checked_in",
+          "registrationOrder": 3,
+          "eligibilityOrder": 3,
+          "priorityOrder": null
+        },
+        {
+          "id": "a",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        },
+        {
+          "id": "b",
+          "state": "checked_in",
+          "registrationOrder": 2,
+          "eligibilityOrder": 2,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": ["a", "b", "c"],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "ineligible-duplicate-eligibility-ignored",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "duplicate eligibility_order among ineligible entries is not ambiguity",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "w",
+          "state": "waiting",
+          "registrationOrder": 1,
+          "eligibilityOrder": 4,
+          "priorityOrder": null
+        },
+        {
+          "id": "n",
+          "state": "checked_in",
+          "registrationOrder": 2,
+          "eligibilityOrder": 4,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "accepted",
+      "expectedOrderedEntryIds": ["n"],
+      "rejectionReason": null
+    },
+    {
+      "caseId": "unknown-contract-version",
+      "contractVersion": "queue-ordering/v0",
+      "rule": "unsupported contract version rejected",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "a",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "rejected",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": "unsupported_contract_version"
+    },
+    {
+      "caseId": "missing-eligibility-order",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "eligible entry requires eligibility_order",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "a",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": null,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "rejected",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": "missing_eligibility_order"
+    },
+    {
+      "caseId": "duplicate-entry-id",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "immutable identity unique",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "a",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        },
+        {
+          "id": "a",
+          "state": "checked_in",
+          "registrationOrder": 2,
+          "eligibilityOrder": 2,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "rejected",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": "duplicate_entry_id"
+    },
+    {
+      "caseId": "duplicate-registration-order",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "registration_order unique",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "a",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        },
+        {
+          "id": "b",
+          "state": "waiting",
+          "registrationOrder": 1,
+          "eligibilityOrder": null,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "rejected",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": "duplicate_registration_order"
+    },
+    {
+      "caseId": "duplicate-eligibility-order",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "eligible eligibility_order unique",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "a",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 2,
+          "priorityOrder": null
+        },
+        {
+          "id": "b",
+          "state": "checked_in",
+          "registrationOrder": 2,
+          "eligibilityOrder": 2,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "rejected",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": "duplicate_eligibility_order"
+    },
+    {
+      "caseId": "duplicate-priority-order",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "eligible priority_order unique",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "a",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1,
+          "priorityOrder": 1
+        },
+        {
+          "id": "b",
+          "state": "checked_in",
+          "registrationOrder": 2,
+          "eligibilityOrder": 2,
+          "priorityOrder": 1
+        }
+      ],
+      "outcome": "rejected",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": "duplicate_priority_order"
+    },
+    {
+      "caseId": "non-positive-order",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "orders are positive safe integers",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "a",
+          "state": "checked_in",
+          "registrationOrder": 0,
+          "eligibilityOrder": 1,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "rejected",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": "invalid_ordering_value"
+    },
+    {
+      "caseId": "fractional-order",
+      "contractVersion": "queue-ordering/v1",
+      "rule": "orders are integers",
+      "sessionStatus": "open",
+      "entries": [
+        {
+          "id": "a",
+          "state": "checked_in",
+          "registrationOrder": 1,
+          "eligibilityOrder": 1.5,
+          "priorityOrder": null
+        }
+      ],
+      "outcome": "rejected",
+      "expectedOrderedEntryIds": [],
+      "rejectionReason": "invalid_ordering_value"
+    }
+  ]
+}
