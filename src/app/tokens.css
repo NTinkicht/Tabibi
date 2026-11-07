@@ -1,0 +1,70 @@
+:root {
+  --tb-ground: #f4f6f3;
+  --tb-surface: #ffffff;
+  --tb-surface-subtle: #f7f8f6;
+  --tb-surface-sunken: #fafbf9;
+  --tb-border: #e1e5e0;
+  --tb-divider: #e7eae6;
+  --tb-border-strong: #c9d1cb;
+  --tb-text: #17201d;
+  --tb-text-secondary: #3b4641;
+  --tb-text-muted: #55625c;
+  --tb-primary: #0f6e64;
+  --tb-primary-strong: #0b5a52;
+  --tb-primary-tint: #ddf0ec;
+  --tb-primary-wash: #f1f8f6;
+  --tb-info: #1d4f91;
+  --tb-info-tint: #e5edf8;
+  --tb-warning-text: #6b3b00;
+  --tb-warning-tint: #fcefd9;
+  --tb-warning-border: #f0d3a6;
+  --tb-priority-text: #8a3300;
+  --tb-priority-tint: #fde6d6;
+  --tb-danger: #a12d2d;
+  --tb-danger-border: #e6c3c3;
+  --tb-disabled-bg: #eef1ed;
+  --tb-disabled-text: #5f6b66;
+  --tb-inverse: #17201d;
+  --tb-segmented-selected-bg: #e8f4f1;
+
+  --tb-font-latin: 'IBM Plex Sans', system-ui, sans-serif;
+  --tb-font-arabic:
+    'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif;
+  --tb-font: var(--tb-font-latin);
+
+  --tb-text-fine: 12px;
+  --tb-text-meta: 13px;
+  --tb-text-control: 14px;
+  --tb-text-body: 15px;
+  --tb-text-row: 16px;
+  --tb-text-section: 17px;
+  --tb-text-title: 20px;
+  --tb-text-stat: 26px;
+  --tb-text-ticket: 30px;
+  --tb-line-height: 1.45;
+
+  --tb-space-1: 4px;
+  --tb-space-2: 8px;
+  --tb-space-3: 10px;
+  --tb-space-4: 12px;
+  --tb-space-5: 14px;
+  --tb-space-6: 16px;
+  --tb-space-7: 20px;
+  --tb-space-8: 24px;
+  --tb-space-9: 32px;
+  --tb-gutter: 32px;
+  --tb-max-width: 1440px;
+
+  --tb-radius-control: 10px;
+  --tb-radius-tile: 12px;
+  --tb-radius-card: 16px;
+  --tb-radius-pill: 999px;
+
+  --tb-focus-ring: 3px solid var(--tb-info);
+  --tb-focus-offset: 2px;
+  --tb-touch-target: 44px;
+}
+
+html[lang='ar'] {
+  --tb-font: var(--tb-font-arabic);
+}

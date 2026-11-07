@@ -1,0 +1,138 @@
+/* TAB-UI-01 base element styles (docs/design/foundations.md). Logical properties only. */
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+@import '@fontsource/ibm-plex-sans/latin-700.css';
+@import '@fontsource/ibm-plex-sans-arabic/arabic-400.css';
+@import '@fontsource/ibm-plex-sans-arabic/arabic-500.css';
+@import '@fontsource/ibm-plex-sans-arabic/arabic-600.css';
+@import '@fontsource/ibm-plex-sans-arabic/arabic-700.css';
+
+body {
+  font-family: var(--tb-font);
+  font-size: var(--tb-text-body);
+  line-height: var(--tb-line-height);
+  color: var(--tb-text);
+  text-align: start;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--tb-font);
+  color: var(--tb-text);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: var(--tb-focus-ring);
+  outline-offset: var(--tb-focus-offset);
+}
+
+.tb-button {
+  min-block-size: var(--tb-touch-target);
+  padding-inline: var(--tb-space-6);
+  border: 1px solid transparent;
+  border-radius: var(--tb-radius-control);
+  font-size: var(--tb-text-control);
+  font-weight: 600;
+  cursor: pointer;
+}
+.tb-button--primary {
+  background: var(--tb-primary);
+  color: var(--tb-surface);
+}
+.tb-button--secondary {
+  background: var(--tb-surface);
+  color: var(--tb-text);
+  border-color: var(--tb-border-strong);
+}
+.tb-button--danger {
+  background: var(--tb-surface);
+  color: var(--tb-danger);
+  border-color: var(--tb-danger-border);
+}
+.tb-button--soft {
+  background: var(--tb-priority-tint);
+  color: var(--tb-priority-text);
+}
+.tb-button:disabled {
+  background: var(--tb-disabled-bg);
+  color: var(--tb-disabled-text);
+  border-color: transparent;
+  cursor: not-allowed;
+}
+
+.tb-chip {
+  display: inline-flex;
+  align-items: center;
+  padding-block: var(--tb-space-1);
+  padding-inline: var(--tb-space-4);
+  border-radius: var(--tb-radius-pill);
+  font-size: var(--tb-text-meta);
+  font-weight: 600;
+  background: var(--tb-disabled-bg);
+  color: var(--tb-text-secondary);
+}
+.tb-chip--called {
+  background: var(--tb-primary-tint);
+  color: var(--tb-primary-strong);
+}
+.tb-chip--arrived {
+  background: var(--tb-info-tint);
+  color: var(--tb-info);
+}
+.tb-chip--active {
+  background: var(--tb-primary);
+  color: var(--tb-surface);
+}
+.tb-chip--warning {
+  background: var(--tb-warning-tint);
+  color: var(--tb-warning-text);
+}
+.tb-chip--priority {
+  background: var(--tb-priority-tint);
+  color: var(--tb-priority-text);
+}
+
+.tb-segmented {
+  display: inline-flex;
+  gap: var(--tb-space-1);
+  padding: var(--tb-space-1);
+  border-radius: var(--tb-radius-pill);
+  background: var(--tb-surface-subtle);
+}
+.tb-segmented button {
+  min-block-size: var(--tb-touch-target);
+  padding-inline: var(--tb-space-6);
+  border: 2px solid transparent;
+  border-radius: var(--tb-radius-pill);
+  background: transparent;
+  color: var(--tb-text);
+  font-size: var(--tb-text-control);
+  font-weight: 600;
+  cursor: pointer;
+}
+.tb-segmented button[aria-pressed='true'] {
+  border-color: var(--tb-primary);
+  background: var(--tb-segmented-selected-bg);
+}
+
+.tb-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tb-space-4);
+  padding-block: var(--tb-space-4);
+  padding-inline: var(--tb-space-6);
+  border-radius: var(--tb-radius-tile);
+  background: var(--tb-inverse);
+  color: var(--tb-surface);
+  font-size: var(--tb-text-control);
+}
