@@ -1,4 +1,5 @@
 'use client';
+import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
 import Link from 'next/link';
 import { receptionistCopy } from '@/modules/localization/receptionist';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -187,6 +188,7 @@ export function ReceptionDesk({
   }
   return (
     <main className="desk" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+      <DocumentLocaleSync locale={locale} />
       <header className="deskHeader">
         <div>
           <span className="eyebrow">TABIBI · RECEPTION</span>

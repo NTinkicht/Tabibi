@@ -1,5 +1,6 @@
 'use client';
 
+import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
 import Link from 'next/link';
 import { receptionistCopy } from '@/modules/localization/receptionist';
 import { BulkAppointmentNoShowAction } from './BulkAppointmentNoShowAction';
@@ -350,6 +351,7 @@ export function WalkInQueue({
 
   return (
     <main className="desk" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+      <DocumentLocaleSync locale={locale} />
       <header className="deskHeader">
         <div>
           <span className="eyebrow">TABIBI · WALK-IN</span>
