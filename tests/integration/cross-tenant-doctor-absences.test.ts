@@ -185,6 +185,14 @@ describe('doctor absence mutations enforce clinic_admin or the doctor themself',
     expect(await absenceCount(DOCTOR_DAY)).toBe(1);
   });
 
+  it('DELETE succeeds for the doctor themself and removes the absence', async () => {
+    expect(await absenceCount(DOCTOR_DAY)).toBe(1);
+    expect(
+      await remove(await cookieFor(subjects.doctorUserA), DOCTOR_DAY),
+    ).toBe(200);
+    expect(await absenceCount(DOCTOR_DAY)).toBe(0);
+  });
+
   it('DELETE succeeds for the clinic-A admin and removes the absence', async () => {
     expect(await remove(await cookieFor(subjects.adminA), SEEDED_DAY)).toBe(
       200,
