@@ -79,9 +79,7 @@ describe('shared components', () => {
   });
 
   it('Chip is non-interactive', () => {
-    const html = renderToStaticMarkup(
-      createElement(Chip, { tone: 'called', children: 'c' }),
-    );
+    const html = renderToStaticMarkup(Chip({ tone: 'called', children: 'c' }));
     expect(html.startsWith('<span')).toBe(true);
     expect(html).not.toContain('button');
   });
@@ -102,9 +100,9 @@ describe('shared components', () => {
   });
 
   it('StatusBar exposes role=status', () => {
-    expect(
-      renderToStaticMarkup(createElement(StatusBar, { children: 'done' })),
-    ).toContain('role="status"');
+    expect(renderToStaticMarkup(StatusBar({ children: 'done' }))).toContain(
+      'role="status"',
+    );
   });
 });
 
