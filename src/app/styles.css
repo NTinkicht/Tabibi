@@ -891,3 +891,12 @@ h1 {
 .doctorToday {
   color: #52716d;
 }
+
+.takeNextPanel {
+  display: grid;
+  flex-basis: 100%;
+  gap: 0.5rem;
+}
+.takeNext {
+  min-height: 44px;
+}

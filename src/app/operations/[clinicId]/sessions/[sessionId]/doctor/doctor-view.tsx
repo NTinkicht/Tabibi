@@ -21,6 +21,7 @@ type DashboardSession = {
   status: SessionStatus;
   declaredDelayMinutes: number | null;
   delayVersion: number;
+  queueOrderVersion: number;
 };
 
 const key = () => crypto.randomUUID();
@@ -44,6 +45,8 @@ export function DoctorView({
   const [busy, setBusy] = useState(false);
   const [noShowFor, setNoShowFor] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const [takeFor, setTakeFor] = useState<string | null>(null);
+  const [takeReason, setTakeReason] = useState('');
   const keysRef = useRef(new Map<string, string>());
   const loadRef = useRef(0);
   const base = `/api/clinics/${clinicId}/sessions/${sessionId}`;
@@ -135,6 +138,19 @@ export function DoctorView({
       `queue/${entry.id}/commands`,
       `${entry.id}:${command}:${entryReason ?? ''}`,
       { command, reason: entryReason },
+    );
+  }
+  /** Take-next = the existing reorder command to position 1, current version. */
+  function takeNext(entry: ConsoleEntry, entryReason: string) {
+    if (!session) return Promise.resolve(false);
+    return post(
+      `queue/${entry.id}/reorder`,
+      `${entry.id}:reorder:1:${session.queueOrderVersion}:${entryReason}`,
+      {
+        targetPosition: 1,
+        expectedVersion: session.queueOrderVersion,
+        reason: entryReason,
+      },
     );
   }
   function setDelay(minutes: number) {
@@ -354,7 +370,73 @@ export function DoctorView({
                   <li key={entry.id}>
                     <strong>{entry.publicDisplayLabel}</strong>{' '}
                     <span>{entry.privateDisplayName}</span>
+                    {entry.priorityOrder !== null && (
+                      <span className="priorityBadge">{t.priorityBadge}</span>
+                    )}
                     <small>{formatWaitRange(entry.eta, t)}</small>
+                    {view.takeNextIds.includes(entry.id) &&
+                      takeFor !== entry.id && (
+                        <button
+                          type="button"
+                          className="quiet takeNext"
+                          aria-label={d.takeNextAria.replace(
+                            '{ticket}',
+                            entry.publicDisplayLabel,
+                          )}
+                          disabled={busy}
+                          onClick={() => {
+                            setTakeReason('');
+                            setTakeFor(entry.id);
+                          }}
+                        >
+                          {d.takeNextLabel}
+                        </button>
+                      )}
+                    {takeFor === entry.id && (
+                      <div className="takeNextPanel" role="group">
+                        <p>
+                          {d.takeNextAsk
+                            .replace('{ticket}', entry.publicDisplayLabel)
+                            .replace('{name}', entry.privateDisplayName)}
+                        </p>
+                        <label>
+                          {t.queueReason}
+                          <input
+                            value={takeReason}
+                            maxLength={500}
+                            onChange={(event) =>
+                              setTakeReason(event.target.value)
+                            }
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          disabled={busy || takeReason.trim() === ''}
+                          onClick={() => {
+                            void takeNext(entry, takeReason.trim()).then(
+                              (ok) => {
+                                if (!ok) return;
+                                setTakeFor(null);
+                                setTakeReason('');
+                              },
+                            );
+                          }}
+                        >
+                          {d.takeNextConfirm}
+                        </button>
+                        <button
+                          type="button"
+                          className="quiet"
+                          onClick={() => {
+                            setTakeFor(null);
+                            setTakeReason('');
+                          }}
+                        >
+                          {d.takeNextBack}
+                        </button>
+                        <small>{d.takeNextHint}</small>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ol>
