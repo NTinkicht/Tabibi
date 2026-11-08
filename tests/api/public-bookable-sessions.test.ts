@@ -5,7 +5,7 @@ const constructedSecrets: string[] = [];
 
 vi.mock('@/modules/public-availability', () => ({
   PublicBookableSessionService: class {
-    list(...args: unknown[]) {
+    listPage(...args: unknown[]) {
       return list(...args);
     }
   },
@@ -28,10 +28,13 @@ import { GET } from '@/app/api/public/bookable-sessions/route';
 
 const SECRET = 'route-test-public-availability-selection-secret-32b';
 
-function request(): Request {
-  return new Request('https://tabibi.test/api/public/bookable-sessions', {
-    headers: { 'x-request-id': 'tab-p0-03-bookable-1' },
-  });
+function request(query = ''): Request {
+  return new Request(
+    `https://tabibi.test/api/public/bookable-sessions${query}`,
+    {
+      headers: { 'x-request-id': 'tab-p0-03-bookable-1' },
+    },
+  );
 }
 
 describe('GET /api/public/bookable-sessions', () => {
@@ -52,36 +55,44 @@ describe('GET /api/public/bookable-sessions', () => {
   });
 
   it('serializes only the public allow-list with no-store headers', async () => {
-    list.mockResolvedValue([
-      {
-        name: 'Clinique El Amal',
-        defaultLocale: 'fr',
-        enabledLocales: ['fr', 'ar'],
-        id: 'clinic-secret',
-        tenantKey: 'tenant-secret',
-        doctors: [
-          {
-            displayName: 'Dr. Amel Benali',
-            id: 'doctor-secret',
-            userId: 'user-secret',
-            sessions: [
-              {
-                serviceDate: '2099-01-02',
-                startsAt: '2099-01-02T08:00:00.000Z',
-                endsAt: '2099-01-02T09:00:00.000Z',
-                selectionReference: 'v1.iv.ciphertext.tag',
-                sessionId: 'session-secret',
-                status: 'planned-secret',
-              },
-            ],
-          },
-        ],
-      },
-    ]);
+    list.mockResolvedValue({
+      hasMore: true,
+      clinics: [
+        {
+          name: 'Clinique El Amal',
+          defaultLocale: 'fr',
+          enabledLocales: ['fr', 'ar'],
+          wilayaCode: '09',
+          commune: 'Blida',
+          addressLine: '1 rue des Roses',
+          id: 'clinic-secret',
+          tenantKey: 'tenant-secret',
+          doctors: [
+            {
+              displayName: 'Dr. Amel Benali',
+              specialtyCodes: ['cardiology'],
+              id: 'doctor-secret',
+              userId: 'user-secret',
+              sessions: [
+                {
+                  serviceDate: '2099-01-02',
+                  startsAt: '2099-01-02T08:00:00.000Z',
+                  endsAt: '2099-01-02T09:00:00.000Z',
+                  selectionReference: 'v1.iv.ciphertext.tag',
+                  sessionId: 'session-secret',
+                  status: 'planned-secret',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
 
     const response = await GET(request());
 
     expect(response.status).toBe(200);
+    expect(list).toHaveBeenCalledWith(expect.anything(), {}, 1);
     expect(response.headers.get('x-request-id')).toBe('tab-p0-03-bookable-1');
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
@@ -92,9 +103,13 @@ describe('GET /api/public/bookable-sessions', () => {
           name: 'Clinique El Amal',
           defaultLocale: 'fr',
           enabledLocales: ['fr', 'ar'],
+          wilayaCode: '09',
+          commune: 'Blida',
+          addressLine: '1 rue des Roses',
           doctors: [
             {
               displayName: 'Dr. Amel Benali',
+              specialtyCodes: ['cardiology'],
               sessions: [
                 {
                   serviceDate: '2099-01-02',
@@ -107,6 +122,8 @@ describe('GET /api/public/bookable-sessions', () => {
           ],
         },
       ],
+      page: 1,
+      hasMore: true,
     });
     const serialized = JSON.stringify(body);
     for (const secret of [
@@ -123,10 +140,47 @@ describe('GET /api/public/bookable-sessions', () => {
   });
 
   it('returns a successful empty result', async () => {
-    list.mockResolvedValue([]);
+    list.mockResolvedValue({ clinics: [], hasMore: false });
     const response = await GET(request());
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ clinics: [] });
+    expect(await response.json()).toEqual({
+      clinics: [],
+      page: 1,
+      hasMore: false,
+    });
+  });
+
+  it('passes validated discovery filters and page to the read model', async () => {
+    list.mockResolvedValue({ clinics: [], hasMore: false });
+    const response = await GET(
+      request('?wilaya=09&specialty=cardiology&language=ar&page=2'),
+    );
+    expect(response.status).toBe(200);
+    expect(list).toHaveBeenCalledWith(
+      expect.anything(),
+      { wilayaCode: '09', specialtyCode: 'cardiology', languageCode: 'ar' },
+      2,
+    );
+    expect((await response.json()).page).toBe(2);
+  });
+
+  it.each([
+    ['unknown wilaya', '?wilaya=99'],
+    ['unknown specialty', '?specialty=astrology'],
+    ['unknown language', '?language=en'],
+    ['bad page', '?page=0'],
+    ['unknown key', '?doctorId=x'],
+    ['repeated key', '?wilaya=09&wilaya=16'],
+    ['available is not accepted here', '?available=true'],
+  ])('rejects %s with 400 and never queries', async (_label, query) => {
+    const response = await GET(request(query));
+    expect(response.status).toBe(400);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toEqual({
+      status: 'rejected',
+      requestId: 'tab-p0-03-bookable-1',
+    });
+    expect(list).not.toHaveBeenCalled();
   });
 
   it.each([
