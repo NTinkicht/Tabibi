@@ -1,9 +1,10 @@
 import Link from 'next/link';
+import { GuestHelpSection, GuestHelpShell } from '../help-layout';
 
 export default function GuestBookingHelpPage() {
   return (
-    <main className="pageShell" data-testid="guest-booking-help">
-      <section lang="fr" dir="ltr" aria-labelledby="booking-help-fr">
+    <GuestHelpShell testId="guest-booking-help">
+      <GuestHelpSection locale="fr" labelledBy="booking-help-fr">
         <h1 id="booking-help-fr">Préparer votre réservation</h1>
         <p>
           Avant de commencer, préparez les informations nécessaires pour éviter
@@ -33,9 +34,9 @@ export default function GuestBookingHelpPage() {
         <div>
           <Link href="/guest/help">Voir toutes les rubriques d’aide</Link>
         </div>
-      </section>
+      </GuestHelpSection>
 
-      <section lang="ar" dir="rtl" aria-labelledby="booking-help-ar">
+      <GuestHelpSection locale="ar" labelledBy="booking-help-ar">
         <h1 id="booking-help-ar">استعد لحجز موعدك</h1>
         <p>قبل البدء، جهّز المعلومات اللازمة لتفادي انقطاع خطوات الحجز.</p>
         <h2>ما الذي تحتاج إلى تجهيزه؟</h2>
@@ -57,7 +58,7 @@ export default function GuestBookingHelpPage() {
         <div>
           <Link href="/guest/help">عرض جميع مواضيع المساعدة</Link>
         </div>
-      </section>
-    </main>
+      </GuestHelpSection>
+    </GuestHelpShell>
   );
 }

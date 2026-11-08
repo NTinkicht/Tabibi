@@ -1,9 +1,10 @@
 import Link from 'next/link';
+import { GuestHelpSection, GuestHelpShell } from '../help-layout';
 
 export default function GuestHelpHubPage() {
   return (
-    <main className="pageShell" data-testid="guest-help-hub">
-      <section lang="fr" dir="ltr" aria-labelledby="guest-help-fr">
+    <GuestHelpShell testId="guest-help-hub">
+      <GuestHelpSection locale="fr" labelledBy="guest-help-fr" backLink={false}>
         <h1 id="guest-help-fr">Aide pour votre parcours invité</h1>
         <p role="note" data-testid="guest-help-safety-fr">
           Cette aide concerne le parcours de réservation et de file d’attente.
@@ -47,9 +48,9 @@ export default function GuestHelpHubPage() {
             </Link>
           </li>
         </ul>
-      </section>
+      </GuestHelpSection>
 
-      <section lang="ar" dir="rtl" aria-labelledby="guest-help-ar">
+      <GuestHelpSection locale="ar" labelledBy="guest-help-ar" backLink={false}>
         <h1 id="guest-help-ar">مساعدة خلال رحلة الحجز كضيف</h1>
         <p role="note" data-testid="guest-help-safety-ar">
           هذه المساعدة مخصصة لمسار الحجز وقائمة الانتظار. في حالة الطوارئ
@@ -87,7 +88,7 @@ export default function GuestHelpHubPage() {
             </Link>
           </li>
         </ul>
-      </section>
-    </main>
+      </GuestHelpSection>
+    </GuestHelpShell>
   );
 }
