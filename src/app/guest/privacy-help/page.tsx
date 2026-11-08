@@ -1,9 +1,10 @@
 import Link from 'next/link';
+import { GuestHelpSection, GuestHelpShell } from '../help-layout';
 
 export default function GuestPrivacyHelpPage() {
   return (
-    <main>
-      <section lang="fr" dir="ltr" aria-labelledby="privacy-help-fr">
+    <GuestHelpShell>
+      <GuestHelpSection locale="fr" labelledBy="privacy-help-fr">
         <h1 id="privacy-help-fr">
           Protéger vos informations pendant le parcours invité
         </h1>
@@ -30,8 +31,8 @@ export default function GuestPrivacyHelpPage() {
         <div>
           <Link href="/guest/booking-help">Revenir à la préparation</Link>
         </div>
-      </section>
-      <section lang="ar" dir="rtl" aria-labelledby="privacy-help-ar">
+      </GuestHelpSection>
+      <GuestHelpSection locale="ar" labelledBy="privacy-help-ar">
         <h1 id="privacy-help-ar">حماية معلوماتك أثناء استخدام مسار الضيف</h1>
         <ul>
           <li>استخدم فقط شاشات طبيبي المخصصة للحجز وقائمة الانتظار.</li>
@@ -51,7 +52,7 @@ export default function GuestPrivacyHelpPage() {
         <div>
           <Link href="/guest/booking-help">العودة إلى التحضير</Link>
         </div>
-      </section>
-    </main>
+      </GuestHelpSection>
+    </GuestHelpShell>
   );
 }

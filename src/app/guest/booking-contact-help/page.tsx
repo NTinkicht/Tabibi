@@ -1,9 +1,10 @@
 import Link from 'next/link';
+import { GuestHelpSection, GuestHelpShell } from '../help-layout';
 
 export default function GuestBookingContactHelpPage() {
   return (
-    <main>
-      <section lang="fr" dir="ltr" aria-labelledby="booking-contact-fr">
+    <GuestHelpShell>
+      <GuestHelpSection locale="fr" labelledBy="booking-contact-fr">
         <h1 id="booking-contact-fr">Coordonnées pour votre réservation</h1>
         <p>
           Ajoutez au moins un moyen de contact pour que la clinique puisse vous
@@ -16,9 +17,9 @@ export default function GuestBookingContactHelpPage() {
         </ul>
         <Link href="/guest/booking-help">Revenir à la préparation</Link>
         <Link href="/guest/privacy-help">Protéger vos informations</Link>
-      </section>
+      </GuestHelpSection>
 
-      <section lang="ar" dir="rtl" aria-labelledby="booking-contact-ar">
+      <GuestHelpSection locale="ar" labelledBy="booking-contact-ar">
         <h1 id="booking-contact-ar">بيانات التواصل للحجز</h1>
         <p>
           أضف وسيلة تواصل واحدة على الأقل حتى تتمكن العيادة من التواصل معك بخصوص
@@ -31,7 +32,7 @@ export default function GuestBookingContactHelpPage() {
         </ul>
         <Link href="/guest/booking-help">العودة إلى التحضير</Link>
         <Link href="/guest/privacy-help">حماية معلوماتك</Link>
-      </section>
-    </main>
+      </GuestHelpSection>
+    </GuestHelpShell>
   );
 }

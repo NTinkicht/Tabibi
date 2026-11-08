@@ -1,9 +1,10 @@
 import Link from 'next/link';
+import { GuestHelpSection, GuestHelpShell } from '../help-layout';
 
 export default function GuestQueueArrivalHelpPage() {
   return (
-    <main>
-      <section lang="fr" dir="ltr" aria-labelledby="queue-arrival-fr">
+    <GuestHelpShell>
+      <GuestHelpSection locale="fr" labelledBy="queue-arrival-fr">
         <h1 id="queue-arrival-fr">À votre arrivée à la clinique</h1>
         <p>
           Gardez votre page de file d’attente ouverte et suivez uniquement le
@@ -28,9 +29,9 @@ export default function GuestQueueArrivalHelpPage() {
             Revoir les étapes pendant l’attente
           </Link>
         </div>
-      </section>
+      </GuestHelpSection>
 
-      <section lang="ar" dir="rtl" aria-labelledby="queue-arrival-ar">
+      <GuestHelpSection locale="ar" labelledBy="queue-arrival-ar">
         <h1 id="queue-arrival-ar">عند وصولك إلى العيادة</h1>
         <p>أبقِ صفحة قائمة الانتظار مفتوحة واتبع الحالة المعروضة لحجزك فقط.</p>
         <ul>
@@ -46,7 +47,7 @@ export default function GuestQueueArrivalHelpPage() {
         <div>
           <Link href="/guest/queue-next-steps">مراجعة خطوات الانتظار</Link>
         </div>
-      </section>
-    </main>
+      </GuestHelpSection>
+    </GuestHelpShell>
   );
 }

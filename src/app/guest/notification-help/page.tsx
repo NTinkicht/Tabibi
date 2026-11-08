@@ -1,9 +1,10 @@
 import Link from 'next/link';
+import { GuestHelpSection, GuestHelpShell } from '../help-layout';
 
 export default function GuestNotificationHelpPage() {
   return (
-    <main>
-      <section lang="fr" dir="ltr" aria-labelledby="notification-help-fr">
+    <GuestHelpShell>
+      <GuestHelpSection locale="fr" labelledBy="notification-help-fr">
         <h1 id="notification-help-fr">Comprendre les notifications Tabibi</h1>
         <ul>
           <li>
@@ -29,8 +30,8 @@ export default function GuestNotificationHelpPage() {
             Consulter les étapes pendant l’attente
           </Link>
         </div>
-      </section>
-      <section lang="ar" dir="rtl" aria-labelledby="notification-help-ar">
+      </GuestHelpSection>
+      <GuestHelpSection locale="ar" labelledBy="notification-help-ar">
         <h1 id="notification-help-ar">فهم إشعارات طبيبي</h1>
         <ul>
           <li>المواعيد وأوقات الانتظار تقديرية وقد تتغير.</li>
@@ -42,7 +43,7 @@ export default function GuestNotificationHelpPage() {
         <div>
           <Link href="/guest/queue-next-steps">مراجعة خطوات الانتظار</Link>
         </div>
-      </section>
-    </main>
+      </GuestHelpSection>
+    </GuestHelpShell>
   );
 }

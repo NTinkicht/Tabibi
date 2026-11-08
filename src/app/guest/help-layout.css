@@ -1,0 +1,78 @@
+/* TAB-UI-17 guest help pages: foundations tokens, logical properties only. */
+.tb-help {
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--tb-space-6);
+  max-inline-size: 40rem;
+  margin-inline: auto;
+  padding: var(--tb-space-6);
+  background: var(--tb-ground);
+  color: var(--tb-text);
+}
+
+.tb-help__card {
+  box-sizing: border-box;
+  min-inline-size: 0;
+  padding: var(--tb-space-7);
+  background: var(--tb-surface);
+  border: 1px solid var(--tb-border);
+  border-radius: var(--tb-radius-card);
+  overflow-wrap: anywhere;
+  font-family: var(--tb-font-latin);
+}
+
+.tb-help__card[lang='ar'] {
+  font-family: var(--tb-font-arabic);
+}
+
+.tb-help__card h1 {
+  margin-block: var(--tb-space-4) var(--tb-space-4);
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+.tb-help__card h2 {
+  margin-block: var(--tb-space-7) var(--tb-space-2);
+  font-size: 1.0625rem;
+}
+
+.tb-help__card ul {
+  margin-block: var(--tb-space-4);
+  padding-inline-start: var(--tb-space-8);
+}
+
+.tb-help__card li + li {
+  margin-block-start: var(--tb-space-2);
+}
+
+.tb-help__card a {
+  display: inline-block;
+  min-block-size: 44px;
+  padding-block: var(--tb-space-3);
+  color: var(--tb-info);
+  text-decoration: underline;
+}
+
+.tb-help__card [role='note'] {
+  padding: var(--tb-space-5);
+  background: var(--tb-warning-tint);
+  border: 1px solid var(--tb-warning-border);
+  border-radius: var(--tb-radius-tile);
+  color: var(--tb-warning-text);
+}
+
+.tb-help__footer {
+  display: grid;
+  gap: var(--tb-space-1);
+  margin-block-start: var(--tb-space-8);
+  padding: var(--tb-space-5);
+  background: var(--tb-surface-subtle);
+  border: 1px solid var(--tb-divider);
+  border-radius: var(--tb-radius-tile);
+  font-size: 0.8125rem;
+  color: var(--tb-text-muted);
+}
+
+.tb-help__footer strong {
+  color: var(--tb-text-secondary);
+}
