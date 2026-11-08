@@ -881,8 +881,11 @@ export class QueueService {
         throw new QueueConflictError(
           'Queue lifecycle commands require an open or paused session',
         );
-      const current = await client.query<{ state: QueueEntryState }>(
-        `SELECT state FROM queue_entries
+      const current = await client.query<{
+        state: QueueEntryState;
+        source: string;
+      }>(
+        `SELECT state,source FROM queue_entries
           WHERE id=$1 AND session_id=$2 AND clinic_id=$3 FOR UPDATE`,
         [entryId, sessionId, scope.clinicId],
       );
@@ -893,6 +896,14 @@ export class QueueService {
         );
       if (prior !== 'no_show' && prior !== 'cancelled')
         throw new QueueConflictError(`Cannot restore queue entry in ${prior}`);
+      // Only entries created as walk-ins are restorable here. A transferred
+      // appointment leaves its cancelled source entry unlinked (the appointment
+      // is re-pointed at the target entry), so the link check alone would let a
+      // restore double-book the patient. Fail closed on any other source.
+      if (current.rows[0]!.source !== 'walk_in')
+        throw new QueueConflictError(
+          'Only walk-in entries can be restored here: restore appointment entries through the appointment',
+        );
       const linked = await client.query(
         `SELECT 1 FROM appointments WHERE queue_entry_id=$1 AND clinic_id=$2`,
         [entryId, scope.clinicId],
