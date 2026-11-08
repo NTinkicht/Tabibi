@@ -703,3 +703,38 @@ h1 {
     font-size: clamp(1.75rem, 7vw, 2.5rem);
   }
 }
+.sessionBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #c9dcda;
+  border-radius: 1rem;
+  background: #fff;
+}
+.sessionBar .delayStepper,
+.sessionBar .sessionActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sessionBar .delayValue {
+  min-width: 7rem;
+  text-align: center;
+  font-weight: 800;
+}
+.sessionBar .callNext {
+  margin-inline-start: auto;
+  font-size: 1.1rem;
+}
+.pausedBanner {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e0b252;
+  border-radius: 0.75rem;
+  background: #fff6e0;
+  color: #5c3d00;
+  font-weight: 700;
+}
