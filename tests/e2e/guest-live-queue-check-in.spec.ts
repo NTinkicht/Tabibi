@@ -44,8 +44,24 @@ async function submitBookingForm(page: Page) {
 
 function checkInButton(page: Page) {
   return page.getByRole('button', {
-    name: /Confirmer ma présence|Réessayer|تأكيد الحضور|إعادة المحاولة/,
+    name: /Je suis arrivé|Confirmer mon arrivée|Réessayer|وصلت إلى العيادة|تأكيد وصولي|إعادة المحاولة/,
   });
+}
+
+// Two-step arrival (docs/design/patient-status.md): the first button only asks
+// for confirmation; the second one (or the retry button after a transient
+// failure) issues the single check-in request.
+async function clickCheckIn(page: Page) {
+  await checkInButton(page).first().waitFor();
+  const first = page.getByRole('button', {
+    name: /Je suis arrivé|وصلت إلى العيادة/,
+  });
+  if ((await first.count()) > 0) await first.click();
+  await page
+    .getByRole('button', {
+      name: /Confirmer mon arrivée|Réessayer|تأكيد وصولي|إعادة المحاولة/,
+    })
+    .click();
 }
 
 test('check-in button appears only while the guest is waiting, sends the bearer and a stable operationId, and shows success', async ({
@@ -69,9 +85,8 @@ test('check-in button appears only while the guest is waiting, sends the bearer 
   await submitBookingForm(page);
   await expect(page.getByText(/en attente/)).toBeVisible();
 
-  const button = checkInButton(page);
-  await expect(button).toBeVisible();
-  await button.click();
+  await expect(checkInButton(page)).toBeVisible();
+  await clickCheckIn(page);
 
   await expect(page.getByText('Votre présence a été confirmée.')).toBeVisible();
   expect(capturedAuth).toBe(`Bearer ${BEARER}`);
@@ -102,7 +117,7 @@ test('a reconciled replay shows the already-confirmed message instead of the fre
   });
 
   await submitBookingForm(page);
-  await checkInButton(page).click();
+  await clickCheckIn(page);
 
   await expect(
     page.getByText('Votre présence était déjà confirmée.'),
@@ -137,14 +152,14 @@ test('a generic rejection is shown without exposing the underlying reason, and a
   });
 
   await submitBookingForm(page);
-  await checkInButton(page).click();
+  await clickCheckIn(page);
 
   await expect(
     page.getByText('Impossible de confirmer votre présence pour le moment.'),
   ).toBeVisible();
   expect(page.getByText('guest_check_in_unavailable')).toHaveCount(0);
 
-  await checkInButton(page).click();
+  await clickCheckIn(page);
   await expect(page.getByText('Votre présence a été confirmée.')).toBeVisible();
 
   expect(attempt).toBe(2);
@@ -194,7 +209,7 @@ test('a transient failure keeps the same operationId across a manual retry and d
 
   await submitBookingForm(page);
   const statusRegion = page.getByRole('status');
-  await checkInButton(page).click();
+  await clickCheckIn(page);
   await firstStarted;
   // The button's accessible name switches to the pending label while
   // disabled, so re-query by role within the status region rather than
@@ -236,9 +251,10 @@ test('Arabic renders the check-in button and success message with RTL parity', a
   await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
 
-  const button = page.getByRole('button', { name: 'تأكيد الحضور' });
-  await expect(button).toBeVisible();
-  await button.click();
+  await expect(
+    page.getByRole('button', { name: 'وصلت إلى العيادة' }),
+  ).toBeVisible();
+  await clickCheckIn(page);
   await expect(page.getByText('تم تأكيد حضورك.')).toBeVisible();
 });
 
@@ -289,7 +305,7 @@ test('a stalled check-in request times out into the transient state and a retry 
 
   await page.clock.install();
   await submitBookingForm(page);
-  await checkInButton(page).click();
+  await clickCheckIn(page);
   await expect.poll(() => attempt).toBe(1);
 
   await page.clock.fastForward(10_000);
@@ -333,7 +349,7 @@ test('a malformed 200 check-in response is not treated as success and a retry re
   });
 
   await submitBookingForm(page);
-  await checkInButton(page).click();
+  await clickCheckIn(page);
 
   await expect(
     page.getByText('La confirmation a échoué. Veuillez réessayer.'),
@@ -348,4 +364,43 @@ test('a malformed 200 check-in response is not treated as success and a retry re
 
   expect(attempt).toBe(2);
   expect(seenOperationIds[1]).toBe(seenOperationIds[0]);
+});
+
+test('the first step only asks for confirmation: no request is sent until the guest confirms, and "Pas encore" cancels without one', async ({
+  page,
+}) => {
+  await mockBooking(page);
+  await mockWaitingStatus(page);
+
+  let requests = 0;
+  await page.route(CHECK_IN_URL, async (route) => {
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ state: 'checked_in', reconciled: false }),
+    });
+  });
+
+  await submitBookingForm(page);
+  await page
+    .getByRole('button', { name: 'Je suis arrivé(e) à la clinique' })
+    .click();
+  await expect(
+    page.getByText('Confirmez seulement si vous êtes déjà dans la clinique.'),
+  ).toBeVisible();
+  expect(requests).toBe(0);
+
+  await page.getByRole('button', { name: 'Pas encore' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Je suis arrivé(e) à la clinique' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Confirmer mon arrivée' }),
+  ).toHaveCount(0);
+  expect(requests).toBe(0);
+
+  await clickCheckIn(page);
+  await expect(page.getByText('Votre présence a été confirmée.')).toBeVisible();
+  expect(requests).toBe(1);
 });
