@@ -150,9 +150,24 @@ describe('staff membership HTTP API (#663)', () => {
     expect(listed.res.headers.get('cache-control')).toBe('no-store');
     expect(listed.json).toEqual({
       memberships: [
-        { userId: ids.admin, role: 'clinic_admin' },
-        { userId: ids.receptionist, role: 'receptionist' },
-        { userId: ids.doctorUser, role: 'doctor' },
+        {
+          userId: ids.admin,
+          role: 'clinic_admin',
+          displayName: 'Admin',
+          identifier: 'sm-admin',
+        },
+        {
+          userId: ids.receptionist,
+          role: 'receptionist',
+          displayName: 'Receptionist',
+          identifier: 'sm-receptionist',
+        },
+        {
+          userId: ids.doctorUser,
+          role: 'doctor',
+          displayName: 'Doctor',
+          identifier: 'sm-doctor',
+        },
       ].sort((a, b) => a.userId.localeCompare(b.userId)),
     });
     const docs = await listDoctors('sm-admin');
@@ -192,8 +207,11 @@ describe('staff membership HTTP API (#663)', () => {
     expect(await membershipAudits()).toBe(2);
     expect((await listMembers('sm-receptionist')).json).toMatchObject({
       memberships: expect.arrayContaining([
-        { userId: ids.admin, role: 'receptionist' },
-        { userId: ids.receptionist, role: 'clinic_admin' },
+        expect.objectContaining({ userId: ids.admin, role: 'receptionist' }),
+        expect.objectContaining({
+          userId: ids.receptionist,
+          role: 'clinic_admin',
+        }),
       ]),
     });
   });
