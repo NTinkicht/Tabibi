@@ -31,8 +31,24 @@ async function submitBookingForm(page: Page, name = 'Test Guest') {
 
 function checkInButton(page: Page) {
   return page.getByRole('button', {
-    name: /Confirmer ma présence|Réessayer|تأكيد الحضور|إعادة المحاولة/,
+    name: /Je suis arrivé|Confirmer mon arrivée|Réessayer|وصلت إلى العيادة|تأكيد وصولي|إعادة المحاولة/,
   });
+}
+
+// Two-step arrival (docs/design/patient-status.md): the first button only asks
+// for confirmation; the second one (or the retry button after a transient
+// failure) issues the single check-in request.
+async function clickCheckIn(page: Page) {
+  await checkInButton(page).first().waitFor();
+  const first = page.getByRole('button', {
+    name: /Je suis arrivé|وصلت إلى العيادة/,
+  });
+  if ((await first.count()) > 0) await first.click();
+  await page
+    .getByRole('button', {
+      name: /Confirmer mon arrivée|Réessayer|تأكيد وصولي|إعادة المحاولة/,
+    })
+    .click();
 }
 
 test('reload after a completed check-in returns to the plain booking form without leaking that a booking or check-in exists', async ({
@@ -58,7 +74,7 @@ test('reload after a completed check-in returns to the plain booking form withou
   });
 
   await submitBookingForm(page);
-  await checkInButton(page).click();
+  await clickCheckIn(page);
   await expect(page.getByText('Votre présence a été confirmée.')).toBeVisible();
 
   await page.reload();
@@ -192,7 +208,7 @@ test('a stale in-flight poll response that predates a successful check-in cannot
   await staleStatusStarted;
 
   // While that stale poll is still in flight, check in successfully.
-  await checkInButton(page).click();
+  await clickCheckIn(page);
   await expect(page.getByText('Votre présence a été confirmée.')).toBeVisible();
   await expect(page.getByText(/enregistré/)).toBeVisible();
 
@@ -270,7 +286,7 @@ test('a check-in that succeeds while polling is independently failing still show
   await expect(page.getByText(/en attente/)).toBeVisible();
 
   // Start a check-in and leave its response gated open.
-  await checkInButton(page).click();
+  await clickCheckIn(page);
 
   // Independently, an immediate poll (triggered via a visibility toggle
   // rather than waiting out the real cadence) fails and flips the view to
@@ -329,7 +345,7 @@ test('Arabic renders the stale-response suppression and reload-recovery behavior
   await page.getByRole('button', { name: 'تأكيد الحجز' }).click();
   await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
 
-  await page.getByRole('button', { name: 'تأكيد الحضور' }).click();
+  await clickCheckIn(page);
   await expect(page.getByText('تم تأكيد حضورك.')).toBeVisible();
 
   await page.reload();

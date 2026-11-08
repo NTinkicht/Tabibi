@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
+import { Button } from '../../../ui';
+
 type SupportedLocale = 'ar' | 'fr';
 type ContactPreference = 'none' | 'phone' | 'email';
 
@@ -101,6 +103,9 @@ type Copy = {
   bookingStates: Record<string, string>;
   queueStates: Record<string, string>;
   checkIn: string;
+  imHere: string;
+  confirmArrivalQuestion: string;
+  notYet: string;
   checkInPending: string;
   checkInSuccess: string;
   checkInAlreadyDone: string;
@@ -187,7 +192,11 @@ const COPY: Record<SupportedLocale, Copy> = {
       'Notifications en direct rétablies. La dernière vérification affichée reste la référence.',
     lastVerified: 'Dernière vérification :',
     visitStatus: 'Statut de la visite',
-    checkIn: 'Confirmer ma présence',
+    checkIn: 'Confirmer mon arrivée',
+    imHere: 'Je suis arrivé(e) à la clinique',
+    confirmArrivalQuestion:
+      'Confirmez seulement si vous êtes déjà dans la clinique.',
+    notYet: 'Pas encore',
     checkInPending: 'Confirmation en cours…',
     checkInSuccess: 'Votre présence a été confirmée.',
     checkInAlreadyDone: 'Votre présence était déjà confirmée.',
@@ -291,7 +300,10 @@ const COPY: Record<SupportedLocale, Copy> = {
       'عادت الإشعارات المباشرة. يظل وقت آخر تحقق معروض هو المرجع.',
     lastVerified: 'آخر تحقق من الحالة:',
     visitStatus: 'حالة الزيارة',
-    checkIn: 'تأكيد الحضور',
+    checkIn: 'تأكيد وصولي',
+    imHere: 'وصلت إلى العيادة',
+    confirmArrivalQuestion: 'أكّد فقط إذا كنت داخل العيادة بالفعل.',
+    notYet: 'ليس بعد',
     checkInPending: 'جارٍ التأكيد…',
     checkInSuccess: 'تم تأكيد حضورك.',
     checkInAlreadyDone: 'كان حضورك مؤكدًا بالفعل.',
@@ -813,8 +825,12 @@ function LiveQueueView({
   // fall back to pre-check-in data.
   const lastDataRef = useRef<LiveQueueData | null>(null);
 
+  // Step one of the two-step arrival: the explicit question is shown first so
+  // that arrival is never inferred; only the confirm button issues the request.
+  const [arrivalConfirming, setArrivalConfirming] = useState(false);
   const submitCheckIn = async () => {
     if (checkInState.kind === 'pending') return;
+    setArrivalConfirming(false);
     const bearer = initialBearerRef.current;
     if (!bearer) return;
     checkInOperationIdRef.current ??= crypto.randomUUID();
@@ -1542,17 +1558,36 @@ function LiveQueueView({
               {checkInState.kind === 'transient' ? (
                 <p role="alert">{copy.checkInTransient}</p>
               ) : null}
-              <button
-                type="button"
-                onClick={() => void submitCheckIn()}
-                disabled={checkInState.kind === 'pending'}
-              >
-                {checkInState.kind === 'pending'
-                  ? copy.checkInPending
-                  : checkInState.kind === 'transient'
-                    ? copy.retry
-                    : copy.checkIn}
-              </button>
+              {checkInState.kind === 'idle' ||
+              checkInState.kind === 'rejected' ? (
+                arrivalConfirming ? (
+                  <>
+                    <p>{copy.confirmArrivalQuestion}</p>
+                    <Button onClick={() => void submitCheckIn()}>
+                      {copy.checkIn}
+                    </Button>{' '}
+                    <Button
+                      variant="secondary"
+                      onClick={() => setArrivalConfirming(false)}
+                    >
+                      {copy.notYet}
+                    </Button>
+                  </>
+                ) : (
+                  <Button onClick={() => setArrivalConfirming(true)}>
+                    {copy.imHere}
+                  </Button>
+                )
+              ) : (
+                <Button
+                  onClick={() => void submitCheckIn()}
+                  disabled={checkInState.kind === 'pending'}
+                >
+                  {checkInState.kind === 'pending'
+                    ? copy.checkInPending
+                    : copy.retry}
+                </Button>
+              )}
             </>
           )}
         </div>
