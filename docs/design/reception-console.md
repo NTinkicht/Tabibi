@@ -80,8 +80,8 @@ Wait column: checked_in rows show "Attente estimée" / "الانتظار الم�
 `eta` is null). The browser never converts it to a clock time or recomputes it. Waiting rows with
 an appointment show "Rendez-vous 10:40" from `appointmentStartsAt` (see Data prerequisite).
 
-Note: the visual reference shows clock-time estimates and called-at times; this specification
-supersedes it (range estimates, no called-at time) because those are what the server provides.
+The visual reference was updated on 2026-11-08 to show range estimates and no called-at time
+(gap register G-04, G-15); this specification remains the source of truth.
 
 ## Copy
 
