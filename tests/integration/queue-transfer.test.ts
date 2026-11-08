@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AppointmentService } from '@/modules/appointment';
 import { AppointmentRecoveryService } from '@/modules/appointment/recovery';
 import { QueueConflictError, QueueService } from '@/modules/queue';
+import { QueueRestoreService } from '@/modules/queue/restore';
 import { QueueTransferService } from '@/modules/queue/transfer';
 import { migrate } from '../../scripts/db/lib';
 
@@ -322,6 +323,71 @@ describe('walk-in queue transfer', () => {
       [ids.target],
     );
     expect(n.rows[0].n).toBe(1);
+  });
+
+  it('revokes every source guest credential, exchange and pending link intent, even after the source is restored', async () => {
+    const a = await walkIn('A');
+    await pool.query(
+      `INSERT INTO guest_credentials
+         (id,clinic_id,session_id,queue_entry_id,bearer_verifier,expires_at)
+       VALUES ($1,$2,$3,$4,$5,now() + interval '1 hour')`,
+      [randomUUID(), ids.clinic, ids.session, a, 'c'.repeat(64)],
+    );
+    await pool.query(
+      `INSERT INTO guest_exchange_ids
+         (id,clinic_id,session_id,queue_entry_id,issued_by_user_id,exchange_verifier,contact_kind,expires_at)
+       VALUES ($1,$2,$3,$4,$5,$6,'phone',now() + interval '5 minutes')`,
+      [
+        randomUUID(),
+        ids.clinic,
+        ids.session,
+        a,
+        ids.receptionist,
+        'd'.repeat(64),
+      ],
+    );
+    await pool.query(
+      `INSERT INTO guest_link_intents
+         (id,clinic_id,queue_entry_id,intent,envelope_ciphertext,expires_at)
+       VALUES ($1,$2,$3,'initial','ciphertext',now() + interval '5 minutes')`,
+      [randomUUID(), ids.clinic, a],
+    );
+    // Control: all three are live before the transfer.
+    const live = async () =>
+      (
+        await pool.query<{ c: number; e: number; i: number }>(
+          `SELECT
+             (SELECT count(*)::int FROM guest_credentials WHERE queue_entry_id=$1 AND revoked_at IS NULL) c,
+             (SELECT count(*)::int FROM guest_exchange_ids WHERE queue_entry_id=$1 AND consumed_at IS NULL) e,
+             (SELECT count(*)::int FROM guest_link_intents WHERE queue_entry_id=$1 AND state='pending') i`,
+          [a],
+        )
+      ).rows[0];
+    expect(await live()).toEqual({ c: 1, e: 1, i: 1 });
+    const result = await transfer(a);
+    expect(await live()).toEqual({ c: 0, e: 0, i: 0 });
+    const intent = await pool.query(
+      `SELECT state, envelope_ciphertext FROM guest_link_intents WHERE queue_entry_id=$1`,
+      [a],
+    );
+    expect(intent.rows[0]).toEqual({
+      state: 'expired',
+      envelope_ciphertext: null,
+    });
+    // The target carries no guest authority until a fresh exchange is consumed.
+    const targetAuth = await pool.query(
+      `SELECT (SELECT count(*)::int FROM guest_credentials WHERE queue_entry_id=$1) c`,
+      [result.target.id],
+    );
+    expect(targetAuth.rows[0].c).toBe(0);
+    // Restoring the cancelled source must not revive the old authority.
+    await new QueueRestoreService(pool).restore(scope, ids.session, a, {
+      checkIn: false,
+      reason: 'Undo',
+      idempotencyKey: key(),
+      correlationId: 'x',
+    });
+    expect(await live()).toEqual({ c: 0, e: 0, i: 0 });
   });
 
   it('requires a reason and a receptionist or clinic admin', async () => {

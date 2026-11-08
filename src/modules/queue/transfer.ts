@@ -234,6 +234,25 @@ export class QueueTransferService {
       );
       if (entry.priority_order !== null)
         await this.compactPriority(client, scope.clinicId, sessionId);
+      // Fail closed on guest access: every source verifier, outstanding
+      // exchange ID and pending link intent dies with the source entry, so a
+      // later restore of the cancelled source cannot revive old authority.
+      await client.query(
+        `UPDATE guest_credentials SET revoked_at=now()
+          WHERE queue_entry_id=$1 AND clinic_id=$2 AND revoked_at IS NULL`,
+        [entryId, scope.clinicId],
+      );
+      await client.query(
+        `UPDATE guest_exchange_ids SET consumed_at=now()
+          WHERE queue_entry_id=$1 AND clinic_id=$2 AND consumed_at IS NULL`,
+        [entryId, scope.clinicId],
+      );
+      await client.query(
+        `UPDATE guest_link_intents
+            SET state='expired', envelope_ciphertext=NULL, scrubbed_at=now()
+          WHERE queue_entry_id=$1 AND clinic_id=$2 AND state='pending'`,
+        [entryId, scope.clinicId],
+      );
       await client.query(
         `INSERT INTO queue_entries
            (id, clinic_id, session_id, patient_id, state, source,
