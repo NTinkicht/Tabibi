@@ -1,3 +1,4 @@
+import { activeDoctorAssociationSql } from '@/modules/clinic/active-doctor';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
@@ -374,7 +375,9 @@ export class SessionService {
               'serviceDate must match the clinic-local date of startsAt',
             );
           const association = await client.query(
-            `SELECT 1 FROM doctor_clinics WHERE clinic_id = $1 AND doctor_id = $2`,
+            `SELECT 1 FROM doctor_clinics association
+              WHERE association.clinic_id = $1 AND association.doctor_id = $2
+                AND ${activeDoctorAssociationSql('association')}`,
             [scope.clinicId, input.doctorId],
           );
           if (association.rowCount !== 1) throw new AuthorizationError();

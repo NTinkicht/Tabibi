@@ -60,6 +60,7 @@ const committedMigrations = [
   '0049_guest_link_intent_dispatch.sql',
   '0050_eta_notification_baselines.sql',
   '0051_booking_receipt_ciphertext_scrub.sql',
+  '0052_doctor_clinic_departure.sql',
 ];
 
 beforeAll(async () => {

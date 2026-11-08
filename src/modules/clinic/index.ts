@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { activeDoctorAssociationSql } from './active-doctor';
 import {
   PUBLIC_DISCOVERY_MAX_PAGE,
   PUBLIC_DISCOVERY_PAGE_SIZE,
@@ -8,6 +9,7 @@ import { appendAuditEvent } from '@/modules/audit';
 import {
   type ClinicRole,
   type ClinicScope,
+  type Queryable,
   requireClinicRole,
 } from '@/modules/identity';
 import { BOOKABLE_SESSION_HORIZON_DAYS } from '@/modules/public-availability';
@@ -235,7 +237,8 @@ export class PublicDiscoveryService {
     // specialty and, if availability is requested, has a session that
     // PublicBookableSessionService.list would offer (keep the two in sync).
     const matchesDoctor = (association: string) => `
-          ($2::text IS NULL OR $2::text = ANY (${association}.specialty_codes))
+          ${activeDoctorAssociationSql(association)}
+          AND ($2::text IS NULL OR $2::text = ANY (${association}.specialty_codes))
           AND (NOT $3::boolean OR EXISTS (
                 SELECT 1 FROM consultation_sessions session
                  WHERE session.clinic_id = ${association}.clinic_id
@@ -379,6 +382,33 @@ export class MembershipNotFoundError extends Error {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// G-19: departure marker on the clinic-doctor association (migration 0052).
+async function markDoctorDeparted(
+  db: Queryable,
+  clinicId: string,
+  userId: string,
+): Promise<void> {
+  await db.query(
+    `UPDATE doctor_clinics SET departed_at = now()
+      WHERE clinic_id = $1 AND departed_at IS NULL
+        AND doctor_id = (SELECT id FROM doctor_profiles WHERE user_id = $2)`,
+    [clinicId, userId],
+  );
+}
+
+export async function clearDoctorDeparture(
+  db: Queryable,
+  clinicId: string,
+  userId: string,
+): Promise<void> {
+  await db.query(
+    `UPDATE doctor_clinics SET departed_at = NULL
+      WHERE clinic_id = $1 AND departed_at IS NOT NULL
+        AND doctor_id = (SELECT id FROM doctor_profiles WHERE user_id = $2)`,
+    [clinicId, userId],
+  );
+}
+
 export class ClinicService {
   constructor(private readonly pool: Pool) {}
 
@@ -485,7 +515,9 @@ export class ClinicService {
               association.specialty_codes
          FROM doctor_profiles doctor
          JOIN doctor_clinics association ON association.doctor_id = doctor.id
-        WHERE association.clinic_id = $1 ORDER BY doctor.display_name, doctor.id`,
+        WHERE association.clinic_id = $1
+          AND ${activeDoctorAssociationSql('association')}
+        ORDER BY doctor.display_name, doctor.id`,
       [scope.clinicId],
     );
     return result.rows.map((row) => ({
@@ -616,12 +648,66 @@ export class ClinicService {
            SET role = EXCLUDED.role, updated_at = now()`,
         [scope.clinicId, userId, role],
       );
+      // G-19: a doctor leaving the doctor role leaves public discovery and new
+      // bookings; returning to it restores them.
+      if (currentRole === 'doctor' && role !== 'doctor')
+        await markDoctorDeparted(client, scope.clinicId, userId);
+      if (role === 'doctor')
+        await clearDoctorDeparture(client, scope.clinicId, userId);
       await appendAuditEvent(client, {
         ...scope,
         entityType: 'membership',
         entityId: userId,
         action: 'membership.set',
         metadata: { role },
+      });
+    });
+  }
+
+  // Gap register G-19 (TAB-P1-07): remove a person's access to this clinic.
+  // Only a clinic_admin, serialized with setMembership on the clinic row and
+  // re-checked under that lock. Unknown, malformed and other-clinic users are
+  // the same MembershipNotFoundError; the last clinic_admin cannot be removed.
+  // Access ends on the next request because every clinic call re-reads the
+  // membership (requireClinicRole); the person's other clinics are untouched.
+  // A removed doctor keeps the clinic association (history, sessions and
+  // appointments stay intact) but leaves public discovery and new bookings via
+  // activeDoctorAssociationSql (doctor_clinics.departed_at).
+  async removeMembership(scope: ClinicScope, userId: string): Promise<void> {
+    return inTransaction(this.pool, async (client) => {
+      await requireClinicRole(client, scope, ['clinic_admin']);
+      if (!UUID_PATTERN.test(userId)) throw new MembershipNotFoundError();
+      await client.query('SELECT 1 FROM clinics WHERE id = $1 FOR UPDATE', [
+        scope.clinicId,
+      ]);
+      await requireClinicRole(client, scope, ['clinic_admin']);
+      const current = await client.query<{ role: ClinicRole }>(
+        `SELECT role FROM clinic_memberships
+          WHERE clinic_id = $1 AND user_id = $2`,
+        [scope.clinicId, userId],
+      );
+      const currentRole = current.rows[0]?.role;
+      if (!currentRole) throw new MembershipNotFoundError();
+      if (currentRole === 'clinic_admin') {
+        const otherAdmins = await client.query(
+          `SELECT 1 FROM clinic_memberships
+            WHERE clinic_id = $1 AND role = 'clinic_admin' AND user_id <> $2`,
+          [scope.clinicId, userId],
+        );
+        if (otherAdmins.rowCount === 0) throw new LastClinicAdminError();
+      }
+      await client.query(
+        `DELETE FROM clinic_memberships WHERE clinic_id = $1 AND user_id = $2`,
+        [scope.clinicId, userId],
+      );
+      if (currentRole === 'doctor')
+        await markDoctorDeparted(client, scope.clinicId, userId);
+      await appendAuditEvent(client, {
+        ...scope,
+        entityType: 'membership',
+        entityId: userId,
+        action: 'membership.removed',
+        metadata: { previousRole: currentRole },
       });
     });
   }
@@ -678,6 +764,11 @@ export class ClinicService {
          ON CONFLICT DO NOTHING`,
         [scope.clinicId, id],
       );
+      const rejoined = await client.query(
+        `UPDATE doctor_clinics SET departed_at = NULL
+          WHERE clinic_id = $1 AND doctor_id = $2 AND departed_at IS NOT NULL`,
+        [scope.clinicId, id],
+      );
       const codes = await client.query<{ specialty_codes: string[] }>(
         `SELECT specialty_codes FROM doctor_clinics
           WHERE clinic_id = $1 AND doctor_id = $2`,
@@ -690,7 +781,10 @@ export class ClinicService {
           displayName,
           specialtyCodes: codes.rows[0]!.specialty_codes,
         },
-        changed: association.rowCount === 1 || currentRole !== 'doctor',
+        changed:
+          association.rowCount === 1 ||
+          rejoined.rowCount === 1 ||
+          currentRole !== 'doctor',
       };
       if (!result.changed) return result;
       await client.query(

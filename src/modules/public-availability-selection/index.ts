@@ -1,3 +1,4 @@
+import { activeDoctorAssociationSql } from '@/modules/clinic/active-doctor';
 import {
   createCipheriv,
   createDecipheriv,
@@ -199,6 +200,7 @@ export class PublicAvailabilitySelectionService {
          JOIN doctor_clinics association
            ON association.clinic_id = session.clinic_id
           AND association.doctor_id = session.doctor_id
+          AND ${activeDoctorAssociationSql('association')}
         WHERE session.id = $1
           AND session.clinic_id = $2
           AND session.doctor_id = $3

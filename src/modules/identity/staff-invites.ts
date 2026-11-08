@@ -255,6 +255,14 @@ export class StaffInviteService {
            ON CONFLICT DO NOTHING`,
           [invite.clinic_id, userId],
         );
+        // G-19: a doctor who left this clinic and is invited back is listed
+        // and bookable again (see clinic/active-doctor.ts).
+        await client.query(
+          `UPDATE doctor_clinics SET departed_at = NULL
+            WHERE clinic_id = $1 AND departed_at IS NOT NULL
+              AND doctor_id = (SELECT id FROM doctor_profiles WHERE user_id = $2)`,
+          [invite.clinic_id, userId],
+        );
       }
       const membership = await client.query(
         `INSERT INTO clinic_memberships (clinic_id, user_id, role)

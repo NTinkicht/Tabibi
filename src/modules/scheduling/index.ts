@@ -1,3 +1,4 @@
+import { activeDoctorAssociationSql } from '@/modules/clinic/active-doctor';
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
@@ -158,7 +159,9 @@ async function requireClinicDoctor(
 ): Promise<void> {
   if (!UUID_TEXT.test(doctorId)) throw new AuthorizationError();
   const result = await db.query(
-    'SELECT 1 FROM doctor_clinics WHERE clinic_id = $1 AND doctor_id = $2',
+    `SELECT 1 FROM doctor_clinics association
+      WHERE association.clinic_id = $1 AND association.doctor_id = $2
+        AND ${activeDoctorAssociationSql('association')}`,
     [clinicId, doctorId],
   );
   if (result.rowCount !== 1) throw new AuthorizationError();
