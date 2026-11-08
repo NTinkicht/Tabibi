@@ -215,6 +215,9 @@ export class StaffInviteService {
     const match = TOKEN_PATTERN.exec(token);
     if (!match) throw new InviteRejectedError();
     const [, inviteId, secret] = match as unknown as [string, string, string];
+    // TOKEN_PATTERN admits any 36 hex/hyphen characters; a non-UUID id must
+    // be the generic rejection, never a database type error (500).
+    if (!UUID_PATTERN.test(inviteId)) throw new InviteRejectedError();
     const found = await this.pool.query<{
       email: string;
       role: InvitableRole;
@@ -298,6 +301,9 @@ export class StaffInviteService {
     const match = TOKEN_PATTERN.exec(token);
     if (!match) throw new InviteRejectedError();
     const [, inviteId, secret] = match as unknown as [string, string, string];
+    // TOKEN_PATTERN admits any 36 hex/hyphen characters; a non-UUID id must
+    // be the generic rejection, never a database type error (500).
+    if (!UUID_PATTERN.test(inviteId)) throw new InviteRejectedError();
     const displayName = input.displayName.trim();
     if (displayName === '' || displayName.length > 120) {
       throw new InviteInputError('Invalid display name');

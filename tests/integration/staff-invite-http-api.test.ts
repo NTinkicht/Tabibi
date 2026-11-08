@@ -325,6 +325,8 @@ describe('staff invite HTTP API (G-18)', () => {
       expired.token,
       wrongSecret,
       'garbage',
+      `${'-'.repeat(36)}.${'A'.repeat(43)}`,
+      `${'f'.repeat(36)}.${'A'.repeat(43)}`,
       `${randomUUID()}.${'B'.repeat(43)}`,
     ]) {
       for (const response of [await preview(token), await accept(token)]) {
