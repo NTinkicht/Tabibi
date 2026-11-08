@@ -101,6 +101,11 @@ textarea {
   color: var(--tb-priority-text);
 }
 
+.tb-chip--danger {
+  background: color-mix(in srgb, var(--tb-danger) 10%, var(--tb-surface));
+  color: var(--tb-danger);
+}
+
 .tb-segmented {
   display: inline-flex;
   gap: var(--tb-space-1);

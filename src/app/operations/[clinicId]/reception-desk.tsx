@@ -1,22 +1,14 @@
 'use client';
 import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
 import Link from 'next/link';
+import './reception-home.css';
+import { Button } from '@/app/ui';
+import { shiftDate } from '@/modules/receptionist-dashboard/home-view';
+import { SessionCard, type HomeSession } from './session-card';
 import { receptionistCopy } from '@/modules/localization/receptionist';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-type Status = 'planned' | 'open' | 'paused' | 'closed' | 'cancelled';
-type Session = {
-  id: string;
-  doctorId: string;
-  doctorDisplayName: string;
-  startsAt: string;
-  endsAt: string;
-  status: Status;
-  openedAt: string | null;
-  closedAt: string | null;
-  declaredDelayMinutes: number | null;
-  delayVersion: number;
-};
+type Session = HomeSession;
 
 function key() {
   return crypto.randomUUID();
@@ -40,6 +32,8 @@ export function ReceptionDesk({
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [pending, setPending] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [undelivered, setUndelivered] = useState(0);
+  const [undeliveredUnknown, setUndeliveredUnknown] = useState(false);
   const [delayMinutes, setDelayMinutes] = useState<Record<string, string>>({});
   const pendingKeysRef = useRef(new Map<string, string>());
 
@@ -75,8 +69,45 @@ export function ReceptionDesk({
     }
   }, [clinicId, date]);
   useEffect(() => {
+    // Fetch-on-change: load() resets the list and shows the loading state first.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+  useEffect(() => {
+    // Banner is best effort: a failure here must never block the day's sessions.
+    // Both failure sources shown on the notifications page count; if either
+    // fetch fails the link is still offered (fail-safe, never hide failures).
+    const controller = new AbortController();
+    const init = { cache: 'no-store' as const, signal: controller.signal };
+    const base = `/api/clinics/${clinicId}/notifications`;
+    const count = async (
+      url: string,
+      field: string,
+    ): Promise<number | null> => {
+      try {
+        const response = await fetch(url, init);
+        if (!response.ok) return null;
+        const body = (await response.json()) as Record<string, unknown> | null;
+        const list = body?.[field];
+        return Array.isArray(list) ? list.length : null;
+      } catch {
+        return null;
+      }
+    };
+    void Promise.all([
+      count(`${base}/dead-letters?limit=100`, 'deadLetters'),
+      count(`${base}/guest-link-failures?limit=100`, 'failures'),
+    ]).then(([dead, guest]) => {
+      if (controller.signal.aborted) return;
+      setUndelivered(
+        dead !== null && guest !== null
+          ? dead + guest
+          : (dead ?? 0) + (guest ?? 0),
+      );
+      setUndeliveredUnknown(dead === null || guest === null);
+    });
+    return () => controller.abort();
+  }, [clinicId]);
   async function mutate(
     sessionId: string,
     opId: string,
@@ -104,8 +135,16 @@ export function ReceptionDesk({
         message?: string;
       };
       if (!response.ok || !data.session) throw new Error(data.message);
+      // Mutation responses carry no queueCounts: keep the last known counts.
       setSessions((items) =>
-        items.map((item) => (item.id === sessionId ? data.session! : item)),
+        items.map((item) =>
+          item.id === sessionId
+            ? {
+                ...data.session!,
+                queueCounts: data.session!.queueCounts ?? item.queueCounts,
+              }
+            : item,
+        ),
       );
     } catch (error) {
       setMessage(
@@ -187,183 +226,111 @@ export function ReceptionDesk({
     }
   }
   return (
-    <main className="desk" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+    <main className="rh" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <DocumentLocaleSync locale={locale} />
-      <header className="deskHeader">
-        <div>
-          <span className="eyebrow">TABIBI · RECEPTION</span>
-          <h1>{t.title}</h1>
-          <p>{t.subtitle}</p>
-        </div>
-        <Link
-          className="notificationsLink"
-          href={`/operations/${clinicId}/notifications?locale=${locale}`}
-        >
-          {t.notifications}
-        </Link>
+      <header className="rh-header">
+        <h1>{t.title}</h1>
         <button
-          className="locale"
+          type="button"
+          className="tb-button tb-button--secondary"
           onClick={() => setLocale(locale === 'ar' ? 'fr' : 'ar')}
         >
           {locale === 'ar' ? 'Français' : 'العربية'}
         </button>
       </header>
-      <section className="toolbar">
+      <div className="rh-date">
+        <Button
+          variant="secondary"
+          aria-label={t.homePrevDay}
+          onClick={() => setDate((value) => shiftDate(value, -1))}
+        >
+          <span aria-hidden="true">{locale === 'ar' ? '›' : '‹'}</span>
+        </Button>
         <label>
-          <span className="srOnly">Date</span>
+          <span className="srOnly">{t.homeDate}</span>
           <input
             type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => e.target.value && setDate(e.target.value)}
           />
         </label>
-        <button onClick={() => void load()}>{t.reload}</button>
-      </section>
+        <Button
+          variant="secondary"
+          aria-label={t.homeNextDay}
+          onClick={() => setDate((value) => shiftDate(value, 1))}
+        >
+          <span aria-hidden="true">{locale === 'ar' ? '‹' : '›'}</span>
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => setDate(localDateString(new Date()))}
+        >
+          {t.homeToday}
+        </Button>
+        <Button variant="secondary" onClick={() => void load()}>
+          {t.reload}
+        </Button>
+      </div>
+      {(undelivered > 0 || undeliveredUnknown) && (
+        <div className="rh-banner" role="status">
+          {undelivered > 0 && (
+            <span>{t.homeUndelivered.replace('{n}', String(undelivered))}</span>
+          )}
+          <Link href={`/operations/${clinicId}/notifications?locale=${locale}`}>
+            {t.notifications}
+          </Link>
+        </div>
+      )}
       {message && (
-        <div className="alert" role="alert">
+        <div className="rh-alert" role="alert">
           {message}
         </div>
       )}
       {state === 'loading' && (
-        <div className="state" aria-live="polite">
-          <span className="spinner" />
+        <div className="rh-state" aria-live="polite">
           {t.loading}
         </div>
       )}
       {state === 'error' && (
-        <div className="state error">
+        <div className="rh-state rh-state--error">
           <p>{t.error}</p>
-          <button onClick={() => void load()}>{t.reload}</button>
+          <Button variant="secondary" onClick={() => void load()}>
+            {t.reload}
+          </Button>
         </div>
       )}
       {state === 'ready' && sessions.length === 0 && (
-        <div className="state">
-          <span className="emptyIcon">◷</span>
-          <p>{t.empty}</p>
+        <div className="rh-state">
+          <p>{t.homeEmptyDay}</p>
         </div>
       )}
       <section
-        className="sessionGrid"
+        className="rh-grid"
         aria-busy={pending !== null || state === 'loading'}
       >
         {sessions.map((session) => (
-          <article
-            className={`sessionCard status-${session.status}`}
+          <SessionCard
             key={session.id}
-          >
-            <div className="sessionTop">
-              <div>
-                <h2>{session.doctorDisplayName}</h2>
-                <p className="time">
-                  {new Intl.DateTimeFormat(
-                    locale === 'ar' ? 'ar-DZ' : 'fr-DZ',
-                    { hour: '2-digit', minute: '2-digit', timeZone: timezone },
-                  ).format(new Date(session.startsAt))}{' '}
-                  —{' '}
-                  {new Intl.DateTimeFormat(
-                    locale === 'ar' ? 'ar-DZ' : 'fr-DZ',
-                    { hour: '2-digit', minute: '2-digit', timeZone: timezone },
-                  ).format(new Date(session.endsAt))}
-                </p>
-              </div>
-              <span className="status">{t.statuses[session.status]}</span>
-            </div>
-            {session.declaredDelayMinutes !== null && (
-              <p className="delayBadge">
-                +{session.declaredDelayMinutes} {t.minutes}
-              </p>
-            )}
-            <div className="actions">
-              {session.status === 'planned' && (
-                <button onClick={() => void command(session, 'open')}>
-                  {t.open}
-                </button>
-              )}
-              {session.status === 'open' && (
-                <button onClick={() => void command(session, 'pause')}>
-                  {t.pause}
-                </button>
-              )}
-              {session.status === 'paused' && (
-                <button onClick={() => void command(session, 'resume')}>
-                  {t.resume}
-                </button>
-              )}
-              {['open', 'paused'].includes(session.status) && (
-                <button onClick={() => void command(session, 'close')}>
-                  {t.close}
-                </button>
-              )}
-              {!['closed', 'cancelled'].includes(session.status) && (
-                <button
-                  className="danger"
-                  onClick={() => void command(session, 'cancel')}
-                >
-                  {t.cancel}
-                </button>
-              )}
-              {!['closed', 'cancelled'].includes(session.status) && (
-                <form
-                  className="delayControl"
-                  onSubmit={(event) => void delay(event, session)}
-                >
-                  <label htmlFor={`delay-${session.id}`}>
-                    {t.delayMinutes}
-                  </label>
-                  <input
-                    id={`delay-${session.id}`}
-                    aria-describedby={`delay-hint-${session.id}`}
-                    type="number"
-                    inputMode="numeric"
-                    min="1"
-                    max="720"
-                    step="1"
-                    required
-                    value={
-                      delayMinutes[session.id] ??
-                      String(session.declaredDelayMinutes ?? '')
-                    }
-                    onChange={(event) =>
-                      setDelayMinutes((values) => ({
-                        ...values,
-                        [session.id]: event.target.value,
-                      }))
-                    }
-                  />
-                  <span className="srOnly" id={`delay-hint-${session.id}`}>
-                    {t.delayRange}
-                  </span>
-                  <button className="quiet" type="submit">
-                    {t.delay}
-                  </button>
-                </form>
-              )}
-              {session.declaredDelayMinutes !== null && (
-                <button
-                  className="quiet"
-                  onClick={() => void clearDelay(session)}
-                >
-                  {t.clear}
-                </button>
-              )}
-              {['planned', 'open', 'paused'].includes(session.status) && (
-                <Link
-                  className="queueLink"
-                  href={`/operations/${clinicId}/sessions/${session.id}/queue?locale=${locale}`}
-                >
-                  {t.walkIns}
-                </Link>
-              )}
-            </div>
-            {pending === session.id && (
-              <div className="pending" aria-live="polite">
-                {t.pending}
-              </div>
-            )}
-          </article>
+            session={session}
+            clinicId={clinicId}
+            t={t}
+            locale={locale}
+            timezone={timezone}
+            pending={pending === session.id}
+            delayValue={
+              delayMinutes[session.id] ??
+              String(session.declaredDelayMinutes ?? '')
+            }
+            onCommand={(item, name) => void command(item, name)}
+            onDelayChange={(id, value) =>
+              setDelayMinutes((values) => ({ ...values, [id]: value }))
+            }
+            onDelaySubmit={(event, item) => void delay(event, item)}
+            onClearDelay={(item) => void clearDelay(item)}
+          />
         ))}
       </section>
-      <section className="createPanel">
+      <section className="rh-create">
         <h2>{t.add}</h2>
         <form onSubmit={(e) => void create(e)}>
           <label>
@@ -378,9 +345,9 @@ export function ReceptionDesk({
             {t.end}
             <input required name="end" type="time" />
           </label>
-          <button disabled={pending === 'create'}>
+          <Button type="submit" disabled={pending === 'create'}>
             {pending === 'create' ? t.pending : t.save}
-          </button>
+          </Button>
         </form>
       </section>
     </main>

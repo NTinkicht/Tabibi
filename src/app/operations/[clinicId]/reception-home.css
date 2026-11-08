@@ -1,0 +1,181 @@
+/* TAB-UI-14 reception home (docs/design/reception-home.md). Tokens + logical properties only. */
+.rh {
+  max-inline-size: var(--tb-max-width);
+  margin-inline: auto;
+  padding-block: var(--tb-space-8);
+  padding-inline: var(--tb-gutter);
+  min-block-size: 100vh;
+}
+.rh-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tb-space-6);
+  flex-wrap: wrap;
+}
+.rh-header h1 {
+  margin: 0;
+  font-size: var(--tb-text-title);
+  letter-spacing: 0;
+}
+.rh-date {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tb-space-2);
+  margin-block: var(--tb-space-6);
+}
+.rh-date input,
+.rh-delay input,
+.rh-create input {
+  min-block-size: var(--tb-touch-target);
+  padding-inline: var(--tb-space-4);
+  border: 1px solid var(--tb-border-strong);
+  border-radius: var(--tb-radius-control);
+  background: var(--tb-surface);
+  color: var(--tb-text);
+  font-size: var(--tb-text-control);
+}
+.rh-banner,
+.rh-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tb-space-4);
+  margin-block-end: var(--tb-space-6);
+  padding: var(--tb-space-4) var(--tb-space-6);
+  border-radius: var(--tb-radius-tile);
+  background: var(--tb-warning-tint);
+  border: 1px solid var(--tb-warning-border);
+  color: var(--tb-warning-text);
+  font-weight: 600;
+}
+.rh-banner a {
+  color: var(--tb-warning-text);
+  text-decoration: underline;
+}
+.rh-alert {
+  background: var(--tb-surface);
+  border-color: var(--tb-danger-border);
+  color: var(--tb-danger);
+}
+.rh-state {
+  margin-block: var(--tb-space-8);
+  padding: var(--tb-space-8);
+  border: 1px dashed var(--tb-border-strong);
+  border-radius: var(--tb-radius-card);
+  background: var(--tb-surface);
+  color: var(--tb-text-muted);
+  text-align: center;
+}
+.rh-state--error {
+  color: var(--tb-danger);
+}
+.rh-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+  gap: var(--tb-space-6);
+}
+.rh-grid[aria-busy='true'] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.rh-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tb-space-4);
+  padding: var(--tb-space-7);
+  border: 1px solid var(--tb-border);
+  border-radius: var(--tb-radius-card);
+  background: var(--tb-surface);
+}
+.rh-card--closed,
+.rh-card--cancelled {
+  background: var(--tb-surface-subtle);
+}
+.rh-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--tb-space-4);
+}
+.rh-card__top h2 {
+  margin: 0;
+  font-size: var(--tb-text-row);
+}
+.rh-card__hours {
+  margin: var(--tb-space-1) 0 0;
+  font-size: var(--tb-text-title);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.rh-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tb-space-2);
+}
+.rh-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tb-space-4);
+  margin: 0;
+  color: var(--tb-text-muted);
+  font-size: var(--tb-text-meta);
+}
+.rh-card__counts {
+  margin: 0;
+  padding: var(--tb-space-4);
+  border-radius: var(--tb-radius-tile);
+  background: var(--tb-surface-subtle);
+  color: var(--tb-text-secondary);
+  font-size: var(--tb-text-control);
+}
+.rh-card__actions,
+.rh-delay {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tb-space-2);
+}
+.rh-delay label {
+  font-size: var(--tb-text-meta);
+  color: var(--tb-text-secondary);
+}
+.rh-delay input {
+  inline-size: 6rem;
+}
+.rh-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+.rh-card__pending {
+  color: var(--tb-text-muted);
+  font-size: var(--tb-text-meta);
+}
+.rh-create {
+  margin-block-start: var(--tb-space-9);
+  padding: var(--tb-space-7);
+  border: 1px solid var(--tb-border);
+  border-radius: var(--tb-radius-card);
+  background: var(--tb-surface);
+}
+.rh-create h2 {
+  margin-block: 0 var(--tb-space-4);
+  font-size: var(--tb-text-section);
+}
+.rh-create form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--tb-space-4);
+}
+.rh-create label {
+  display: grid;
+  gap: var(--tb-space-1);
+  font-size: var(--tb-text-meta);
+  color: var(--tb-text-secondary);
+}
