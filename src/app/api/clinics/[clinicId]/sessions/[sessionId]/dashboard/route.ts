@@ -20,6 +20,13 @@ export async function GET(
     const dashboard = await new ReceptionistDashboardService(
       getPool(),
     ).getSnapshot(scope, sessionId);
-    return { status: 200, body: dashboard };
+    const clinic = await getPool().query<{ timezone: string }>(
+      'SELECT timezone FROM clinics WHERE id = $1',
+      [scope.clinicId],
+    );
+    return {
+      status: 200,
+      body: { ...dashboard, timezone: clinic.rows[0]?.timezone ?? 'UTC' },
+    };
   });
 }

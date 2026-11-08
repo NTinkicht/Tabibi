@@ -7,8 +7,10 @@ import { BulkAppointmentNoShowAction } from './BulkAppointmentNoShowAction';
 import { SessionBar } from './session-bar';
 import {
   buildConsoleView,
+  formatLastAction,
   type ConsoleEntry,
 } from '@/modules/receptionist-dashboard/console-view';
+import { QueueRows, ServingCards, type PanelAction } from './console-regions';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 type EntryState =
@@ -76,10 +78,12 @@ export function WalkInQueue({
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
   const [pendingEntry, setPendingEntry] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState('');
   const [queueOrderVersion, setQueueOrderVersion] = useState(0);
   const [session, setSession] = useState<DashboardSession | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const [stale, setStale] = useState(false);
+  const [timezone, setTimezone] = useState('UTC');
   const pendingKeysRef = useRef(new Map<string, string>());
   const loadRequestRef = useRef(0);
   const hasSnapshotRef = useRef(false);
@@ -98,6 +102,7 @@ export function WalkInQueue({
         queueOrderVersion?: number;
         session?: DashboardSession;
         generatedAt?: string;
+        timezone?: string;
         refreshAfterSeconds?: number;
         message?: string;
       };
@@ -106,6 +111,7 @@ export function WalkInQueue({
       if (requestId !== loadRequestRef.current) return;
       setEntries(body.entries);
       setSession(body.session);
+      if (body.timezone) setTimezone(body.timezone);
       setQueueOrderVersion(body.session.queueOrderVersion);
       setRefreshedAt(new Date(body.generatedAt));
       hasSnapshotRef.current = true;
@@ -204,6 +210,7 @@ export function WalkInQueue({
       );
       setState('ready');
       form.reset();
+      void load();
     } catch (error) {
       setMessage(
         error instanceof Error && error.message ? error.message : t.queueError,
@@ -228,10 +235,14 @@ export function WalkInQueue({
       | 'cancel'
       | 'start_consultation'
       | 'complete_consultation',
+    panelReason?: string,
   ) {
-    let reason: string | undefined;
+    let reason: string | undefined = panelReason;
     let cancellationSource: 'patient' | 'clinic' | undefined;
-    if (commandName === 'no_show' || commandName === 'cancel') {
+    if (
+      (commandName === 'no_show' || commandName === 'cancel') &&
+      reason === undefined
+    ) {
       reason = window.prompt(t.queueReason)?.trim();
       if (!reason) return;
     }
@@ -270,6 +281,13 @@ export function WalkInQueue({
       };
       if (!response.ok || !body.entry) throw new Error(body.message);
       pendingKeysRef.current.delete(operation);
+      setLastAction(
+        formatLastAction(
+          t.lastAction,
+          entry,
+          t.queueStatuses[body.entry.state] ?? '',
+        ),
+      );
       await load();
     } catch (error) {
       setMessage(
@@ -280,16 +298,9 @@ export function WalkInQueue({
     }
   }
 
-  async function reorder(entry: WaitingEntry) {
-    const rawPosition = window.prompt(t.reorderPosition);
-    if (rawPosition === null) return;
-    const targetPosition = Number(rawPosition);
-    if (!Number.isInteger(targetPosition) || targetPosition < 1) {
-      setMessage(t.reorderInvalid);
-      return;
-    }
-    const reason = window.prompt(t.reorderReason)?.trim();
-    if (!reason) return;
+  /** Prioritise = reorder to position 1 of the priority cohort, with a reason. */
+  async function prioritise(entry: WaitingEntry, reason: string) {
+    const targetPosition = 1;
     const operation = `${entry.id}:reorder:${targetPosition}:${queueOrderVersion}:${reason}`;
     const idempotencyKey = pendingKeysRef.current.get(operation) ?? key();
     pendingKeysRef.current.set(operation, idempotencyKey);
@@ -323,6 +334,7 @@ export function WalkInQueue({
       )
         throw new Error(body.message);
       pendingKeysRef.current.delete(operation);
+      setLastAction(formatLastAction(t.lastAction, entry, t.priorityBadge));
       await load();
     } catch (error) {
       setMessage(
@@ -414,24 +426,27 @@ export function WalkInQueue({
     if (target) void command(target, 'call');
   }
 
-  const actionFor: Record<
-    EntryState,
-    {
-      command: Parameters<typeof command>[1];
-      label: string;
-      danger?: boolean;
-    } | null
-  > = {
-    waiting: { command: 'check_in', label: t.checkIn },
-    checked_in: { command: 'call', label: t.call },
-    called: { command: 'start_consultation', label: t.startConsultation },
-    in_consultation: {
-      command: 'complete_consultation',
-      label: t.completeConsultation,
+  function panelAction(
+    entry: ConsoleEntry,
+    action: PanelAction,
+    reason: string,
+  ) {
+    const target = entries.find((item) => item.id === entry.id);
+    if (!target) return;
+    if (action === 'prioritise') void prioritise(target, reason);
+    else void command(target, action, reason);
+  }
+  const regions = {
+    t,
+    locale,
+    timezone,
+    busy: pending || pendingEntry !== null || stale,
+    pendingEntryId: pendingEntry,
+    onPrimary: (entry: ConsoleEntry, name: Parameters<typeof command>[1]) => {
+      const target = entries.find((item) => item.id === entry.id);
+      if (target) void command(target, name);
     },
-    completed: null,
-    cancelled: null,
-    no_show: null,
+    onPanel: panelAction,
   };
 
   return (
@@ -572,72 +587,23 @@ export function WalkInQueue({
           <p>{t.noWaiting}</p>
         </div>
       )}
-      {state === 'ready' && entries.length > 0 && (
-        <section className="queueList" aria-label={t.queueTitle}>
-          {entries.map((entry) => (
-            <article className="queueRow" key={entry.id}>
-              <div>
-                <strong>{entry.privateDisplayName}</strong>
-                <small>
-                  {entry.hasContact ? t.contactOnFile : t.noContact}
-                </small>
-              </div>
-              <div className="queueIdentity">
-                <span>{t.publicLabel}</span>
-                <strong>{entry.publicDisplayLabel}</strong>
-              </div>
-              <span className="registrationOrder">
-                {entry.priorityOrder
-                  ? `${t.priorityOrder} #${entry.priorityOrder}`
-                  : `${t.registrationOrder} #${entry.registrationOrder}`}
-              </span>
-              <span className={`queueState queueState-${entry.state}`}>
-                {t.queueStatuses[entry.state]}
-              </span>
-              <div className="queueActions">
-                {actionFor[entry.state] && (
-                  <button
-                    disabled={pendingEntry !== null}
-                    onClick={() =>
-                      void command(entry, actionFor[entry.state]!.command)
-                    }
-                  >
-                    {pendingEntry === entry.id
-                      ? t.pending
-                      : actionFor[entry.state]!.label}
-                  </button>
-                )}
-                {['checked_in', 'called'].includes(entry.state) && (
-                  <button
-                    className="quiet"
-                    disabled={pendingEntry !== null}
-                    onClick={() => void command(entry, 'no_show')}
-                  >
-                    {t.noShow}
-                  </button>
-                )}
-                {['waiting', 'checked_in', 'called'].includes(entry.state) && (
-                  <button
-                    className="danger"
-                    disabled={pendingEntry !== null}
-                    onClick={() => void command(entry, 'cancel')}
-                  >
-                    {t.cancelEntry}
-                  </button>
-                )}
-                {['waiting', 'checked_in'].includes(entry.state) && (
-                  <button
-                    className="priorityAction"
-                    disabled={pendingEntry !== null}
-                    onClick={() => void reorder(entry)}
-                  >
-                    {t.reorderAudited}
-                  </button>
-                )}
-              </div>
-            </article>
-          ))}
-        </section>
+      {state === 'ready' && consoleView && (
+        <>
+          {lastAction && (
+            <div className="lastAction" role="status">
+              {lastAction}
+            </div>
+          )}
+          <ServingCards rows={consoleView.serving} h={regions} />
+          {consoleView.queue.length > 0 && (
+            <QueueRows
+              rows={consoleView.queue}
+              arrived={consoleView.arrivedCount}
+              notArrived={consoleView.notArrivedCount}
+              h={regions}
+            />
+          )}
+        </>
       )}
     </main>
   );

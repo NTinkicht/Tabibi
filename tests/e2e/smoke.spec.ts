@@ -120,24 +120,22 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
   await expect(
     page.getByText('Patient test', { exact: true }).first(),
   ).toBeVisible();
-  await expect(
-    page.getByText('Sans coordonnées', { exact: true }).first(),
-  ).toBeVisible();
+  await expect(page.getByText('Sans coordonnées').first()).toBeVisible();
   await expect(page.getByText(/^W-[A-F0-9]{10}$/).first()).toBeVisible();
   await page.getByRole('button', { name: 'العربية' }).click();
   await page.getByRole('button', { name: 'تسجيل الوصول' }).last().click();
-  await expect(page.getByText('ترتيب التسجيل #1')).toBeVisible();
-  const dialogAnswers = ['1', 'تنظيم تشغيلي للاستقبال'];
-  page.on('dialog', (dialog) => void dialog.accept(dialogAnswers.shift()));
+  await expect(page.locator('.consoleRow')).toHaveCount(1);
   const reorderResponsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&
       response.url().endsWith('/reorder'),
   );
+  await page.getByRole('button', { name: /^إجراءات أخرى لـ/ }).click();
   await page
-    .getByRole('button', { name: 'تقديم / إعادة ترتيب (مدقّق)' })
-    .click();
+    .getByLabel('السبب التشغيلي (مطلوب)')
+    .fill('تنظيم تشغيلي للاستقبال');
+  await page.getByRole('button', { name: 'تقديم', exact: true }).click();
   expect((await reorderResponsePromise).status()).toBe(200);
-  await expect(page.getByText('ترتيب الخدمة #1')).toBeVisible();
+  await expect(page.getByText('أولوية', { exact: true })).toBeVisible();
   await pool.end();
 });

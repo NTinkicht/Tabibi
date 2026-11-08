@@ -116,30 +116,29 @@ test('mobile Arabic queue view reloads safely after a stale reorder conflict and
     );
     await expect(stalePage.locator('main')).toHaveAttribute('dir', 'rtl');
 
-    const firstAnswers = ['1', 'سبب تشغيلي للاختبار'];
-    page.on('dialog', (dialog) => void dialog.accept(firstAnswers.shift()));
     const firstResponsePromise = page.waitForResponse((response) =>
       response.url().endsWith('/reorder'),
     );
     await page
-      .getByRole('button', { name: 'تقديم / إعادة ترتيب (مدقّق)' })
+      .getByRole('button', { name: /^إجراءات أخرى لـ/ })
       .nth(1)
       .click();
+    await page.getByLabel('السبب التشغيلي (مطلوب)').fill('سبب تشغيلي للاختبار');
+    await page.getByRole('button', { name: 'تقديم', exact: true }).click();
     expect((await firstResponsePromise).status()).toBe(200);
-    await expect(page.getByText('ترتيب الخدمة #1')).toBeVisible();
+    await expect(page.getByText('أولوية', { exact: true })).toBeVisible();
 
-    const staleAnswers = ['1', 'محاولة ببيانات قديمة'];
-    stalePage.on(
-      'dialog',
-      (dialog) => void dialog.accept(staleAnswers.shift()),
-    );
     const staleResponsePromise = stalePage.waitForResponse((response) =>
       response.url().endsWith('/reorder'),
     );
     await stalePage
-      .getByRole('button', { name: 'تقديم / إعادة ترتيب (مدقّق)' })
+      .getByRole('button', { name: /^إجراءات أخرى لـ/ })
       .nth(0)
       .click();
+    await stalePage
+      .getByLabel('السبب التشغيلي (مطلوب)')
+      .fill('محاولة ببيانات قديمة');
+    await stalePage.getByRole('button', { name: 'تقديم', exact: true }).click();
     expect((await staleResponsePromise).status()).toBe(409);
     await expect(
       stalePage

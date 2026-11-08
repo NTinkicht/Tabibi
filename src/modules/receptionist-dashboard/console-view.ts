@@ -131,7 +131,7 @@ export function formatWaitRange(
   eta: ConsoleEntry['eta'],
   copy: { waitRange: string; waitSingle: string; waitUnknown: string },
 ): string {
-  if (eta === null) return copy.waitUnknown;
+  if (eta === null || eta === undefined) return copy.waitUnknown;
   if (eta.minWaitMinutes === eta.maxWaitMinutes)
     return copy.waitSingle.replace('{min}', String(eta.minWaitMinutes));
   return copy.waitRange
@@ -149,4 +149,16 @@ export function steppedDelay(
   const base = committed ?? 0;
   const next = base + direction * CONSOLE_DELAY_STEP_MINUTES;
   return Math.min(CONSOLE_DELAY_MAX_MINUTES, Math.max(0, next));
+}
+
+/** Status-bar text for a committed command, from the FR/AR `lastAction` copy. */
+export function formatLastAction(
+  template: string,
+  entry: Pick<ConsoleEntry, 'publicDisplayLabel' | 'privateDisplayName'>,
+  stateLabel: string,
+): string {
+  return template
+    .replace('{ticket}', entry.publicDisplayLabel)
+    .replace('{name}', entry.privateDisplayName)
+    .replace('{state}', stateLabel);
 }
