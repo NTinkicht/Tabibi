@@ -193,8 +193,9 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
         await route.continue();
       },
     );
+    const card = page.locator('.servingCard').filter({ hasText: privateName });
     await row.getByRole('button', { name: 'نداء' }).click();
-    await expect(row).toContainText('تم النداء');
+    await expect(card).toContainText('تم النداء');
     expect(commandRequests).toBe(1);
 
     await queue.command(scope, sessionId, patient.entry.id, {
@@ -203,7 +204,7 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
       correlationId: `wu50-start-${run}`,
     });
     await page.getByRole('button', { name: 'تحديث' }).click();
-    await expect(row).toContainText('في الاستشارة');
+    await expect(card).toContainText('في الاستشارة');
 
     await queue.command(scope, sessionId, patient.entry.id, {
       command: 'complete_consultation',
@@ -211,17 +212,16 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
       correlationId: `wu50-complete-${run}`,
     });
     await page.reload();
-    const terminalRow = page
-      .locator('article.queueRow')
+    // Terminal entries leave the console (docs/design/reception-console.md).
+    const terminalEntry = page
+      .locator('article.queueRow, article.servingCard')
       .filter({ hasText: privateName });
-    await expect(terminalRow).toContainText('مكتمل');
+    await expect(terminalEntry).toHaveCount(0);
     await page.getByRole('button', { name: 'تحديث' }).click();
-    await expect(terminalRow).toContainText('مكتمل');
-    await expect(terminalRow).not.toContainText('تم النداء');
+    await expect(terminalEntry).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Français' }).click();
     await expect(page.locator('main')).toHaveAttribute('dir', 'ltr');
-    await expect(terminalRow).toContainText('Terminé');
     await expect(page.locator('body')).not.toContainText(otherPrivateName);
     await expect(page.locator('body')).not.toContainText(other.entry.id);
     await expect(page.locator('body')).not.toContainText(otherClinicId);

@@ -45,7 +45,7 @@ function entryMeta(entry: ConsoleEntry, h: RegionHandlers): string {
   } else {
     parts.push(h.t.walkInMeta);
   }
-  if (entry.hasContact) parts.push(h.t.phoneOnFile);
+  parts.push(entry.hasContact ? h.t.phoneOnFile : h.t.noContact);
   return parts.join(' · ');
 }
 
