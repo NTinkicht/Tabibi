@@ -40,7 +40,14 @@ This is a widening of authorization and therefore an **owner decision** (tracked
 5. When a patient is called: secondary "Le patient ne se présente pas" → inline reason panel
    (reason required) → no-show.
 6. "Ensuite": up to four next callable entries with name, meta and canonical wait range;
-   "N pas encore arrivés".
+   "N pas encore arrivés". Every row except the first has a 44 px **"take next"** button
+   (`aria-label` "Faire passer A-016 en premier") that opens an inline panel: "Faire passer
+   A-016 · Sofiane Bouzid avant les autres ?", required reason, "Faire passer en premier" /
+   "Retour", audit hint. Confirm calls the existing **reorder** API (target position 1, current
+   `queueOrderVersion`, reason; owner decision #817); on success the patient shows the
+   "Prioritaire" badge first and the primary button offers to call them. A stale version (409)
+   or denial leaves the list unchanged and shows the error. Visual reference updated
+   2026-11-08 (doctor artboards).
 7. Footer line: today's completed / no-show counts.
 
 Every button issues exactly one existing command and renders only the committed result; a
