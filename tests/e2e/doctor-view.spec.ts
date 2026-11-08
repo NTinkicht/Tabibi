@@ -154,3 +154,61 @@ test('doctor view renders RTL in Arabic', async ({ page }) => {
   await expect(page.locator('main.doctorView')).toHaveAttribute('dir', 'rtl');
   await expect(page.locator('.doctorPrimary')).toHaveText('إنهاء الاستشارة');
 });
+
+test('doctor view: resume after a lost pause response uses a different idempotency key', async ({
+  page,
+}) => {
+  await page.context().addCookies([
+    {
+      name: 'tabibi_staff_session',
+      value: 'mocked-staff-session',
+      url: 'http://127.0.0.1:3000',
+      httpOnly: true,
+      sameSite: 'Strict',
+    },
+  ]);
+  let status: 'open' | 'paused' = 'open';
+  let lostFirst = false;
+  const keys: Array<{ command: unknown; key: string | undefined }> = [];
+  await page.route('**/api/clinics/**', async (route) => {
+    const request = route.request();
+    if (request.method() === 'GET')
+      return route.fulfill({
+        json: {
+          entries: [row('a', 1, 'in_consultation', 'Yacine Haddad')],
+          session: {
+            doctorDisplayName: 'Dr Leila',
+            startsAt: '2026-09-08T09:00:00.000Z',
+            endsAt: '2026-09-08T12:00:00.000Z',
+            status,
+            declaredDelayMinutes: null,
+            delayVersion: 1,
+            queueOrderVersion: 1,
+          },
+          generatedAt: new Date().toISOString(),
+          refreshAfterSeconds: 30,
+        },
+      });
+    const body = request.postDataJSON() as { command: string };
+    keys.push({
+      command: body.command,
+      key: request.headers()['idempotency-key'],
+    });
+    status = body.command === 'pause' ? 'paused' : 'open';
+    if (!lostFirst) {
+      lostFirst = true;
+      return route.abort();
+    }
+    return route.fulfill({ json: { session: { status } } });
+  });
+  await page.goto(url);
+  await page.locator('.doctorControls button[aria-pressed]').click();
+  await expect(
+    page.locator('.doctorControls button[aria-pressed="true"]'),
+  ).toBeVisible();
+  await page.locator('.doctorControls button[aria-pressed="true"]').click();
+  await expect.poll(() => keys.length).toBe(2);
+  expect(keys[0].command).toBe('pause');
+  expect(keys[1].command).toBe('resume');
+  expect(keys[1].key).not.toBe(keys[0].key);
+});

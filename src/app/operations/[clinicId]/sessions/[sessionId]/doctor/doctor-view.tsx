@@ -42,7 +42,7 @@ export function DoctorView({
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const [noShowOpen, setNoShowOpen] = useState(false);
+  const [noShowFor, setNoShowFor] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const keysRef = useRef(new Map<string, string>());
   const loadRef = useRef(0);
@@ -203,9 +203,13 @@ export function DoctorView({
                 aria-pressed={session.status === 'paused'}
                 disabled={busy}
                 onClick={() =>
-                  void post('commands', 'session:toggle', {
-                    command: session.status === 'open' ? 'pause' : 'resume',
-                  })
+                  void post(
+                    'commands',
+                    `session:${session.status === 'open' ? 'pause' : 'resume'}`,
+                    {
+                      command: session.status === 'open' ? 'pause' : 'resume',
+                    },
+                  )
                 }
               >
                 {session.status === 'open' ? t.pause : t.resume}
@@ -285,12 +289,15 @@ export function DoctorView({
 
           {view.canNoShow && view.current && (
             <div className="doctorNoShow">
-              {!noShowOpen ? (
+              {noShowFor !== view.current.id ? (
                 <button
                   type="button"
                   className="quiet"
                   disabled={busy}
-                  onClick={() => setNoShowOpen(true)}
+                  onClick={() => {
+                    setReason('');
+                    setNoShowFor(view.current?.id ?? null);
+                  }}
                 >
                   {d.noShowAsk}
                 </button>
@@ -314,7 +321,7 @@ export function DoctorView({
                       void entryCommand(target, 'no_show', reason.trim()).then(
                         (ok) => {
                           if (!ok) return;
-                          setNoShowOpen(false);
+                          setNoShowFor(null);
                           setReason('');
                         },
                       );
@@ -326,7 +333,7 @@ export function DoctorView({
                     type="button"
                     className="quiet"
                     onClick={() => {
-                      setNoShowOpen(false);
+                      setNoShowFor(null);
                       setReason('');
                     }}
                   >
