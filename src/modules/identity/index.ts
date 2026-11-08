@@ -54,4 +54,25 @@ export async function requireDoctorIdentity(
   if (result.rowCount !== 1) throw new AuthorizationError();
 }
 
+/**
+ * Owner decision #799 (option A): a doctor may act only on a consultation
+ * session whose doctor is the caller's OWN doctor identity in this clinic.
+ * A session that does not exist in this clinic is denied, not "not found", so
+ * a doctor cannot probe other clinics' or doctors' session ids.
+ */
+export async function requireOwnSessionDoctor(
+  db: Queryable,
+  scope: ClinicScope,
+  sessionId: string,
+): Promise<void> {
+  const owner = await db.query<{ doctor_id: string }>(
+    `SELECT doctor_id FROM consultation_sessions
+      WHERE id = $1 AND clinic_id = $2`,
+    [sessionId, scope.clinicId],
+  );
+  const doctorId = owner.rows[0]?.doctor_id;
+  if (!doctorId) throw new AuthorizationError();
+  await requireDoctorIdentity(db, scope, doctorId);
+}
+
 export type TransactionClient = PoolClient;

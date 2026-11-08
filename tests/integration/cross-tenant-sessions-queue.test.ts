@@ -21,7 +21,10 @@ import { GET as dashboard } from '@/app/api/clinics/[clinicId]/sessions/[session
 // The generic matrix (#767) sends `{}` bodies, so a 400/404 could mask a
 // missing requireClinicRole. Session create is receptionist/clinic_admin,
 // session commands and delay are the owning doctor, receptionist and
-// clinic_admin, queue operations are receptionist/clinic_admin only. A
+// clinic_admin, queue operations are receptionist/clinic_admin only, except
+// that the owning doctor may read the dashboard and call / start / complete /
+// no-show on their own session (owner decision #799, covered in
+// doctor-queue-authorization.test.ts). A
 // clinic-B admin must also fail through its OWN clinic path with the clinic-A
 // session id (IDOR), without any state change.
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 4 });
@@ -283,7 +286,14 @@ describe('queue routes enforce the target clinic role', () => {
         handler === listQueue
           ? `${sessionPath()}/queue`
           : `${sessionPath()}/dashboard`;
-      for (const s of [subjects.adminB, subjects.doctorA])
+      // Owner decision #799: the OWNING doctor may read the dashboard of this
+      // session; the queue list stays receptionist/clinic_admin only, and a
+      // non-owning doctor or another clinic is denied both.
+      const denied =
+        handler === listQueue
+          ? [subjects.adminB, subjects.doctorA, subjects.doctorA2]
+          : [subjects.adminB, subjects.doctorA2];
+      for (const s of denied)
         expect(
           await status(
             handler(
@@ -293,6 +303,15 @@ describe('queue routes enforce the target clinic role', () => {
           ),
           s,
         ).toBe(403);
+      if (handler === dashboard)
+        expect(
+          await status(
+            handler(
+              request(url, 'GET', await cookieFor(subjects.doctorA)),
+              sessionCtx() as never,
+            ),
+          ),
+        ).toBe(200);
       expect(
         await status(
           handler(
