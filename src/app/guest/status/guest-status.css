@@ -64,3 +64,6 @@
 .gs-footer p {
   margin-block: var(--tb-space-1);
 }
+.gs-panel h2 {
+  color: inherit;
+}

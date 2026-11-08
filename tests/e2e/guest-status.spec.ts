@@ -519,3 +519,90 @@ test('guest status Arabic RTL fits a 360px phone without horizontal scroll and r
   const text = await page.locator('body').innerText();
   expect(text).not.toMatch(/\+?\d{9,}|@|Dr\b|Dr\./);
 });
+
+test('guest status called panel heading is white on the primary background', async ({
+  page,
+}) => {
+  await mockStatus(page, { ...activeEligible, queueState: 'called' });
+  await page.goto('/guest/status');
+  const heading = page.getByRole('heading', { name: 'It is your turn' });
+  await expect(heading).toBeVisible();
+  expect(await heading.evaluate((el) => getComputedStyle(el).color)).toBe(
+    'rgb(255, 255, 255)',
+  );
+});
+
+test('guest status closed terminal outcome has its own copy', async ({
+  page,
+}) => {
+  await mockStatus(page, {
+    generatedAt: '2026-09-10T09:05:00Z',
+    terminal: true,
+    finalStatus: 'closed',
+  });
+  await page.goto('/guest/status');
+  await expect(page.getByText('The clinic session is closed.')).toBeVisible();
+  await expect(page.getByText('This page no longer updates.')).toBeVisible();
+});
+
+for (const [label, body, tone] of [
+  ['called', { ...activeEligible, queueState: 'called' }, 'called'],
+  [
+    'in_consultation',
+    { ...activeEligible, queueState: 'in_consultation' },
+    'active',
+  ],
+  [
+    'paused session',
+    {
+      ...activeEligible,
+      session: { status: 'paused', declaredDelayMinutes: null },
+    },
+    'warning',
+  ],
+  ['live', activeEligible, 'arrived'],
+  ['provisional', activeWaiting, 'neutral'],
+] as const) {
+  test(`guest status chip tone for ${label} is ${tone}`, async ({ page }) => {
+    await mockStatus(page, body);
+    await page.goto('/guest/status');
+    await expect(page.locator(`section.gs-page .tb-chip--${tone}`)).toHaveCount(
+      1,
+    );
+    await expect(page.locator('section.gs-page .tb-chip')).toHaveCount(1);
+  });
+}
+
+test('guest status shows the delay notice only when a delay is declared', async ({
+  page,
+}) => {
+  await mockStatus(page, activeWaiting);
+  await page.goto('/guest/status');
+  await expect(page.locator('.gs-delay')).toContainText('10');
+  await page.unroute('**/api/guest/status');
+  await mockStatus(page, {
+    ...activeWaiting,
+    session: { status: 'open', declaredDelayMinutes: null },
+  });
+  await page.reload();
+  await expect(page.getByText('Patients ahead:')).toHaveCount(0);
+  await expect(page.locator('.gs-delay')).toHaveCount(0);
+});
+
+test('guest status footer has help links and the privacy line', async ({
+  page,
+}) => {
+  await mockStatus(page, activeEligible);
+  await page.goto('/guest/status');
+  const footer = page.locator('footer.gs-footer');
+  await expect(
+    footer.getByRole('link', { name: 'What to do while waiting' }),
+  ).toHaveAttribute('href', '/guest/queue-next-steps');
+  await expect(footer.getByRole('link', { name: 'Help' })).toHaveAttribute(
+    'href',
+    '/guest/help',
+  );
+  await expect(footer).toContainText(
+    'This page shows no name, phone number, doctor or clinic identifier.',
+  );
+});
