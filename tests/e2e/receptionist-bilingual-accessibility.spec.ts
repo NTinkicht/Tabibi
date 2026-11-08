@@ -184,19 +184,19 @@ test('receptionist queue stays clinic-scoped, private, bilingual, and keyboard o
     await expect(receptionView).toContainText('د. ليلى');
     await expect(receptionView).toContainText('مفتوحة');
 
-    const reorder = page
-      .getByRole('button', { name: 'تقديم / إعادة ترتيب (مدقّق)' })
-      .nth(1);
-    await tabTo(page, reorder);
-    await expect(reorder).toBeFocused();
-    const answers = ['1', 'WU55 keyboard acceptance'];
-    page.on('dialog', (dialog) => void dialog.accept(answers.shift()));
+    const more = page.getByRole('button', { name: /^إجراءات أخرى لـ/ }).nth(1);
+    await tabTo(page, more);
+    await expect(more).toBeFocused();
+    await page.keyboard.press('Enter');
+    await page
+      .getByLabel('السبب التشغيلي (مطلوب)')
+      .fill('WU55 keyboard acceptance');
     const reorderResponse = page.waitForResponse((response) =>
       response.url().endsWith('/reorder'),
     );
-    await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: 'تقديم', exact: true }).click();
     expect((await reorderResponse).status()).toBe(200);
-    await expect(page.getByText('ترتيب الخدمة #1')).toBeVisible();
+    await expect(page.getByText('أولوية', { exact: true })).toBeVisible();
 
     const frenchButton = page.getByRole('button', { name: 'Français' });
     await tabTo(page, frenchButton);

@@ -738,3 +738,90 @@ h1 {
   color: #5c3d00;
   font-weight: 700;
 }
+.servingRegion,
+.queueRegion {
+  margin-top: 1.5rem;
+}
+.servingCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 0.75rem;
+}
+.servingCard {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #c9dcda;
+  border-radius: 1rem;
+}
+.servingCard .ticket {
+  font-size: 1.9rem;
+}
+.servingCard small,
+.emptyServing,
+.queueCount {
+  color: #52716d;
+}
+.queueRows {
+  display: grid;
+  gap: 0.5rem;
+}
+.queueRow.consoleRow {
+  grid-template-columns: 2rem 5.5rem minmax(0, 1fr) 9rem 8rem auto;
+}
+.rowPosition {
+  font-weight: 800;
+  color: #52716d;
+}
+.waitCell strong {
+  display: block;
+}
+.chip {
+  margin-inline-start: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: #e3f1ee;
+  color: #164d45;
+}
+.chip.priorityChip {
+  background: #fff6e0;
+  color: #5c3d00;
+}
+.rowPanelWrap {
+  position: relative;
+}
+.rowPanel {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 15rem;
+  margin-top: 0.4rem;
+  padding: 0.75rem;
+  background: #fff;
+  border: 1px solid #c9dcda;
+  border-radius: 0.75rem;
+}
+.rowPanelActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.lastAction {
+  margin-top: 1rem;
+  padding: 0.6rem 1rem;
+  border-radius: 0.75rem;
+  background: #e3f1ee;
+  color: #164d45;
+  font-weight: 700;
+}
+@media (max-width: 1100px) {
+  .queueRow.consoleRow {
+    grid-template-columns: 2rem 5rem minmax(0, 1fr) auto;
+  }
+  .queueRow.consoleRow .waitCell,
+  .queueRow.consoleRow .queueState {
+    grid-column: 3;
+  }
+}

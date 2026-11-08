@@ -127,7 +127,7 @@ test('background dashboard poll failure preserves the last good snapshot and mar
   ).toBeVisible();
   await expect(page.getByText('مريض ثابت', { exact: true })).toBeVisible();
   await expect(
-    page.getByRole('button', { name: 'تقديم / إعادة ترتيب (مدقّق)' }),
+    page.getByRole('button', { name: 'إجراءات أخرى لـ W-KEEP00001' }),
   ).toBeVisible();
 
   await expect.poll(() => dashboardRequests).toBeGreaterThan(1);
@@ -149,7 +149,7 @@ test('background dashboard poll failure preserves the last good snapshot and mar
   ).toBeVisible();
   await expect(page.getByText('مريض ثابت', { exact: true })).toBeVisible();
   await expect(
-    page.getByRole('button', { name: 'تقديم / إعادة ترتيب (مدقّق)' }),
+    page.getByRole('button', { name: 'إجراءات أخرى لـ W-KEEP00001' }),
   ).toBeVisible();
 });
 

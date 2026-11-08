@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildConsoleView,
+  formatLastAction,
   formatWaitRange,
   steppedDelay,
   type ConsoleEntry,
@@ -179,8 +180,30 @@ describe('reception console view model', () => {
       'appointmentMeta',
       'walkInMeta',
       'phoneOnFile',
+      'queueListTitle',
+      'prioritise',
+      'moreActionsFor',
     ] as const;
     for (const locale of ['fr', 'ar'] as const)
       for (const k of keys) expect(receptionistCopy[locale][k]).toBeTruthy();
+  });
+
+  it('formats the status-bar text per locale and tolerates a missing eta', () => {
+    const e = entry({
+      publicDisplayLabel: 'A-013',
+      privateDisplayName: 'Yacine',
+    });
+    expect(formatLastAction(receptionistCopy.fr.lastAction, e, 'Appelé')).toBe(
+      'A-013 Yacine : Appelé.',
+    );
+    expect(formatLastAction(receptionistCopy.ar.lastAction, e, 'x')).toBe(
+      'A-013 Yacine: x.',
+    );
+    expect(
+      formatWaitRange(
+        undefined as unknown as ConsoleEntry['eta'],
+        receptionistCopy.fr,
+      ),
+    ).toBe('—');
   });
 });
