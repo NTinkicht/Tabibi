@@ -70,6 +70,7 @@ const EXPECTED: Record<string, readonly Method[]> = {
   'sessions/[sessionId]/queue': ['GET', 'POST'],
   'sessions/[sessionId]/queue/[entryId]/commands': ['POST'],
   'sessions/[sessionId]/queue/[entryId]/reorder': ['POST'],
+  'sessions/[sessionId]/queue/[entryId]/restore': ['POST'],
   'sessions/[sessionId]/queue/[entryId]/status-link': ['POST'],
 };
 
@@ -195,7 +196,7 @@ describe('staff clinic route inventory', () => {
       );
     }
     expect(discovered).toEqual(EXPECTED);
-    expect(mutations).toHaveLength(27);
+    expect(mutations).toHaveLength(28);
     expect(reads).toHaveLength(13);
   });
 });

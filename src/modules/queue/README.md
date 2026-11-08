@@ -17,5 +17,10 @@ operational reason, validate an optimistic queue version, persist an exact-retry
 receipt, and audit both the prior and resulting priority cohort. Call selection
 uses eligible priority entries first and normal eligibility order second.
 
-ETA, notifications, appointment-specific no-show rules, restore, and transfer
-remain outside this bounded work unit.
+Walk-in restore (`restore.ts`, `POST .../queue/[entryId]/restore`) returns a
+cancelled or no-show walk-in entry to `waiting`, or to `checked_in` at a fresh
+eligibility tail, for receptionist/clinic_admin with a reason and an idempotency
+key; live priority is never carried back and appointment-backed entries are
+refused (they restore through appointment recovery). ETA, notifications,
+appointment-specific no-show rules, and walk-in transfer remain outside this
+bounded work unit.
