@@ -49,8 +49,26 @@ appointment caption; nothing is inferred in the browser.
 
 Below 1200 px the side panel wraps under the main column (flex-wrap; no media-query
 breakpoints needed for that). Below 700 px queue rows wrap their cells onto two lines and the
-session bar stacks. Tablet layout (1024 × 768, landscape) is the next design iteration; it must
-not require horizontal scrolling.
+session bar stacks.
+
+### Tablet (1024 × 768 landscape, touch; owner: receptionists use desktop **and** tablet)
+
+Visual reference: row "Reception console · tablet" (French and Arabic, with the add-patient
+panel open). Applies when the viewport is ≤ 1199 px wide and the primary pointer is coarse
+(`@media (max-width: 1199px) and (pointer: coarse)`); same data, commands and rules as desktop.
+
+- Header (60 px): logo, session switcher button (doctor + hours) instead of navigating back to
+  the home, today's counts as one line, language switch.
+- Session strip: state chip, delay − value + (44 px buttons), Pause, and the Call-next button
+  (≥ 60 px tall) at the end.
+- Body: a 300 px "En cours" column (in-consultation and called cards, 52 px buttons) and the
+  queue list filling the rest with 64 px rows (ticket, name, meta, wait, primary action ≥ 48 px,
+  ⋯ 48 px). No horizontal scrolling.
+- The walk-in form moves into a modal side panel (`role="dialog"`, `aria-modal`, 400 px, on the
+  inline-end side, so right in French and left in Arabic) opened by a floating "Ajouter un
+  patient" button (56 px); focus is trapped and returned on close; 52 px inputs; "today" tiles
+  are replaced by the header counts line.
+- Touch: no hover-only affordances; every target ≥ 44 px (48+ for primary actions).
 
 ## Regions and behaviour
 

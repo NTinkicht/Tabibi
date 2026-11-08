@@ -66,6 +66,46 @@ export interface ConsultationSession {
   delayUpdatedAt: Date | null;
 }
 
+/**
+ * Gap register G-17: aggregate, non-identifying queue counts per session for
+ * the reception home. Only counts by state: no labels, names or contacts.
+ */
+export interface SessionQueueCounts {
+  waiting: number;
+  checkedIn: number;
+  called: number;
+  inConsultation: number;
+  completed: number;
+  noShow: number;
+  cancelled: number;
+}
+
+export type SessionListItem = ConsultationSession & {
+  queueCounts: SessionQueueCounts;
+};
+
+const QUEUE_COUNT_KEYS: Record<string, keyof SessionQueueCounts> = {
+  waiting: 'waiting',
+  checked_in: 'checkedIn',
+  called: 'called',
+  in_consultation: 'inConsultation',
+  completed: 'completed',
+  no_show: 'noShow',
+  cancelled: 'cancelled',
+};
+
+function emptyQueueCounts(): SessionQueueCounts {
+  return {
+    waiting: 0,
+    checkedIn: 0,
+    called: 0,
+    inConsultation: 0,
+    completed: 0,
+    noShow: 0,
+    cancelled: 0,
+  };
+}
+
 interface SessionRow {
   id: string;
   clinic_id: string;
@@ -243,6 +283,42 @@ export class SessionService {
       [scope.clinicId, serviceDate, doctor?.rows[0]?.id ?? null],
     );
     return result.rows.map(fromRow);
+  }
+
+  /**
+   * The same authorized, doctor-scoped list as `listSessions`, plus aggregate
+   * queue counts per session (G-17). Counts are read only for the session ids
+   * that list already authorized, and only within this clinic.
+   */
+  async listSessionsWithQueueCounts(
+    scope: ClinicScope,
+    serviceDate: string,
+  ): Promise<SessionListItem[]> {
+    const sessions = await this.listSessions(scope, serviceDate);
+    if (sessions.length === 0) return [];
+    const counts = await this.pool.query<{
+      session_id: string;
+      state: string;
+      n: number;
+    }>(
+      `SELECT session_id, state, count(*)::int AS n
+         FROM queue_entries
+        WHERE clinic_id = $1 AND session_id = ANY($2::uuid[])
+        GROUP BY session_id, state`,
+      [scope.clinicId, sessions.map((session) => session.id)],
+    );
+    const bySession = new Map<string, SessionQueueCounts>();
+    for (const row of counts.rows) {
+      const key = QUEUE_COUNT_KEYS[row.state];
+      if (!key) continue;
+      const entry = bySession.get(row.session_id) ?? emptyQueueCounts();
+      entry[key] = Number(row.n);
+      bySession.set(row.session_id, entry);
+    }
+    return sessions.map((session) => ({
+      ...session,
+      queueCounts: bySession.get(session.id) ?? emptyQueueCounts(),
+    }));
   }
 
   async createManual(
