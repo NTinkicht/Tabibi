@@ -9,7 +9,7 @@ Visual reference for all designs: https://claude.ai/artifact/RRe557S5McvDYnLFc7Q
 
 | ID | Gap | Found in | Corrected by | Status |
 |---|---|---|---|---|
-| G-01 | No staff **restore** or **transfer** API, although `PRODUCT.md` TAB-P0-07 requires both and the console design uses them | reception console design | #810 | open |
+| G-01 | No staff **restore** or **transfer** API, although `PRODUCT.md` TAB-P0-07 requires both and the console design uses them | reception console design | #810 | closed |
 | G-02 | Console status bar has no **Restore** and rows have no **Transfer** (blocked by G-01) | reception console design | #813 (after #810, #786) | open |
 | G-03 | Staff dashboard had no appointment origin / start time for row metadata | Codex review of #784 | `reception-console.md` data prerequisite, implemented with #786 (`origin`, `appointmentStartsAt` in `ReceptionistDashboardEntry`) | closed |
 | G-04 | Mockups showed browser-computed clock-time ETAs and called-at times the server does not provide | Codex review of #784 | specs use the canonical wait range; visual reference corrected (G-15) | closed |

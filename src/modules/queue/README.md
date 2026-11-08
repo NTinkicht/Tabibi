@@ -21,6 +21,12 @@ Walk-in restore (`restore.ts`, `POST .../queue/[entryId]/restore`) returns a
 cancelled or no-show walk-in entry to `waiting`, or to `checked_in` at a fresh
 eligibility tail, for receptionist/clinic_admin with a reason and an idempotency
 key; live priority is never carried back and appointment-backed entries are
-refused (they restore through appointment recovery). ETA, notifications,
-appointment-specific no-show rules, and walk-in transfer remain outside this
+refused (they restore through appointment recovery). Walk-in transfer
+(`transfer.ts`, `POST .../queue/[entryId]/transfer`) moves a waiting, checked-in
+or called walk-in entry to another planned/open/paused session of the same
+doctor: the source is cancelled with a `transfer` cause in the audit event, and
+the target entry is `waiting` (from waiting) or `checked_in` at the target tail
+(from checked-in or called); called status and priority never carry over, and
+consulting, terminal and appointment-backed entries are refused. ETA,
+notifications and appointment-specific no-show rules remain outside this
 bounded work unit.
