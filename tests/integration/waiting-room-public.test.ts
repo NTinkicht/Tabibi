@@ -85,7 +85,22 @@ describe('privacy-preserving waiting-room projection', () => {
       ids.session,
     );
 
+    expect(Object.keys(snapshot).sort()).toEqual([
+      'entries',
+      'generatedAt',
+      'session',
+    ]);
+    expect(Object.keys(snapshot.session).sort()).toEqual([
+      'declaredDelayMinutes',
+      'pauseStatus',
+    ]);
+    expect(Number.isNaN(Date.parse(snapshot.generatedAt))).toBe(false);
+    expect(new Date(snapshot.generatedAt).toISOString()).toBe(
+      snapshot.generatedAt,
+    );
     expect(snapshot).toEqual({
+      session: { pauseStatus: 'active', declaredDelayMinutes: 0 },
+      generatedAt: snapshot.generatedAt,
       entries: [
         {
           publicDisplayLabel: registration.entry.publicDisplayLabel,
@@ -103,6 +118,43 @@ describe('privacy-preserving waiting-room projection', () => {
     expect(serialized).not.toContain(registration.entry.id);
     expect(serialized).not.toContain(ids.clinic);
     expect(serialized).not.toContain(ids.session);
+  });
+
+  it('exposes pause state and declared delay, and neutral values for unknown sessions', async () => {
+    await pool.query(
+      `UPDATE consultation_sessions
+          SET status = 'paused', declared_delay_minutes = 25, delay_updated_at = now(), updated_at = now()
+        WHERE id = $1 AND clinic_id = $2`,
+      [ids.session, ids.clinic],
+    );
+    const service = new WaitingRoomService(pool);
+    const paused = await service.getPublicSnapshot(ids.clinic, ids.session);
+    expect(paused.session).toEqual({
+      pauseStatus: 'paused',
+      declaredDelayMinutes: 25,
+    });
+
+    await pool.query(
+      `UPDATE consultation_sessions
+          SET status = 'open', updated_at = now()
+        WHERE id = $1 AND clinic_id = $2`,
+      [ids.session, ids.clinic],
+    );
+    const open = await service.getPublicSnapshot(ids.clinic, ids.session);
+    expect(open.session).toEqual({
+      pauseStatus: 'active',
+      declaredDelayMinutes: 25,
+    });
+
+    const crossClinic = await service.getPublicSnapshot(
+      ids.otherClinic,
+      ids.session,
+    );
+    expect(crossClinic.session).toEqual({
+      pauseStatus: 'active',
+      declaredDelayMinutes: 0,
+    });
+    expect(crossClinic.entries).toEqual([]);
   });
 
   it('uses a public label that is independent from the queue-entry UUID', async () => {

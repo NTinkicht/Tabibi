@@ -8,7 +8,14 @@ export interface PublicWaitingRoomEntry {
   called: boolean;
 }
 
+export interface PublicWaitingRoomSession {
+  pauseStatus: 'active' | 'paused';
+  declaredDelayMinutes: number;
+}
+
 export interface PublicWaitingRoomSnapshot {
+  session: PublicWaitingRoomSession;
+  generatedAt: string;
   entries: PublicWaitingRoomEntry[];
 }
 
@@ -19,6 +26,21 @@ export class WaitingRoomService {
     clinicId: string,
     sessionId: string,
   ): Promise<PublicWaitingRoomSnapshot> {
+    const generatedAt = new Date();
+    // Unknown or cross-clinic sessions fall back to the neutral values so the
+    // public endpoint never reveals whether a session exists.
+    const sessionResult = await this.pool.query<{
+      status: string;
+      declared_delay_minutes: number | null;
+    }>(
+      `SELECT status::text AS status,
+              declared_delay_minutes
+         FROM consultation_sessions
+        WHERE id = $2
+          AND clinic_id = $1`,
+      [clinicId, sessionId],
+    );
+    const sessionRow = sessionResult.rows[0];
     const result = await this.pool.query<{
       public_display_label: string;
       state: PublicWaitingRoomState;
@@ -38,6 +60,14 @@ export class WaitingRoomService {
     );
 
     return {
+      session: {
+        pauseStatus: sessionRow?.status === 'paused' ? 'paused' : 'active',
+        declaredDelayMinutes: Math.max(
+          0,
+          sessionRow?.declared_delay_minutes ?? 0,
+        ),
+      },
+      generatedAt: generatedAt.toISOString(),
       entries: result.rows.map((row) => ({
         publicDisplayLabel: row.public_display_label,
         state: row.state,
