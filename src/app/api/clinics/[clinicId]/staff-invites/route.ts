@@ -23,7 +23,9 @@ const createInviteSchema = z
   .strict();
 
 // G-18 (#824): a clinic_admin invites a doctor or receptionist. The token is
-// in this one response only (cache-control: no-store, never logged); the
+// in this one response only and never logged. `cache-control: no-store` is
+// set by operationalJson on every response, success and error alike (asserted
+// in staff-invite-http-api.test.ts); the
 // admin's UI turns it into the one-time link /staff/invite#<token>, whose
 // fragment never reaches the server.
 export async function POST(
