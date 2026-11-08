@@ -33,6 +33,12 @@ export interface DoctorView {
   paused: boolean;
   /** Up to four next arrived entries after the one the primary would call. */
   next: ConsoleEntry[];
+  /**
+   * Ids in `next` the doctor may move to position 1 (reorder API, owner
+   * decision #817). Never the entry the primary button would call, and none
+   * unless the session is open or paused (the reorder gate).
+   */
+  takeNextIds: string[];
   notArrivedCount: number;
   completedCount: number;
   noShowCount: number;
@@ -73,6 +79,15 @@ export function buildDoctorView(
   const arrived = view.queue
     .filter((row) => row.entry.state === 'checked_in')
     .map((row) => row.entry);
+  const next = arrived
+    .filter((entry) => entry.id !== view.nextCallable?.id || current !== null)
+    .slice(0, DOCTOR_NEXT_LIST_LIMIT);
+  const reorderable = status === 'open' || status === 'paused';
+  const takeNextIds = reorderable
+    ? next
+        .filter((entry) => entry.id !== view.nextCallable?.id)
+        .map((entry) => entry.id)
+    : [];
   return {
     current,
     primary,
@@ -82,9 +97,8 @@ export function buildDoctorView(
       QUEUE_COMMAND_SOURCE_STATES.no_show.includes(current.state) &&
       allowed(status, 'no_show'),
     paused: view.paused,
-    next: arrived
-      .filter((entry) => entry.id !== view.nextCallable?.id || current !== null)
-      .slice(0, DOCTOR_NEXT_LIST_LIMIT),
+    next,
+    takeNextIds,
     notArrivedCount: view.notArrivedCount,
     completedCount: entries.filter((e) => e.state === 'completed').length,
     noShowCount: entries.filter((e) => e.state === 'no_show').length,
