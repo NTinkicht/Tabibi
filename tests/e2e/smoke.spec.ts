@@ -120,9 +120,7 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
   await expect(
     page.getByText('Patient test', { exact: true }).first(),
   ).toBeVisible();
-  await expect(
-    page.getByText('Sans coordonnées').first(),
-  ).toBeVisible();
+  await expect(page.getByText('Sans coordonnées').first()).toBeVisible();
   await expect(page.getByText(/^W-[A-F0-9]{10}$/).first()).toBeVisible();
   await page.getByRole('button', { name: 'العربية' }).click();
   await page.getByRole('button', { name: 'تسجيل الوصول' }).last().click();
