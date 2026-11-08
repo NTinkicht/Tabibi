@@ -23,7 +23,8 @@ export type ChipTone =
   | 'arrived'
   | 'active'
   | 'warning'
-  | 'priority';
+  | 'priority'
+  | 'danger';
 
 export function Chip({
   tone = 'neutral',

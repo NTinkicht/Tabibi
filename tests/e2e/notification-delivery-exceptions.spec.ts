@@ -315,6 +315,25 @@ test('reception desk links to the notification delivery exceptions page', async 
     });
   });
 
+  // The reception home shows the link only inside the undelivered banner.
+  await page.route(DEAD_LETTERS_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        deadLettersBody([
+          {
+            eventKey: 'queue.called',
+            queueLabel: 'G-042',
+            attemptCount: 5,
+            maxAttempts: 5,
+            outcomeAt: '2026-09-08T09:00:00.000Z',
+          },
+        ]),
+      ),
+    });
+  });
+
   await page.goto(`/operations/${clinicId}?locale=fr`);
   const link = page.getByRole('link', { name: 'Notifications non remises' });
   await expect(link).toHaveAttribute(

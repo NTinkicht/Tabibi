@@ -99,7 +99,7 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
   await expect(page.getByLabel('دقائق التأخير')).toHaveValue('35');
   await page.getByRole('button', { name: 'Français' }).click();
 
-  await page.getByRole('link', { name: 'Patients sans rendez-vous' }).click();
+  await page.getByRole('link', { name: 'Ouvrir la console' }).click();
   await expect(
     page.getByRole('heading', { name: 'File des patients sans rendez-vous' }),
   ).toBeVisible();
