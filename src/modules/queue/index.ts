@@ -804,6 +804,191 @@ export class QueueService {
     });
   }
 
+  /**
+   * Staff restore of a mistaken `no_show` or `cancelled` walk-in entry (G-01,
+   * TAB-P0-07). The entry returns to `waiting` (or to `checked_in` at a fresh
+   * eligibility tail when `checkIn` is set); the old terminal state stays in
+   * the audit trail, priority never carries over and the version advances.
+   * Entries linked to an appointment are refused here: they are restored
+   * through the appointment recovery route, which keeps both records in step.
+   */
+  async restore(
+    scope: ClinicScope,
+    sessionId: string,
+    entryId: string,
+    rawInput: {
+      reason: string;
+      checkIn?: boolean;
+      idempotencyKey: string;
+      correlationId: string;
+    },
+  ): Promise<StaffQueueEntry> {
+    const reason = rawInput.reason?.trim();
+    if (!reason) throw new QueueValidationError('Restore reason is required');
+    if (!rawInput.idempotencyKey || rawInput.idempotencyKey.length > 128)
+      throw new QueueValidationError('A valid idempotency key is required');
+    const checkIn = rawInput.checkIn === true;
+    const requestFingerprint = createHash('sha256')
+      .update(
+        JSON.stringify({
+          sessionId,
+          entryId,
+          command: 'restore',
+          reason,
+          checkIn,
+        }),
+      )
+      .digest('hex');
+
+    return inTransaction(this.pool, async (client) => {
+      await client.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [
+          `queue-command:${scope.clinicId}:${scope.actorUserId}:${rawInput.idempotencyKey}`,
+        ],
+      );
+      await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
+      const receipt = await client.query<{
+        request_fingerprint: string;
+        response: StaffQueueEntry;
+      }>(
+        `SELECT request_fingerprint, response FROM queue_command_receipts
+          WHERE clinic_id=$1 AND actor_user_id=$2 AND idempotency_key=$3`,
+        [scope.clinicId, scope.actorUserId, rawInput.idempotencyKey],
+      );
+      if (receipt.rows[0]) {
+        if (receipt.rows[0].request_fingerprint !== requestFingerprint)
+          throw new QueueConflictError(
+            'Idempotency key was already used for a different queue command',
+          );
+        return receipt.rows[0].response;
+      }
+      const session = await client.query<{ status: string }>(
+        `SELECT status FROM consultation_sessions
+          WHERE id=$1 AND clinic_id=$2 FOR UPDATE`,
+        [sessionId, scope.clinicId],
+      );
+      if (!session.rows[0])
+        throw new QueueConflictError(
+          'Consultation session was not found in this clinic',
+        );
+      if (
+        queueCommandSessionGate(
+          session.rows[0].status as SessionStatus,
+          'check_in',
+        ) !== 'allowed'
+      )
+        throw new QueueConflictError(
+          'Queue lifecycle commands require an open or paused session',
+        );
+      const current = await client.query<{ state: QueueEntryState }>(
+        `SELECT state FROM queue_entries
+          WHERE id=$1 AND session_id=$2 AND clinic_id=$3 FOR UPDATE`,
+        [entryId, sessionId, scope.clinicId],
+      );
+      const prior = current.rows[0]?.state;
+      if (!prior)
+        throw new QueueConflictError(
+          'Queue entry was not found in this clinic and session',
+        );
+      if (prior !== 'no_show' && prior !== 'cancelled')
+        throw new QueueConflictError(`Cannot restore queue entry in ${prior}`);
+      const linked = await client.query(
+        `SELECT 1 FROM appointments WHERE queue_entry_id=$1 AND clinic_id=$2`,
+        [entryId, scope.clinicId],
+      );
+      if (linked.rows[0])
+        throw new QueueConflictError(
+          'This entry belongs to an appointment: restore it through the appointment',
+        );
+      let eligibilityOrder: number | null = null;
+      if (checkIn) {
+        const next = await client.query<{ value: string }>(
+          `SELECT COALESCE(MAX(eligibility_order), 0) + 1 AS value
+             FROM queue_entries WHERE session_id=$1`,
+          [sessionId],
+        );
+        eligibilityOrder = Number(next.rows[0]!.value);
+      }
+      const target: QueueEntryState = checkIn ? 'checked_in' : 'waiting';
+      const updated = await client.query<{
+        id: string;
+        session_id: string;
+        state: QueueEntryState;
+        registration_order: string;
+        eligibility_order: string | null;
+        priority_order: string | null;
+        public_display_label: string;
+        private_display_name: string;
+        preferred_locale: 'ar' | 'fr';
+        contact_phone: string | null;
+        contact_email: string | null;
+      }>(
+        `UPDATE queue_entries entry SET state=$4::queue_entry_status,
+           eligibility_order=$5, priority_order=NULL,
+           in_consultation_started_at=NULL, completed_at=NULL, updated_at=now()
+         FROM patient_operational_records patient
+         WHERE entry.id=$1 AND entry.session_id=$2 AND entry.clinic_id=$3
+           AND patient.id=entry.patient_id AND patient.clinic_id=entry.clinic_id
+         RETURNING entry.id, entry.session_id, entry.state,
+           entry.registration_order, entry.eligibility_order, entry.priority_order,
+           entry.public_display_label, patient.private_display_name,
+           patient.preferred_locale, patient.contact_phone, patient.contact_email`,
+        [entryId, sessionId, scope.clinicId, target, eligibilityOrder],
+      );
+      await client.query(
+        `UPDATE consultation_sessions
+            SET queue_order_version=queue_order_version+1,updated_at=now()
+          WHERE id=$1`,
+        [sessionId],
+      );
+      const row = updated.rows[0]!;
+      const response: StaffQueueEntry = {
+        id: row.id,
+        sessionId: row.session_id,
+        state: row.state,
+        registrationOrder: Number(row.registration_order),
+        eligibilityOrder:
+          row.eligibility_order === null ? null : Number(row.eligibility_order),
+        priorityOrder: null,
+        publicDisplayLabel: row.public_display_label,
+        privateDisplayName: row.private_display_name,
+        preferredLocale: row.preferred_locale,
+        hasContact: row.contact_phone !== null || row.contact_email !== null,
+      };
+      await appendAuditEvent(client, {
+        ...scope,
+        entityType: 'queue_entry',
+        entityId: entryId,
+        action: 'queue_entry.restore',
+        metadata: {
+          command: 'restore',
+          outcome: 'applied',
+          sessionId,
+          from: prior,
+          to: target,
+          reason,
+          correlationId: rawInput.correlationId,
+          idempotencyKey: rawInput.idempotencyKey,
+        },
+      });
+      await client.query(
+        `INSERT INTO queue_command_receipts
+          (clinic_id,actor_user_id,idempotency_key,request_fingerprint,queue_entry_id,response)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [
+          scope.clinicId,
+          scope.actorUserId,
+          rawInput.idempotencyKey,
+          requestFingerprint,
+          entryId,
+          JSON.stringify(response),
+        ],
+      );
+      return response;
+    });
+  }
+
   async reorder(
     scope: ClinicScope,
     sessionId: string,

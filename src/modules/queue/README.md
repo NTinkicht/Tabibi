@@ -17,5 +17,12 @@ operational reason, validate an optimistic queue version, persist an exact-retry
 receipt, and audit both the prior and resulting priority cohort. Call selection
 uses eligible priority entries first and normal eligibility order second.
 
-ETA, notifications, appointment-specific no-show rules, restore, and transfer
-remain outside this bounded work unit.
+Staff may restore a mistaken `no_show` or `cancelled` walk-in entry
+(`POST .../queue/{entryId}/restore`, receptionist and clinic admin only): it
+returns to `waiting`, or to `checked_in` at a fresh eligibility tail with
+`checkIn`, drops any priority, advances the queue version and keeps the earlier
+terminal transition in the audit trail. Appointment-linked entries are restored
+through the appointment route so both records stay in step.
+
+ETA, notifications, appointment-specific no-show rules, and transfer remain
+outside this bounded work unit.

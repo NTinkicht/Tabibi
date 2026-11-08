@@ -13,6 +13,7 @@ import {
   POST as registerWalkIn,
 } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/route';
 import { POST as entryCommand } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/[entryId]/commands/route';
+import { POST as restoreEntry } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/[entryId]/restore/route';
 import { POST as reorder } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/[entryId]/reorder/route';
 import { GET as dashboard } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/dashboard/route';
 
@@ -336,6 +337,20 @@ describe('queue routes enforce the target clinic role', () => {
               { command: 'check_in' },
             ),
             entryCtx(entries[0]!),
+          ),
+        ),
+        s,
+      ).toBe(403);
+      expect(
+        await status(
+          restoreEntry(
+            request(
+              `${sessionPath()}/queue/${entries[1]}/restore`,
+              'POST',
+              await cookieFor(s),
+              { reason: 'mistake' },
+            ),
+            entryCtx(entries[1]!),
           ),
         ),
         s,

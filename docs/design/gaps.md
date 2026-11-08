@@ -9,7 +9,7 @@ Visual reference for all designs: https://claude.ai/artifact/RRe557S5McvDYnLFc7Q
 
 | ID | Gap | Found in | Corrected by | Status |
 |---|---|---|---|---|
-| G-01 | No staff **restore** or **transfer** API, although `PRODUCT.md` TAB-P0-07 requires both and the console design uses them | reception console design | #810 | open |
+| G-01 | No staff **restore** or **transfer** API, although `PRODUCT.md` TAB-P0-07 requires both and the console design uses them | reception console design | #810 (restore for walk-in entries: `POST …/queue/{entryId}/restore`, merged with this slice; transfer still to do) | open |
 | G-02 | Console status bar has no **Restore** and rows have no **Transfer** (blocked by G-01) | reception console design | #813 (after #810, #786) | open |
 | G-03 | Staff dashboard had no appointment origin / start time for row metadata | Codex review of #784 | `reception-console.md` data prerequisite, implemented with #786 (`origin`, `appointmentStartsAt` in `ReceptionistDashboardEntry`) | closed |
 | G-04 | Mockups showed browser-computed clock-time ETAs and called-at times the server does not provide | Codex review of #784 | specs use the canonical wait range; visual reference corrected (G-15) | closed |
@@ -20,8 +20,8 @@ Visual reference for all designs: https://claude.ai/artifact/RRe557S5McvDYnLFc7Q
 | G-09 | Surfaces without an approved design: reception home, staff sign-in, notifications page, clinic setup, guest help pages | UI inventory 2026-11-08 | items 1–3 designed 2026-11-08 (`reception-home.md`), implementation: #822; clinic setup designed 2026-11-08 (`clinic-setup.md`), implementation: #829, #830; guest help pages restyled with the foundations (no bespoke design): #831 | open (until #822, #829, #830, #831) |
 | G-10 | Bookable sessions had no filters, location or specialties, so search could not show sessions; discovery is session-free by #692 | find-and-book design | #803 | closed |
 | G-11 | An availability on/off toggle would have removed booking for available doctors (plain discovery has no session data) | Codex review of #802 | two explicit modes in `find-and-book.md`, implemented by #804 | open (until #804) |
-| G-12 | `/guest/status` (status-only cookie) cannot check in or show a wait range; the two guest credential classes must not be mixed | Codex review of #797 | `patient-status.md` two-surfaces table, implemented by #798 | open (until #798) |
-| G-13 | Cancelled and no-show must not read as "visit finished" | Codex review of #797 | `patient-status.md` terminal rows, implemented by #798 | open (until #798) |
+| G-12 | `/guest/status` (status-only cookie) cannot check in or show a wait range; the two guest credential classes must not be mixed | Codex review of #797 | `patient-status.md` two-surfaces table, implemented by #806, #807, #835 | closed |
+| G-13 | Cancelled and no-show must not read as "visit finished" | Codex review of #797 | `patient-status.md` terminal rows, implemented by #806, #807, #835 | closed |
 | G-14 | The booking bearer is memory-only, so a closed page loses online access unless a contact link exists | find-and-book design | `find-and-book.md` keep-page-open notice, implemented by #805 | open (until #805) |
 | G-15 | Visual reference still showed superseded details (clock-time ETAs, called-at times, availability checkbox) | spec reviews | canvas updated to match the specs on 2026-11-08 | closed |
 | G-16 | The doctor must be able to replace any patient by any other one (reorder), which #799 option A had kept reception-only | owner request 2026-11-08 | permission: #817 (PR #820, merged); doctor-view reorder design approved 2026-11-08 (`doctor-view.md`), UI: #819 | open (until #819) |
