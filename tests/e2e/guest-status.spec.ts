@@ -412,3 +412,197 @@ test('guest status closes SSE while hidden and performs a canonical poll when vi
     )
     .toBe(2);
 });
+
+async function mockStatus(
+  page: import('@playwright/test').Page,
+  body: unknown,
+  language?: string,
+) {
+  if (language) {
+    await page.addInitScript((value) => {
+      Object.defineProperty(navigator, 'language', { get: () => value });
+    }, language);
+  }
+  await page.route('**/api/guest/status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+  });
+}
+
+test('guest status is read-only: no check-in button and no wait range', async ({
+  page,
+}) => {
+  await mockStatus(page, activeWaiting, 'fr-DZ');
+  await page.goto('/guest/status');
+  await expect(
+    page.getByText('Signalez votre arrivée à l’accueil.'),
+  ).toBeVisible();
+  await expect(page.getByText(/Votre position est provisoire/)).toBeVisible();
+  await expect(
+    page.locator('section[lang="fr"]').getByRole('button'),
+  ).toHaveCount(0);
+  await expect(page.getByText(/Attente estimée|min–/)).toHaveCount(0);
+});
+
+test('guest status shows the called panel as a status region', async ({
+  page,
+}) => {
+  await mockStatus(
+    page,
+    { ...activeEligible, queueState: 'called', patientsAhead: 0 },
+    'fr-DZ',
+  );
+  await page.goto('/guest/status');
+  const panel = page
+    .getByRole('status')
+    .filter({ hasText: 'C’est votre tour' });
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText('G-018');
+});
+
+test('guest status shows a paused panel that keeps the place', async ({
+  page,
+}) => {
+  await mockStatus(page, {
+    ...activeEligible,
+    session: { status: 'paused', declaredDelayMinutes: null },
+  });
+  await page.goto('/guest/status');
+  await expect(page.getByText('Consultations are paused')).toBeVisible();
+  await expect(page.getByText('Patients ahead: 2')).toBeVisible();
+});
+
+for (const [finalStatus, expected] of [
+  ['completed', 'Your visit is finished.'],
+  ['cancelled', 'Your appointment was cancelled.'],
+  ['no_show', 'You were marked absent. Please contact reception.'],
+] as const) {
+  test(`guest status terminal outcome ${finalStatus} has its own copy`, async ({
+    page,
+  }) => {
+    await mockStatus(page, {
+      generatedAt: '2026-09-10T09:05:00Z',
+      terminal: true,
+      finalStatus,
+    });
+    await page.goto('/guest/status');
+    await expect(page.getByText(expected)).toBeVisible();
+    await expect(page.getByText('This page no longer updates.')).toBeVisible();
+    for (const [other, text] of [
+      ['completed', 'Your visit is finished.'],
+      ['cancelled', 'Your appointment was cancelled.'],
+    ] as const) {
+      if (other !== finalStatus) {
+        await expect(page.getByText(text)).toHaveCount(0);
+      }
+    }
+  });
+}
+
+test('guest status Arabic RTL fits a 360px phone without horizontal scroll and renders no identifiers', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await mockStatus(page, activeEligible, 'ar-DZ');
+  await page.goto('/guest/status');
+  await expect(page.getByText('المرضى قبلك: 2')).toBeVisible();
+  await expect(page.locator('section[lang="ar"][dir="rtl"]')).toBeVisible();
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  const text = await page.locator('body').innerText();
+  expect(text).not.toMatch(/\+?\d{9,}|@|Dr\b|Dr\./);
+});
+
+test('guest status called panel heading is white on the primary background', async ({
+  page,
+}) => {
+  await mockStatus(page, { ...activeEligible, queueState: 'called' });
+  await page.goto('/guest/status');
+  const heading = page.getByRole('heading', { name: 'It is your turn' });
+  await expect(heading).toBeVisible();
+  expect(await heading.evaluate((el) => getComputedStyle(el).color)).toBe(
+    'rgb(255, 255, 255)',
+  );
+});
+
+test('guest status closed terminal outcome has its own copy', async ({
+  page,
+}) => {
+  await mockStatus(page, {
+    generatedAt: '2026-09-10T09:05:00Z',
+    terminal: true,
+    finalStatus: 'closed',
+  });
+  await page.goto('/guest/status');
+  await expect(page.getByText('The clinic session is closed.')).toBeVisible();
+  await expect(page.getByText('This page no longer updates.')).toBeVisible();
+});
+
+for (const [label, body, tone] of [
+  ['called', { ...activeEligible, queueState: 'called' }, 'called'],
+  [
+    'in_consultation',
+    { ...activeEligible, queueState: 'in_consultation' },
+    'active',
+  ],
+  [
+    'paused session',
+    {
+      ...activeEligible,
+      session: { status: 'paused', declaredDelayMinutes: null },
+    },
+    'warning',
+  ],
+  ['live', activeEligible, 'arrived'],
+  ['provisional', activeWaiting, 'neutral'],
+] as const) {
+  test(`guest status chip tone for ${label} is ${tone}`, async ({ page }) => {
+    await mockStatus(page, body);
+    await page.goto('/guest/status');
+    await expect(page.locator(`section.gs-page .tb-chip--${tone}`)).toHaveCount(
+      1,
+    );
+    await expect(page.locator('section.gs-page .tb-chip')).toHaveCount(1);
+  });
+}
+
+test('guest status shows the delay notice only when a delay is declared', async ({
+  page,
+}) => {
+  await mockStatus(page, activeWaiting);
+  await page.goto('/guest/status');
+  await expect(page.locator('.gs-delay')).toContainText('10');
+  await page.unroute('**/api/guest/status');
+  await mockStatus(page, {
+    ...activeWaiting,
+    session: { status: 'open', declaredDelayMinutes: null },
+  });
+  await page.reload();
+  await expect(page.getByText('Patients ahead:')).toHaveCount(0);
+  await expect(page.locator('.gs-delay')).toHaveCount(0);
+});
+
+test('guest status footer has help links and the privacy line', async ({
+  page,
+}) => {
+  await mockStatus(page, activeEligible);
+  await page.goto('/guest/status');
+  const footer = page.locator('footer.gs-footer');
+  await expect(
+    footer.getByRole('link', { name: 'What to do while waiting' }),
+  ).toHaveAttribute('href', '/guest/queue-next-steps');
+  await expect(footer.getByRole('link', { name: 'Help' })).toHaveAttribute(
+    'href',
+    '/guest/help',
+  );
+  await expect(footer).toContainText(
+    'This page shows no name, phone number, doctor or clinic identifier.',
+  );
+});
