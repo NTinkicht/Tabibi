@@ -44,6 +44,10 @@ export interface ReceptionistDashboardEntry {
   privateDisplayName: string;
   preferredLocale: 'ar' | 'fr';
   hasContact: boolean;
+  /** Staff-only: whether the entry is backed by an appointment. */
+  origin: 'appointment' | 'walk_in';
+  /** Staff-only ISO instant of the linked appointment start, else null. */
+  appointmentStartsAt: string | null;
   activeConsultationRemainingMinutes: number | null;
   eta: {
     patientsAhead: number;
@@ -94,6 +98,7 @@ type Row = {
   private_display_name: string | null;
   preferred_locale: 'ar' | 'fr' | null;
   has_contact: boolean | null;
+  appointment_starts_at: Date | null;
   in_consultation_started_at: Date | null;
 };
 
@@ -133,13 +138,16 @@ export class ReceptionistDashboardService {
                 entry.priority_order, entry.public_display_label,
                 entry.in_consultation_started_at,
                 patient.private_display_name, patient.preferred_locale,
-                (patient.contact_phone IS NOT NULL OR patient.contact_email IS NOT NULL) AS has_contact
+                (patient.contact_phone IS NOT NULL OR patient.contact_email IS NOT NULL) AS has_contact,
+                appointment.scheduled_start_at AS appointment_starts_at
            FROM consultation_sessions session
            JOIN doctor_profiles doctor ON doctor.id = session.doctor_id
            LEFT JOIN queue_entries entry
              ON entry.session_id = session.id AND entry.clinic_id = session.clinic_id
            LEFT JOIN patient_operational_records patient
              ON patient.id = entry.patient_id AND patient.clinic_id = entry.clinic_id
+           LEFT JOIN appointments appointment
+             ON appointment.queue_entry_id = entry.id AND appointment.clinic_id = entry.clinic_id
           WHERE session.id = $1 AND session.clinic_id = $2
           ORDER BY CASE entry.state ${OPERATIONAL_STATE_ORDER_SQL} ELSE ${TERMINAL_STATE_RANK} END,
                    CASE WHEN entry.priority_order IS NULL THEN 1 ELSE 0 END,
@@ -362,6 +370,11 @@ export class ReceptionistDashboardService {
             privateDisplayName: row.private_display_name!,
             preferredLocale: row.preferred_locale!,
             hasContact: row.has_contact!,
+            origin: (row.appointment_starts_at ? 'appointment' : 'walk_in') as
+              | 'appointment'
+              | 'walk_in',
+            appointmentStartsAt:
+              row.appointment_starts_at?.toISOString() ?? null,
             activeConsultationRemainingMinutes:
               first.session_status === 'open' &&
               state === 'in_consultation' &&

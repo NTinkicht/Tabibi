@@ -492,6 +492,54 @@ describe('receptionist dashboard read model', () => {
     ).toBe(afterEta?.revision);
   });
 
+  it('projects staff-only origin and appointment start from the linked appointment', async () => {
+    const queue = new QueueService(pool);
+    const walkIn = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Walk In',
+      preferredLocale: 'fr',
+      idempotencyKey: 'origin-w',
+      correlationId: 'origin-w',
+    });
+    const booked = await queue.registerWalkIn(scope, ids.sessionA, {
+      privateDisplayName: 'Booked',
+      preferredLocale: 'ar',
+      idempotencyKey: 'origin-b',
+      correlationId: 'origin-b',
+    });
+    const patient = await pool.query<{ patient_id: string }>(
+      `SELECT patient_id FROM queue_entries WHERE id=$1`,
+      [booked.entry.id],
+    );
+    await pool.query(
+      `INSERT INTO appointments
+         (id, clinic_id, doctor_id, session_id, patient_id, queue_entry_id,
+          status, scheduled_start_at, scheduled_end_at, preferred_locale)
+       VALUES ($1,$2,$3,$4,$5,$6,'confirmed','2026-09-08 10:00Z','2026-09-08 10:20Z','ar')`,
+      [
+        randomUUID(),
+        ids.clinicA,
+        ids.doctor,
+        ids.sessionA,
+        patient.rows[0]!.patient_id,
+        booked.entry.id,
+      ],
+    );
+    const snapshot = await new ReceptionistDashboardService(pool).getSnapshot(
+      scope,
+      ids.sessionA,
+    );
+    const byId = new Map(snapshot.entries.map((entry) => [entry.id, entry]));
+    expect(byId.get(walkIn.entry.id)).toMatchObject({
+      origin: 'walk_in',
+      appointmentStartsAt: null,
+    });
+    expect(byId.get(booked.entry.id)).toMatchObject({
+      origin: 'appointment',
+      appointmentStartsAt: '2026-09-08T10:00:00.000Z',
+    });
+    expect(snapshot.entries).toHaveLength(2);
+  });
+
   it('denies wrong roles and treats a cross-clinic session as absent', async () => {
     await pool.query(
       `UPDATE clinic_memberships SET role='doctor' WHERE clinic_id=$1 AND user_id=$2`,
