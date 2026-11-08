@@ -13,6 +13,7 @@ import {
   POST as registerWalkIn,
 } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/route';
 import { POST as entryCommand } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/[entryId]/commands/route';
+import { POST as restoreEntry } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/[entryId]/restore/route';
 import { POST as reorder } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/[entryId]/reorder/route';
 import { GET as dashboard } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/dashboard/route';
 
@@ -373,6 +374,37 @@ describe('queue routes enforce the target clinic role', () => {
     expect(idor).toBeGreaterThanOrEqual(400);
     expect(idor).toBeLessThan(500);
     expect(await entryStates()).toEqual(states);
+  });
+
+  it('walk-in restore is denied to other clinics and doctors, allowed to reception', async () => {
+    await pool.query(
+      `UPDATE queue_entries SET state='cancelled' WHERE id = $1`,
+      [entries[0]],
+    );
+    const states = await entryStates();
+    const restoreRequest = async (subject: string, clinicId = ids.clinicA) =>
+      restoreEntry(
+        request(
+          `${sessionPath(clinicId)}/queue/${entries[0]}/restore`,
+          'POST',
+          await cookieFor(subject),
+          { reason: 'Cancelled by mistake' },
+        ),
+        entryCtx(entries[0]!, clinicId),
+      );
+    for (const s of [subjects.adminB, subjects.doctorA, subjects.doctorA2])
+      expect(await status(restoreRequest(s)), s).toBe(403);
+    const idor = await status(restoreRequest(subjects.adminB, ids.clinicB));
+    expect(idor).toBeGreaterThanOrEqual(400);
+    expect(idor).toBeLessThan(500);
+    expect(await entryStates()).toEqual(states);
+    // Positive control: the same payload succeeds for clinic-A reception.
+    expect(await status(restoreRequest(subjects.receptionistA))).toBe(200);
+    const r = await pool.query<{ state: string }>(
+      `SELECT state FROM queue_entries WHERE id = $1`,
+      [entries[0]],
+    );
+    expect(r.rows[0]!.state).toBe('waiting');
   });
 
   it('the receptionist and clinic admin succeed with valid payloads', async () => {

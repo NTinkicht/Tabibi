@@ -196,7 +196,7 @@ describe('staff logout', () => {
       }
     }
     // Same inventory as tests/api/staff-route-boundary-matrix.test.ts.
-    expect(checked).toBe(40);
+    expect(checked).toBe(41);
   });
 
   it('treats a replayed revoked token as an idempotent no-op that stays rejected', async () => {
