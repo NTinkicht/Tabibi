@@ -1,3 +1,4 @@
+import { activeDoctorAssociationSql } from '@/modules/clinic/active-doctor';
 import type { Pool } from 'pg';
 import type { AvailabilitySelectionInput } from '@/modules/public-availability-selection';
 import { abortableQuery } from '@/platform/database/abortable-query';
@@ -43,6 +44,7 @@ export class PublicDoctorAvailabilityService {
           AND session.doctor_id = $2
           AND association.clinic_id = $1
           AND association.doctor_id = $2
+          AND ${activeDoctorAssociationSql('association')}
           AND session.status IN ('planned', 'open', 'paused')
           AND session.starts_at >= now()
         ORDER BY session.starts_at, session.id`,
@@ -219,6 +221,7 @@ export class PublicBookableSessionService {
            JOIN doctor_profiles doctor
              ON doctor.id = session.doctor_id
           WHERE session.status IN ('planned', 'open', 'paused')
+            AND ${activeDoctorAssociationSql('association')}
             AND session.starts_at > now()
             AND session.starts_at < now() + make_interval(days => $1::int)
             AND ($3::text IS NULL OR clinic.wilaya_code = $3::text)

@@ -1,3 +1,4 @@
+import { lockActiveDoctorAssociation } from '@/modules/clinic/active-doctor';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
@@ -373,11 +374,14 @@ export class SessionService {
             throw new SessionValidationError(
               'serviceDate must match the clinic-local date of startsAt',
             );
-          const association = await client.query(
-            `SELECT 1 FROM doctor_clinics WHERE clinic_id = $1 AND doctor_id = $2`,
-            [scope.clinicId, input.doctorId],
-          );
-          if (association.rowCount !== 1) throw new AuthorizationError();
+          if (
+            !(await lockActiveDoctorAssociation(
+              client,
+              scope.clinicId,
+              input.doctorId,
+            ))
+          )
+            throw new AuthorizationError();
           // TAB-P0-02 (#638): a clinic closure day never gets a new session.
           // The shared calendar lock serializes this check with addClosure.
           await lockClinicCalendar(client, scope.clinicId);

@@ -25,6 +25,23 @@ Staff HTTP routes (#663): `GET /api/clinics/{clinicId}/doctors` (`listDoctors`),
 (`setMembership` with `existingMemberOnly`). Unknown/non-member users are 404,
 `LastClinicAdminError` and `DoctorMembershipRequiresAssociationError` are 409.
 
+`removeMembership` (G-19, #825, clinic admins only,
+`DELETE /api/clinics/{clinicId}/memberships/{userId}`) ends a person's access to
+this clinic. It serializes with `setMembership` on the clinic row, keeps the
+last `clinic_admin` (`LastClinicAdminError`, 409), treats unknown, malformed and
+non-member ids as `MembershipNotFoundError` (404), deletes the membership (access
+ends on the next request, because every route re-reads it) and audits
+`membership.removed` with the previous role. Staff sessions are not revoked
+here; they simply stop authorizing for this clinic.
+
+Departed doctors (migration 0052): removing a doctor's membership, or changing
+their role away from `doctor`, sets `doctor_clinics.departed_at` instead of
+deleting the association, so sessions, appointments and audit history keep their
+references. Every public discovery, bookable-session, selection and booking
+query, the staff doctor list, and manual/template session planning require
+`activeDoctorAssociationSql` (`departed_at IS NULL`). `addDoctor`, setting the
+role back to `doctor`, and accepting a doctor invite clear it.
+
 `addDoctor` (#667, clinic admins only, `POST /api/clinics/{clinicId}/doctors`
 with `{ userId, displayName }`) associates an existing member of this clinic as
 one of its doctors and sets their role to `doctor`. It serializes with

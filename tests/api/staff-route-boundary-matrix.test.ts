@@ -50,7 +50,7 @@ const EXPECTED: Record<string, readonly Method[]> = {
   'doctors/[doctorId]/absences': ['GET', 'POST'],
   'doctors/[doctorId]/absences/[absenceDate]': ['DELETE'],
   memberships: ['GET'],
-  'memberships/[userId]': ['PATCH'],
+  'memberships/[userId]': ['PATCH', 'DELETE'],
   'notifications/dead-letters': ['GET'],
   'notifications/guest-link-failures': ['GET'],
   'notifications/dispatch': ['POST'],
@@ -191,7 +191,7 @@ describe('staff clinic route inventory', () => {
       );
     }
     expect(discovered).toEqual(EXPECTED);
-    expect(mutations).toHaveLength(24);
+    expect(mutations).toHaveLength(25);
     expect(reads).toHaveLength(12);
   });
 });

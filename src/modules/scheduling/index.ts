@@ -1,3 +1,4 @@
+import { lockActiveDoctorAssociation } from '@/modules/clinic/active-doctor';
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
@@ -148,20 +149,19 @@ async function activeTemplateOverlaps(
   return (result.rowCount ?? 0) > 0;
 }
 
-// The doctor must be associated with this clinic. A clinic admin passes
-// requireScheduleWrite for any doctor id, so without this check another
-// clinic's doctor would surface as a raw foreign-key error.
+// The doctor must be associated with this clinic, and not departed (G-19). A
+// clinic admin passes requireScheduleWrite for any doctor id, so without this
+// check another clinic's doctor would surface as a raw foreign-key error. The
+// association is share-locked until the transaction ends, so a concurrent
+// departure cannot slip between this check and the write.
 async function requireClinicDoctor(
   db: Queryable,
   clinicId: string,
   doctorId: string,
 ): Promise<void> {
   if (!UUID_TEXT.test(doctorId)) throw new AuthorizationError();
-  const result = await db.query(
-    'SELECT 1 FROM doctor_clinics WHERE clinic_id = $1 AND doctor_id = $2',
-    [clinicId, doctorId],
-  );
-  if (result.rowCount !== 1) throw new AuthorizationError();
+  if (!(await lockActiveDoctorAssociation(db, clinicId, doctorId)))
+    throw new AuthorizationError();
 }
 
 // A clinic closure (holiday) cannot be added over a day that still has any
@@ -267,6 +267,8 @@ export class SchedulingService {
   ): Promise<ScheduleTemplate> {
     return inTransaction(this.pool, async (client) => {
       await requireScheduleWrite(client, scope, input.doctorId);
+      // G-19: no new weekly range for a doctor who left this clinic.
+      await requireClinicDoctor(client, scope.clinicId, input.doctorId);
       const active = input.active ?? true;
       if (active) {
         // Serialize collision check and insert per doctor so two concurrent
@@ -397,6 +399,8 @@ export class SchedulingService {
     return inTransaction(this.pool, async (client) => {
       await requireScheduleWrite(client, scope, input.doctorId);
       await lockClinicCalendar(client, scope.clinicId);
+      // G-19: a departed doctor's kept templates never generate new sessions.
+      await requireClinicDoctor(client, scope.clinicId, input.doctorId);
       // Each candidate occurrence is skipped when it would overlap a
       // non-cancelled session of the same doctor in this clinic (for example a
       // manual session), other than its own already-generated occurrence,

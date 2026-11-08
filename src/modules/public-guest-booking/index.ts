@@ -1,3 +1,4 @@
+import { activeDoctorAssociationSql } from '@/modules/clinic/active-doctor';
 import {
   createCipheriv,
   createDecipheriv,
@@ -390,7 +391,8 @@ export class PublicGuestBookingService {
           WHERE session.id = $1
             AND session.clinic_id = $2
             AND session.doctor_id = $3
-          FOR UPDATE OF session`,
+            AND ${activeDoctorAssociationSql('association')}
+          FOR UPDATE OF session FOR SHARE OF association`,
         [selection.sessionId, selection.clinicId, selection.doctorId],
       );
       const session = sessionResult.rows[0];
