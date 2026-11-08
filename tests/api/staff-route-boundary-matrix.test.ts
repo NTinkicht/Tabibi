@@ -28,6 +28,7 @@ const ids = {
   absenceDate: '2026-10-26',
   consultationTypeId: '66666666-6666-4666-8666-666666666666',
   userId: '77777777-7777-4777-8777-777777777777',
+  inviteId: '88888888-8888-4888-8888-888888888888',
 };
 const ROUTES_ROOT = join(__dirname, '..', '..', 'src', 'app', 'api', 'clinics');
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
@@ -55,6 +56,8 @@ const EXPECTED: Record<string, readonly Method[]> = {
   'notifications/guest-link-failures': ['GET'],
   'notifications/dispatch': ['POST'],
   'schedule-generations': ['POST'],
+  'staff-invites': ['GET', 'POST'],
+  'staff-invites/[inviteId]': ['DELETE'],
   'schedule-templates': ['GET', 'POST'],
   'schedule-templates/[templateId]': ['PATCH'],
   sessions: ['GET', 'POST'],
@@ -120,7 +123,8 @@ function url(key: string): string {
     .replace('[doctorId]', ids.doctorId)
     .replace('[absenceDate]', ids.absenceDate)
     .replace('[consultationTypeId]', ids.consultationTypeId)
-    .replace('[userId]', ids.userId);
+    .replace('[userId]', ids.userId)
+    .replace('[inviteId]', ids.inviteId);
   return `http://localhost/api/clinics/${ids.clinicId}/${path}?date=2026-10-24&limit=5`;
 }
 
@@ -191,8 +195,8 @@ describe('staff clinic route inventory', () => {
       );
     }
     expect(discovered).toEqual(EXPECTED);
-    expect(mutations).toHaveLength(25);
-    expect(reads).toHaveLength(12);
+    expect(mutations).toHaveLength(27);
+    expect(reads).toHaveLength(13);
   });
 });
 

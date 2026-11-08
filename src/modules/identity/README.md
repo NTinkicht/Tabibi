@@ -28,3 +28,23 @@ stdin only, idempotent, refuses weak passwords and existing accounts).
 admins may invite `doctor` or `receptionist` only, the token is stored as a
 SHA-256 verifier, a second open invite for the same clinic and email is refused,
 and accepting never changes an existing account password or membership.
+
+HTTP surface (G-18, #824). Clinic admins only, same-origin for mutations:
+`POST /api/clinics/{clinicId}/staff-invites` with `{ email, role, ttlSeconds? }`
+→ 201 `{ invite: { inviteId, token, expiresAt } }` (the only response that ever
+carries the token; `no-store`), `GET …/staff-invites` → open invites
+(`status: pending | expired`; an expired one blocks a new invite for that email
+until it is revoked), `DELETE …/staff-invites/{inviteId}` → 200, or 404 for
+unknown, malformed, other-clinic, revoked and accepted invites
+(`InviteNotFoundError`). The admin UI builds the one-time link
+`/staff/invite#<token>`: the token sits in the URL fragment, which never
+reaches the server. The public page reads it, removes it from the address bar
+and posts it to `POST /api/staff/invites/preview` (clinic name, role, email,
+expiry) and `POST /api/staff/invites/accept` with
+`{ token, displayName, password }`. Both are same-origin, size-bounded,
+rate-limited (one ingress bucket plus 20 attempts per invite id per 15
+minutes), answer every unusable token with the one 400 `invite_invalid`,
+password-policy failures with 400 `password_policy` and its `code`, and any
+malformed body with a generic 400 that echoes nothing. Accepting does not sign
+the person in. A doctor invited back after leaving clears the departure marker
+(G-19).

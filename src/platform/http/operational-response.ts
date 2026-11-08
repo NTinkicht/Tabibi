@@ -11,6 +11,13 @@ import {
   MembershipUserNotFoundError,
 } from '@/modules/clinic';
 import { AuthorizationError } from '@/modules/identity';
+import { PasswordPolicyError } from '@/modules/identity/staff-credentials';
+import {
+  InviteConflictError,
+  InviteInputError,
+  InviteNotFoundError,
+  InviteRejectedError,
+} from '@/modules/identity/staff-invites';
 import { QueueConflictError, QueueValidationError } from '@/modules/queue';
 import { ReceptionistDashboardNotFoundError } from '@/modules/receptionist-dashboard';
 import {
@@ -69,7 +76,8 @@ export async function operationalJson(
       error instanceof ConsultationTypeNotFoundError ||
       error instanceof MembershipNotFoundError ||
       error instanceof MembershipUserNotFoundError ||
-      error instanceof ClinicDoctorNotFoundError
+      error instanceof ClinicDoctorNotFoundError ||
+      error instanceof InviteNotFoundError
     ) {
       status = 404;
       code = 'not_found';
@@ -78,6 +86,10 @@ export async function operationalJson(
       error instanceof SessionValidationError ||
       error instanceof QueueValidationError ||
       error instanceof InvalidClinicTimezoneError ||
+      // G-18: one generic answer for every unusable invite token.
+      error instanceof InviteRejectedError ||
+      error instanceof InviteInputError ||
+      error instanceof PasswordPolicyError ||
       error instanceof ZodError ||
       error instanceof SyntaxError
     ) {
@@ -94,6 +106,7 @@ export async function operationalJson(
       error instanceof ConsultationTypeConflictError ||
       error instanceof LastClinicAdminError ||
       error instanceof DoctorMembershipRequiresAssociationError ||
+      error instanceof InviteConflictError ||
       isPostgresCheckConflict(error)
     ) {
       status = 409;

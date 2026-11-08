@@ -46,6 +46,41 @@ export class InviteRejectedError extends Error {
   }
 }
 
+/**
+ * Revoking an invite that does not exist in this clinic (unknown, malformed,
+ * another clinic's, already revoked or accepted). A subclass of
+ * InviteRejectedError so service callers keep one generic error, while the
+ * admin HTTP route can answer 404 instead of the accept route's 400.
+ */
+export class InviteNotFoundError extends InviteRejectedError {
+  constructor() {
+    super();
+    this.name = 'InviteNotFoundError';
+  }
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** An open (not revoked, not accepted) invite as the clinic admin sees it. */
+export interface OpenInvite {
+  inviteId: string;
+  email: string;
+  role: InvitableRole;
+  createdAt: Date;
+  expiresAt: Date;
+  /** `expired` invites still block a new invite for the email until revoked. */
+  status: 'pending' | 'expired';
+}
+
+/** What the invitee may see before accepting: no other clinic data. */
+export interface InvitePreview {
+  clinicName: string;
+  email: string;
+  role: InvitableRole;
+  expiresAt: Date;
+}
+
 export interface CreatedInvite {
   inviteId: string;
   /** Returned exactly once; only its SHA-256 verifier is stored. */
@@ -143,6 +178,80 @@ export class StaffInviteService {
     }
   }
 
+  /**
+   * G-18 (#824): the clinic's open invites, newest first. Clinic admins only.
+   * Never returns the token or its verifier.
+   */
+  async listOpen(scope: ClinicScope, now = new Date()): Promise<OpenInvite[]> {
+    await requireClinicRole(this.pool, scope, ['clinic_admin']);
+    const result = await this.pool.query<{
+      id: string;
+      email: string;
+      role: InvitableRole;
+      created_at: Date;
+      expires_at: Date;
+    }>(
+      `SELECT id, email, role, created_at, expires_at FROM staff_invites
+        WHERE clinic_id = $1 AND revoked_at IS NULL AND accepted_at IS NULL
+        ORDER BY created_at DESC, id`,
+      [scope.clinicId],
+    );
+    return result.rows.map((row) => ({
+      inviteId: row.id,
+      email: row.email,
+      role: row.role,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+      status: row.expires_at.getTime() <= now.getTime() ? 'expired' : 'pending',
+    }));
+  }
+
+  /**
+   * G-18 (#824): what an invite grants, for the accept page, given the full
+   * token. Unknown, expired, revoked, used, malformed and wrong-secret tokens
+   * are the one generic InviteRejectedError, exactly as accept() answers.
+   */
+  async preview(token: string, now = new Date()): Promise<InvitePreview> {
+    const match = TOKEN_PATTERN.exec(token);
+    if (!match) throw new InviteRejectedError();
+    const [, inviteId, secret] = match as unknown as [string, string, string];
+    // TOKEN_PATTERN admits any 36 hex/hyphen characters; a non-UUID id must
+    // be the generic rejection, never a database type error (500).
+    if (!UUID_PATTERN.test(inviteId)) throw new InviteRejectedError();
+    const found = await this.pool.query<{
+      email: string;
+      role: InvitableRole;
+      token_verifier: Buffer;
+      expires_at: Date;
+      revoked_at: Date | null;
+      accepted_at: Date | null;
+      clinic_name: string;
+    }>(
+      `SELECT invite.email, invite.role, invite.token_verifier, invite.expires_at,
+              invite.revoked_at, invite.accepted_at, clinic.name AS clinic_name
+         FROM staff_invites invite
+         JOIN clinics clinic ON clinic.id = invite.clinic_id
+        WHERE invite.id = $1`,
+      [inviteId],
+    );
+    const invite = found.rows[0];
+    if (
+      !invite ||
+      !timingSafeEqual(verifierOf(secret), invite.token_verifier) ||
+      invite.revoked_at !== null ||
+      invite.accepted_at !== null ||
+      invite.expires_at.getTime() <= now.getTime()
+    ) {
+      throw new InviteRejectedError();
+    }
+    return {
+      clinicName: invite.clinic_name,
+      email: invite.email,
+      role: invite.role,
+      expiresAt: invite.expires_at,
+    };
+  }
+
   async revoke(
     scope: ClinicScope,
     inviteId: string,
@@ -152,13 +261,14 @@ export class StaffInviteService {
     try {
       await client.query('BEGIN');
       await requireClinicRole(client, scope, ['clinic_admin']);
+      if (!UUID_PATTERN.test(inviteId)) throw new InviteNotFoundError();
       // The clinic_id predicate makes a cross-clinic invite id indistinguishable from a missing one.
       const revoked = await client.query(
         `UPDATE staff_invites SET revoked_at = $3
           WHERE id = $1 AND clinic_id = $2 AND revoked_at IS NULL AND accepted_at IS NULL`,
         [inviteId, scope.clinicId, now],
       );
-      if (revoked.rowCount === 0) throw new InviteRejectedError();
+      if (revoked.rowCount === 0) throw new InviteNotFoundError();
       await audit(
         client,
         scope.clinicId,
@@ -191,6 +301,9 @@ export class StaffInviteService {
     const match = TOKEN_PATTERN.exec(token);
     if (!match) throw new InviteRejectedError();
     const [, inviteId, secret] = match as unknown as [string, string, string];
+    // TOKEN_PATTERN admits any 36 hex/hyphen characters; a non-UUID id must
+    // be the generic rejection, never a database type error (500).
+    if (!UUID_PATTERN.test(inviteId)) throw new InviteRejectedError();
     const displayName = input.displayName.trim();
     if (displayName === '' || displayName.length > 120) {
       throw new InviteInputError('Invalid display name');
