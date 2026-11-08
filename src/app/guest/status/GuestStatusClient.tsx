@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Chip, type ChipTone } from '../../ui';
+import './guest-status.css';
 
 const NORMAL_POLL_MS = 30_000;
 const MAX_RETRY_AFTER_SECONDS = 300;
@@ -66,6 +68,18 @@ type Copy = {
   queueStates: Record<string, string>;
   sessionStates: Record<string, string>;
   terminalStates: Record<string, string>;
+  provisionalNote: string;
+  reportArrival: string;
+  stayNearReception: string;
+  pausedTitle: string;
+  pausedBody: string;
+  patientsAheadSuffix: string;
+  yourTurn: string;
+  goToDeskWithNumber: string;
+  noLongerUpdates: string;
+  terminalBodies: Record<string, string>;
+  helpLink: string;
+  privacyFooter: string;
 };
 
 const COPY: Record<SupportedLocale, Copy> = {
@@ -108,6 +122,26 @@ const COPY: Record<SupportedLocale, Copy> = {
       no_show: 'no show',
       closed: 'closed',
     },
+    provisionalNote:
+      'Your position is provisional until you check in at the clinic.',
+    reportArrival: 'Tell reception when you arrive.',
+    stayNearReception: 'Please stay near reception.',
+    pausedTitle: 'Consultations are paused',
+    pausedBody:
+      'Your place is kept. Your estimate is suspended during the pause.',
+    patientsAheadSuffix: 'patients ahead of you',
+    yourTurn: 'It is your turn',
+    goToDeskWithNumber: 'Go to reception and give your number:',
+    noLongerUpdates: 'This page no longer updates.',
+    terminalBodies: {
+      completed: 'Your visit is finished.',
+      cancelled: 'Your appointment was cancelled.',
+      no_show: 'You were marked absent. Please contact reception.',
+      closed: 'The clinic session is closed.',
+    },
+    helpLink: 'Help',
+    privacyFooter:
+      'This page shows no name, phone number, doctor or clinic identifier.',
   },
   fr: {
     title: 'Tabibi',
@@ -148,6 +182,26 @@ const COPY: Record<SupportedLocale, Copy> = {
       no_show: 'absent',
       closed: 'fermée',
     },
+    provisionalNote:
+      'Votre position est provisoire tant que vous n’êtes pas enregistré(e) à la clinique.',
+    reportArrival: 'Signalez votre arrivée à l’accueil.',
+    stayNearReception: 'Merci de rester près de l’accueil.',
+    pausedTitle: 'Consultations suspendues',
+    pausedBody:
+      'Votre place est conservée. L’estimation est suspendue pendant la pause.',
+    patientsAheadSuffix: 'patients avant vous',
+    yourTurn: 'C’est votre tour',
+    goToDeskWithNumber: 'Présentez-vous à l’accueil avec votre numéro :',
+    noLongerUpdates: 'Cette page ne se met plus à jour.',
+    terminalBodies: {
+      completed: 'Votre visite est terminée.',
+      cancelled: 'Votre rendez-vous a été annulé.',
+      no_show: 'Vous avez été marqué(e) absent(e). Contactez l’accueil.',
+      closed: 'La session de la clinique est fermée.',
+    },
+    helpLink: 'Aide',
+    privacyFooter:
+      'Cette page n’affiche ni nom, ni téléphone, ni médecin, ni identifiant de clinique.',
   },
   ar: {
     title: 'طبيبي',
@@ -186,6 +240,24 @@ const COPY: Record<SupportedLocale, Copy> = {
       no_show: 'لم يحضر',
       closed: 'مغلقة',
     },
+    provisionalNote: 'موقعك مؤقت إلى أن تسجّل وصولك إلى العيادة.',
+    reportArrival: 'أبلغ الاستقبال عند وصولك.',
+    stayNearReception: 'يرجى البقاء قرب الاستقبال.',
+    pausedTitle: 'الاستشارات متوقفة',
+    pausedBody: 'مكانك محفوظ. التقدير متوقف خلال فترة التوقف.',
+    patientsAheadSuffix: 'مرضى قبلك',
+    yourTurn: 'حان دورك',
+    goToDeskWithNumber: 'توجّه إلى الاستقبال مع رقمك:',
+    noLongerUpdates: 'لم تعد هذه الصفحة تتحدّث.',
+    terminalBodies: {
+      completed: 'انتهت زيارتك.',
+      cancelled: 'تم إلغاء موعدك.',
+      no_show: 'تم تسجيلك غائبًا. يرجى الاتصال بالاستقبال.',
+      closed: 'جلسة العيادة مغلقة.',
+    },
+    helpLink: 'مساعدة',
+    privacyFooter:
+      'لا تعرض هذه الصفحة اسمًا أو هاتفًا أو طبيبًا أو معرّف عيادة.',
   },
 };
 
@@ -387,111 +459,175 @@ export function GuestStatusClient() {
     };
   }, []);
 
-  const shell = (content: React.ReactNode) => (
-    <section lang={locale} dir={direction} aria-live="polite">
-      <h1>{copy.title}</h1>
-      <p>{copy.subtitle}</p>
+  const shell = (content: React.ReactNode, chip?: React.ReactNode) => (
+    <section
+      lang={locale}
+      dir={direction}
+      aria-live="polite"
+      className="gs-page"
+    >
+      <header className="gs-header">
+        <h1>{copy.title}</h1>
+        {chip}
+      </header>
+      <p className="gs-subtitle">{copy.subtitle}</p>
       {content}
+      <footer className="gs-footer">
+        <p>
+          <a href="/guest/queue-next-steps">{copy.queueHelpLink}</a>
+        </p>
+        <p>
+          <a href="/guest/help">{copy.helpLink}</a>
+        </p>
+        <p>
+          <small>{copy.privacyFooter}</small>
+        </p>
+      </footer>
     </section>
   );
 
-  if (state.kind === 'loading') return shell(<p>{copy.loading}</p>);
+  if (state.kind === 'loading')
+    return shell(<p className="gs-card">{copy.loading}</p>);
 
   if (state.kind === 'signed_out') {
     return shell(
-      <>
+      <div className="gs-card">
         <h2>{copy.accessUnavailable}</h2>
         <p>{copy.accessUnavailableBody}</p>
-      </>,
+      </div>,
     );
   }
 
   if (state.kind === 'error') {
     return shell(
-      <>
+      <div className="gs-card">
         <h2>{copy.statusUnavailable}</h2>
         <p>{copy.statusUnavailableBody}</p>
-      </>,
+      </div>,
     );
   }
 
   if (state.kind === 'terminal') {
+    const finalStatus = state.snapshot.finalStatus;
     return shell(
-      <>
+      <div className="gs-card" data-outcome={finalStatus}>
         <h2>{copy.visitStatus}</h2>
+        <p>{copy.terminalStates[finalStatus] ?? finalStatus}</p>
+        {copy.terminalBodies[finalStatus] ? (
+          <p>{copy.terminalBodies[finalStatus]}</p>
+        ) : null}
         <p>
-          {copy.terminalStates[state.snapshot.finalStatus] ??
-            state.snapshot.finalStatus}
+          <small>{copy.noLongerUpdates}</small>
         </p>
-      </>,
+      </div>,
     );
   }
 
   const { snapshot } = state;
+  const sessionPaused = snapshot.session.status === 'paused';
+  const called = snapshot.queueState === 'called';
+  const chipTone: ChipTone = called
+    ? 'called'
+    : snapshot.queueState === 'in_consultation'
+      ? 'active'
+      : sessionPaused
+        ? 'warning'
+        : snapshot.positionKind === 'live'
+          ? 'arrived'
+          : 'neutral';
+  const live =
+    snapshot.positionKind === 'live' && snapshot.patientsAhead !== null;
   return shell(
     <>
-      <p>
-        <strong>{copy.yourLabel}</strong> {snapshot.publicDisplayLabel}
-      </p>
-      <p>
-        <strong>{copy.status}</strong>{' '}
-        {copy.queueStates[snapshot.queueState] ?? snapshot.queueState}
-      </p>
-      {snapshot.session.status !== 'open' ? (
+      <div className="gs-card gs-ticket">
         <p>
-          <strong>{copy.sessionState}</strong>{' '}
-          {copy.sessionStates[snapshot.session.status] ??
-            snapshot.session.status}
+          <strong>{copy.yourLabel}</strong>{' '}
+          <bdi className="gs-ticket-code">{snapshot.publicDisplayLabel}</bdi>
         </p>
+      </div>
+      {called ? (
+        <div className="gs-panel gs-panel--called" role="status">
+          <h2>{copy.yourTurn}</h2>
+          <p>
+            {copy.goToDeskWithNumber}{' '}
+            <bdi className="gs-ticket-code">{snapshot.publicDisplayLabel}</bdi>
+          </p>
+        </div>
+      ) : sessionPaused ? (
+        <div className="gs-panel gs-panel--paused" role="status">
+          <h2>{copy.pausedTitle}</h2>
+          <p>{copy.pausedBody}</p>
+        </div>
       ) : null}
-      {snapshot.positionKind === 'live' && snapshot.patientsAhead !== null ? (
+      <div className="gs-card">
+        {snapshot.session.status !== 'open' ? (
+          <p>
+            <strong>{copy.sessionState}</strong>{' '}
+            {copy.sessionStates[snapshot.session.status] ??
+              snapshot.session.status}
+          </p>
+        ) : null}
+        {live ? (
+          <>
+            <p className="gs-ahead">
+              <strong>{copy.patientsAhead}</strong> {snapshot.patientsAhead}
+            </p>
+            <p>
+              <small>{copy.patientsAheadSuffix}</small>
+            </p>
+            <p>{copy.stayNearReception}</p>
+          </>
+        ) : snapshot.arrivalWindow ? (
+          <>
+            <p>
+              <strong>{copy.arrivalWindow}</strong>{' '}
+              <bdi>
+                {formatTime(
+                  snapshot.arrivalWindow.earliestAt,
+                  locale,
+                  snapshot.clinicTimezone,
+                )}
+                –
+                {formatTime(
+                  snapshot.arrivalWindow.latestAt,
+                  locale,
+                  snapshot.clinicTimezone,
+                )}
+              </bdi>
+            </p>
+            <p>{copy.provisionalNote}</p>
+            <p>{copy.reportArrival}</p>
+          </>
+        ) : null}
+        {snapshot.session.declaredDelayMinutes !== null ? (
+          <p className="gs-delay">
+            <strong>{copy.clinicDelay}</strong>{' '}
+            {snapshot.session.declaredDelayMinutes} {copy.minute}
+          </p>
+        ) : null}
         <p>
-          <strong>{copy.patientsAhead}</strong> {snapshot.patientsAhead}
+          <a
+            href={`/guest/eta-explained?lang=${locale === 'ar' ? 'ar' : 'fr'}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-describedby="tabibi-guest-status-eta-explainer-hint"
+          >
+            {copy.estimateExplainerLink}
+          </a>{' '}
+          <small id="tabibi-guest-status-eta-explainer-hint">
+            ({copy.estimateExplainerNewTab})
+          </small>
         </p>
-      ) : snapshot.arrivalWindow ? (
         <p>
-          <strong>{copy.arrivalWindow}</strong>{' '}
-          {formatTime(
-            snapshot.arrivalWindow.earliestAt,
-            locale,
-            snapshot.clinicTimezone,
-          )}
-          –
-          {formatTime(
-            snapshot.arrivalWindow.latestAt,
-            locale,
-            snapshot.clinicTimezone,
-          )}
+          <small>
+            {copy.updated}{' '}
+            {formatTime(snapshot.generatedAt, locale, snapshot.clinicTimezone)}
+          </small>
         </p>
-      ) : null}
-      {snapshot.session.declaredDelayMinutes !== null ? (
-        <p>
-          <strong>{copy.clinicDelay}</strong>{' '}
-          {snapshot.session.declaredDelayMinutes} {copy.minute}
-        </p>
-      ) : null}
-      <p>
-        <a
-          href={`/guest/eta-explained?lang=${locale === 'ar' ? 'ar' : 'fr'}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-describedby="tabibi-guest-status-eta-explainer-hint"
-        >
-          {copy.estimateExplainerLink}
-        </a>{' '}
-        <small id="tabibi-guest-status-eta-explainer-hint">
-          ({copy.estimateExplainerNewTab})
-        </small>
-      </p>
-      <p>
-        <a href="/guest/queue-next-steps">{copy.queueHelpLink}</a>
-      </p>
-      <p>
-        <small>
-          {copy.updated}{' '}
-          {formatTime(snapshot.generatedAt, locale, snapshot.clinicTimezone)}
-        </small>
-      </p>
+      </div>
     </>,
+    <Chip tone={chipTone}>
+      {copy.queueStates[snapshot.queueState] ?? snapshot.queueState}
+    </Chip>,
   );
 }
