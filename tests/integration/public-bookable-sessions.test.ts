@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
+import { PUBLIC_DISCOVERY_PAGE_SIZE } from '@/modules/clinic/discovery-page';
 import {
   BOOKABLE_SESSION_HORIZON_DAYS,
+  InvalidBookableFilterError,
   BOOKABLE_SESSIONS_PER_DOCTOR,
   PublicBookableSessionService,
 } from '@/modules/public-availability';
@@ -156,9 +158,13 @@ describe('public bookable sessions (TAB-P0-03)', () => {
         name: 'Clinique Bookable',
         defaultLocale: 'fr',
         enabledLocales: ['fr', 'ar'],
+        wilayaCode: null,
+        commune: null,
+        addressLine: null,
         doctors: [
           {
             displayName: 'Dr Alpha',
+            specialtyCodes: [],
             sessions: [earlier, later, paused].map((startsAt) => ({
               ...window(startsAt),
               selectionReference: expect.stringMatching(/^v1\./),
@@ -166,6 +172,7 @@ describe('public bookable sessions (TAB-P0-03)', () => {
           },
           {
             displayName: 'Dr Zed',
+            specialtyCodes: [],
             sessions: [
               {
                 ...window(zed),
@@ -282,5 +289,204 @@ describe('public bookable sessions (TAB-P0-03)', () => {
     expect(
       await new PublicBookableSessionService(pool, selections()).list(),
     ).toEqual([]);
+  });
+
+  describe('filters, location and specialties (#803)', () => {
+    async function seedLocated(
+      name: string,
+      wilaya: string | null,
+      locales: string[],
+      commune: string | null = null,
+      addressLine: string | null = null,
+    ): Promise<string> {
+      const clinicId = randomUUID();
+      await pool.query(
+        `INSERT INTO clinics (id, tenant_key, name, default_locale, enabled_locales,
+                              status, wilaya_code, commune, address_line)
+         VALUES ($1, $2, $3, $4, $5::text[], 'active', $6, $7, $8)`,
+        [
+          clinicId,
+          `p003-tenant-${clinicId}`,
+          name,
+          locales[0],
+          locales,
+          wilaya,
+          commune,
+          addressLine,
+        ],
+      );
+      return clinicId;
+    }
+
+    async function specialize(
+      clinicId: string,
+      doctorId: string,
+      codes: string[],
+    ) {
+      await pool.query(
+        `UPDATE doctor_clinics SET specialty_codes = $3::text[]
+          WHERE clinic_id = $1 AND doctor_id = $2`,
+        [clinicId, doctorId, codes],
+      );
+    }
+
+    async function seedScenario() {
+      const blida = await seedLocated(
+        'Clinique Blida',
+        '09',
+        ['fr', 'ar'],
+        'Blida',
+        '1 rue des Roses',
+      );
+      const alger = await seedLocated('Clinique Alger', '16', ['fr']);
+      const cardio = await seedDoctor(blida, 'Dr Cardio');
+      const pedia = await seedDoctor(blida, 'Dr Pedia');
+      const algerDoc = await seedDoctor(alger, 'Dr Alger');
+      await specialize(blida, cardio, ['cardiology']);
+      await specialize(blida, pedia, ['pediatrics']);
+      await specialize(alger, algerDoc, ['cardiology']);
+      for (const [clinic, doctor] of [
+        [blida, cardio],
+        [blida, pedia],
+        [alger, algerDoc],
+      ] as const) {
+        await seedSession(clinic, doctor, at(DAY_MS));
+      }
+      return { blida, alger, cardio, pedia, algerDoc };
+    }
+
+    const service = () => new PublicBookableSessionService(pool, selections());
+
+    it('publishes location and specialties exactly as discovery does, and nothing else', async () => {
+      const { blida, alger, cardio, pedia, algerDoc } = await seedScenario();
+      const result = await service().list();
+      expect(
+        result.map((clinic) => ({
+          name: clinic.name,
+          wilayaCode: clinic.wilayaCode,
+          commune: clinic.commune,
+          addressLine: clinic.addressLine,
+          doctors: clinic.doctors.map((d) => [d.displayName, d.specialtyCodes]),
+        })),
+      ).toEqual([
+        {
+          name: 'Clinique Alger',
+          wilayaCode: '16',
+          commune: null,
+          addressLine: null,
+          doctors: [['Dr Alger', ['cardiology']]],
+        },
+        {
+          name: 'Clinique Blida',
+          wilayaCode: '09',
+          commune: 'Blida',
+          addressLine: '1 rue des Roses',
+          doctors: [
+            ['Dr Cardio', ['cardiology']],
+            ['Dr Pedia', ['pediatrics']],
+          ],
+        },
+      ]);
+      for (const clinic of result) {
+        expect(Object.keys(clinic).sort()).toEqual([
+          'addressLine',
+          'commune',
+          'defaultLocale',
+          'doctors',
+          'enabledLocales',
+          'name',
+          'wilayaCode',
+        ]);
+        for (const doctor of clinic.doctors) {
+          expect(Object.keys(doctor).sort()).toEqual([
+            'displayName',
+            'sessions',
+            'specialtyCodes',
+          ]);
+        }
+      }
+      const serialized = JSON.stringify(result);
+      for (const forbidden of [blida, alger, cardio, pedia, algerDoc]) {
+        expect(serialized).not.toContain(forbidden);
+      }
+    });
+
+    it('keeps only the matching clinic-doctor pairs', async () => {
+      await seedScenario();
+      const pairs = (clinics: Awaited<ReturnType<typeof listFiltered>>) =>
+        clinics.flatMap((c) =>
+          c.doctors.map((d) => `${c.name}/${d.displayName}`),
+        );
+      const listFiltered = (
+        f: Parameters<PublicBookableSessionService['list']>[1],
+      ) => service().list(undefined, f);
+
+      expect(
+        pairs(await listFiltered({ specialtyCode: 'cardiology' })),
+      ).toEqual(['Clinique Alger/Dr Alger', 'Clinique Blida/Dr Cardio']);
+      expect(pairs(await listFiltered({ wilayaCode: '09' }))).toEqual([
+        'Clinique Blida/Dr Cardio',
+        'Clinique Blida/Dr Pedia',
+      ]);
+      expect(
+        pairs(
+          await listFiltered({ wilayaCode: '09', specialtyCode: 'pediatrics' }),
+        ),
+      ).toEqual(['Clinique Blida/Dr Pedia']);
+      expect(pairs(await listFiltered({ languageCode: 'ar' }))).toEqual([
+        'Clinique Blida/Dr Cardio',
+        'Clinique Blida/Dr Pedia',
+      ]);
+      expect(
+        pairs(await listFiltered({ wilayaCode: '16', languageCode: 'ar' })),
+      ).toEqual([]);
+    });
+
+    it('refuses filter values outside the controlled lists', async () => {
+      await expect(
+        service().list(undefined, { wilayaCode: '99' }),
+      ).rejects.toThrow(InvalidBookableFilterError);
+      await expect(
+        service().list(undefined, { specialtyCode: 'astrology' }),
+      ).rejects.toThrow(InvalidBookableFilterError);
+      await expect(
+        service().list(undefined, { languageCode: 'en' }),
+      ).rejects.toThrow(InvalidBookableFilterError);
+      await expect(service().listPage(undefined, {}, 0)).rejects.toThrow(
+        InvalidBookableFilterError,
+      );
+    });
+
+    it('pages whole clinics with a look-ahead and never splits a clinic', async () => {
+      const total = PUBLIC_DISCOVERY_PAGE_SIZE + 3;
+      for (let index = 0; index < total; index += 1) {
+        const clinic = await seedLocated(
+          `Clinique ${String(index).padStart(3, '0')}`,
+          null,
+          ['fr'],
+        );
+        for (const name of ['A', 'B']) {
+          const doctor = await seedDoctor(clinic, `Dr ${name}${index}`);
+          await seedSession(clinic, doctor, at(DAY_MS));
+        }
+      }
+      const first = await service().listPage(undefined, {}, 1);
+      const second = await service().listPage(undefined, {}, 2);
+      const third = await service().listPage(undefined, {}, 3);
+
+      expect(first.clinics).toHaveLength(PUBLIC_DISCOVERY_PAGE_SIZE);
+      expect(first.hasMore).toBe(true);
+      expect(second.clinics).toHaveLength(3);
+      expect(second.hasMore).toBe(false);
+      expect(third).toEqual({ clinics: [], hasMore: false });
+      expect(first.clinics.every((c) => c.doctors.length === 2)).toBe(true);
+      expect(second.clinics.every((c) => c.doctors.length === 2)).toBe(true);
+      expect([...first.clinics, ...second.clinics].map((c) => c.name)).toEqual(
+        Array.from(
+          { length: total },
+          (_, index) => `Clinique ${String(index).padStart(3, '0')}`,
+        ),
+      );
+    });
   });
 });

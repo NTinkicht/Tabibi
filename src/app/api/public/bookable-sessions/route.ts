@@ -1,5 +1,6 @@
 import { PublicBookableSessionService } from '@/modules/public-availability';
 import { PublicAvailabilitySelectionService } from '@/modules/public-availability-selection';
+import { parseDiscoveryFilters } from '@/platform/http/discovery-input';
 import { getPool } from '@/platform/database/pool';
 import { observedJson } from '@/platform/http/request-context';
 
@@ -38,15 +39,28 @@ export async function GET(request: Request): Promise<Response> {
   });
 
   try {
-    const response = await observedJson(request, async () => {
+    const response = await observedJson(request, async (requestId) => {
+      // TAB-P0-03 (#803): the discovery filters (same rules as discovery:
+      // unknown or repeated keys and codes outside the controlled lists are
+      // refused). `available` is meaningless here (every result is bookable)
+      // and is refused too.
+      const parsed = parseDiscoveryFilters(request.url);
+      if (parsed === null || parsed.availableOnly !== undefined) {
+        return { status: 400, body: { status: 'rejected', requestId } };
+      }
+      const { page = 1, ...filters } = parsed;
       // Fail closed before any query when the sealing secret is unusable.
       const pool = getPool('public-discovery');
       const sealer = new PublicAvailabilitySelectionService(
         pool,
         publicSelectionSecret(),
       );
-      const clinics = await Promise.race([
-        new PublicBookableSessionService(pool, sealer).list(controller.signal),
+      const { clinics, hasMore } = await Promise.race([
+        new PublicBookableSessionService(pool, sealer).listPage(
+          controller.signal,
+          filters,
+          page,
+        ),
         deadline,
       ]);
 
@@ -58,8 +72,12 @@ export async function GET(request: Request): Promise<Response> {
             name: clinic.name,
             defaultLocale: clinic.defaultLocale,
             enabledLocales: clinic.enabledLocales,
+            wilayaCode: clinic.wilayaCode,
+            commune: clinic.commune,
+            addressLine: clinic.addressLine,
             doctors: clinic.doctors.map((doctor) => ({
               displayName: doctor.displayName,
+              specialtyCodes: [...doctor.specialtyCodes],
               sessions: doctor.sessions.map((session) => ({
                 serviceDate: session.serviceDate,
                 startsAt: session.startsAt,
@@ -68,6 +86,8 @@ export async function GET(request: Request): Promise<Response> {
               })),
             })),
           })),
+          page,
+          hasMore: hasMore === true,
         },
       };
     });

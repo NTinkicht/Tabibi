@@ -1,6 +1,13 @@
 import type { Pool } from 'pg';
 import type { AvailabilitySelectionInput } from '@/modules/public-availability-selection';
 import { abortableQuery } from '@/platform/database/abortable-query';
+import {
+  PUBLIC_DISCOVERY_MAX_PAGE,
+  PUBLIC_DISCOVERY_PAGE_SIZE,
+} from '@/modules/clinic/discovery-page';
+import { isDiscoveryLanguageCode } from '@/modules/clinic/languages';
+import { isSpecialtyCode } from '@/modules/clinic/specialties';
+import { isWilayaCode } from '@/modules/clinic/wilayas';
 
 export interface PublicDoctorAvailability {
   serviceDate: string;
@@ -62,6 +69,9 @@ export interface PublicBookableSession {
 
 export interface PublicBookableDoctor {
   displayName: string;
+  // TAB-P0-03 (#803): this clinic's specialty codes for the doctor, exactly
+  // the values public discovery already publishes.
+  specialtyCodes: string[];
   sessions: PublicBookableSession[];
 }
 
@@ -69,7 +79,31 @@ export interface PublicBookableClinic {
   name: string;
   defaultLocale: string;
   enabledLocales: string[];
+  // TAB-P0-03 (#803): the clinic's public location as discovery publishes it.
+  wilayaCode: string | null;
+  commune: string | null;
+  addressLine: string | null;
   doctors: PublicBookableDoctor[];
+}
+
+// TAB-P0-03 (#803): the discovery filters honoured by the bookable-sessions
+// listing (same controlled lists and semantics as PublicDiscoveryFilters).
+export interface PublicBookableFilters {
+  wilayaCode?: string;
+  specialtyCode?: string;
+  languageCode?: string;
+}
+
+export interface PublicBookablePage {
+  clinics: PublicBookableClinic[];
+  hasMore: boolean;
+}
+
+export class InvalidBookableFilterError extends Error {
+  constructor() {
+    super('Bookable sessions filter is outside the controlled lists');
+    this.name = 'InvalidBookableFilterError';
+  }
 }
 
 /** Seals a just-read clinic/doctor/session window into an opaque reference. */
@@ -82,8 +116,12 @@ interface PublicBookableSessionRow {
   clinic_name: string;
   default_locale: string;
   enabled_locales: string[];
+  wilaya_code: string | null;
+  commune: string | null;
+  address_line: string | null;
   doctor_id: string;
   doctor_display_name: string;
+  doctor_specialty_codes: string[] | null;
   session_id: string;
   service_date: string;
   starts_at: Date;
@@ -103,14 +141,66 @@ export class PublicBookableSessionService {
     private readonly sealer: BookableSessionSealer,
   ) {}
 
-  async list(signal?: AbortSignal): Promise<PublicBookableClinic[]> {
+  async list(
+    signal?: AbortSignal,
+    filters: PublicBookableFilters = {},
+  ): Promise<PublicBookableClinic[]> {
+    return this.query(signal, filters, null, 0);
+  }
+
+  // One server-fixed page of clinics (a clinic is never split across pages;
+  // one look-ahead clinic tells whether a further page exists).
+  async listPage(
+    signal: AbortSignal | undefined,
+    filters: PublicBookableFilters,
+    page: number,
+  ): Promise<PublicBookablePage> {
+    if (
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      page > PUBLIC_DISCOVERY_MAX_PAGE
+    ) {
+      throw new InvalidBookableFilterError();
+    }
+    const clinics = await this.query(
+      signal,
+      filters,
+      PUBLIC_DISCOVERY_PAGE_SIZE + 1,
+      (page - 1) * PUBLIC_DISCOVERY_PAGE_SIZE,
+    );
+    return {
+      clinics: clinics.slice(0, PUBLIC_DISCOVERY_PAGE_SIZE),
+      hasMore: clinics.length > PUBLIC_DISCOVERY_PAGE_SIZE,
+    };
+  }
+
+  private async query(
+    signal: AbortSignal | undefined,
+    filters: PublicBookableFilters,
+    clinicLimit: number | null,
+    clinicOffset: number,
+  ): Promise<PublicBookableClinic[]> {
+    const { wilayaCode, specialtyCode, languageCode } = filters;
+    // Fail closed: a value outside the controlled lists is refused, never
+    // silently ignored.
+    if (
+      (wilayaCode !== undefined && !isWilayaCode(wilayaCode)) ||
+      (specialtyCode !== undefined && !isSpecialtyCode(specialtyCode)) ||
+      (languageCode !== undefined && !isDiscoveryLanguageCode(languageCode))
+    ) {
+      throw new InvalidBookableFilterError();
+    }
     const text = `WITH bookable AS (
          SELECT clinic.id AS clinic_id,
                 clinic.name AS clinic_name,
                 clinic.default_locale,
                 clinic.enabled_locales,
+                clinic.wilaya_code,
+                clinic.commune,
+                clinic.address_line,
                 doctor.id AS doctor_id,
                 doctor.display_name AS doctor_display_name,
+                association.specialty_codes AS doctor_specialty_codes,
                 session.id AS session_id,
                 session.service_date::text AS service_date,
                 session.starts_at,
@@ -131,17 +221,33 @@ export class PublicBookableSessionService {
           WHERE session.status IN ('planned', 'open', 'paused')
             AND session.starts_at > now()
             AND session.starts_at < now() + make_interval(days => $1::int)
+            AND ($3::text IS NULL OR clinic.wilaya_code = $3::text)
+            AND ($4::text IS NULL OR $4::text = ANY (association.specialty_codes))
+            AND ($5::text IS NULL OR $5::text = ANY (clinic.enabled_locales))
+       ), kept AS (
+         SELECT * FROM bookable WHERE doctor_rank <= $2::int
+       ), page_clinics AS (
+         SELECT clinic_id
+           FROM (SELECT DISTINCT clinic_id, clinic_name FROM kept) listed
+          ORDER BY clinic_name, clinic_id
+          LIMIT $6::int OFFSET $7::int
        )
-       SELECT clinic_id, clinic_name, default_locale, enabled_locales,
-              doctor_id, doctor_display_name, session_id, service_date,
-              starts_at, ends_at
-         FROM bookable
-        WHERE doctor_rank <= $2::int
-        ORDER BY clinic_name, clinic_id, doctor_display_name, doctor_id,
+       SELECT kept.clinic_id, clinic_name, default_locale, enabled_locales,
+              wilaya_code, commune, address_line,
+              doctor_id, doctor_display_name, doctor_specialty_codes,
+              session_id, service_date, starts_at, ends_at
+         FROM kept
+         JOIN page_clinics ON page_clinics.clinic_id = kept.clinic_id
+        ORDER BY clinic_name, kept.clinic_id, doctor_display_name, doctor_id,
                  starts_at, session_id`;
     const values = [
       BOOKABLE_SESSION_HORIZON_DAYS,
       BOOKABLE_SESSIONS_PER_DOCTOR,
+      wilayaCode ?? null,
+      specialtyCode ?? null,
+      languageCode ?? null,
+      clinicLimit,
+      clinicOffset,
     ];
     const result = await abortableQuery<PublicBookableSessionRow>(
       this.pool,
@@ -162,6 +268,9 @@ export class PublicBookableSessionService {
           name: row.clinic_name,
           defaultLocale: row.default_locale,
           enabledLocales: [...row.enabled_locales],
+          wilayaCode: row.wilaya_code,
+          commune: row.commune,
+          addressLine: row.address_line,
           doctors: [],
         };
         clinics.push(clinic);
@@ -169,7 +278,11 @@ export class PublicBookableSessionService {
         doctorKey = undefined;
       }
       if (row.doctor_id !== doctorKey) {
-        doctor = { displayName: row.doctor_display_name, sessions: [] };
+        doctor = {
+          displayName: row.doctor_display_name,
+          specialtyCodes: [...(row.doctor_specialty_codes ?? [])],
+          sessions: [],
+        };
         clinic!.doctors.push(doctor);
         doctorKey = row.doctor_id;
       }
