@@ -16,8 +16,10 @@ dashboard read are limited to `receptionist` and `clinic_admin`. The doctor view
   entries of sessions whose doctor is the caller's own doctor identity in the same clinic, with
   the same CAS/version, doctor-global lock, idempotency, reason and audit rules as reception;
 - a doctor-scoped read of the session dashboard for those sessions only;
-- no other widening: no check-in, walk-in creation, reorder/priority, cancel, bulk no-show,
-  other doctors' sessions, or other clinics;
+- **reorder** of their own session's waiting/arrived patients (owner decision #817, reason
+  required, audited), so the doctor can replace the next patient by any other one;
+- no other widening: no check-in, walk-in creation, cancel, bulk no-show, other doctors'
+  sessions, or other clinics;
 - cross-tenant and cross-doctor denial tests (extending the route matrix), audit actor = doctor.
 
 This is a widening of authorization and therefore an **owner decision** (tracked as an

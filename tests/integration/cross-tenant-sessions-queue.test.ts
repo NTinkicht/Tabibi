@@ -23,7 +23,7 @@ import { GET as dashboard } from '@/app/api/clinics/[clinicId]/sessions/[session
 // session commands and delay are the owning doctor, receptionist and
 // clinic_admin, queue operations are receptionist/clinic_admin only, except
 // that the owning doctor may read the dashboard and call / start / complete /
-// no-show on their own session (owner decision #799, covered in
+// no-show and reorder on their own session (owner decisions #799 and #817, covered in
 // doctor-queue-authorization.test.ts). A
 // clinic-B admin must also fail through its OWN clinic path with the clinic-A
 // session id (IDOR), without any state change.
@@ -340,6 +340,9 @@ describe('queue routes enforce the target clinic role', () => {
         ),
         s,
       ).toBe(403);
+      // Owner decision #817: the OWNING doctor may reorder (covered in
+      // doctor-queue-authorization.test.ts); everyone else here is denied.
+      if (s === subjects.doctorA) continue;
       expect(
         await status(
           reorder(

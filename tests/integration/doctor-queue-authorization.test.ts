@@ -7,10 +7,11 @@ import { QueueService } from '@/modules/queue';
 import { createStaffSessionToken } from '@/platform/http/staff-auth';
 import { GET as dashboard } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/dashboard/route';
 import { POST as entryCommand } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/[entryId]/commands/route';
+import { POST as reorderRoute } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/[entryId]/reorder/route';
 
-// Owner decision #799 (option A): a doctor may call / start / complete /
-// no-show and read the dashboard ONLY on sessions of their own doctor identity
-// in the same clinic. Check-in, cancel and everything else stay
+// Owner decisions #799 (option A) and #817: a doctor may call / start /
+// complete / no-show, reorder and read the dashboard ONLY on sessions of their
+// own doctor identity in the same clinic. Check-in, cancel and everything else stay
 // receptionist/clinic_admin only; other doctors and other clinics are denied
 // without any state change; retries are re-authorized.
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 4 });
@@ -84,6 +85,42 @@ async function command(
     { params: Promise.resolve({ clinicId, sessionId, entryId }) },
   );
   return response.status;
+}
+
+async function reorderEntry(
+  subject: string,
+  entryId: string,
+  body: Record<string, unknown>,
+  opts: { clinicId?: string; sessionId?: string } = {},
+): Promise<number> {
+  const clinicId = opts.clinicId ?? ids.clinicA;
+  const sessionId = opts.sessionId ?? ids.session;
+  const response = await reorderRoute(
+    request(
+      `${ORIGIN}/api/clinics/${clinicId}/sessions/${sessionId}/queue/${entryId}/reorder`,
+      'POST',
+      await cookieFor(subject),
+      body,
+    ),
+    { params: Promise.resolve({ clinicId, sessionId, entryId }) },
+  );
+  return response.status;
+}
+
+async function orderVersion(sessionId = ids.session): Promise<number> {
+  const r = await pool.query<{ v: string }>(
+    `SELECT queue_order_version AS v FROM consultation_sessions WHERE id = $1`,
+    [sessionId],
+  );
+  return Number(r.rows[0]!.v);
+}
+
+async function priorityOf(entryId: string): Promise<string | null> {
+  const r = await pool.query<{ p: string | null }>(
+    `SELECT priority_order AS p FROM queue_entries WHERE id = $1`,
+    [entryId],
+  );
+  return r.rows[0]!.p;
 }
 
 async function readDashboard(
@@ -176,7 +213,7 @@ beforeAll(async () => {
   );
   const queue = new QueueService(pool);
   const reception = { clinicId: ids.clinicA, actorUserId: ids.receptionistA };
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     const item = await queue.registerWalkIn(reception, ids.session, {
       privateDisplayName: `Patient ${i}`,
       preferredLocale: 'fr',
@@ -185,8 +222,8 @@ beforeAll(async () => {
     });
     entries.push(item.entry.id);
   }
-  // Entries 0..2 are checked in by reception; entry 3 stays waiting.
-  for (let i = 0; i < 3; i++)
+  // Entries 0..2 and 4 are checked in by reception; entry 3 stays waiting.
+  for (const i of [0, 1, 2, 4])
     await queue.command(reception, ids.session, entries[i]!, {
       command: 'check_in',
       idempotencyKey: `dq-checkin-${i}`,
@@ -259,6 +296,37 @@ describe('doctor queue authorization (owner decision #799)', () => {
     expect(
       await readDashboard(subjects.doctorA, { sessionId: randomUUID() }),
     ).toBe(403);
+    // Reorder: other doctor, other clinic (both paths) and cross-session.
+    const reorderBody = async () => ({
+      targetPosition: 1,
+      expectedVersion: await orderVersion(),
+      reason: 'urgent',
+    });
+    expect(
+      await reorderEntry(subjects.doctorA2, entries[4]!, await reorderBody()),
+    ).toBe(403);
+    expect(
+      await reorderEntry(subjects.doctorB, entries[4]!, await reorderBody()),
+    ).toBe(403);
+    expect(
+      await reorderEntry(subjects.doctorB, entries[4]!, await reorderBody(), {
+        clinicId: ids.clinicB,
+      }),
+    ).toBe(403);
+    expect(
+      await reorderEntry(
+        subjects.doctorA,
+        otherSessionEntry,
+        {
+          targetPosition: 1,
+          expectedVersion: await orderVersion(ids.sessionA2),
+          reason: 'urgent',
+        },
+        { sessionId: ids.sessionA2 },
+      ),
+    ).toBe(403);
+    expect(await priorityOf(entries[4]!)).toBeNull();
+    expect(await priorityOf(otherSessionEntry)).toBeNull();
     expect(await allStates()).toEqual(before);
     expect(await stateOf(otherSessionEntry)).toBe('checked_in');
   });
@@ -336,6 +404,45 @@ describe('doctor queue authorization (owner decision #799)', () => {
       }),
     ).toBe(200);
     expect(await stateOf(entries[1]!)).toBe('no_show');
+  });
+
+  it('the owning doctor replaces the next patient by another one through reorder (reason required)', async () => {
+    // Entry 2 is next by arrival; the doctor wants entry 4 first.
+    expect(
+      await reorderEntry(subjects.doctorA, entries[4]!, {
+        targetPosition: 1,
+        expectedVersion: await orderVersion(),
+      }),
+    ).toBe(400);
+    expect(await priorityOf(entries[4]!)).toBeNull();
+    expect(
+      await reorderEntry(subjects.doctorA, entries[4]!, {
+        targetPosition: 1,
+        expectedVersion: await orderVersion(),
+        reason: 'clinical urgency',
+      }),
+    ).toBe(200);
+    expect(await priorityOf(entries[4]!)).not.toBeNull();
+    // `call` still only takes the committed next entry.
+    expect(
+      await command(subjects.doctorA, entries[2]!, { command: 'call' }),
+    ).toBe(409);
+    expect(await stateOf(entries[2]!)).toBe('checked_in');
+    for (const cmd of ['call', 'start_consultation', 'complete_consultation'])
+      expect(
+        await command(subjects.doctorA, entries[4]!, { command: cmd }),
+        cmd,
+      ).toBe(200);
+    expect(await stateOf(entries[4]!)).toBe('completed');
+
+    const audit = await pool.query<{ actor_user_id: string }>(
+      `SELECT actor_user_id FROM audit_events
+        WHERE entity_type = 'queue_entry' AND entity_id = $1
+          AND action LIKE '%reorder%'`,
+      [entries[4]],
+    );
+    expect(audit.rows.length).toBeGreaterThan(0);
+    for (const row of audit.rows) expect(row.actor_user_id).toBe(ids.doctorA);
   });
 
   it('a doctor retry is re-authorized: the receipt cannot be replayed after losing the membership', async () => {

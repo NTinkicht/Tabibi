@@ -851,7 +851,15 @@ export class QueueService {
           `queue-reorder:${scope.clinicId}:${scope.actorUserId}:${rawInput.idempotencyKey}`,
         ],
       );
-      await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
+      // Owner decision #817: the owning doctor may reorder their own
+      // session's queue; retries are re-authorized before the receipt.
+      const role = await requireClinicRole(client, scope, [
+        'doctor',
+        'receptionist',
+        'clinic_admin',
+      ]);
+      if (role === 'doctor')
+        await requireOwnSessionDoctor(client, scope, sessionId);
       const receipt = await client.query<{
         request_fingerprint: string;
         response: QueueReorderResult;
