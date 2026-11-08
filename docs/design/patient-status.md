@@ -11,6 +11,21 @@ components, the guest status page (`src/app/guest/status`). The data flow, polli
 and out-of-order protection, and the explicit check-in request stay exactly as they are; no new
 API, field or permission.
 
+## Two surfaces, two capabilities
+
+The two pages hold different credential classes and must stay separate (`SECURITY.md`:
+class non-interchangeability is a release requirement):
+
+| Surface | Credential | Has `eta` wait range | Can check in |
+|---|---|---|---|
+| Booking live-queue host (`/guest/live-queue/[selectionReference]`) | booking-origin `guestBearer` (Authorization header) | yes (`/api/public/bookings/live-queue-status`) | yes, explicit two-step via `POST /api/public/bookings/check-in` |
+| Guest status page (`/guest/status`) | exchange-origin status-only HttpOnly cookie | no (has `patientsAhead`, `positionKind`, `arrivalWindow`, `session`) | **no**: read-only |
+
+On the status page the provisional panel shows the arrival window and the provisional note but
+**no** "I've arrived" button (it tells the patient to check in at reception or from their booking
+link), and the live panel shows `patientsAhead` and the delay notice without a wait range.
+Never convert, forward or substitute one credential for the other to make a panel work.
+
 ## Data (unchanged allow-lists)
 
 Only what the public projections already return: `publicDisplayLabel`, `queueState` /
@@ -33,12 +48,18 @@ Allow-list and no-identifier-leak tests must not be loosened.
 
 | Condition | Chip | Panel |
 |---|---|---|
-| booking not arrived (`positionKind = provisional`) | Pas encore arrivé(e) / لم تصل بعد | suggested arrival window `earliestAt – latestAt` (30 px, clinic time zone), basis sentence, provisional-position note, primary **"Je suis arrivé(e) à la clinique"** → inline confirmation ("Confirmez seulement si vous êtes déjà dans la clinique." + "Confirmer mon arrivée" / "Pas encore") → existing `POST /api/public/bookings/check-in` |
-| live (`checked_in`) | Dans la file / في القائمة | `patientsAhead` (56 px) + "patients avant vous"; "Attente estimée ≈ min–max min"; amber delay notice when `delayStatus = declared`; "stay near reception" line; after a successful check-in a success status line |
+| booking not arrived (`positionKind = provisional`) | Pas encore arrivé(e) / لم تصل بعد | suggested arrival window `earliestAt – latestAt` (30 px, clinic time zone), basis sentence, provisional-position note; **booking host only:** primary **"Je suis arrivé(e) à la clinique"** → inline confirmation ("Confirmez seulement si vous êtes déjà dans la clinique." + "Confirmer mon arrivée" / "Pas encore") → existing `POST /api/public/bookings/check-in`; status page: "Signalez votre arrivée à l’accueil" text, no button |
+| live (`checked_in`) | Dans la file / في القائمة | `patientsAhead` (56 px) + "patients avant vous"; booking host only: "Attente estimée ≈ min–max min"; amber delay notice when `delayStatus = declared`; "stay near reception" line; after a successful check-in a success status line |
 | paused (`pauseStatus = paused`) | En pause / متوقف مؤقتًا | warning panel: consultations suspended, place kept, `patientsAhead` still shown, "Estimation suspendue pendant la pause" (no countdown; honours `countdownEligible = false`) |
 | called | Appelé(e) / حان دورك | full primary panel: "C’est votre tour" / "حان دورك", go to reception, ticket repeated (44 px); `role="status"` |
-| terminal | Terminé / انتهت | "Votre visite est terminée" + page no longer updates |
+| terminal `completed` | Terminé / انتهت | "Votre visite est terminée" / "انتهت زيارتك" + page no longer updates |
+| terminal `cancelled` | Annulé / ملغى | the existing cancellation copy (who cancelled when the projection says so) + page no longer updates |
+| terminal `no_show` | Absent / لم يحضر | the existing absence copy and what to do next (contact reception) + page no longer updates |
 | closed session, rejected/expired link, network error | (existing messages) | existing copy in the new card style; never a fabricated estimate |
+
+Terminal copy always follows the returned outcome (`finalStatus` on the status page, the terminal
+booking/queue state on the booking host); a cancellation or absence must never read as a
+completed visit.
 
 The confirmation step is mandatory: arrival is never inferred from location, time or page
 visits. Ranges collapse to one value when `min = max`; "—" when `eta` is null.
@@ -61,7 +82,9 @@ module next to the existing live-queue strings (e.g. `imHere`, `confirmArrivalQu
 
 ## Acceptance
 
-- Playwright (fr LTR, ar RTL, 390 × 844 and 360 × 740): each panel from fixture responses,
+- Playwright (fr LTR, ar RTL, 390 × 844 and 360 × 740): each panel from fixture responses on
+  each surface (no check-in button and no wait range on `/guest/status`), each terminal outcome
+  with its own copy,
   the two-step check-in (cancel and confirm paths), stale/out-of-order responses never regress
   the panel (existing tests keep passing), screenshot baselines committed.
 - Allow-list tests unchanged and passing; a test asserts the rendered page contains no
