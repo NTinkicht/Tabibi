@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AppointmentService } from '@/modules/appointment';
-import { QueueService } from '@/modules/queue';
+import { AppointmentRecoveryService } from '@/modules/appointment/recovery';
+import { QueueConflictError, QueueService } from '@/modules/queue';
 import { QueueRestoreService } from '@/modules/queue/restore';
 import { migrate } from '../../scripts/db/lib';
 
@@ -333,5 +334,56 @@ describe('walk-in queue restore', () => {
       [entryId],
     );
     expect(row.rows[0].state).toBe('cancelled');
+  });
+
+  it('refuses the cancelled source entry of a transferred appointment (no appointment references it any more)', async () => {
+    const target = randomUUID();
+    await pool.query(
+      `INSERT INTO consultation_sessions
+        (id,clinic_id,doctor_id,service_date,starts_at,ends_at,status)
+        VALUES($1,$2,$3,'2026-09-20','2026-09-20 09:00Z','2026-09-20 12:00Z','planned')`,
+      [target, ids.clinic, ids.doctor],
+    );
+    const booking = await new AppointmentService(pool).bookForExistingPatient(
+      scope,
+      ids.session,
+      {
+        patientId: ids.patient,
+        scheduledStartAt: new Date('2026-09-18T09:30:00Z'),
+        scheduledEndAt: new Date('2026-09-18T09:45:00Z'),
+        contactPreference: 'none',
+        idempotencyKey: key(),
+        correlationId: 'qr-book-transfer',
+      },
+    );
+    await new AppointmentRecoveryService(pool).command(
+      scope,
+      ids.session,
+      booking.appointment.id,
+      {
+        command: 'transfer',
+        reason: 'Move to another day',
+        targetSessionId: target,
+        idempotencyKey: key(),
+        correlationId: 'qr-transfer',
+      },
+    );
+    const source = booking.entry.id;
+    const state = await pool.query(
+      'SELECT state FROM queue_entries WHERE id=$1',
+      [source],
+    );
+    expect(state.rows[0].state).toBe('cancelled');
+    const refs = await pool.query(
+      'SELECT 1 FROM appointments WHERE queue_entry_id=$1',
+      [source],
+    );
+    expect(refs.rowCount).toBe(0);
+    await expect(restore(source)).rejects.toBeInstanceOf(QueueConflictError);
+    const after = await pool.query(
+      'SELECT state FROM queue_entries WHERE id=$1',
+      [source],
+    );
+    expect(after.rows[0].state).toBe('cancelled');
   });
 });
