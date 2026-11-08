@@ -28,18 +28,30 @@ specialties. To render "next session" and a doctor's sessions without inventing 
   shape; filters return only matching clinic-doctor pairs; a no-identifier-leak test covers the
   response; discovery stays session-free (#692 unchanged).
 
-The UI uses bookable sessions when "only with available sessions" is on (the default) and plain
-discovery when it is off; doctors without bookable sessions then show "Pas de session réservable
-en ligne pour l’instant" / "لا توجد جلسة قابلة للحجز عبر الإنترنت حاليًا" and no button.
+The search has two explicit modes instead of an on/off filter, so no result ever has to be
+matched across the two projections (they share no public identifier):
+
+- **Réserver en ligne / الحجز عبر الإنترنت** (default): results come only from filtered bookable
+  sessions; every doctor shown has at least one bookable session, a next-session line and
+  "Voir les sessions".
+- **Tous les cabinets / كل العيادات** (directory): results come only from discovery (`available`
+  not sent); cards show clinic, doctors and specialties with **no** next-session line and **no**
+  booking button, plus the line "Pour réserver, utilisez « Réserver en ligne »" / "للحجز، استعمل
+  «الحجز عبر الإنترنت»". It never claims a doctor has or lacks sessions.
+
+The visual reference shows an "only with available sessions" checkbox; this two-mode control
+supersedes it.
 
 ## Screens (phone first, 360–430 px; ≤ 720 px centred column on desktop)
 
 1. **Search** (`/`): title "Trouver un médecin" / "ابحث عن طبيب"; filter card with specialty and
    wilaya `<select>`s (labels from `specialties.ts` / `wilayas.ts`, wilaya shown as
-   `09 · Blida`), doctor-language segmented control (Toutes / العربية / Français), checkbox
-   "Seulement avec des sessions disponibles" (default on); result count; clinic cards (name,
+   `09 · Blida`), doctor-language segmented control (Toutes / العربية / Français), mode segmented control
+   (Réserver en ligne | Tous les cabinets, default the first; see Data prerequisite); result
+   count; clinic cards (name,
    commune · wilaya, address line, languages) listing doctors with specialty chips, "Prochaine
-   session : …" from the earliest bookable session, and primary "Voir les sessions". Server
+   session : …" from the earliest bookable session, and primary "Voir les sessions" (booking
+   mode only; directory cards have neither). Server
    render the first page (as today); "Plus de résultats" loads the next page. Footer note:
    information comes from clinics; no patients or private contacts are shown.
 2. **Doctor sessions** (same page, client state; back button mirrors in RTL): doctor, specialty,
@@ -77,7 +89,8 @@ result count announced on change; works at 200 % zoom at 360 px without horizont
 
 - API: the filtered bookable-sessions tests above (allow-list exact shape, filter semantics,
   no-leak, 400 on bad codes, horizon unchanged).
-- Playwright fr/ar at 390 × 844 and 1280 px: filters, available on/off, sessions → booking
+- Playwright fr/ar at 390 × 844 and 1280 px: filters, both modes (no booking button or
+  next-session line in directory mode), sessions → booking
   route, details validation per contact choice, confirmation notice per contact choice,
   RTL mirroring of back navigation, screenshot baselines.
 - Existing discovery SSR, booking, idempotency and bearer-handling tests keep passing unchanged.
