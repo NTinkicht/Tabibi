@@ -634,7 +634,7 @@ export function GuestStatusClient() {
           </small>
         </p>
         <p>
-          <small data-testid="guest-status-updated">
+          <small data-testid="guest-status-updated" aria-live="off">
             <UpdatedAgoText
               generatedAt={snapshot.generatedAt}
               locale={locale}
