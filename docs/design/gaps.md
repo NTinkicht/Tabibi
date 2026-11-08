@@ -15,7 +15,7 @@ Visual reference for all designs: https://claude.ai/artifact/RRe557S5McvDYnLFc7Q
 | G-04 | Mockups showed browser-computed clock-time ETAs and called-at times the server does not provide | Codex review of #784 | specs use the canonical wait range; visual reference corrected (G-15) | closed |
 | G-05 | No dedicated **tablet** layout for the reception console (deferred: device not confirmed) | reception console design | #814 (parked: owner decision + design) | open |
 | G-06 | Doctors could not run queue commands or read the dashboard, needed by the doctor view | doctor view design | owner decision A in #799, PR #801 | closed |
-| G-07 | Public waiting-room projection has no pause status, declared delay or `generatedAt` | waiting-room design | #811 | open |
+| G-07 | Public waiting-room projection has no pause status, declared delay or `generatedAt` | waiting-room design | #811 | closed |
 | G-08 | Waiting-room page never refreshes and has no staleness signal, so a wall TV can show stale tickets as current | waiting-room design | #812 (after #811) | open |
 | G-09 | Surfaces without an approved design: reception home, staff sign-in, notifications page, clinic setup, guest help pages | UI inventory 2026-11-08 | #815 (parked: design) | open |
 | G-10 | Bookable sessions had no filters, location or specialties, so search could not show sessions; discovery is session-free by #692 | find-and-book design | #803 | closed |
