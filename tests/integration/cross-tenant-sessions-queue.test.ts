@@ -14,6 +14,7 @@ import {
 } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/route';
 import { POST as entryCommand } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/[entryId]/commands/route';
 import { POST as restoreEntry } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/[entryId]/restore/route';
+import { POST as transferEntry } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/[entryId]/transfer/route';
 import { POST as reorder } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/queue/[entryId]/reorder/route';
 import { GET as dashboard } from '@/app/api/clinics/[clinicId]/sessions/[sessionId]/dashboard/route';
 
@@ -429,5 +430,38 @@ describe('queue routes enforce the target clinic role', () => {
       [entries[0]],
     );
     expect(r.rows[0]!.state).toBe('checked_in');
+  });
+
+  it('walk-in transfer is denied to other clinics and doctors, allowed to reception', async () => {
+    const targetId = randomUUID();
+    await pool.query(
+      `INSERT INTO consultation_sessions (id, clinic_id, doctor_id, service_date, starts_at, ends_at, status)
+       VALUES ($1, $2, $3, CURRENT_DATE + 1, CURRENT_DATE + 1 + time '09:00', CURRENT_DATE + 1 + time '12:00', 'planned')`,
+      [targetId, ids.clinicA, ids.profileA],
+    );
+    const states = await entryStates();
+    const transferRequest = async (subject: string, clinicId = ids.clinicA) =>
+      transferEntry(
+        request(
+          `${sessionPath(clinicId)}/queue/${entries[0]}/transfer`,
+          'POST',
+          await cookieFor(subject),
+          { reason: 'Doctor moved', targetSessionId: targetId },
+        ),
+        entryCtx(entries[0]!, clinicId),
+      );
+    for (const s of [subjects.adminB, subjects.doctorA, subjects.doctorA2])
+      expect(await status(transferRequest(s)), s).toBe(403);
+    const idor = await status(transferRequest(subjects.adminB, ids.clinicB));
+    expect(idor).toBeGreaterThanOrEqual(400);
+    expect(idor).toBeLessThan(500);
+    expect(await entryStates()).toEqual(states);
+    // Positive control: the same payload succeeds for clinic-A reception.
+    expect(await status(transferRequest(subjects.receptionistA))).toBe(200);
+    const r = await pool.query<{ state: string }>(
+      `SELECT state FROM queue_entries WHERE id = $1`,
+      [entries[0]],
+    );
+    expect(r.rows[0]!.state).toBe('cancelled');
   });
 });
