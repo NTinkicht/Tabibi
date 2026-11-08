@@ -39,8 +39,8 @@ matched across the two projections (they share no public identifier):
   booking button, plus the line "Pour réserver, utilisez « Réserver en ligne »" / "للحجز، استعمل
   «الحجز عبر الإنترنت»". It never claims a doctor has or lacks sessions.
 
-The visual reference shows an "only with available sessions" checkbox; this two-mode control
-supersedes it.
+The visual reference was updated on 2026-11-08 to show this two-mode control (gap register
+G-11, G-15).
 
 ## Screens (phone first, 360–430 px; ≤ 720 px centred column on desktop)
 
