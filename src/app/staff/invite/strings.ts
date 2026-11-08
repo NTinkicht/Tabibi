@@ -1,0 +1,66 @@
+export type InviteLocale = 'ar' | 'fr';
+
+export const inviteStrings = {
+  fr: {
+    title: 'Rejoindre une clinique',
+    loading: 'Vérification de l’invitation…',
+    invitedAs: (clinic: string, role: string) =>
+      `${clinic} vous invite en tant que ${role}.`,
+    roles: { doctor: 'médecin', receptionist: 'réceptionniste' },
+    email: 'Adresse e-mail invitée',
+    expires: 'Invitation valable jusqu’au',
+    displayName: 'Votre nom (affiché à l’équipe)',
+    password: 'Choisissez un mot de passe',
+    passwordHint:
+      'Au moins 12 caractères. Si vous avez déjà un compte Tabibi, votre mot de passe actuel reste inchangé.',
+    confirm: 'Confirmez le mot de passe',
+    submit: 'Rejoindre la clinique',
+    submitting: 'Envoi en cours…',
+    errorSummary: 'Impossible de continuer',
+    invalid:
+      'Ce lien d’invitation n’est plus valable. Demandez une nouvelle invitation à l’administrateur de la clinique.',
+    missing:
+      'Lien incomplet. Ouvrez le lien d’invitation complet reçu de la clinique.',
+    mismatch: 'Les deux mots de passe ne correspondent pas.',
+    too_short: 'Le mot de passe doit contenir au moins 12 caractères.',
+    too_long: 'Le mot de passe est trop long.',
+    matches_identity: 'Le mot de passe ne doit pas être votre adresse e-mail.',
+    invalidInput: 'Vérifiez votre nom et votre mot de passe.',
+    rateLimited: 'Trop de tentatives. Réessayez plus tard.',
+    unavailable: 'Service indisponible. Réessayez dans un instant.',
+    doneTitle: 'Bienvenue dans l’équipe',
+    done: 'Votre accès est prêt. Connectez-vous avec votre adresse e-mail et votre mot de passe.',
+    signIn: 'Se connecter',
+    otherLanguage: 'العربية',
+  },
+  ar: {
+    title: 'الانضمام إلى عيادة',
+    loading: 'جارٍ التحقق من الدعوة…',
+    invitedAs: (clinic: string, role: string) =>
+      `تدعوك ${clinic} للانضمام بصفة ${role}.`,
+    roles: { doctor: 'طبيب', receptionist: 'موظف استقبال' },
+    email: 'البريد الإلكتروني المدعو',
+    expires: 'الدعوة صالحة حتى',
+    displayName: 'اسمك (يظهر للفريق)',
+    password: 'اختر كلمة مرور',
+    passwordHint:
+      '12 حرفًا على الأقل. إذا كان لديك حساب في طبيبي، تبقى كلمة مرورك الحالية كما هي.',
+    confirm: 'أكّد كلمة المرور',
+    submit: 'الانضمام إلى العيادة',
+    submitting: 'جارٍ الإرسال…',
+    errorSummary: 'تعذّر المتابعة',
+    invalid: 'رابط الدعوة هذا لم يعد صالحًا. اطلب دعوة جديدة من مسؤول العيادة.',
+    missing: 'الرابط غير مكتمل. افتح رابط الدعوة الكامل الذي وصلك من العيادة.',
+    mismatch: 'كلمتا المرور غير متطابقتين.',
+    too_short: 'يجب أن تتكون كلمة المرور من 12 حرفًا على الأقل.',
+    too_long: 'كلمة المرور طويلة جدًا.',
+    matches_identity: 'يجب ألا تكون كلمة المرور هي بريدك الإلكتروني.',
+    invalidInput: 'تحقّق من اسمك وكلمة المرور.',
+    rateLimited: 'محاولات كثيرة. حاول لاحقًا.',
+    unavailable: 'الخدمة غير متاحة. حاول بعد قليل.',
+    doneTitle: 'مرحبًا بك في الفريق',
+    done: 'حسابك جاهز. سجّل الدخول ببريدك الإلكتروني وكلمة المرور.',
+    signIn: 'تسجيل الدخول',
+    otherLanguage: 'Français',
+  },
+} as const;
