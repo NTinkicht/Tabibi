@@ -4,6 +4,11 @@ import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
 import Link from 'next/link';
 import { receptionistCopy } from '@/modules/localization/receptionist';
 import { BulkAppointmentNoShowAction } from './BulkAppointmentNoShowAction';
+import { SessionBar } from './session-bar';
+import {
+  buildConsoleView,
+  type ConsoleEntry,
+} from '@/modules/receptionist-dashboard/console-view';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 type EntryState =
@@ -329,6 +334,81 @@ export function WalkInQueue({
     }
   }
 
+  async function sessionMutation(
+    path: 'commands' | 'delay',
+    operation: string,
+    payload: object,
+  ) {
+    let idempotencyKey = pendingKeysRef.current.get(operation);
+    if (!idempotencyKey) {
+      idempotencyKey = key();
+      pendingKeysRef.current.set(operation, idempotencyKey);
+    }
+    setPending(true);
+    setMessage('');
+    try {
+      const response = await fetch(
+        `/api/clinics/${clinicId}/sessions/${sessionId}/${path}`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'idempotency-key': idempotencyKey,
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+      const body = (await response.json()) as {
+        session?: unknown;
+        message?: string;
+      };
+      if (!response.ok || !body.session) throw new Error(body.message);
+      pendingKeysRef.current.delete(operation);
+    } catch (error) {
+      setMessage(
+        error instanceof Error && error.message ? error.message : t.queueError,
+      );
+    } finally {
+      setPending(false);
+      await load();
+    }
+  }
+
+  function sessionCommand(commandName: 'pause' | 'resume' | 'close') {
+    void sessionMutation('commands', `session:${commandName}`, {
+      command: commandName,
+    });
+  }
+
+  function setDelay(minutes: number) {
+    if (!session) return;
+    const payload =
+      minutes === 0
+        ? { command: 'clear_delay', expectedVersion: session.delayVersion }
+        : {
+            command:
+              session.declaredDelayMinutes === null
+                ? 'declare_delay'
+                : 'update_delay',
+            minutes,
+            expectedVersion: session.delayVersion,
+          };
+    void sessionMutation(
+      'delay',
+      `session:delay:${session.delayVersion}:${minutes}`,
+      payload,
+    );
+  }
+
+  const consoleView = session
+    ? buildConsoleView(entries as unknown as ConsoleEntry[], session.status)
+    : null;
+  const nextCallable = consoleView?.nextCallable ?? null;
+  function callNext() {
+    const target = entries.find((entry) => entry.id === nextCallable?.id);
+    if (target) void command(target, 'call');
+  }
+
   const actionFor: Record<
     EntryState,
     {
@@ -406,6 +486,22 @@ export function WalkInQueue({
             </strong>
           </div>
         </section>
+      )}
+
+      {session && consoleView && (
+        <SessionBar
+          t={t}
+          status={session.status}
+          declaredDelayMinutes={session.declaredDelayMinutes}
+          nextCallable={nextCallable}
+          callNextEnabled={
+            consoleView.callNextEnabled && !stale && pendingEntry === null
+          }
+          busy={pending || pendingEntry !== null}
+          onCallNext={callNext}
+          onDelay={setDelay}
+          onSessionCommand={sessionCommand}
+        />
       )}
 
       {message && (
