@@ -40,3 +40,15 @@ export function formatUpdatedAgo(
 ): string {
   return PHRASES[locale](age.value, age.unit);
 }
+
+/** Re-render cadence for the relative age; coarse to avoid per-second churn. */
+export const UPDATED_AGO_TICK_MS = 5_000;
+
+/** Starts the 5 s clock tick and returns its cleanup (clears the interval). */
+export function startUpdatedAgoTicker(
+  setNowMs: (nowMs: number) => void,
+  now: () => number = Date.now,
+): () => void {
+  const timer = setInterval(() => setNowMs(now()), UPDATED_AGO_TICK_MS);
+  return () => clearInterval(timer);
+}

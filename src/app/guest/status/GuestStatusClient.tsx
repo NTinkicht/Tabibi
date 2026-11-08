@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Chip, type ChipTone } from '../../ui';
 import './guest-status.css';
-import { formatUpdatedAgo, updatedAgo } from './updated-ago';
+import { UpdatedAgoText } from './UpdatedAgoText';
 
 const NORMAL_POLL_MS = 30_000;
 const MAX_RETRY_AFTER_SECONDS = 300;
@@ -282,24 +282,6 @@ function formatTime(
     minute: '2-digit',
     timeZone: clinicTimezone,
   }).format(new Date(value));
-}
-
-/** Ticking relative age of the snapshot; the 5 s tick avoids per-second re-render churn. */
-function UpdatedAgoText({
-  generatedAt,
-  locale,
-}: {
-  generatedAt: string;
-  locale: SupportedLocale;
-}) {
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const tick = window.setInterval(() => setNowMs(Date.now()), 5_000);
-    return () => window.clearInterval(tick);
-  }, [generatedAt]);
-  const age = updatedAgo(generatedAt, nowMs);
-  if (!age) return null;
-  return <>{formatUpdatedAgo(age, locale)}</>;
 }
 
 /** Detect one of the guest UI locales supported by this bounded status view. */
