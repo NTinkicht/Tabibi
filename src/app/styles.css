@@ -891,3 +891,22 @@ h1 {
 .doctorToday {
   color: #52716d;
 }
+
+.priorityBadge {
+  display: inline-block;
+  border-radius: 999px;
+  background: #fff0c8;
+  color: #805500;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  height: max-content;
+}
+.takeNextPanel {
+  display: grid;
+  flex-basis: 100%;
+  gap: 0.5rem;
+}
+.takeNext {
+  min-height: 44px;
+}
