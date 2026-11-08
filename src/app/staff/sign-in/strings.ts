@@ -14,6 +14,7 @@ export const signInStrings = {
     rateLimited: 'Trop de tentatives. Réessayez plus tard.',
     unavailable: 'Service indisponible. Réessayez dans un instant.',
     noClinic: 'Aucune clinique n’est associée à ce compte.',
+    help: 'Mot de passe oublié ou compte verrouillé : demandez à l’administrateur de la clinique.',
     otherLanguage: 'العربية',
   },
   ar: {
@@ -28,6 +29,7 @@ export const signInStrings = {
     rateLimited: 'محاولات كثيرة. حاول لاحقًا.',
     unavailable: 'الخدمة غير متاحة. حاول بعد قليل.',
     noClinic: 'لا توجد عيادة مرتبطة بهذا الحساب.',
+    help: 'نسيت كلمة المرور أو الحساب مقفل؟ اطلب المساعدة من مسؤول العيادة.',
     otherLanguage: 'Français',
   },
 } as const;

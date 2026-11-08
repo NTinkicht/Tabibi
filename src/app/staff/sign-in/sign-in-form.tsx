@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import './sign-in.css';
+import { Button } from '@/app/ui';
 import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
 import { safeReturnPath } from './return-path';
 import { signInStrings, type SignInLocale } from './strings';
@@ -61,67 +63,79 @@ export function SignInForm({
     }
   }
 
+  const invalid = failure === 'failed';
   return (
     <main
-      className="pageShell"
+      className="si"
       lang={locale}
       dir={locale === 'ar' ? 'rtl' : 'ltr'}
       data-testid="staff-sign-in"
     >
       <DocumentLocaleSync locale={locale} />
-      <h1>{t.title}</h1>
-      <p>{t.subtitle}</p>
-      {failure ? (
-        <div
-          ref={summaryRef}
-          tabIndex={-1}
-          role="alert"
-          data-testid="sign-in-error"
-        >
-          <strong>{t.errorSummary}</strong>
-          <p>{t[failure]}</p>
-        </div>
-      ) : null}
-      <form onSubmit={submit} method="post" action="#" noValidate>
-        <p>
-          <label htmlFor="staff-subject">{t.subject}</label>
-          <br />
-          <input
-            id="staff-subject"
-            name="subject"
-            type="text"
-            autoComplete="username"
-            required
-            maxLength={320}
-            dir="ltr"
-          />
+      <div className="si-card">
+        <p className="si-brand" lang="fr" dir="ltr">
+          Tabibi
         </p>
-        <p>
-          <label htmlFor="staff-password">{t.password}</label>
-          <br />
-          <input
-            id="staff-password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            maxLength={1024}
-            dir="ltr"
-          />
-        </p>
-        <button type="submit" disabled={pending}>
-          {pending ? t.submitting : t.submit}
-        </button>
-      </form>
-      <p>
-        <button
-          type="button"
-          lang={locale === 'ar' ? 'fr' : 'ar'}
-          onClick={() => setLocale(locale === 'ar' ? 'fr' : 'ar')}
-        >
-          {t.otherLanguage}
-        </button>
-      </p>
+        <h1>{t.title}</h1>
+        <p className="si-subtitle">{t.subtitle}</p>
+        {failure ? (
+          <div
+            ref={summaryRef}
+            className="si-error"
+            tabIndex={-1}
+            role="alert"
+            data-testid="sign-in-error"
+          >
+            <strong>{t.errorSummary}</strong>
+            <p>{t[failure]}</p>
+          </div>
+        ) : null}
+        <form onSubmit={submit} method="post" action="#" noValidate>
+          <div className="si-field">
+            <label htmlFor="staff-subject">{t.subject}</label>
+            <input
+              id="staff-subject"
+              name="subject"
+              type="text"
+              autoComplete="username"
+              required
+              maxLength={320}
+              dir="ltr"
+              aria-invalid={invalid || undefined}
+            />
+          </div>
+          <div className="si-field">
+            <label htmlFor="staff-password">{t.password}</label>
+            <input
+              id="staff-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              maxLength={1024}
+              dir="ltr"
+              aria-invalid={invalid || undefined}
+            />
+          </div>
+          <Button
+            type="submit"
+            variant="primary"
+            className="si-submit"
+            disabled={pending}
+          >
+            {pending ? t.submitting : t.submit}
+          </Button>
+        </form>
+        <p className="si-help">{t.help}</p>
+      </div>
+      <button
+        type="button"
+        className="si-language"
+        lang={locale === 'ar' ? 'fr' : 'ar'}
+        onClick={() => setLocale(locale === 'ar' ? 'fr' : 'ar')}
+      >
+        {t.otherLanguage}
+      </button>
     </main>
   );
 }

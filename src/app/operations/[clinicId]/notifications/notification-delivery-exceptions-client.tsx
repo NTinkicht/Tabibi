@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import './notifications.css';
+import { Button } from '@/app/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 type Locale = 'ar' | 'fr';
@@ -71,6 +73,18 @@ const copy = {
     title: 'Notifications non remises',
     back: 'Retour à la réception',
     refresh: 'Actualiser',
+    intro:
+      'Ces notifications n’ont pas pu être remises. Le patient n’a peut-être pas été prévenu.',
+    todoTitle: 'Que faire ?',
+    todoTell: 'Prévenez le patient à l’accueil.',
+    todoLink:
+      'Ou émettez un nouveau lien de suivi depuis la ligne du patient dans la console de la session (action « lien de statut »).',
+    queueTableTitle: 'Notifications de file',
+    event: 'Événement',
+    ticket: 'Ticket',
+    intent: 'Type de lien',
+    privacy:
+      'Cette page n’affiche ni coordonnées ni texte du fournisseur de notification.',
     loading: 'Chargement des notifications non remises…',
     error: 'Impossible de charger les notifications. Veuillez réessayer.',
     empty: 'Aucune notification en échec de livraison.',
@@ -119,6 +133,16 @@ const copy = {
     title: 'إشعارات تعذّر تسليمها',
     back: 'العودة إلى الاستقبال',
     refresh: 'تحديث',
+    intro: 'تعذّر تسليم هذه الإشعارات. قد لا يكون المريض قد أُبلغ.',
+    todoTitle: 'ماذا أفعل؟',
+    todoTell: 'أبلغ المريض عند الاستقبال.',
+    todoLink:
+      'أو أصدر رابط متابعة جديدًا من سطر المريض في شاشة الجلسة (إجراء «رابط الحالة»).',
+    queueTableTitle: 'إشعارات قائمة الانتظار',
+    event: 'الحدث',
+    ticket: 'التذكرة',
+    intent: 'نوع الرابط',
+    privacy: 'لا تعرض هذه الصفحة بيانات الاتصال ولا نص مزوّد الإشعارات.',
     loading: 'جارٍ تحميل الإشعارات التي تعذّر تسليمها…',
     error: 'تعذّر تحميل الإشعارات. حاول مرة أخرى.',
     empty: 'لا توجد إشعارات تعذّر تسليمها.',
@@ -277,20 +301,28 @@ function NotificationDeliveryExceptionsView({
     };
   }, [clinicId, generation]);
 
+  const when = (iso: string) => {
+    const instant = new Date(iso);
+    return Number.isFinite(instant.getTime())
+      ? instant.toLocaleString(locale === 'ar' ? 'ar' : 'fr', {
+          numberingSystem: 'latn',
+        })
+      : '—';
+  };
   return (
     <main
-      className="desk notificationExceptions"
+      className="desk notificationExceptions nx"
       lang={locale}
       dir={locale === 'ar' ? 'rtl' : 'ltr'}
     >
-      <header className="notificationExceptionsHeader">
+      <header className="notificationExceptionsHeader nx-header">
         <Link
           href={`/operations/${encodeURIComponent(clinicId)}?locale=${locale}`}
         >
           {t.back}
         </Link>
         <div
-          className="notificationExceptionsLocales"
+          className="notificationExceptionsLocales tb-segmented"
           role="group"
           aria-label={t.language}
         >
@@ -313,56 +345,78 @@ function NotificationDeliveryExceptionsView({
         </div>
       </header>
       <h1>{t.title}</h1>
+      <p>{t.intro}</p>
       <p>{t.note}</p>
-      <button
+      <section className="nx-todo" aria-labelledby="nx-todo-title">
+        <h2 id="nx-todo-title">{t.todoTitle}</h2>
+        <ul>
+          <li>{t.todoTell}</li>
+          <li>{t.todoLink}</li>
+        </ul>
+      </section>
+      <Button
+        variant="secondary"
         className="notificationExceptionsRefresh"
-        type="button"
         onClick={refresh}
         disabled={state.kind === 'loading'}
       >
         {t.refresh}
-      </button>
+      </Button>
       <section
         className="notificationExceptionsState"
         aria-busy={state.kind === 'loading'}
+        aria-labelledby="nx-queue-title"
       >
+        <h2 id="nx-queue-title">{t.queueTableTitle}</h2>
         {state.kind === 'loading' ? <p role="status">{t.loading}</p> : null}
         {state.kind === 'error' ? <p role="alert">{t.error}</p> : null}
         {state.kind === 'ready' && state.records.length === 0 ? (
           <p role="status">{t.empty}</p>
         ) : null}
         {state.kind === 'ready' && state.records.length > 0 ? (
-          <ul className="notificationExceptionsList">
-            {state.records.map((record, index) => {
-              const eventLabel = Object.prototype.hasOwnProperty.call(
-                t.events,
-                record.event,
-              )
-                ? t.events[record.event as keyof typeof t.events]
-                : t.otherEvent;
-              const instant = new Date(record.at);
-              return (
-                <li key={index}>
-                  <h2>{eventLabel}</h2>
-                  <p>
-                    {t.queueLabel}: {record.queueLabel ?? t.noQueueLabel}
-                  </p>
-                  <p>
-                    {t.outcome}: {t.outcomes[record.outcomeCategory]}
-                  </p>
-                  <p>
-                    {t.at}:{' '}
-                    {Number.isFinite(instant.getTime())
-                      ? instant.toLocaleString(locale === 'ar' ? 'ar' : 'fr')
-                      : '—'}
-                  </p>
-                  <p>
-                    {t.attempt}: {record.attempts} / {record.maximum}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="nx-scroll">
+            <table className="nx-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t.event}</th>
+                  <th scope="col">{t.ticket}</th>
+                  <th scope="col">{t.outcome}</th>
+                  <th scope="col">{t.attempt}</th>
+                  <th scope="col">{t.at}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {state.records.map((record, index) => (
+                  <tr key={index}>
+                    <td>
+                      {Object.prototype.hasOwnProperty.call(
+                        t.events,
+                        record.event,
+                      )
+                        ? t.events[record.event as keyof typeof t.events]
+                        : t.otherEvent}
+                    </td>
+                    <td>
+                      {record.queueLabel ? (
+                        <bdi>{record.queueLabel}</bdi>
+                      ) : (
+                        t.noQueueLabel
+                      )}
+                    </td>
+                    <td>{t.outcomes[record.outcomeCategory]}</td>
+                    <td>
+                      <bdi>
+                        {record.attempts} / {record.maximum}
+                      </bdi>
+                    </td>
+                    <td>
+                      <bdi>{when(record.at)}</bdi>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </section>
       {state.kind === 'ready' ? (
@@ -375,38 +429,48 @@ function NotificationDeliveryExceptionsView({
           {state.guestLinks.length === 0 ? (
             <p role="status">{t.guestLinksEmpty}</p>
           ) : (
-            <ul className="notificationExceptionsList">
-              {state.guestLinks.map((failure, index) => {
-                const instant = new Date(failure.at);
-                return (
-                  <li key={index}>
-                    <h3>
-                      {failure.intent
-                        ? t.guestLinkIntents[failure.intent]
-                        : t.otherGuestLink}
-                    </h3>
-                    <p>
-                      {t.queueLabel}: {failure.queueLabel ?? t.noQueueLabel}
-                    </p>
-                    <p>
-                      {t.guestLinkState}: {t.guestLinkStates[failure.state]}
-                    </p>
-                    <p>
-                      {t.at}:{' '}
-                      {Number.isFinite(instant.getTime())
-                        ? instant.toLocaleString(locale === 'ar' ? 'ar' : 'fr')
-                        : '—'}
-                    </p>
-                    <p>
-                      {t.attempt}: {failure.attempts}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="nx-scroll">
+              <table className="nx-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{t.intent}</th>
+                    <th scope="col">{t.guestLinkState}</th>
+                    <th scope="col">{t.ticket}</th>
+                    <th scope="col">{t.attempt}</th>
+                    <th scope="col">{t.at}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.guestLinks.map((failure, index) => (
+                    <tr key={index}>
+                      <td>
+                        {failure.intent
+                          ? t.guestLinkIntents[failure.intent]
+                          : t.otherGuestLink}
+                      </td>
+                      <td>{t.guestLinkStates[failure.state]}</td>
+                      <td>
+                        {failure.queueLabel ? (
+                          <bdi>{failure.queueLabel}</bdi>
+                        ) : (
+                          t.noQueueLabel
+                        )}
+                      </td>
+                      <td>
+                        <bdi>{failure.attempts}</bdi>
+                      </td>
+                      <td>
+                        <bdi>{when(failure.at)}</bdi>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       ) : null}
+      <p className="nx-privacy">{t.privacy}</p>
     </main>
   );
 }
