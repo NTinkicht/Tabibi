@@ -12,3 +12,30 @@
 export function activeDoctorAssociationSql(association: string): string {
   return `${association}.departed_at IS NULL`;
 }
+
+interface AssociationQueryable {
+  query(text: string, values?: unknown[]): Promise<{ rowCount: number | null }>;
+}
+
+/**
+ * True when the doctor's association with the clinic is active, holding a
+ * FOR SHARE lock on it until the caller's transaction ends. A concurrent
+ * departure (markDoctorDeparted's UPDATE) then waits for this transaction,
+ * and a check that waited for a departure re-evaluates `departed_at` on the
+ * committed row, so a new session or booking can never be admitted against a
+ * stale snapshot of an association that is being departed.
+ */
+export async function lockActiveDoctorAssociation(
+  db: AssociationQueryable,
+  clinicId: string,
+  doctorId: string,
+): Promise<boolean> {
+  const result = await db.query(
+    `SELECT 1 FROM doctor_clinics association
+      WHERE association.clinic_id = $1 AND association.doctor_id = $2
+        AND ${activeDoctorAssociationSql('association')}
+      FOR SHARE`,
+    [clinicId, doctorId],
+  );
+  return result.rowCount === 1;
+}

@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import { ClinicService } from '@/modules/clinic';
 import { AuthorizationError } from '@/modules/identity';
+import { SchedulingService } from '@/modules/scheduling';
 import { SessionService } from '@/modules/session';
 import { closePool } from '@/platform/database/pool';
 import { createStaffSessionToken } from '@/platform/http/staff-auth';
@@ -28,6 +29,7 @@ const ids = {
   adminB: randomUUID(),
   profileA: randomUUID(),
   session: randomUUID(),
+  template: randomUUID(),
 };
 const subjects = {
   adminA1: 'rm-admin-a1',
@@ -162,7 +164,33 @@ beforeAll(async () => {
      VALUES ($1, $2, $3, CURRENT_DATE + 2, CURRENT_DATE + 2 + time '09:00', CURRENT_DATE + 2 + time '12:00', 'planned')`,
     [ids.session, ids.clinicA, ids.profileA],
   );
+  await pool.query(
+    `INSERT INTO schedule_templates (id, clinic_id, doctor_id, weekday, local_start_time, local_end_time, occurrence_index, active)
+     VALUES ($1, $2, $3, 1, '14:00', '17:00', 0, true)`,
+    [ids.template, ids.clinicA, ids.profileA],
+  );
 });
+
+async function bookWith(ref: string): Promise<number> {
+  const response = await book(
+    new Request(`${ORIGIN}/api/public/bookings`, {
+      method: 'POST',
+      headers: {
+        origin: ORIGIN,
+        'content-type': 'application/json',
+        'idempotency-key': `rm-book-${randomUUID()}`,
+      },
+      body: JSON.stringify({
+        selectionReference: ref,
+        privateDisplayName: 'Racing Patient',
+        preferredLocale: 'fr',
+        contactPhone: '0555000111',
+        contactPreference: 'phone',
+      }),
+    }),
+  );
+  return response.status;
+}
 
 afterAll(async () => {
   await pool.end();
@@ -226,7 +254,8 @@ describe('staff membership removal (G-19)', () => {
           selectionReference: ref,
           privateDisplayName: 'Late Patient',
           preferredLocale: 'fr',
-          contactPreference: 'none',
+          contactPhone: '0555000111',
+          contactPreference: 'phone',
         }),
       }),
     );
@@ -261,6 +290,33 @@ describe('staff membership removal (G-19)', () => {
         correlationId: 'rm-session',
       }),
     ).rejects.toBeInstanceOf(AuthorizationError);
+    // The kept weekly template neither generates sessions nor can be extended.
+    const scheduling = new SchedulingService(pool);
+    const sessionsBefore = await pool.query(
+      `SELECT 1 FROM consultation_sessions WHERE doctor_id = $1`,
+      [ids.profileA],
+    );
+    await expect(
+      scheduling.generateSessions(adminScope, {
+        doctorId: ids.profileA,
+        startDate: day,
+        daysAhead: 14,
+      }),
+    ).rejects.toBeInstanceOf(AuthorizationError);
+    await expect(
+      scheduling.createTemplate(adminScope, {
+        doctorId: ids.profileA,
+        weekday: 2,
+        localStartTime: '09:00',
+        localEndTime: '12:00',
+        occurrenceIndex: 0,
+      }),
+    ).rejects.toBeInstanceOf(AuthorizationError);
+    const sessionsAfter = await pool.query(
+      `SELECT 1 FROM consultation_sessions WHERE doctor_id = $1`,
+      [ids.profileA],
+    );
+    expect(sessionsAfter.rowCount).toBe(sessionsBefore.rowCount);
   });
 
   it('re-adding the doctor relists them; changing their role away from doctor delists them again', async () => {
@@ -299,6 +355,33 @@ describe('staff membership removal (G-19)', () => {
     expect(doctorNames((await publicDiscovery()).clinics)).toContain(
       'Dr RM Leaving',
     );
+  });
+
+  it('a booking waiting on a concurrent departure is refused once the departure commits', async () => {
+    const ref = (await publicBookable()).clinics
+      .find((clinic) => clinic.name === 'RM Clinic A')
+      ?.doctors.find((doctor) => doctor.displayName === 'Dr RM Leaving')
+      ?.sessions[0]?.selectionReference;
+    expect(ref).toBeTruthy();
+    const departing = await pool.connect();
+    try {
+      await departing.query('BEGIN');
+      await departing.query(
+        `UPDATE doctor_clinics SET departed_at = now() WHERE clinic_id = $1 AND doctor_id = $2`,
+        [ids.clinicA, ids.profileA],
+      );
+      const booking = bookWith(ref!);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await departing.query('COMMIT');
+      expect(await booking).not.toBe(201);
+    } finally {
+      departing.release();
+    }
+    const entries = await pool.query(
+      `SELECT 1 FROM queue_entries WHERE session_id = $1`,
+      [ids.session],
+    );
+    expect(entries.rowCount).toBe(0);
   });
 
   it('the last clinic admin cannot be removed', async () => {
