@@ -1,0 +1,87 @@
+/* TAB-UI-14 staff sign-in (docs/design/reception-home.md). Tokens + logical properties only. */
+.si {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tb-space-6);
+  min-block-size: 100vh;
+  padding: var(--tb-space-8) var(--tb-space-6);
+  background: var(--tb-ground);
+}
+.si-card {
+  inline-size: 100%;
+  max-inline-size: 420px;
+  padding: var(--tb-space-9);
+  border: 1px solid var(--tb-border);
+  border-radius: var(--tb-radius-card);
+  background: var(--tb-surface);
+}
+.si-brand {
+  margin: 0 0 var(--tb-space-6);
+  color: var(--tb-primary);
+  font-size: var(--tb-text-title);
+  font-weight: 700;
+}
+.si-card h1 {
+  margin: 0;
+  font-size: var(--tb-text-title);
+}
+.si-subtitle {
+  margin-block: var(--tb-space-2) var(--tb-space-7);
+  color: var(--tb-text-muted);
+}
+.si-error {
+  margin-block-end: var(--tb-space-6);
+  padding: var(--tb-space-4) var(--tb-space-6);
+  border: 1px solid var(--tb-danger-border);
+  border-radius: var(--tb-radius-tile);
+  color: var(--tb-danger);
+}
+.si-error p {
+  margin: var(--tb-space-1) 0 0;
+}
+.si-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tb-space-2);
+  margin-block-end: var(--tb-space-6);
+}
+.si-field label {
+  color: var(--tb-text-secondary);
+  font-size: var(--tb-text-meta);
+  font-weight: 600;
+}
+.si-field input {
+  min-block-size: var(--tb-touch-target);
+  padding-inline: var(--tb-space-4);
+  border: 1px solid var(--tb-border-strong);
+  border-radius: var(--tb-radius-control);
+  background: var(--tb-surface);
+  color: var(--tb-text);
+  font-size: var(--tb-text-row);
+}
+.si-field input[aria-invalid='true'] {
+  border-color: var(--tb-danger);
+  outline: 1px solid var(--tb-danger);
+}
+.si-submit {
+  inline-size: 100%;
+  min-block-size: 52px;
+}
+.si-help {
+  margin: var(--tb-space-6) 0 0;
+  color: var(--tb-text-muted);
+  font-size: var(--tb-text-meta);
+}
+.si-language {
+  min-block-size: var(--tb-touch-target);
+  padding-inline: var(--tb-space-6);
+  border: 0;
+  background: none;
+  color: var(--tb-info);
+  font-size: var(--tb-text-control);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}

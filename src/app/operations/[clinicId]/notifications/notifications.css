@@ -1,0 +1,72 @@
+/* TAB-UI-14 notifications page (docs/design/reception-home.md). Tokens + logical properties only. */
+.nx {
+  max-inline-size: var(--tb-max-width);
+  margin-inline: auto;
+  padding-block: var(--tb-space-8);
+  padding-inline: var(--tb-gutter);
+}
+.nx-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tb-space-6);
+}
+.nx-header a {
+  color: var(--tb-info);
+  font-weight: 600;
+}
+.nx h1 {
+  font-size: var(--tb-text-title);
+}
+.nx h2 {
+  font-size: var(--tb-text-section);
+}
+.nx-todo {
+  margin-block: var(--tb-space-6);
+  padding: var(--tb-space-6) var(--tb-space-7);
+  border: 1px solid var(--tb-warning-border);
+  border-radius: var(--tb-radius-tile);
+  background: var(--tb-warning-tint);
+  color: var(--tb-warning-text);
+}
+.nx-todo h2 {
+  margin: 0 0 var(--tb-space-2);
+  color: inherit;
+}
+.nx-todo ul {
+  margin: 0;
+  padding-inline-start: var(--tb-space-8);
+}
+.nx-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--tb-border);
+  border-radius: var(--tb-radius-card);
+  background: var(--tb-surface);
+}
+.nx-table {
+  inline-size: 100%;
+  min-inline-size: 640px;
+  border-collapse: collapse;
+}
+.nx-table th,
+.nx-table td {
+  padding: var(--tb-space-4) var(--tb-space-6);
+  border-block-end: 1px solid var(--tb-divider);
+  text-align: start;
+  vertical-align: top;
+}
+.nx-table th {
+  background: var(--tb-surface-subtle);
+  color: var(--tb-text-secondary);
+  font-size: var(--tb-text-meta);
+  font-weight: 600;
+}
+.nx-table tbody tr:last-child td {
+  border-block-end: 0;
+}
+.nx-privacy {
+  margin-block-start: var(--tb-space-8);
+  color: var(--tb-text-muted);
+  font-size: var(--tb-text-meta);
+}

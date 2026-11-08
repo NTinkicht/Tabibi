@@ -86,11 +86,19 @@ test('French view renders a labelled exception, hides raw identifiers, and refre
     page.getByRole('heading', { name: 'Notifications non remises' }),
   ).toBeVisible();
   await expect(page.getByText('Patient appelé')).toBeVisible();
-  await expect(page.getByText('Passage: A-041')).toBeVisible();
-  await expect(page.getByText('Tentatives de livraison: 3 / 5')).toBeVisible();
+  const queueRow = page.getByRole('row', { name: /Patient appelé/ });
+  await expect(queueRow.getByRole('cell').nth(1)).toHaveText('A-041');
+  await expect(queueRow.getByRole('cell').nth(3)).toHaveText('3 / 5');
+  // Real table headers (spec: two tables with <th scope="col">) and the "Que faire ?" box.
+  await expect(
+    page.getByRole('columnheader', { name: 'Ticket' }).first(),
+  ).toHaveAttribute('scope', 'col');
+  await expect(
+    page.getByRole('heading', { name: 'Que faire ?' }),
+  ).toBeVisible();
   // The raw provider outcome code ('provider_unknown') must never reach the
   // DOM -- only its generic, allow-listed category label may appear.
-  await expect(page.getByText('Motif: Motif non précisé')).toBeVisible();
+  await expect(queueRow.getByText('Motif non précisé')).toBeVisible();
 
   const bodyText = await page.locator('body').innerText();
   expect(bodyText).not.toContain(rawQueueEntryId);
@@ -387,10 +395,15 @@ test('guest-link failures are listed from the staff endpoint without raw identif
     }),
   ).toBeVisible();
   await expect(page.getByText('Renvoi du lien')).toBeVisible();
-  await expect(page.getByText('Passage: B-007')).toBeVisible();
+  const linkRow = page.getByRole('row', { name: /Renvoi du lien/ });
+  await expect(linkRow.getByRole('cell').nth(2)).toHaveText('B-007');
   await expect(page.getByText('Livraison abandonnée')).toBeVisible();
   await expect(page.getByText('Lien expiré avant remise')).toBeVisible();
-  await expect(page.getByText('Passage: Passage non identifié')).toBeVisible();
+  await expect(
+    page
+      .getByRole('row', { name: /Lien de suivi/ })
+      .getByText('Passage non identifié'),
+  ).toBeVisible();
   const bodyText = await page.locator('body').innerText();
   expect(bodyText).not.toContain(rawQueueEntryId);
   expect(bodyText).not.toContain('some_future_intent');
