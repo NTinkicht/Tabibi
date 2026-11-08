@@ -83,6 +83,7 @@ export function WalkInQueue({
   const [session, setSession] = useState<DashboardSession | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const [stale, setStale] = useState(false);
+  const [timezone, setTimezone] = useState('UTC');
   const pendingKeysRef = useRef(new Map<string, string>());
   const loadRequestRef = useRef(0);
   const hasSnapshotRef = useRef(false);
@@ -101,6 +102,7 @@ export function WalkInQueue({
         queueOrderVersion?: number;
         session?: DashboardSession;
         generatedAt?: string;
+        timezone?: string;
         refreshAfterSeconds?: number;
         message?: string;
       };
@@ -109,6 +111,7 @@ export function WalkInQueue({
       if (requestId !== loadRequestRef.current) return;
       setEntries(body.entries);
       setSession(body.session);
+      if (body.timezone) setTimezone(body.timezone);
       setQueueOrderVersion(body.session.queueOrderVersion);
       setRefreshedAt(new Date(body.generatedAt));
       hasSnapshotRef.current = true;
@@ -436,6 +439,7 @@ export function WalkInQueue({
   const regions = {
     t,
     locale,
+    timezone,
     busy: pending || pendingEntry !== null || stale,
     pendingEntryId: pendingEntry,
     onPrimary: (entry: ConsoleEntry, name: Parameters<typeof command>[1]) => {

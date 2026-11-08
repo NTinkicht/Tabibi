@@ -15,6 +15,8 @@ export type PanelAction = 'prioritise' | 'no_show' | 'cancel';
 export interface RegionHandlers {
   t: Copy;
   locale: 'ar' | 'fr';
+  /** Clinic IANA timezone used to format appointment times. */
+  timezone: string;
   /** True while any command is in flight or the snapshot is stale. */
   busy: boolean;
   pendingEntryId: string | null;
@@ -39,7 +41,7 @@ function entryMeta(entry: ConsoleEntry, h: RegionHandlers): string {
   if (entry.origin === 'appointment' && entry.appointmentStartsAt) {
     const time = new Date(entry.appointmentStartsAt).toLocaleTimeString(
       h.locale === 'ar' ? 'ar-DZ' : 'fr-DZ',
-      { hour: '2-digit', minute: '2-digit' },
+      { hour: '2-digit', minute: '2-digit', timeZone: h.timezone },
     );
     parts.push(h.t.appointmentMeta.replace('{time}', time));
   } else {
