@@ -140,7 +140,9 @@ export function DoctorView({
       { command, reason: entryReason },
     );
   }
-  /** Take-next = the existing reorder command to position 1, current version. */
+  /** Take-next = the existing reorder command to position 1, current version.
+   * Goes through post(): it sets busy for the duration (the confirm button is
+   * disabled={busy}) and reloads the queue via load() before resolving. */
   function takeNext(entry: ConsoleEntry, entryReason: string) {
     if (!session) return Promise.resolve(false);
     return post(
