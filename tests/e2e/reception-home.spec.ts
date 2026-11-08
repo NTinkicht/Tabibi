@@ -51,7 +51,12 @@ const allStatuses = [
   session(5, 'cancelled'),
 ];
 
-async function mockHome(page: Page, sessions: unknown[], deadLetters = 0) {
+async function mockHome(
+  page: Page,
+  sessions: unknown[],
+  deadLetters = 0,
+  guestFailures: number | 'fail' = 0,
+) {
   await page.context().addCookies([
     {
       name: 'tabibi_staff_session',
@@ -70,6 +75,17 @@ async function mockHome(page: Page, sessions: unknown[], deadLetters = 0) {
       route.fulfill({
         json: { deadLetters: Array.from({ length: deadLetters }, () => ({})) },
       }),
+  );
+  await page.route(
+    `**/api/clinics/${clinicId}/notifications/guest-link-failures**`,
+    (route) =>
+      guestFailures === 'fail'
+        ? route.fulfill({ status: 500, json: {} })
+        : route.fulfill({
+            json: {
+              failures: Array.from({ length: guestFailures }, () => ({})),
+            },
+          }),
   );
 }
 
@@ -180,4 +196,52 @@ test('keyboard only: Tab reaches the console link of an open session', async ({
     if (await link.evaluate((el) => el === document.activeElement)) break;
   }
   await expect(link).toBeFocused();
+});
+
+test('banner link shows when only guest-link failures exist', async ({
+  page,
+}) => {
+  await mockHome(page, [], 0, 2);
+  await page.goto(`/operations/${clinicId}?locale=fr`);
+  const banner = page.locator('.rh-banner');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('2 notification');
+  await expect(
+    banner.getByRole('link', { name: 'Notifications non remises' }),
+  ).toBeVisible();
+});
+
+test('banner link stays available when a failure source cannot be fetched', async ({
+  page,
+}) => {
+  await mockHome(page, [], 0, 'fail');
+  await page.goto(`/operations/${clinicId}?locale=fr`);
+  await expect(
+    page
+      .locator('.rh-banner')
+      .getByRole('link', { name: 'Notifications non remises' }),
+  ).toBeVisible();
+});
+
+test('pause keeps the card counts line (mutation response has no queueCounts)', async ({
+  page,
+}) => {
+  await mockHome(page, [allStatuses[1]], 0);
+  const open = allStatuses[1] as Record<string, unknown>;
+  const { queueCounts: _omit, ...withoutCounts } = open;
+  void _omit;
+  await page.route(
+    `**/api/clinics/${clinicId}/sessions/${open.id}/commands`,
+    (route) =>
+      route.fulfill({
+        json: { session: { ...withoutCounts, status: 'paused' } },
+      }),
+  );
+  await page.goto(`/operations/${clinicId}?locale=fr`);
+  const counts = page.locator('.rh-card__counts');
+  await expect(counts).toContainText('4 arrivés');
+  await page.getByRole('button', { name: 'Pause' }).click();
+  await expect(page.locator('.rh-card--paused')).toHaveCount(1);
+  await expect(counts).toContainText('4 arrivés');
+  await expect(counts).not.toContainText('Aucun patient');
 });

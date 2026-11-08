@@ -33,6 +33,7 @@ export function ReceptionDesk({
   const [pending, setPending] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [undelivered, setUndelivered] = useState(0);
+  const [undeliveredUnknown, setUndeliveredUnknown] = useState(false);
   const [delayMinutes, setDelayMinutes] = useState<Record<string, string>>({});
   const pendingKeysRef = useRef(new Map<string, string>());
 
@@ -74,17 +75,37 @@ export function ReceptionDesk({
   }, [load]);
   useEffect(() => {
     // Banner is best effort: a failure here must never block the day's sessions.
+    // Both failure sources shown on the notifications page count; if either
+    // fetch fails the link is still offered (fail-safe, never hide failures).
     const controller = new AbortController();
-    fetch(`/api/clinics/${clinicId}/notifications/dead-letters?limit=100`, {
-      cache: 'no-store',
-      signal: controller.signal,
-    })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((body: { deadLetters?: unknown[] } | null) => {
-        if (body && Array.isArray(body.deadLetters))
-          setUndelivered(body.deadLetters.length);
-      })
-      .catch(() => undefined);
+    const init = { cache: 'no-store' as const, signal: controller.signal };
+    const base = `/api/clinics/${clinicId}/notifications`;
+    const count = async (
+      url: string,
+      field: string,
+    ): Promise<number | null> => {
+      try {
+        const response = await fetch(url, init);
+        if (!response.ok) return null;
+        const body = (await response.json()) as Record<string, unknown> | null;
+        const list = body?.[field];
+        return Array.isArray(list) ? list.length : null;
+      } catch {
+        return null;
+      }
+    };
+    void Promise.all([
+      count(`${base}/dead-letters?limit=100`, 'deadLetters'),
+      count(`${base}/guest-link-failures?limit=100`, 'failures'),
+    ]).then(([dead, guest]) => {
+      if (controller.signal.aborted) return;
+      setUndelivered(
+        dead !== null && guest !== null
+          ? dead + guest
+          : (dead ?? 0) + (guest ?? 0),
+      );
+      setUndeliveredUnknown(dead === null || guest === null);
+    });
     return () => controller.abort();
   }, [clinicId]);
   async function mutate(
@@ -114,8 +135,16 @@ export function ReceptionDesk({
         message?: string;
       };
       if (!response.ok || !data.session) throw new Error(data.message);
+      // Mutation responses carry no queueCounts: keep the last known counts.
       setSessions((items) =>
-        items.map((item) => (item.id === sessionId ? data.session! : item)),
+        items.map((item) =>
+          item.id === sessionId
+            ? {
+                ...data.session!,
+                queueCounts: data.session!.queueCounts ?? item.queueCounts,
+              }
+            : item,
+        ),
       );
     } catch (error) {
       setMessage(
@@ -242,9 +271,11 @@ export function ReceptionDesk({
           {t.reload}
         </Button>
       </div>
-      {undelivered > 0 && (
+      {(undelivered > 0 || undeliveredUnknown) && (
         <div className="rh-banner" role="status">
-          <span>{t.homeUndelivered.replace('{n}', String(undelivered))}</span>
+          {undelivered > 0 && (
+            <span>{t.homeUndelivered.replace('{n}', String(undelivered))}</span>
+          )}
           <Link href={`/operations/${clinicId}/notifications?locale=${locale}`}>
             {t.notifications}
           </Link>

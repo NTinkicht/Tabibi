@@ -15,8 +15,8 @@ sessions (existing scoping).
 
 - Title "Sessions du jour" / "جلسات اليوم"; date control: previous day, `<input type="date">`,
   next day, "Aujourd’hui"; times rendered in the clinic time zone.
-- Undelivered-notifications banner (only when the dead-letter count > 0) linking to the
-  notifications page.
+- Undelivered-notifications banner (when queue dead letters plus guest-link failures > 0, or
+  when either source cannot be fetched: fail-safe) linking to the notifications page.
 - Grid of session cards (`auto-fill, minmax(380px, 1fr)`): doctor + specialty, hours (20 px),
   status chip (planned = info tint, open = primary tint, paused = warning, closed = neutral,
   cancelled = danger tint), delay chip when declared, opened/closed time, a counts line
