@@ -24,3 +24,4 @@ Visual reference for all designs: https://claude.ai/artifact/RRe557S5McvDYnLFc7Q
 | G-13 | Cancelled and no-show must not read as "visit finished" | Codex review of #797 | `patient-status.md` terminal rows, implemented by #798 | open (until #798) |
 | G-14 | The booking bearer is memory-only, so a closed page loses online access unless a contact link exists | find-and-book design | `find-and-book.md` keep-page-open notice, implemented by #805 | open (until #805) |
 | G-15 | Visual reference still showed superseded details (clock-time ETAs, called-at times, availability checkbox) | spec reviews | canvas updated to match the specs on 2026-11-08 | closed |
+| G-16 | The doctor must be able to replace any patient by any other one (reorder), which #799 option A had kept reception-only | owner request 2026-11-08 | permission: #817 (this PR); doctor-view UI: #819 | open (until #819) |
