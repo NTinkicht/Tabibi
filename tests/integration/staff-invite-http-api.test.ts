@@ -258,8 +258,18 @@ describe('staff invite HTTP API (G-18)', () => {
       error: 'password_policy',
       code: 'too_short',
     });
-    const identity = await accept(token, 'joiner');
+    const identity = await accept(token, 'Joiner@X.example');
     expect(identity.status).toBe(400);
+    expect(await identity.json()).toEqual({
+      error: 'password_policy',
+      code: 'matches_identity',
+    });
+    const long = await accept(token, 'x'.repeat(257));
+    expect(long.status).toBe(400);
+    expect(await long.json()).toEqual({
+      error: 'password_policy',
+      code: 'too_long',
+    });
     // A rejected attempt leaves the invite open.
     expect((await preview(token)).status).toBe(200);
 
@@ -317,6 +327,15 @@ describe('staff invite HTTP API (G-18)', () => {
         status: 'expired',
       }),
     ]);
+    // An expired invite still blocks a new one for that address until revoked.
+    const blocked = { email: 'expired@x.example', role: 'receptionist' };
+    expect((await create(subjects.adminA, blocked)).status).toBe(409);
+    expect(await revoke(subjects.adminA, expired.inviteId)).toBe(200);
+    const reinvite = await create(subjects.adminA, blocked);
+    expect(reinvite.status).toBe(201);
+    const fresh = ((await reinvite.json()) as { invite: { inviteId: string } })
+      .invite.inviteId;
+    expect(await revoke(subjects.adminA, fresh)).toBe(200);
 
     const live = await newInvite('live@x.example');
     const wrongSecret = `${live.inviteId}.${'A'.repeat(43)}`;
