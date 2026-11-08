@@ -1,7 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
-import { type ClinicScope, requireClinicRole } from '@/modules/identity';
+import {
+  AuthorizationError,
+  type ClinicScope,
+  type Queryable,
+  requireClinicRole,
+  requireOwnSessionDoctor,
+} from '@/modules/identity';
 import {
   applyQueueCommand,
   exitsPriorityCohort,
@@ -218,6 +224,35 @@ async function loadRegistration(
       publicDisplayLabel: row.public_display_label,
     },
   };
+}
+
+/**
+ * Owner decision #799 (option A): the consultation-flow commands a doctor may
+ * issue on their OWN sessions. Everything else (check-in, cancel, walk-in
+ * registration, reorder/priority, bulk no-show, other doctors' sessions, other
+ * clinics) stays receptionist / clinic_admin only.
+ */
+export const DOCTOR_QUEUE_COMMANDS: ReadonlySet<QueueCommand> = new Set([
+  'call',
+  'start_consultation',
+  'complete_consultation',
+  'no_show',
+]);
+
+async function requireQueueCommandActor(
+  db: Queryable,
+  scope: ClinicScope,
+  sessionId: string,
+  command: QueueCommand,
+): Promise<void> {
+  const role = await requireClinicRole(db, scope, [
+    'doctor',
+    'receptionist',
+    'clinic_admin',
+  ]);
+  if (role !== 'doctor') return;
+  if (!DOCTOR_QUEUE_COMMANDS.has(command)) throw new AuthorizationError();
+  await requireOwnSessionDoctor(db, scope, sessionId);
 }
 
 export class QueueService {
@@ -503,8 +538,14 @@ export class QueueService {
           `queue-command:${scope.clinicId}:${scope.actorUserId}:${rawInput.idempotencyKey}`,
         ],
       );
-      // Retries are re-authorized; a revoked receptionist cannot use a receipt.
-      await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
+      // Retries are re-authorized; a revoked receptionist or doctor (or a
+      // doctor no longer linked to this session) cannot use a receipt.
+      await requireQueueCommandActor(
+        client,
+        scope,
+        sessionId,
+        rawInput.command,
+      );
       const receipt = await client.query<{
         request_fingerprint: string;
         response: StaffQueueEntry;

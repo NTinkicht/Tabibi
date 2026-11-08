@@ -1,5 +1,9 @@
 import type { Pool, PoolClient } from 'pg';
-import { type ClinicScope, requireClinicRole } from '@/modules/identity';
+import {
+  type ClinicScope,
+  requireClinicRole,
+  requireOwnSessionDoctor,
+} from '@/modules/identity';
 import type { QueueEntryState } from '@/modules/queue';
 import {
   MAX_HISTORICAL_SAMPLES,
@@ -125,7 +129,15 @@ export class ReceptionistDashboardService {
           'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
         );
       }
-      await requireClinicRole(client, scope, ['receptionist', 'clinic_admin']);
+      // Owner decision #799 (option A): a doctor may read the dashboard of
+      // their OWN sessions only; anything else is denied before any row read.
+      const role = await requireClinicRole(client, scope, [
+        'doctor',
+        'receptionist',
+        'clinic_admin',
+      ]);
+      if (role === 'doctor')
+        await requireOwnSessionDoctor(client, scope, sessionId);
       const result = await client.query<Row>(
         `SELECT session.id AS session_id,
                 session.doctor_id,
