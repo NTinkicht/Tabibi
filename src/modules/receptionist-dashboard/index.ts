@@ -98,6 +98,7 @@ type Row = {
   private_display_name: string | null;
   preferred_locale: 'ar' | 'fr' | null;
   has_contact: boolean | null;
+  appointment_id: string | null;
   appointment_starts_at: Date | null;
   in_consultation_started_at: Date | null;
 };
@@ -139,6 +140,7 @@ export class ReceptionistDashboardService {
                 entry.in_consultation_started_at,
                 patient.private_display_name, patient.preferred_locale,
                 (patient.contact_phone IS NOT NULL OR patient.contact_email IS NOT NULL) AS has_contact,
+                appointment.id AS appointment_id,
                 appointment.scheduled_start_at AS appointment_starts_at
            FROM consultation_sessions session
            JOIN doctor_profiles doctor ON doctor.id = session.doctor_id
@@ -370,9 +372,9 @@ export class ReceptionistDashboardService {
             privateDisplayName: row.private_display_name!,
             preferredLocale: row.preferred_locale!,
             hasContact: row.has_contact!,
-            origin: (row.appointment_starts_at ? 'appointment' : 'walk_in') as
-              | 'appointment'
-              | 'walk_in',
+            origin: (row.appointment_id !== null
+              ? 'appointment'
+              : 'walk_in') as 'appointment' | 'walk_in',
             appointmentStartsAt:
               row.appointment_starts_at?.toISOString() ?? null,
             activeConsultationRemainingMinutes:
