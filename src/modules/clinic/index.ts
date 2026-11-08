@@ -52,6 +52,10 @@ export interface ClinicLocation {
 export interface ClinicMembership {
   userId: string;
   role: ClinicRole;
+  /** users.display_name, for the clinic-setup staff list (G-20). */
+  displayName: string;
+  /** users.auth_subject: the sign-in identifier the person uses (G-20). */
+  identifier: string;
 }
 
 export interface ClinicDoctor {
@@ -491,12 +495,21 @@ export class ClinicService {
     const result = await this.pool.query<{
       user_id: string;
       role: ClinicRole;
+      display_name: string;
+      auth_subject: string;
     }>(
-      `SELECT user_id, role FROM clinic_memberships
-        WHERE clinic_id = $1 ORDER BY user_id`,
+      `SELECT membership.user_id, membership.role, users.display_name, users.auth_subject
+         FROM clinic_memberships membership
+         JOIN users ON users.id = membership.user_id
+        WHERE membership.clinic_id = $1 ORDER BY membership.user_id`,
       [scope.clinicId],
     );
-    return result.rows.map((row) => ({ userId: row.user_id, role: row.role }));
+    return result.rows.map((row) => ({
+      userId: row.user_id,
+      role: row.role,
+      displayName: row.display_name,
+      identifier: row.auth_subject,
+    }));
   }
 
   async listDoctors(scope: ClinicScope): Promise<ClinicDoctor[]> {
