@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Chip, type ChipTone } from '../../ui';
 import './guest-status.css';
+import { formatUpdatedAgo, updatedAgo } from './updated-ago';
 
 const NORMAL_POLL_MS = 30_000;
 const MAX_RETRY_AFTER_SECONDS = 300;
@@ -61,7 +62,6 @@ type Copy = {
   clinicDelay: string;
   sessionState: string;
   minute: string;
-  updated: string;
   estimateExplainerLink: string;
   estimateExplainerNewTab: string;
   queueHelpLink: string;
@@ -101,7 +101,6 @@ const COPY: Record<SupportedLocale, Copy> = {
     clinicDelay: 'Declared clinic delay:',
     sessionState: 'Clinic session:',
     minute: 'min',
-    updated: 'Updated',
     estimateExplainerLink: 'Why estimates can change',
     estimateExplainerNewTab: 'opens in a new tab',
     queueHelpLink: 'What to do while waiting',
@@ -161,7 +160,6 @@ const COPY: Record<SupportedLocale, Copy> = {
     clinicDelay: 'Retard déclaré de la clinique :',
     sessionState: 'Session de la clinique :',
     minute: 'min',
-    updated: 'Mis à jour',
     estimateExplainerLink: 'Pourquoi ces estimations changent',
     estimateExplainerNewTab: 's’ouvre dans un nouvel onglet',
     queueHelpLink: 'Que faire pendant l’attente',
@@ -219,7 +217,6 @@ const COPY: Record<SupportedLocale, Copy> = {
     clinicDelay: 'التأخير المعلن للعيادة:',
     sessionState: 'جلسة العيادة:',
     minute: 'دقيقة',
-    updated: 'آخر تحديث',
     estimateExplainerLink: 'لماذا تتغير هذه التقديرات',
     estimateExplainerNewTab: 'يُفتح في علامة تبويب جديدة',
     queueHelpLink: 'ماذا تفعل أثناء الانتظار',
@@ -285,6 +282,24 @@ function formatTime(
     minute: '2-digit',
     timeZone: clinicTimezone,
   }).format(new Date(value));
+}
+
+/** Ticking relative age of the snapshot; the 5 s tick avoids per-second re-render churn. */
+function UpdatedAgoText({
+  generatedAt,
+  locale,
+}: {
+  generatedAt: string;
+  locale: SupportedLocale;
+}) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const tick = window.setInterval(() => setNowMs(Date.now()), 5_000);
+    return () => window.clearInterval(tick);
+  }, [generatedAt]);
+  const age = updatedAgo(generatedAt, nowMs);
+  if (!age) return null;
+  return <>{formatUpdatedAgo(age, locale)}</>;
 }
 
 /** Detect one of the guest UI locales supported by this bounded status view. */
@@ -619,9 +634,11 @@ export function GuestStatusClient() {
           </small>
         </p>
         <p>
-          <small>
-            {copy.updated}{' '}
-            {formatTime(snapshot.generatedAt, locale, snapshot.clinicTimezone)}
+          <small data-testid="guest-status-updated">
+            <UpdatedAgoText
+              generatedAt={snapshot.generatedAt}
+              locale={locale}
+            />
           </small>
         </p>
       </div>
