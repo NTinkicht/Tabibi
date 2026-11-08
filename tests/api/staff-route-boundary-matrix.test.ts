@@ -191,7 +191,7 @@ describe('staff clinic route inventory', () => {
       );
     }
     expect(discovered).toEqual(EXPECTED);
-    expect(mutations).toHaveLength(24);
+    expect(mutations).toHaveLength(25);
     expect(reads).toHaveLength(12);
   });
 });
