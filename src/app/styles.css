@@ -269,18 +269,26 @@ h1 {
 }
 .createPanel form {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr auto;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(
+      0,
+      auto
+    );
   gap: 0.8rem;
   align-items: end;
 }
 .createPanel label {
+  min-width: 0;
   display: grid;
   gap: 0.4rem;
   font-size: 0.8rem;
   font-weight: 750;
 }
+.createPanel select {
+  min-width: 0;
+  max-width: 100%;
+}
 .createPanel p {
-  color: #52716d;
+  color: #3f5f5b;
 }
 .queueToolbar {
   display: flex;
