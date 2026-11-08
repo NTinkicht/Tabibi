@@ -833,3 +833,61 @@ h1 {
     grid-column: 3;
   }
 }
+.doctorView {
+  display: grid;
+  gap: 0.9rem;
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+.doctorHeader,
+.doctorControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.doctorView h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+.doctorCurrent {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #c9dcda;
+  border-radius: 1rem;
+}
+.doctorCurrent .ticket {
+  font-size: 2.1rem;
+}
+.doctorPrimary {
+  min-height: 4.75rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+.doctorNoShow,
+.doctorNext ol {
+  display: grid;
+  gap: 0.5rem;
+}
+.doctorNext ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.doctorNext li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+.doctorError {
+  color: #8a1c1c;
+  font-weight: 700;
+}
+.doctorToday {
+  color: #52716d;
+}
