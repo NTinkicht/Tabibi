@@ -117,3 +117,39 @@ test('session bar: delay step, pause banner and call next each issue one command
   expect(posts.at(-1)?.path).toContain(`queue/${entryId}/commands`);
   expect(posts.at(-1)?.body.command).toBe('call');
 });
+
+test('session bar: rejected close keeps its error and controls stay busy until the refresh lands', async ({
+  page,
+}) => {
+  await authenticate(page);
+  let delayRefresh = false;
+  await page.route('**/api/clinics/**', async (route) => {
+    const request = route.request();
+    if (request.method() === 'GET') {
+      if (delayRefresh) await new Promise((r) => setTimeout(r, 800));
+      return route.fulfill({ json: snapshot('open', null, 1) });
+    }
+    const url = new URL(request.url()).pathname;
+    if (url.endsWith('/commands')) {
+      return route.fulfill({
+        status: 409,
+        json: { message: 'Session has active entries' },
+      });
+    }
+    return route.fulfill({ json: { session: {} } });
+  });
+  await page.goto(
+    `/operations/${clinicId}/sessions/${sessionId}/queue?locale=fr`,
+  );
+  const plus = page.getByRole('button', { name: /Retard \+/ });
+  await expect(plus).toBeEnabled();
+  delayRefresh = true;
+  await plus.click();
+  await expect(plus).toBeDisabled();
+  await expect(plus).toBeEnabled();
+  delayRefresh = false;
+  await page.getByRole('button', { name: 'Fermer', exact: true }).click();
+  await expect(page.locator('.alert')).toContainText(
+    'Session has active entries',
+  );
+});

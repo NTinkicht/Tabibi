@@ -346,6 +346,7 @@ export function WalkInQueue({
     }
     setPending(true);
     setMessage('');
+    let failure = '';
     try {
       const response = await fetch(
         `/api/clinics/${clinicId}/sessions/${sessionId}/${path}`,
@@ -365,12 +366,16 @@ export function WalkInQueue({
       if (!response.ok || !body.session) throw new Error(body.message);
       pendingKeysRef.current.delete(operation);
     } catch (error) {
-      setMessage(
-        error instanceof Error && error.message ? error.message : t.queueError,
-      );
-    } finally {
-      setPending(false);
+      failure =
+        error instanceof Error && error.message ? error.message : t.queueError;
+    }
+    try {
       await load();
+    } finally {
+      // Stay busy until the refreshed snapshot is applied, and keep the
+      // mutation error visible (load() clears the message on success).
+      if (failure) setMessage(failure);
+      setPending(false);
     }
   }
 
