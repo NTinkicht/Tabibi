@@ -104,3 +104,21 @@ export function buildProfilePatch(
   if (Object.keys(body).length === 0) return { ok: false, error: 'unchanged' };
   return { ok: true, body };
 }
+
+// A stable list of supported zones that always keeps the stored value, so the
+// options never depend on the current selection.
+const COMMON_TIMEZONES = [
+  'Africa/Algiers',
+  'Africa/Tunis',
+  'Africa/Tripoli',
+  'Africa/Casablanca',
+  'Africa/Cairo',
+  'Europe/Paris',
+  'UTC',
+] as const;
+
+export function timezoneOptions(stored: string): string[] {
+  return COMMON_TIMEZONES.includes(stored as (typeof COMMON_TIMEZONES)[number])
+    ? [...COMMON_TIMEZONES]
+    : [stored, ...COMMON_TIMEZONES];
+}

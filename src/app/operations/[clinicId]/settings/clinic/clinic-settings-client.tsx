@@ -8,6 +8,7 @@ import { WILAYAS } from '@/modules/clinic/wilayas';
 import { clinicSetupCopy } from '@/modules/localization/clinic-setup';
 import '../settings.css';
 import {
+  timezoneOptions,
   buildProfilePatch,
   formFromProfile,
   type ClinicLocale,
@@ -65,12 +66,21 @@ export function ClinicSettingsClient({
     const controller = new AbortController();
     (async () => {
       try {
-        const res = await fetch(base, {
-          credentials: 'same-origin',
-          cache: 'no-store',
+        const init = {
+          credentials: 'same-origin' as const,
+          cache: 'no-store' as const,
           signal: controller.signal,
-        });
-        if (res.status === 403) return setLoad({ kind: 'forbidden' });
+        };
+        // GET /memberships is clinic_admin-only on the server, while the
+        // clinic read is open to every clinic role: use it as the role check
+        // so a non-admin never sees the editable form.
+        const [res, adminProbe] = await Promise.all([
+          fetch(base, init),
+          fetch(`${base}/memberships`, init),
+        ]);
+        if (res.status === 403 || adminProbe.status === 403)
+          return setLoad({ kind: 'forbidden' });
+        if (!adminProbe.ok) return setLoad({ kind: 'error' });
         const parsed = res.ok ? toProfile(await res.json()) : null;
         if (!parsed) return setLoad({ kind: 'error' });
         setProfile(parsed);
@@ -134,9 +144,7 @@ export function ClinicSettingsClient({
       : (enabledLocales[0] ?? form.defaultLocale);
     set({ enabledLocales, defaultLocale });
   };
-  const timezones = form
-    ? Array.from(new Set(['Africa/Algiers', form.timezone]))
-    : [];
+  const timezones = profile ? timezoneOptions(profile.timezone) : [];
 
   return (
     <main className="cs">
@@ -174,99 +182,102 @@ export function ClinicSettingsClient({
             </div>
           )}
           <form onSubmit={onSubmit} noValidate>
-            <div className="cs-field">
-              <label htmlFor="cs-name">{t.name}</label>
-              <input
-                id="cs-name"
-                type="text"
-                value={form.name}
-                maxLength={200}
-                onChange={(e) => set({ name: e.target.value })}
-              />
-            </div>
-            <div className="cs-field">
-              <label htmlFor="cs-tz">{t.timezone}</label>
-              <select
-                id="cs-tz"
-                value={form.timezone}
-                onChange={(e) => set({ timezone: e.target.value })}
-              >
-                {timezones.map((z) => (
-                  <option key={z} value={z}>
-                    {z}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="cs-field">
-              <label htmlFor="cs-wilaya">{t.wilaya}</label>
-              <select
-                id="cs-wilaya"
-                value={form.wilayaCode}
-                onChange={(e) => set({ wilayaCode: e.target.value })}
-              >
-                <option value="">{t.wilayaNone}</option>
-                {WILAYAS.map((w) => (
-                  <option key={w.code} value={w.code}>
-                    {w.code} — {w.labels[locale]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="cs-field">
-              <label htmlFor="cs-commune">{t.commune}</label>
-              <input
-                id="cs-commune"
-                type="text"
-                value={form.commune}
-                maxLength={100}
-                disabled={form.wilayaCode === ''}
-                onChange={(e) => set({ commune: e.target.value })}
-              />
-            </div>
-            <div className="cs-field">
-              <label htmlFor="cs-address">{t.address}</label>
-              <input
-                id="cs-address"
-                type="text"
-                value={form.addressLine}
-                maxLength={200}
-                disabled={form.wilayaCode === ''}
-                onChange={(e) => set({ addressLine: e.target.value })}
-              />
-            </div>
-            <fieldset className="cs-checks">
-              <legend>{t.languages}</legend>
-              {(['ar', 'fr'] as const).map((l) => (
-                <label key={l}>
-                  <input
-                    type="checkbox"
-                    checked={form.enabledLocales.includes(l)}
-                    onChange={() => toggleLocale(l)}
-                  />
-                  {l === 'ar' ? t.langAr : t.langFr}
-                </label>
-              ))}
-            </fieldset>
-            <div className="cs-field">
-              <label htmlFor="cs-default">{t.defaultLanguage}</label>
-              <select
-                id="cs-default"
-                value={form.defaultLocale}
-                onChange={(e) =>
-                  set({ defaultLocale: e.target.value as ClinicLocale })
-                }
-              >
-                {form.enabledLocales.map((l) => (
-                  <option key={l} value={l}>
+            {/* Disabled while saving so no edit is lost when the response replaces the form. */}
+            <fieldset className="cs-lock" disabled={busy}>
+              <div className="cs-field">
+                <label htmlFor="cs-name">{t.name}</label>
+                <input
+                  id="cs-name"
+                  type="text"
+                  value={form.name}
+                  maxLength={200}
+                  onChange={(e) => set({ name: e.target.value })}
+                />
+              </div>
+              <div className="cs-field">
+                <label htmlFor="cs-tz">{t.timezone}</label>
+                <select
+                  id="cs-tz"
+                  value={form.timezone}
+                  onChange={(e) => set({ timezone: e.target.value })}
+                >
+                  {timezones.map((z) => (
+                    <option key={z} value={z}>
+                      {z}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="cs-field">
+                <label htmlFor="cs-wilaya">{t.wilaya}</label>
+                <select
+                  id="cs-wilaya"
+                  value={form.wilayaCode}
+                  onChange={(e) => set({ wilayaCode: e.target.value })}
+                >
+                  <option value="">{t.wilayaNone}</option>
+                  {WILAYAS.map((w) => (
+                    <option key={w.code} value={w.code}>
+                      {w.code} — {w.labels[locale]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="cs-field">
+                <label htmlFor="cs-commune">{t.commune}</label>
+                <input
+                  id="cs-commune"
+                  type="text"
+                  value={form.commune}
+                  maxLength={100}
+                  disabled={form.wilayaCode === ''}
+                  onChange={(e) => set({ commune: e.target.value })}
+                />
+              </div>
+              <div className="cs-field">
+                <label htmlFor="cs-address">{t.address}</label>
+                <input
+                  id="cs-address"
+                  type="text"
+                  value={form.addressLine}
+                  maxLength={200}
+                  disabled={form.wilayaCode === ''}
+                  onChange={(e) => set({ addressLine: e.target.value })}
+                />
+              </div>
+              <fieldset className="cs-checks">
+                <legend>{t.languages}</legend>
+                {(['ar', 'fr'] as const).map((l) => (
+                  <label key={l}>
+                    <input
+                      type="checkbox"
+                      checked={form.enabledLocales.includes(l)}
+                      onChange={() => toggleLocale(l)}
+                    />
                     {l === 'ar' ? t.langAr : t.langFr}
-                  </option>
+                  </label>
                 ))}
-              </select>
-            </div>
-            <Button type="submit" disabled={busy}>
-              {busy ? t.saving : t.save}
-            </Button>
+              </fieldset>
+              <div className="cs-field">
+                <label htmlFor="cs-default">{t.defaultLanguage}</label>
+                <select
+                  id="cs-default"
+                  value={form.defaultLocale}
+                  onChange={(e) =>
+                    set({ defaultLocale: e.target.value as ClinicLocale })
+                  }
+                >
+                  {form.enabledLocales.map((l) => (
+                    <option key={l} value={l}>
+                      {l === 'ar' ? t.langAr : t.langFr}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button type="submit" disabled={busy}>
+                {busy ? t.saving : t.save}
+              </Button>
+            </fieldset>
             {saved && (
               <p className="cs-ok" role="status">
                 {t.saved}

@@ -91,3 +91,9 @@
   color: var(--tb-primary-strong);
   margin-block-start: var(--tb-space-3);
 }
+.cs-lock {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-inline-size: 0;
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProfilePatch,
   formFromProfile,
+  timezoneOptions,
   type ClinicProfile,
 } from '@/app/operations/[clinicId]/settings/clinic-profile-model';
 import { updateClinicSchema } from '@/platform/http/clinic-input';
@@ -96,5 +97,20 @@ describe('buildProfilePatch', () => {
       expect(r.ok).toBe(true);
       if (r.ok) expect(updateClinicSchema.safeParse(r.body).success).toBe(true);
     }
+  });
+});
+
+describe('timezoneOptions', () => {
+  it('offers alternatives for the default zone and keeps the stored value', () => {
+    const opts = timezoneOptions('Africa/Algiers');
+    expect(opts.length).toBeGreaterThan(1);
+    expect(opts).toContain('Africa/Tunis');
+  });
+
+  it('keeps an unlisted stored zone selectable, once', () => {
+    const opts = timezoneOptions('Asia/Dubai');
+    expect(opts[0]).toBe('Asia/Dubai');
+    expect(opts.filter((z) => z === 'Asia/Dubai')).toHaveLength(1);
+    expect(opts).toContain('Africa/Algiers');
   });
 });
