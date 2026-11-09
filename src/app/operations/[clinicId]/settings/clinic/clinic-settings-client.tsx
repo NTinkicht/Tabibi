@@ -1,12 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
 import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
 import { Button } from '@/app/ui';
 import { WILAYAS } from '@/modules/clinic/wilayas';
 import { clinicSetupCopy } from '@/modules/localization/clinic-setup';
 import '../settings.css';
+import { ClosuresSection, ConsultationTypesSection } from './clinic-sections';
 import {
   timezoneOptions,
   buildProfilePatch,
@@ -92,6 +99,8 @@ export function ClinicSettingsClient({
     })();
     return () => controller.abort();
   }, [base]);
+
+  const onForbidden = useCallback(() => setLoad({ kind: 'forbidden' }), []);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -285,6 +294,20 @@ export function ClinicSettingsClient({
             )}
           </form>
         </section>
+      )}
+      {load.kind === 'ready' && (
+        <>
+          <ClosuresSection
+            base={base}
+            locale={locale}
+            onForbidden={onForbidden}
+          />
+          <ConsultationTypesSection
+            base={base}
+            locale={locale}
+            onForbidden={onForbidden}
+          />
+        </>
       )}
     </main>
   );
