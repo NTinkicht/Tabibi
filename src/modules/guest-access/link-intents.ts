@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import {
   GuestLinkEnvelope,
   GuestLinkEnvelopeError,
@@ -65,7 +65,11 @@ export class GuestLinkIntentStore {
     private readonly clock: () => Date = () => new Date(),
   ) {}
 
-  async create(input: CreateGuestLinkIntent): Promise<string> {
+  /** Pass `client` to insert inside the caller's transaction. */
+  async create(
+    input: CreateGuestLinkIntent,
+    client: Pick<PoolClient, 'query'> = this.pool,
+  ): Promise<string> {
     const id = randomUUID();
     const now = this.clock();
     const ciphertext = this.envelope.seal(
@@ -84,7 +88,7 @@ export class GuestLinkIntentStore {
         now.getTime() + 10 * 60 * 1000,
       ),
     );
-    await this.pool.query(
+    await client.query(
       `INSERT INTO guest_link_intents
          (id, clinic_id, queue_entry_id, intent, envelope_ciphertext, created_at, expires_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
