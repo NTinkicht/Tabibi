@@ -1,0 +1,93 @@
+/* TAB-UI-15 clinic setup (docs/design/clinic-setup.md). Tokens + logical properties only. */
+.cs {
+  max-inline-size: var(--tb-max-width);
+  margin-inline: auto;
+  padding-block: var(--tb-space-8);
+  padding-inline: var(--tb-gutter);
+  min-block-size: 100vh;
+}
+.cs h1 {
+  margin: 0;
+  font-size: var(--tb-text-title);
+  letter-spacing: 0;
+}
+.cs-tabs {
+  display: flex;
+  gap: var(--tb-space-2);
+  margin-block: var(--tb-space-6);
+  border-block-end: 1px solid var(--tb-divider);
+}
+.cs-tabs a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 44px;
+  padding-inline: var(--tb-space-4);
+  color: var(--tb-text-secondary);
+  text-decoration: none;
+  border-block-end: 3px solid transparent;
+}
+.cs-tabs a[aria-current='page'] {
+  color: var(--tb-primary-strong);
+  border-block-end-color: var(--tb-primary);
+  font-weight: 600;
+}
+.cs-card {
+  background: var(--tb-surface);
+  border: 1px solid var(--tb-border);
+  border-radius: 16px;
+  padding: var(--tb-space-6);
+}
+.cs-card h2 {
+  margin: 0 0 var(--tb-space-2);
+  font-size: 17px;
+}
+.cs-help {
+  margin: 0 0 var(--tb-space-4);
+  color: var(--tb-text-muted);
+  font-size: 13px;
+}
+.cs-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tb-space-1);
+  margin-block-end: var(--tb-space-4);
+}
+.cs-field label,
+.cs-field legend {
+  font-size: 13px;
+  color: var(--tb-text-secondary);
+}
+.cs-field input[type='text'],
+.cs-field select {
+  min-block-size: 44px;
+  padding-inline: var(--tb-space-3);
+  border: 1px solid var(--tb-border-strong);
+  border-radius: 10px;
+  background: var(--tb-surface);
+  color: var(--tb-text);
+  font: inherit;
+}
+.cs-checks {
+  display: flex;
+  gap: var(--tb-space-4);
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--tb-space-4);
+}
+.cs-checks label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tb-space-2);
+  min-block-size: 44px;
+}
+.cs-error {
+  color: var(--tb-danger);
+  border: 1px solid var(--tb-danger-border);
+  border-radius: 12px;
+  padding: var(--tb-space-3);
+  margin-block-end: var(--tb-space-4);
+}
+.cs-ok {
+  color: var(--tb-primary-strong);
+  margin-block-start: var(--tb-space-3);
+}
