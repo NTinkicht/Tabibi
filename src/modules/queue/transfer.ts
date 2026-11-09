@@ -1,6 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
+import { GuestAccessService } from '@/modules/guest-access';
+import type { GuestLinkEnvelope } from '@/modules/guest-access/link-envelope';
+import { GuestLinkIntentStore } from '@/modules/guest-access/link-intents';
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
 import {
   QueueConflictError,
@@ -18,6 +21,12 @@ import { inTransaction } from '@/platform/database/transaction';
  * `checked_in` at the target eligibility tail. A called status and live
  * priority never carry over. Consulting, terminal and appointment-backed
  * entries are refused (appointments transfer through appointment recovery).
+ *
+ * Guest access (TAB-P0-07 slice 3, #841): all source authority is revoked, and
+ * when the source had live guest access and the patient has a contact, the
+ * same transaction mints one fresh single-use target exchange ID plus its
+ * AAD-bound `transfer` link intent (no target bearer until it is consumed).
+ * A missing envelope configuration fails the whole transfer closed.
  */
 export interface QueueTransferInput {
   targetSessionId: string;
@@ -89,7 +98,10 @@ async function loadEntry(
 }
 
 export class QueueTransferService {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly linkEnvelope?: GuestLinkEnvelope,
+  ) {}
 
   async transfer(
     scope: ClinicScope,
@@ -234,6 +246,21 @@ export class QueueTransferService {
       );
       if (entry.priority_order !== null)
         await this.compactPriority(client, scope.clinicId, sessionId);
+      const hadGuestAccess = await client.query(
+        `SELECT 1 WHERE EXISTS (
+                SELECT 1 FROM guest_credentials
+                 WHERE queue_entry_id=$1 AND clinic_id=$2
+                   AND revoked_at IS NULL AND expires_at > now())
+             OR EXISTS (
+                SELECT 1 FROM guest_exchange_ids
+                 WHERE queue_entry_id=$1 AND clinic_id=$2
+                   AND consumed_at IS NULL AND expires_at > now())
+             OR EXISTS (
+                SELECT 1 FROM guest_link_intents
+                 WHERE queue_entry_id=$1 AND clinic_id=$2 AND state='pending'
+                   AND expires_at > now())`,
+        [entryId, scope.clinicId],
+      );
       // Fail closed on guest access: every source verifier, outstanding
       // exchange ID and pending link intent dies with the source entry, so a
       // later restore of the cancelled source cannot revive old authority.
@@ -276,6 +303,41 @@ export class QueueTransferService {
           WHERE clinic_id=$1 AND id=ANY($2::uuid[])`,
         [scope.clinicId, [sessionId, targetSessionId]],
       );
+      if (hadGuestAccess.rows[0]) {
+        const contact = await client.query(
+          `SELECT 1 FROM patient_operational_records
+            WHERE id=$1 AND clinic_id=$2
+              AND (contact_phone IS NOT NULL OR contact_email IS NOT NULL)`,
+          [entry.patient_id, scope.clinicId],
+        );
+        // Without a contact there is no delivery channel (staff cannot issue
+        // one either), so the target simply carries no guest authority.
+        if (contact.rows[0]) {
+          if (!this.linkEnvelope)
+            throw new Error('Guest link envelope is not configured');
+          const issued = await new GuestAccessService(
+            this.pool,
+          ).issueInTransaction(
+            client,
+            {
+              clinicId: scope.clinicId,
+              sessionId: targetSessionId,
+              queueEntryId: targetEntryId,
+            },
+            scope.actorUserId,
+          );
+          await new GuestLinkIntentStore(this.pool, this.linkEnvelope).create(
+            {
+              clinicId: scope.clinicId,
+              queueEntryId: targetEntryId,
+              intent: 'transfer',
+              material: issued.exchangeId,
+              exchangeExpiresAt: issued.expiresAt,
+            },
+            client,
+          );
+        }
+      }
 
       const response: QueueTransferResult = {
         source: await loadEntry(client, scope.clinicId, entryId),

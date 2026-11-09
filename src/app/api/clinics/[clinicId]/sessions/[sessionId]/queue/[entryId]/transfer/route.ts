@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { GuestLinkEnvelope } from '@/modules/guest-access/link-envelope';
+import { guestBearerSigningSecret } from '@/modules/guest-access';
 import { QueueTransferService } from '@/modules/queue/transfer';
 import { getPool } from '@/platform/database/pool';
 import {
@@ -31,17 +33,15 @@ export async function POST(
     );
     const scope = await authenticatedClinicScope(request, clinicId);
     const input = bodySchema.parse(await request.json());
-    const result = await new QueueTransferService(getPool()).transfer(
-      scope,
-      sessionId,
-      entryId,
-      {
-        reason: input.reason,
-        targetSessionId: input.targetSessionId,
-        idempotencyKey: request.headers.get('idempotency-key') ?? '',
-        correlationId,
-      },
-    );
+    const result = await new QueueTransferService(
+      getPool(),
+      new GuestLinkEnvelope(guestBearerSigningSecret()),
+    ).transfer(scope, sessionId, entryId, {
+      reason: input.reason,
+      targetSessionId: input.targetSessionId,
+      idempotencyKey: request.headers.get('idempotency-key') ?? '',
+      correlationId,
+    });
     return { status: 200, body: result };
   });
 }

@@ -141,9 +141,27 @@ export class GuestAccessService {
     actorUserId: string,
     now = new Date(),
   ): Promise<{ exchangeId: string; expiresAt: Date }> {
+    let issued: { exchangeId: string; expiresAt: Date } | undefined;
+    await inTransaction(this.pool, async (client) => {
+      issued = await this.issueInTransaction(client, target, actorUserId, now);
+    });
+    return issued!;
+  }
+
+  /**
+   * Issues an exchange ID inside the caller's transaction so a staff command
+   * (for example a transfer) can commit the exchange atomically with its own
+   * state change. Same role, state and contact checks as `issue`.
+   */
+  async issueInTransaction(
+    client: PoolClient,
+    target: GuestTarget,
+    actorUserId: string,
+    now = new Date(),
+  ): Promise<{ exchangeId: string; expiresAt: Date }> {
     const exchangeId = secret();
     const expiresAt = new Date(now.getTime() + EXCHANGE_TTL_MS);
-    await inTransaction(this.pool, async (client) => {
+    {
       await requireClinicRole(
         client,
         { clinicId: target.clinicId, actorUserId },
@@ -205,7 +223,7 @@ export class GuestAccessService {
           expiresAt: expiresAt.toISOString(),
         },
       });
-    });
+    }
     return { exchangeId, expiresAt };
   }
 

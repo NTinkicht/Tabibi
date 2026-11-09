@@ -3,6 +3,8 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AppointmentService } from '@/modules/appointment';
 import { AppointmentRecoveryService } from '@/modules/appointment/recovery';
+import { GuestAccessService, verifier } from '@/modules/guest-access';
+import { GuestLinkEnvelope } from '@/modules/guest-access/link-envelope';
 import { QueueConflictError, QueueService } from '@/modules/queue';
 import { QueueRestoreService } from '@/modules/queue/restore';
 import { QueueTransferService } from '@/modules/queue/transfer';
@@ -31,7 +33,12 @@ const scope = { clinicId: ids.clinic, actorUserId: ids.receptionist };
 let seq = 0;
 const key = () => `qr-${++seq}`;
 const queue = () => new QueueService(pool);
-const transferSvc = () => new QueueTransferService(pool);
+const ENVELOPE_SECRET = 'x'.repeat(48);
+const transferSvc = (withEnvelope = true) =>
+  new QueueTransferService(
+    pool,
+    withEnvelope ? new GuestLinkEnvelope(ENVELOPE_SECRET) : undefined,
+  );
 
 beforeAll(async () => migrate());
 beforeEach(async () => {
@@ -112,9 +119,10 @@ beforeEach(async () => {
 });
 afterAll(async () => pool.end());
 
-async function walkIn(name: string) {
+async function walkIn(name: string, contactPhone?: string) {
   const item = await queue().registerWalkIn(scope, ids.session, {
     privateDisplayName: name,
+    contactPhone,
     preferredLocale: 'ar',
     idempotencyKey: key(),
     correlationId: 'qr-register',
@@ -138,8 +146,9 @@ function transfer(
   targetSessionId = ids.target,
   idempotencyKey = key(),
   sessionId = ids.session,
+  withEnvelope = true,
 ) {
-  return transferSvc().transfer(scope, sessionId, entryId, {
+  return transferSvc(withEnvelope).transfer(scope, sessionId, entryId, {
     targetSessionId,
     reason: 'Doctor moved the consultation',
     idempotencyKey,
@@ -388,6 +397,145 @@ describe('walk-in queue transfer', () => {
       correlationId: 'x',
     });
     expect(await live()).toEqual({ c: 0, e: 0, i: 0 });
+  });
+
+  describe('fresh target guest link (#841)', () => {
+    async function liveSourceCredential(entryId: string) {
+      await pool.query(
+        `INSERT INTO guest_credentials
+           (id,clinic_id,session_id,queue_entry_id,bearer_verifier,expires_at)
+         VALUES ($1,$2,$3,$4,$5,now() + interval '1 hour')`,
+        [randomUUID(), ids.clinic, ids.session, entryId, 'c'.repeat(64)],
+      );
+    }
+    const targetAccess = async (targetId: string) =>
+      (
+        await pool.query<{ e: number; i: number; c: number }>(
+          `SELECT
+             (SELECT count(*)::int FROM guest_exchange_ids WHERE queue_entry_id=$1 AND consumed_at IS NULL) e,
+             (SELECT count(*)::int FROM guest_link_intents WHERE queue_entry_id=$1 AND intent='transfer' AND state='pending') i,
+             (SELECT count(*)::int FROM guest_credentials WHERE queue_entry_id=$1) c`,
+          [targetId],
+        )
+      ).rows[0]!;
+
+    it('mints one target-bound single-use exchange and sealed transfer intent, usable once, with old authority dead', async () => {
+      const a = await walkIn('A', '+213555000111');
+      await liveSourceCredential(a);
+      const result = await transfer(a);
+      const targetId = result.target.id;
+      expect(await targetAccess(targetId)).toEqual({ e: 1, i: 1, c: 0 });
+      const intent = (
+        await pool.query<{ id: string; envelope_ciphertext: string }>(
+          `SELECT id, envelope_ciphertext FROM guest_link_intents
+            WHERE queue_entry_id=$1 AND intent='transfer'`,
+          [targetId],
+        )
+      ).rows[0]!;
+      expect(intent.envelope_ciphertext).not.toContain('exchange');
+      const material = new GuestLinkEnvelope(ENVELOPE_SECRET).open(
+        {
+          intent: 'transfer',
+          intentId: intent.id,
+          entryId: targetId,
+          clinicId: ids.clinic,
+        },
+        intent.envelope_ciphertext,
+      );
+      const exchange = (
+        await pool.query<{
+          exchange_verifier: string;
+          session_id: string;
+          queue_entry_id: string;
+        }>(
+          `SELECT exchange_verifier, session_id, queue_entry_id
+             FROM guest_exchange_ids WHERE queue_entry_id=$1`,
+          [targetId],
+        )
+      ).rows[0]!;
+      expect(exchange.exchange_verifier).toBe(verifier(material));
+      expect(exchange.session_id).toBe(ids.target);
+      // The old source authority is dead: nothing live remains on the source.
+      const src = await pool.query(
+        `SELECT 1 FROM guest_credentials WHERE queue_entry_id=$1 AND revoked_at IS NULL`,
+        [a],
+      );
+      expect(src.rowCount).toBe(0);
+      // The fresh link works exactly once and only for the target entry.
+      const guest = new GuestAccessService(pool);
+      const consumed = await guest.consume(material);
+      expect(consumed.target.queueEntryId).toBe(targetId);
+      await expect(guest.consume(material)).rejects.toThrow();
+    });
+
+    it('ignores an expired pending source intent when deciding whether to mint a link', async () => {
+      const expired = await walkIn('E', '+213555000333');
+      await pool.query(
+        `INSERT INTO guest_link_intents
+           (id,clinic_id,queue_entry_id,intent,envelope_ciphertext,created_at,expires_at)
+         VALUES ($1,$2,$3,'initial','x',now() - interval '20 minutes',now() - interval '10 minutes')`,
+        [randomUUID(), ids.clinic, expired],
+      );
+      expect(await targetAccess((await transfer(expired)).target.id)).toEqual({
+        e: 0,
+        i: 0,
+        c: 0,
+      });
+      // Positive control: an unexpired pending intent does carry access.
+      const live = await walkIn('F', '+213555000444');
+      await pool.query(
+        `INSERT INTO guest_link_intents
+           (id,clinic_id,queue_entry_id,intent,envelope_ciphertext,created_at,expires_at)
+         VALUES ($1,$2,$3,'initial','x',now(),now() + interval '5 minutes')`,
+        [randomUUID(), ids.clinic, live],
+      );
+      expect((await targetAccess((await transfer(live)).target.id)).i).toBe(1);
+    });
+
+    it('creates no link without prior guest access or without a contact', async () => {
+      const noAccess = await walkIn('B', '+213555000222');
+      expect(await targetAccess((await transfer(noAccess)).target.id)).toEqual({
+        e: 0,
+        i: 0,
+        c: 0,
+      });
+      const noContact = await walkIn('C');
+      await liveSourceCredential(noContact);
+      expect(await targetAccess((await transfer(noContact)).target.id)).toEqual(
+        { e: 0, i: 0, c: 0 },
+      );
+    });
+
+    it('replays idempotently without minting a second link', async () => {
+      const a = await walkIn('A', '+213555000333');
+      await liveSourceCredential(a);
+      const idem = key();
+      const first = await transfer(a, ids.target, idem);
+      const second = await transfer(a, ids.target, idem);
+      expect(second.target.id).toBe(first.target.id);
+      expect(await targetAccess(first.target.id)).toEqual({
+        e: 1,
+        i: 1,
+        c: 0,
+      });
+    });
+
+    it('fails the whole transfer closed when the envelope is not configured', async () => {
+      const a = await walkIn('A', '+213555000444');
+      await liveSourceCredential(a);
+      await expect(
+        transfer(a, ids.target, key(), ids.session, false),
+      ).rejects.toThrow('envelope');
+      expect(await stateOf(a)).toBe('waiting');
+      const live = await pool.query(
+        `SELECT 1 FROM guest_credentials WHERE queue_entry_id=$1 AND revoked_at IS NULL`,
+        [a],
+      );
+      expect(live.rowCount).toBe(1);
+      // Positive control: with the envelope the same transfer succeeds.
+      const ok = await transfer(a);
+      expect((await targetAccess(ok.target.id)).i).toBe(1);
+    });
   });
 
   it('requires a reason and a receptionist or clinic admin', async () => {
