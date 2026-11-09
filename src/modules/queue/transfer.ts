@@ -257,7 +257,8 @@ export class QueueTransferService {
                    AND consumed_at IS NULL AND expires_at > now())
              OR EXISTS (
                 SELECT 1 FROM guest_link_intents
-                 WHERE queue_entry_id=$1 AND clinic_id=$2 AND state='pending')`,
+                 WHERE queue_entry_id=$1 AND clinic_id=$2 AND state='pending'
+                   AND expires_at > now())`,
         [entryId, scope.clinicId],
       );
       // Fail closed on guest access: every source verifier, outstanding

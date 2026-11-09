@@ -468,6 +468,30 @@ describe('walk-in queue transfer', () => {
       await expect(guest.consume(material)).rejects.toThrow();
     });
 
+    it('ignores an expired pending source intent when deciding whether to mint a link', async () => {
+      const expired = await walkIn('E', '+213555000333');
+      await pool.query(
+        `INSERT INTO guest_link_intents
+           (id,clinic_id,queue_entry_id,intent,envelope_ciphertext,created_at,expires_at)
+         VALUES ($1,$2,$3,'initial','x',now() - interval '20 minutes',now() - interval '10 minutes')`,
+        [randomUUID(), ids.clinic, expired],
+      );
+      expect(await targetAccess((await transfer(expired)).target.id)).toEqual({
+        e: 0,
+        i: 0,
+        c: 0,
+      });
+      // Positive control: an unexpired pending intent does carry access.
+      const live = await walkIn('F', '+213555000444');
+      await pool.query(
+        `INSERT INTO guest_link_intents
+           (id,clinic_id,queue_entry_id,intent,envelope_ciphertext,created_at,expires_at)
+         VALUES ($1,$2,$3,'initial','x',now(),now() + interval '5 minutes')`,
+        [randomUUID(), ids.clinic, live],
+      );
+      expect((await targetAccess((await transfer(live)).target.id)).i).toBe(1);
+    });
+
     it('creates no link without prior guest access or without a contact', async () => {
       const noAccess = await walkIn('B', '+213555000222');
       expect(await targetAccess((await transfer(noAccess)).target.id)).toEqual({
