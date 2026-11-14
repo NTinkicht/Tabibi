@@ -315,6 +315,9 @@ export function WalkInQueue({
         ),
       );
       // The restore API only covers walk-in cancel/no-show outcomes.
+      // Keep the pre-mutation row on purpose: restoreLast() reads only its id,
+      // ticket label and private display name (identity, never state), and the
+      // command response's entry is not guaranteed to carry the display name.
       setRestorable(
         (body.entry.state === 'cancelled' || body.entry.state === 'no_show') &&
           (entry as unknown as ConsoleEntry).origin === 'walk_in'
