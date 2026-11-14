@@ -32,9 +32,9 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 ## TAB-P0-03 Discovery
 
 - [COVERED] Privacy-minimal deterministic projections | src: src/app/public-discovery-clinics.ts | test: tests/integration/public-discovery.test.ts :: "returns deterministic active-clinic projections without internal identifiers" | pr: #691 (ntk-reviewer APPROVED f052353c480e)
-- [COVERED] Strict filters, allow-list and no-store | src: src/app/public-discovery-pages.ts | test: tests/api/public-discovery.test.ts :: "rejects unknown, repeated, empty or uncontrolled filters without querying"; tests/api/public-discovery.test.ts :: "never serializes sensitive fields added by the discovery service" | pr: #691 (ntk-reviewer APPROVED f052353c480e)
+- [COVERED] Strict filters, allow-list and no-store | src: src/app/api/public/discovery/route.ts | test: tests/api/public-discovery.test.ts :: "rejects unknown, repeated, empty or uncontrolled filters without querying"; tests/api/public-discovery.test.ts :: "never serializes sensitive fields added by the discovery service" | pr: #691 (ntk-reviewer APPROVED f052353c480e)
 - [COVERED] Bookable-session windows and empty result | src: src/modules/public-availability/index.ts | test: tests/integration/public-bookable-sessions.test.ts :: "returns an empty list when nothing is bookable" | pr: #671 (ntk-reviewer APPROVED ef1bd90fdc5b)
-- [COVERED] Pagination, availability and language filters | src: src/app/public-discovery-pages.ts | test: tests/integration/public-discovery.test.ts :: "combines both filters" | pr: #695 (APPROVED afe2e955eb59 after earlier CHANGES_REQUESTED f06593166a36), #693 (APPROVED 2fed98147a2d), #697 (APPROVED 6b48162dd8ec)
+- [COVERED] Pagination, availability and language filters | src: src/app/api/public/discovery/route.ts | test: tests/integration/public-discovery.test.ts :: "combines both filters" | pr: #695 (APPROVED afe2e955eb59 after earlier CHANGES_REQUESTED f06593166a36), #693 (APPROVED 2fed98147a2d), #697 (APPROVED 6b48162dd8ec)
 
 ## TAB-P0-04 Pure queue/session contract
 
