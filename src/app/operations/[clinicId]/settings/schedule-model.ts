@@ -164,6 +164,10 @@ export function parseAbsences(raw: unknown): string[] | null {
   return [...(list as string[])].sort();
 }
 
+export function absenceDeleteUrl(collectionUrl: string, day: string): string {
+  return `${collectionUrl}/${encodeURIComponent(day)}`;
+}
+
 // 2026-11-08 is a Sunday: weekday n is that day plus n.
 export function weekdayName(weekday: number, locale: 'ar' | 'fr'): string {
   return new Intl.DateTimeFormat(`${locale}-DZ-u-nu-latn`, {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  absenceDeleteUrl,
   activeRanges,
   buildGenerationBody,
   buildTemplateBody,
@@ -183,5 +184,18 @@ describe('template snapshot sync gate', () => {
     expect(canAddRange(sync, false)).toBe(false);
     sync = templateSyncReducer(sync, 'loaded');
     expect(canAddRange(sync, false)).toBe(true);
+  });
+});
+
+describe('absenceDeleteUrl', () => {
+  it('appends a plain day unchanged', () => {
+    expect(absenceDeleteUrl('/a/absences', '2026-11-08')).toBe(
+      '/a/absences/2026-11-08',
+    );
+  });
+  it('percent-encodes reserved characters in the day segment', () => {
+    expect(absenceDeleteUrl('/a/absences', '../x?y#z')).toBe(
+      '/a/absences/..%2Fx%3Fy%23z',
+    );
   });
 });

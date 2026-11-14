@@ -13,6 +13,7 @@ import { clinicSetupCopy } from '@/modules/localization/clinic-setup';
 import {
   GENERATION_WEEKS,
   WEEKDAY_ORDER,
+  absenceDeleteUrl,
   activeRanges,
   buildGenerationBody,
   buildTemplateBody,
@@ -466,7 +467,7 @@ export function AbsencesSection({
                   void panel.mutate(
                     locale,
                     () =>
-                      fetch(`${url}/${day}`, {
+                      fetch(absenceDeleteUrl(url, day), {
                         method: 'DELETE',
                         credentials: 'same-origin',
                       }),
