@@ -830,7 +830,8 @@ h1 {
    on the inline-end side (right in French, left in Arabic). */
 .tabletAddButton,
 .tabletClose,
-.tabletBackdrop {
+.tabletBackdrop,
+.tabletHeaderBar {
   display: none;
 }
 @media (min-width: 700px) and (max-width: 1199px) and (pointer: coarse) {
@@ -841,6 +842,44 @@ h1 {
   .deskHeader,
   .queueToolbar {
     min-height: 3.75rem;
+  }
+  .deskHeader {
+    align-items: center;
+    gap: 1rem;
+  }
+  .deskHeader h1,
+  .deskHeader p,
+  .queueToolbar .secondaryLink,
+  .consoleSide .todayTiles {
+    display: none;
+  }
+  .deskHeader .tabletHeaderBar {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 1rem;
+    min-width: 0;
+  }
+  .sessionSwitcher {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0.25rem 1rem;
+    border: 1px solid #c9dcda;
+    border-radius: 999px;
+    background: #fff;
+    color: #164d45;
+    text-decoration: none;
+    line-height: 1.2;
+  }
+  .countsLine {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    color: #164d45;
+    font-weight: 700;
+    overflow-wrap: anywhere;
   }
   .desk button,
   .desk .secondaryLink,

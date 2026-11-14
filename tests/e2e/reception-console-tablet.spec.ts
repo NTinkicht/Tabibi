@@ -98,9 +98,23 @@ async function mock(page: Page) {
 
 test.use({ hasTouch: true, viewport: { width: 1024, height: 768 } });
 
-for (const [locale, add, close, side] of [
-  ['fr', 'Ajouter un patient', 'Fermer', 'right'],
-  ['ar', 'إضافة مريض', 'إغلاق', 'left'],
+for (const [locale, add, close, side, counts, back] of [
+  [
+    'fr',
+    'Ajouter un patient',
+    'Fermer',
+    'right',
+    'Arrivés 2 · Pas encore arrivés 1 · Terminés 0 · Absents 0',
+    'Retour aux sessions',
+  ],
+  [
+    'ar',
+    'إضافة مريض',
+    'إغلاق',
+    'left',
+    'وصلوا 2 · لم يصلوا بعد 1 · انتهوا 0 · غائبون 0',
+    'العودة إلى الجلسات',
+  ],
 ] as const) {
   test(`tablet console ${locale}: layout, targets and panel`, async ({
     page,
@@ -119,6 +133,23 @@ for (const [locale, add, close, side] of [
       ),
     ).toBe(true);
     await expect(page.locator('.queueRow.consoleRow').first()).toBeVisible();
+
+    // Header: 60 px, session switcher (doctor + hours) back to the sessions
+    // home and today's counts on one line; the desktop tiles are replaced.
+    const header = await page.locator('.deskHeader').boundingBox();
+    expect(header!.height).toBeGreaterThanOrEqual(60);
+    expect(header!.height).toBeLessThan(96);
+    const switcher = page.locator('.sessionSwitcher');
+    await expect(switcher).toBeVisible();
+    await expect(switcher).toContainText('Dr Leila');
+    await expect(switcher).toHaveAttribute(
+      'href',
+      `/operations/${clinicId}?locale=${locale}`,
+    );
+    await expect(switcher).toHaveAttribute('aria-label', new RegExp(back));
+    expect((await switcher.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await expect(page.locator('.countsLine')).toHaveText(counts);
+    await expect(page.locator('.todayTiles')).toBeHidden();
 
     // No horizontal scroll; 300 px in-progress column beside the queue.
     expect(
@@ -239,6 +270,9 @@ test('desktop pointer keeps the side panel inline (negative control)', async ({
   );
   await expect(page.locator('input[name="privateDisplayName"]')).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.sessionSwitcher')).toBeHidden();
+  await expect(page.locator('.countsLine')).toBeHidden();
+  await expect(page.locator('.todayTiles')).toBeVisible();
   await context.close();
 });
 
