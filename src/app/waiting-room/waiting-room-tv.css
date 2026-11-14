@@ -1,4 +1,8 @@
 .tv {
+  /* Override the global centred-column main style (styles.css) for the full-screen TV. */
+  max-width: none;
+  margin: 0;
+  box-sizing: border-box;
   --tv-unit: clamp(13px, 1.35vw, 26px);
   min-height: 100vh;
   display: flex;

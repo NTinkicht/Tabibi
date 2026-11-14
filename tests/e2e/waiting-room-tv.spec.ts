@@ -187,6 +187,27 @@ test.describe('waiting-room TV display', () => {
     await expect(page.locator('.tv-other')).toHaveText(['Z-001']);
   });
 
+  test('a stalled request is aborted and polling recovers', async ({
+    page,
+  }) => {
+    const ctx = await seed(pool);
+    await page.clock.install();
+    await page.goto(`/waiting-room/${ctx.clinicId}/${ctx.sessionId}`);
+    const api = `**/api/public/clinics/${ctx.clinicId}/sessions/${ctx.sessionId}/waiting-room`;
+    let calls = 0;
+    await page.route(api, (route) => {
+      calls += 1;
+      if (calls === 1) return; // never answers: stalls until the client aborts it
+      return route.continue();
+    });
+    await page.clock.runFor(16_000); // first poll starts and stalls
+    await expect.poll(() => calls).toBe(1);
+    await page.clock.runFor(11_000); // the deadline aborts it
+    await page.waitForTimeout(200);
+    await page.clock.runFor(31_000); // backoff retry fires
+    await expect.poll(() => calls).toBeGreaterThanOrEqual(2);
+  });
+
   test('shows the paused banner and declared delay in both languages', async ({
     page,
   }) => {

@@ -11,6 +11,8 @@ import {
 } from '@/modules/waiting-room/tv-view-model';
 import './waiting-room-tv.css';
 
+const REQUEST_TIMEOUT_MS = 10_000;
+
 export type TvLang = 'both' | 'ar' | 'fr';
 
 type Props = {
@@ -105,6 +107,11 @@ export function WaitingRoomDisplay({ initial, lang }: Props) {
 
     const poll = async () => {
       controller = new AbortController();
+      // Deadline covers headers and body: a stalled request must not stop polling.
+      const deadline = setTimeout(
+        () => controller?.abort(),
+        REQUEST_TIMEOUT_MS,
+      );
       try {
         const response = await fetch(apiPath, {
           cache: 'no-store',
@@ -121,6 +128,8 @@ export function WaitingRoomDisplay({ initial, lang }: Props) {
       } catch {
         if (cancelled) return;
         failures.current += 1;
+      } finally {
+        clearTimeout(deadline);
       }
       if (!cancelled)
         timer = setTimeout(poll, nextPollDelayMs(failures.current));
