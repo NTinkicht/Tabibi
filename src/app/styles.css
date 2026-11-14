@@ -831,7 +831,8 @@ h1 {
 .tabletAddButton,
 .tabletClose,
 .tabletBackdrop,
-.tabletHeaderBar {
+.tabletHeaderBar,
+.sessionStateChip {
   display: none;
 }
 @media (min-width: 700px) and (max-width: 1199px) and (pointer: coarse) {
@@ -893,6 +894,20 @@ h1 {
   .sessionBar button {
     min-height: 2.75rem;
     min-width: 2.75rem;
+  }
+  .sessionStateChip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    border-radius: 999px;
+    background: #e3f1ee;
+    color: #164d45;
+    font-weight: 800;
+  }
+  .sessionStateChip.paused {
+    background: #fff6e0;
+    color: #5c3d00;
   }
   .sessionBar .callNext {
     min-height: 3.75rem;

@@ -98,7 +98,7 @@ async function mock(page: Page) {
 
 test.use({ hasTouch: true, viewport: { width: 1024, height: 768 } });
 
-for (const [locale, add, close, side, counts, back] of [
+for (const [locale, add, close, side, counts, back, stateOpen] of [
   [
     'fr',
     'Ajouter un patient',
@@ -106,6 +106,7 @@ for (const [locale, add, close, side, counts, back] of [
     'right',
     'Arrivés 2 · Pas encore arrivés 1 · Terminés 0 · Absents 0',
     'Retour aux sessions',
+    'Ouverte',
   ],
   [
     'ar',
@@ -114,6 +115,7 @@ for (const [locale, add, close, side, counts, back] of [
     'left',
     'وصلوا 2 · لم يصلوا بعد 1 · انتهوا 0 · غائبون 0',
     'العودة إلى الجلسات',
+    'مفتوحة',
   ],
 ] as const) {
   test(`tablet console ${locale}: layout, targets and panel`, async ({
@@ -179,6 +181,15 @@ for (const [locale, add, close, side, counts, back] of [
           .filter((r) => r.height < 43.5 || r.width < 43.5).length,
     );
     expect(small).toBe(0);
+    // Session strip: state chip first, Call next last (inline-end).
+    const chip = page.getByTestId('session-state-chip');
+    await expect(chip).toHaveText(stateOpen);
+    const chipBox = (await chip.boundingBox())!;
+    const callBox = (await page
+      .locator('.sessionBar .callNext')
+      .boundingBox())!;
+    if (side === 'right') expect(callBox.x).toBeGreaterThan(chipBox.x);
+    else expect(callBox.x).toBeLessThan(chipBox.x);
     const callNext = await page.locator('.sessionBar .callNext').boundingBox();
     expect(callNext!.height).toBeGreaterThanOrEqual(60);
     const row = await page
@@ -273,6 +284,7 @@ test('desktop pointer keeps the side panel inline (negative control)', async ({
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('.sessionSwitcher')).toBeHidden();
   await expect(page.locator('.countsLine')).toBeHidden();
+  await expect(page.getByTestId('session-state-chip')).toBeHidden();
   await expect(page.locator('.todayTiles')).toBeVisible();
   await context.close();
 });
