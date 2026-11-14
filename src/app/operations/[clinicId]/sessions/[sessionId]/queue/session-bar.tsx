@@ -36,6 +36,12 @@ export function SessionBar(props: SessionBarProps) {
   return (
     <>
       <section className="sessionBar" aria-label={t.sessionState}>
+        <span
+          className={`sessionStateChip ${status}`}
+          data-testid="session-state-chip"
+        >
+          {t.statuses[status]}
+        </span>
         <div className="delayStepper" role="group" aria-label={t.delay}>
           <button
             type="button"
