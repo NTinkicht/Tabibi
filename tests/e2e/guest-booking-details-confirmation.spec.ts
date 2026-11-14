@@ -46,13 +46,13 @@ const CASES = [
     radios: { none: 'Aucune', phone: 'Téléphone', email: 'Email' },
     explain: {
       none: /uniquement depuis cette page/,
-      phone: /lien par téléphone/,
-      email: /lien par e-mail/,
+      phone: /joindre par téléphone/,
+      email: /joindre par e-mail/,
     },
     notice: {
       none: /seul accès en ligne/,
-      phone: /lien reçu par téléphone/,
-      email: /lien reçu par e-mail/,
+      phone: /aucun lien de retour/,
+      email: /aucun lien de retour/,
     },
   },
   {
@@ -67,13 +67,13 @@ const CASES = [
     radios: { none: 'بدون', phone: 'الهاتف', email: 'البريد الإلكتروني' },
     explain: {
       none: /من هذه الصفحة فقط/,
-      phone: /عبر الهاتف/,
-      email: /عبر البريد الإلكتروني/,
+      phone: /التواصل معك عبر الهاتف/,
+      email: /التواصل معك عبر البريد الإلكتروني/,
     },
     notice: {
       none: /وصولك الوحيد/,
-      phone: /وصلك عبر الهاتف/,
-      email: /وصلك عبر البريد الإلكتروني/,
+      phone: /ولا يُرسل أي رابط/,
+      email: /ولا يُرسل أي رابط/,
     },
   },
 ] as const;
@@ -127,3 +127,33 @@ for (const c of CASES) {
     });
   }
 }
+
+test('terminal status hides the reserved chip and keep-open notice', async ({
+  page,
+}) => {
+  await page.route(BOOKING_URL, (route) =>
+    route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({ queueLabel: 'G-806', guestBearer: BEARER }),
+    }),
+  );
+  await page.route(STATUS_URL, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        bookingState: 'cancelled',
+        queueState: 'waiting',
+      }),
+    }),
+  );
+  await page.goto('/guest/live-queue/test-selection-ref');
+  await page.getByLabel('Votre nom').fill('Guest');
+  await page.locator('input[type="tel"]').fill('0555555555');
+  await page.getByRole('button', { name: 'Confirmer la réservation' }).click();
+  await expect(page.getByText('G-806')).toBeVisible();
+  await expect(page.getByText('annulée').first()).toBeVisible();
+  await expect(page.getByText('Réservé', { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('guest-keep-open-notice')).toHaveCount(0);
+});

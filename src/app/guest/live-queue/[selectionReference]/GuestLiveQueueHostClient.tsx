@@ -253,9 +253,9 @@ const COPY: Record<SupportedLocale, Copy> = {
     contactExplain: {
       none: 'Sans contact préféré, vous avez le même service à la clinique, mais vous suivez votre passage uniquement depuis cette page.',
       phone:
-        'Vous recevrez un lien par téléphone pour retrouver votre suivi. Renseignez votre numéro ci-dessous.',
+        'La clinique pourra vous joindre par téléphone. Renseignez votre numéro ci-dessous. Votre suivi en ligne reste uniquement sur cette page.',
       email:
-        'Vous recevrez un lien par e-mail pour retrouver votre suivi. Renseignez votre adresse ci-dessous.',
+        'La clinique pourra vous joindre par e-mail. Renseignez votre adresse ci-dessous. Votre suivi en ligne reste uniquement sur cette page.',
     },
     reservedChip: 'Réservé',
     arrivalTimeLine:
@@ -265,9 +265,9 @@ const COPY: Record<SupportedLocale, Copy> = {
     keepOpen: {
       none: 'Cette page est votre seul accès en ligne à votre réservation. Si vous la fermez, donnez votre numéro à l’accueil de la clinique.',
       phone:
-        'Si vous fermez cette page, le lien reçu par téléphone vous y ramène.',
+        'Cette page est votre seul accès en ligne à votre réservation : aucun lien de retour n’est envoyé. Si vous la fermez, donnez votre numéro à l’accueil de la clinique.',
       email:
-        'Si vous fermez cette page, le lien reçu par e-mail vous y ramène.',
+        'Cette page est votre seul accès en ligne à votre réservation : aucun lien de retour n’est envoyé. Si vous la fermez, donnez votre numéro à l’accueil de la clinique.',
     },
     bookingStates: {
       confirmed: 'confirmée',
@@ -377,9 +377,9 @@ const COPY: Record<SupportedLocale, Copy> = {
     contactExplain: {
       none: 'بدون وسيلة اتصال مفضلة تحصل على الخدمة نفسها في العيادة، لكنك تتابع دورك من هذه الصفحة فقط.',
       phone:
-        'ستصلك رسالة برابط عبر الهاتف للعودة إلى متابعتك. أدخل رقمك أدناه.',
+        'يمكن للعيادة التواصل معك عبر الهاتف. أدخل رقمك أدناه. تبقى متابعتك عبر الإنترنت في هذه الصفحة فقط.',
       email:
-        'ستصلك رسالة برابط عبر البريد الإلكتروني للعودة إلى متابعتك. أدخل بريدك أدناه.',
+        'يمكن للعيادة التواصل معك عبر البريد الإلكتروني. أدخل بريدك أدناه. تبقى متابعتك عبر الإنترنت في هذه الصفحة فقط.',
     },
     reservedChip: 'تم الحجز',
     arrivalTimeLine: 'يظهر وقت الوصول المقترح في صفحة المتابعة أدناه.',
@@ -387,9 +387,10 @@ const COPY: Record<SupportedLocale, Copy> = {
     keepOpenHeading: 'أبقِ هذه الصفحة مفتوحة',
     keepOpen: {
       none: 'هذه الصفحة هي وصولك الوحيد إلى حجزك عبر الإنترنت. إذا أغلقتها فأعطِ رقمك لموظف الاستقبال في العيادة.',
-      phone: 'إذا أغلقت هذه الصفحة فالرابط الذي وصلك عبر الهاتف يعيدك إليها.',
+      phone:
+        'هذه الصفحة هي وصولك الوحيد إلى حجزك عبر الإنترنت ولا يُرسل أي رابط للعودة. إذا أغلقتها فأعطِ رقمك لموظف الاستقبال في العيادة.',
       email:
-        'إذا أغلقت هذه الصفحة فالرابط الذي وصلك عبر البريد الإلكتروني يعيدك إليها.',
+        'هذه الصفحة هي وصولك الوحيد إلى حجزك عبر الإنترنت ولا يُرسل أي رابط للعودة. إذا أغلقتها فأعطِ رقمك لموظف الاستقبال في العيادة.',
     },
     bookingStates: {
       confirmed: 'مؤكدة',
@@ -1425,7 +1426,9 @@ function LiveQueueView({
     >
       <h1>{copy.title}</h1>
       <div className="gb-card">
-        <span className="tb-chip tb-chip--active">{copy.reservedChip}</span>
+        {confirmationVisible ? (
+          <span className="tb-chip tb-chip--active">{copy.reservedChip}</span>
+        ) : null}
         <p className="gb-ticket">
           <strong>{copy.yourLabel}</strong> <bdi>{queueLabel}</bdi>
         </p>
