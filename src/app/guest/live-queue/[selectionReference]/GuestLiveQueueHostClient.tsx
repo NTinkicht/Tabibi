@@ -38,7 +38,12 @@ type HostPhase =
   | { kind: 'form' }
   | { kind: 'booking' }
   | { kind: 'booking_failed' }
-  | { kind: 'live'; bearer: string | undefined; queueLabel: string };
+  | {
+      kind: 'live';
+      bearer: string | undefined;
+      queueLabel: string;
+      contactPreference: ContactPreference;
+    };
 
 const TERMINAL_VALUES = new Set(['completed', 'cancelled', 'no_show']);
 // Non-terminal queue-state progression, oldest to newest. Used only to stop a
@@ -125,6 +130,14 @@ type Copy = {
   estimateExplainerLink: string;
   estimateExplainerNewTab: string;
   helpHubLink: string;
+  nameHint: string;
+  privacyLink: string;
+  contactExplain: Record<ContactPreference, string>;
+  reservedChip: string;
+  arrivalTimeLine: string;
+  followMyTurn: string;
+  keepOpenHeading: string;
+  keepOpen: Record<ContactPreference, string>;
 };
 
 // Arabic noun-number agreement for دقيقة (minute): 1/2 take dedicated
@@ -234,6 +247,28 @@ const COPY: Record<SupportedLocale, Copy> = {
     estimateExplainerLink: 'Pourquoi ces estimations changent',
     estimateExplainerNewTab: 's’ouvre dans un nouvel onglet',
     helpHubLink: `Voir toutes les rubriques d'aide`,
+    nameHint:
+      'Visible uniquement par la clinique, jamais sur la page de suivi.',
+    privacyLink: 'Comment vos informations sont protégées',
+    contactExplain: {
+      none: 'Sans contact préféré, vous avez le même service à la clinique, mais vous suivez votre passage uniquement depuis cette page.',
+      phone:
+        'La clinique pourra vous joindre par téléphone. Renseignez votre numéro ci-dessous. Votre suivi en ligne reste uniquement sur cette page.',
+      email:
+        'La clinique pourra vous joindre par e-mail. Renseignez votre adresse ci-dessous. Votre suivi en ligne reste uniquement sur cette page.',
+    },
+    reservedChip: 'Réservé',
+    arrivalTimeLine:
+      'L’heure d’arrivée suggérée apparaît sur la page de suivi ci-dessous.',
+    followMyTurn: 'Suivre mon passage',
+    keepOpenHeading: 'Gardez cette page ouverte',
+    keepOpen: {
+      none: 'Cette page est votre seul accès en ligne à votre réservation. Si vous la fermez, donnez votre numéro à l’accueil de la clinique.',
+      phone:
+        'Cette page est votre seul accès en ligne à votre réservation : aucun lien de retour n’est envoyé. Si vous la fermez, donnez votre numéro à l’accueil de la clinique.',
+      email:
+        'Cette page est votre seul accès en ligne à votre réservation : aucun lien de retour n’est envoyé. Si vous la fermez, donnez votre numéro à l’accueil de la clinique.',
+    },
     bookingStates: {
       confirmed: 'confirmée',
       checked_in: 'enregistré',
@@ -337,6 +372,26 @@ const COPY: Record<SupportedLocale, Copy> = {
     estimateExplainerLink: 'لماذا تتغير هذه التقديرات',
     estimateExplainerNewTab: 'يُفتح في علامة تبويب جديدة',
     helpHubLink: `عرض جميع مواضيع المساعدة`,
+    nameHint: 'يراه فقط طاقم العيادة، ولا يظهر أبدًا في صفحة المتابعة.',
+    privacyLink: 'كيف نحمي معلوماتك',
+    contactExplain: {
+      none: 'بدون وسيلة اتصال مفضلة تحصل على الخدمة نفسها في العيادة، لكنك تتابع دورك من هذه الصفحة فقط.',
+      phone:
+        'يمكن للعيادة التواصل معك عبر الهاتف. أدخل رقمك أدناه. تبقى متابعتك عبر الإنترنت في هذه الصفحة فقط.',
+      email:
+        'يمكن للعيادة التواصل معك عبر البريد الإلكتروني. أدخل بريدك أدناه. تبقى متابعتك عبر الإنترنت في هذه الصفحة فقط.',
+    },
+    reservedChip: 'تم الحجز',
+    arrivalTimeLine: 'يظهر وقت الوصول المقترح في صفحة المتابعة أدناه.',
+    followMyTurn: 'تابع دوري',
+    keepOpenHeading: 'أبقِ هذه الصفحة مفتوحة',
+    keepOpen: {
+      none: 'هذه الصفحة هي وصولك الوحيد إلى حجزك عبر الإنترنت. إذا أغلقتها فأعطِ رقمك لموظف الاستقبال في العيادة.',
+      phone:
+        'هذه الصفحة هي وصولك الوحيد إلى حجزك عبر الإنترنت ولا يُرسل أي رابط للعودة. إذا أغلقتها فأعطِ رقمك لموظف الاستقبال في العيادة.',
+      email:
+        'هذه الصفحة هي وصولك الوحيد إلى حجزك عبر الإنترنت ولا يُرسل أي رابط للعودة. إذا أغلقتها فأعطِ رقمك لموظف الاستقبال في العيادة.',
+    },
     bookingStates: {
       confirmed: 'مؤكدة',
       checked_in: 'تم تسجيل الوصول',
@@ -593,6 +648,7 @@ export function GuestLiveQueueHostClient({
         kind: 'live',
         bearer: result.guestBearer,
         queueLabel: result.queueLabel,
+        contactPreference,
       });
     } catch {
       setPhase({ kind: 'booking_failed' });
@@ -613,6 +669,7 @@ export function GuestLiveQueueHostClient({
           )
         }
         queueLabel={phase.queueLabel}
+        contactPreference={phase.contactPreference}
         copy={copy}
         locale={locale}
       />
@@ -620,7 +677,12 @@ export function GuestLiveQueueHostClient({
   }
 
   return (
-    <section lang={locale} dir={copy.dir} aria-live="polite">
+    <section
+      lang={locale}
+      dir={copy.dir}
+      aria-live="polite"
+      className="gb-page"
+    >
       <h1>{copy.title}</h1>
       <p>{copy.subtitle}</p>
       {phase.kind === 'booking_failed' ? (
@@ -632,6 +694,7 @@ export function GuestLiveQueueHostClient({
         </div>
       ) : null}
       <form
+        className="gb-card"
         onSubmit={(event) => {
           setContactValidationAttempted(true);
           const phone = contactPhoneInputRef.current;
@@ -666,13 +729,18 @@ export function GuestLiveQueueHostClient({
             value={privateDisplayName}
             onChange={(event) => setPrivateDisplayName(event.target.value)}
             disabled={phase.kind === 'booking'}
+            aria-describedby="guest-name-hint"
           />
         </label>
-        <label>
+        <p id="guest-name-hint" className="gb-hint">
+          {copy.nameHint}
+        </p>
+        <label data-emphasis={contactPreference === 'phone'}>
           {copy.contactPhone}
           <input
             ref={contactPhoneInputRef}
             type="tel"
+            dir="ltr"
             minLength={3}
             aria-describedby="guest-contact-requirement"
             value={contactPhone}
@@ -680,11 +748,12 @@ export function GuestLiveQueueHostClient({
             disabled={phase.kind === 'booking'}
           />
         </label>
-        <label>
+        <label data-emphasis={contactPreference === 'email'}>
           {copy.contactEmail}
           <input
             ref={contactEmailInputRef}
             type="email"
+            dir="ltr"
             minLength={3}
             maxLength={254}
             aria-describedby="guest-contact-requirement"
@@ -694,7 +763,7 @@ export function GuestLiveQueueHostClient({
           />
         </label>
         <p id="guest-contact-requirement">{copy.contactRequirement}</p>
-        <fieldset disabled={phase.kind === 'booking'}>
+        <fieldset className="gb-seg" disabled={phase.kind === 'booking'}>
           <legend>{copy.contactPreferenceLabel}</legend>
           {(
             [
@@ -715,7 +784,10 @@ export function GuestLiveQueueHostClient({
             </label>
           ))}
         </fieldset>
-        <fieldset disabled={phase.kind === 'booking'}>
+        <p className="gb-explain" data-testid="guest-contact-explanation">
+          {copy.contactExplain[contactPreference]}
+        </p>
+        <fieldset className="gb-seg" disabled={phase.kind === 'booking'}>
           <legend>{copy.preferredLocaleLabel}</legend>
           {(['fr', 'ar'] as const).map((value) => (
             <label key={value}>
@@ -730,9 +802,16 @@ export function GuestLiveQueueHostClient({
             </label>
           ))}
         </fieldset>
-        <button type="submit" disabled={phase.kind === 'booking'}>
+        <button
+          type="submit"
+          className="tb-button tb-button--primary"
+          disabled={phase.kind === 'booking'}
+        >
           {phase.kind === 'booking' ? copy.submitting : copy.submit}
         </button>
+        <p>
+          <a href="/guest/privacy-help">{copy.privacyLink}</a>
+        </p>
       </form>
     </section>
   );
@@ -768,12 +847,14 @@ function LiveQueueView({
   bearer,
   onBearerAccepted,
   queueLabel,
+  contactPreference,
   copy,
   locale,
 }: {
   bearer: string | undefined;
   onBearerAccepted: () => void;
   queueLabel: string;
+  contactPreference: ContactPreference;
   copy: Copy;
   locale: SupportedLocale;
 }) {
@@ -1334,13 +1415,44 @@ function LiveQueueView({
     // intentionally runs only on mount/unmount for this view instance.
   }, []);
 
+  const confirmationVisible =
+    state.kind !== 'terminal' && state.kind !== 'unavailable';
   const shell = (content: React.ReactNode) => (
-    <section lang={locale} dir={copy.dir} aria-live="polite">
+    <section
+      lang={locale}
+      dir={copy.dir}
+      aria-live="polite"
+      className="gb-page"
+    >
       <h1>{copy.title}</h1>
-      <p>
-        <strong>{copy.yourLabel}</strong> {queueLabel}
-      </p>
-      {content}
+      <div className="gb-card">
+        {confirmationVisible ? (
+          <span className="tb-chip tb-chip--active">{copy.reservedChip}</span>
+        ) : null}
+        <p className="gb-ticket">
+          <strong>{copy.yourLabel}</strong> <bdi>{queueLabel}</bdi>
+        </p>
+        {confirmationVisible ? (
+          <>
+            <p>{copy.arrivalTimeLine}</p>
+            <div
+              className="gb-keep-open"
+              role="note"
+              data-testid="guest-keep-open-notice"
+            >
+              <strong>{copy.keepOpenHeading}</strong>
+              <p>{copy.keepOpen[contactPreference]}</p>
+            </div>
+            <a
+              className="tb-button tb-button--primary"
+              href="#guest-visit-status"
+            >
+              {copy.followMyTurn}
+            </a>
+          </>
+        ) : null}
+      </div>
+      <div id="guest-visit-status">{content}</div>
       <p>
         <a
           href="/guest/help"
