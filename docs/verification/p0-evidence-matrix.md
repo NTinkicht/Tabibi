@@ -121,7 +121,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Arabic mobile queue view recovers from stale conflict and switches to French | src: src/modules/localization | test: tests/e2e/queue-rtl-mobile.spec.ts :: "mobile Arabic queue view reloads safely after a stale reorder conflict and can switch back to F" | pr: review: not audited
 - [COVERED] Receptionist keyboard/bilingual accessibility | src: src/app/operations | test: tests/e2e/receptionist-bilingual-accessibility.spec.ts :: "receptionist queue stays clinic-scoped, private, bilingual, and keyboard operable" | pr: review: not audited
 - [PARTIAL] Doctor flows in both languages: no doctor-facing Playwright journey was located | src: src/app/operations | pr: none
-- [PARTIAL] Screen-reader label and viewport-width coverage is per-spec, not asserted as a matrix | src: src/app | test: tests/e2e/public-discovery-browser-locale.spec.ts :: "Non-Arabic browser uses French directory and supports deliberate Arabic choice" | pr: review: not audited
+- [PARTIAL] Screen-reader label and viewport-width coverage is per-spec, not asserted as a matrix | src: src/app | test: tests/e2e/find-doctor.spec.ts :: "an API error offers a retry that recovers" | pr: review: not audited
 
 ## TAB-P0-15 Privacy/tenant security, migrations, release assurance
 

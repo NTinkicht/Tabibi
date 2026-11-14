@@ -19,7 +19,7 @@ vi.mock('@/platform/observability/logger', () => ({
   getLogger: () => ({ error: logError }),
 }));
 
-import FindDoctorPage from '@/app/find/page';
+import Home from '@/app/page';
 
 const SECRET = 'x'.repeat(32);
 const clinic = {
@@ -49,7 +49,7 @@ const clinic = {
 };
 
 async function initialProp() {
-  const element = (await FindDoctorPage()) as ReactElement<{
+  const element = (await Home()) as ReactElement<{
     initial: unknown;
   }>;
   return element.props.initial;
