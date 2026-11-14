@@ -45,8 +45,11 @@ function toClient(clinics: PublicBookableClinic[]): BookableClinic[] | null {
   return result;
 }
 
-export default async function FindDoctorPage() {
-  let initial: BookableClinic[] | null = null;
+async function loadInitial(): Promise<{
+  clinics: BookableClinic[];
+  hasMore: boolean;
+} | null> {
+  let initial: { clinics: BookableClinic[]; hasMore: boolean } | null = null;
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
@@ -61,18 +64,23 @@ export default async function FindDoctorPage() {
       throw new Error('selection secret not configured');
     }
     const pool = getPool('public-discovery');
-    const { clinics } = await Promise.race([
+    const { clinics, hasMore } = await Promise.race([
       new PublicBookableSessionService(
         pool,
         new PublicAvailabilitySelectionService(pool, secret),
       ).listPage(controller.signal, {}, 1),
       deadline,
     ]);
-    initial = toClient(clinics);
+    const mapped = toClient(clinics);
+    initial = mapped === null ? null : { clinics: mapped, hasMore };
   } catch (error) {
     getLogger().error({ err: error }, 'find doctor SSR fetch failed');
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
-  return <FindDoctorClient initial={initial} />;
+  return initial;
+}
+
+export default async function FindDoctorPage() {
+  return <FindDoctorClient initial={await loadInitial()} />;
 }

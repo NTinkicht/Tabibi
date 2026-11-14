@@ -4,7 +4,7 @@ import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
 import { Button, Chip, SegmentedControl } from '@/app/ui';
 import { SPECIALTIES } from '@/modules/clinic/specialties';
 import { WILAYAS } from '@/modules/clinic/wilayas';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   type PublicClinic,
   type PublicLocale,
@@ -73,7 +73,7 @@ async function fetchPage(
 export default function FindDoctorClient({
   initial,
 }: {
-  initial: BookableClinic[] | null;
+  initial: { clinics: BookableClinic[]; hasMore: boolean } | null;
 }) {
   const detected = useSyncExternalStore<PublicLocale>(
     subscribe,
@@ -86,8 +86,8 @@ export default function FindDoctorClient({
   const [mode, setMode] = useState<FindMode>('book');
   const [filters, setFilters] = useState<FindFilters>(EMPTY_FILTERS);
   const [results, setResults] = useState<Results>({
-    clinics: initial ?? [],
-    hasMore: false,
+    clinics: initial?.clinics ?? [],
+    hasMore: initial?.hasMore ?? false,
     page: 1,
   });
   const [load, setLoad] = useState<Load>(
@@ -101,10 +101,14 @@ export default function FindDoctorClient({
   // The server-rendered page is the unfiltered booking list; any change
   // (or a failed server render) loads from the API.
   const [useInitial, setUseInitial] = useState(initial !== null);
+  // Aborts the in-flight page fetch (first page or load-more) of the current
+  // query when the query changes, so a stale page can never be appended.
+  const moreController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (useInitial) return;
     const controller = new AbortController();
+    moreController.current = controller;
     fetchPage(mode, filters, 1, controller.signal)
       .then((next) => {
         setResults(next);
@@ -117,6 +121,16 @@ export default function FindDoctorClient({
   }, [mode, filters, retry, useInitial]);
 
   function change(next: { mode?: FindMode; filters?: FindFilters }) {
+    const sameMode = next.mode === undefined || next.mode === mode;
+    const sameFilters =
+      next.filters === undefined ||
+      (next.filters.specialty === filters.specialty &&
+        next.filters.wilaya === filters.wilaya &&
+        next.filters.language === filters.language);
+    // Re-selecting the current query must not start a load that no effect
+    // would answer.
+    if (sameMode && sameFilters) return;
+    moreController.current?.abort();
     setUseInitial(false);
     setLoad('loading');
     setSelected(null);
@@ -125,19 +139,23 @@ export default function FindDoctorClient({
   }
 
   async function loadMore() {
+    const controller = new AbortController();
+    moreController.current?.abort();
+    moreController.current = controller;
     try {
       const next = await fetchPage(
         mode,
         filters,
         results.page + 1,
-        new AbortController().signal,
+        controller.signal,
       );
+      if (controller.signal.aborted) return;
       setResults((current) => ({
         ...next,
         clinics: [...current.clinics, ...next.clinics],
       }));
     } catch {
-      setLoad('error');
+      if (!controller.signal.aborted) setLoad('error');
     }
   }
 
