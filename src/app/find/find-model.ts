@@ -42,8 +42,17 @@ export const EMPTY_FILTERS: FindFilters = {
 const SELECTION_REFERENCE = /^[A-Za-z0-9._~-]{8,2048}$/;
 const SERVICE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-function isInstant(value: unknown): value is string {
-  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+// Strict ISO-8601 instant with an explicit offset (what the API emits);
+// Date.parse alone also accepts locale-style strings.
+const ISO_INSTANT =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+
+export function isInstant(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    ISO_INSTANT.test(value) &&
+    !Number.isNaN(Date.parse(value))
+  );
 }
 
 /** Parse one bookable-sessions page; null (fail closed) on any malformed part. */
