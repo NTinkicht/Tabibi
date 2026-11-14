@@ -267,7 +267,7 @@ test.describe('find doctor paging and recovery', () => {
     await page.getByRole('button', { name: 'Tous les cabinets' }).click();
     failing = true;
     await page.getByRole('button', { name: 'Réserver en ligne' }).click();
-    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.locator('main p[role="alert"]')).toBeVisible();
     failing = false;
     await page.getByRole('button', { name: 'Réessayer' }).click();
     await count(page, 1);
