@@ -89,6 +89,14 @@ export const receptionistCopy = {
     pausedBanner:
       'Session en pause : les appels sont suspendus. Vous pouvez toujours enregistrer les arrivées et terminer la consultation en cours.',
     presentNow: 'Le patient est là : enregistrer son arrivée tout de suite',
+    presentNowFailed:
+      'Patient ajouté en attente, mais son arrivée n’a pas pu être enregistrée. Utilisez « Enregistrer l’arrivée » sur sa ligne.',
+    todayTitle: 'Aujourd’hui',
+    tileArrived: 'Arrivés',
+    tileNotArrived: 'Pas encore arrivés',
+    tileCompleted: 'Terminés',
+    tileNoShow: 'Absents',
+    sidePanelLabel: 'Panneau d’accueil',
     addToQueue: 'Ajouter à la file',
     auditedHint:
       'Ces actions sont enregistrées dans le journal d’audit avec votre nom et le motif.',
@@ -232,6 +240,14 @@ export const receptionistCopy = {
     pausedBanner:
       'الجلسة متوقفة مؤقتًا: النداء معلّق. يمكنك مواصلة تسجيل الوصول وإنهاء الاستشارة الجارية.',
     presentNow: 'المريض حاضر: سجّل وصوله فورًا',
+    presentNowFailed:
+      'أُضيف المريض إلى الانتظار، لكن تعذّر تسجيل وصوله. استخدم «تسجيل الوصول» في صفّه.',
+    todayTitle: 'اليوم',
+    tileArrived: 'وصلوا',
+    tileNotArrived: 'لم يصلوا بعد',
+    tileCompleted: 'انتهوا',
+    tileNoShow: 'غائبون',
+    sidePanelLabel: 'لوحة الاستقبال',
     addToQueue: 'إضافة إلى القائمة',
     auditedHint: 'تُسجَّل هذه الإجراءات في سجل التدقيق مع اسمك والسبب.',
     waitEstimate: 'الانتظار المتوقع',

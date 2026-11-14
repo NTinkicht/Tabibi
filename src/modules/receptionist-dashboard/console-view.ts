@@ -162,3 +162,23 @@ export function formatLastAction(
     .replace('{name}', entry.privateDisplayName)
     .replace('{state}', stateLabel);
 }
+
+export interface TodayTiles {
+  arrived: number;
+  notArrived: number;
+  completed: number;
+  noShow: number;
+}
+
+/** Counts of the session dashboard snapshot only; no client-side inference. */
+export function todayTiles(
+  entries: ReadonlyArray<{ state: string }>,
+): TodayTiles {
+  const n = (state: string) => entries.filter((e) => e.state === state).length;
+  return {
+    arrived: n('checked_in'),
+    notArrived: n('waiting'),
+    completed: n('completed'),
+    noShow: n('no_show'),
+  };
+}

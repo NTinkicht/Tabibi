@@ -367,6 +367,129 @@ h1 {
     transform: rotate(360deg);
   }
 }
+/* Reception console: main column plus side panel (inline-end; mirrors in RTL). */
+.consoleLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 1.5rem;
+  align-items: start;
+}
+.consoleMain,
+.consoleSide {
+  min-width: 0;
+}
+.consoleSide {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+.consoleSide .createPanel {
+  margin-top: 0;
+}
+.consoleSide .createPanel form {
+  grid-template-columns: 1fr;
+}
+.langSegment {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.langSegment legend {
+  font-size: 0.8rem;
+  font-weight: 750;
+  padding: 0;
+  margin-bottom: 0.4rem;
+}
+.langSegment label {
+  display: block;
+  position: relative;
+}
+.langSegment input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+}
+.langSegment span {
+  display: block;
+  min-height: 2.75rem;
+  padding: 0.7rem 1.1rem;
+  border: 2px solid #0a6f61;
+  border-radius: 999px;
+  background: white;
+  color: #0a6f61;
+  font-weight: 750;
+}
+.langSegment input:checked + span {
+  background: #0a6f61;
+  color: white;
+}
+.langSegment input:focus-visible + span {
+  outline: 3px solid #1b4fd8;
+  outline-offset: 2px;
+}
+.createPanel .presentNow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+.createPanel .presentNow input {
+  width: 1.4rem;
+  height: 1.4rem;
+  flex: none;
+}
+.todayTiles {
+  background: #f1f7f5;
+  border-radius: 1.2rem;
+  padding: 1.1rem;
+}
+.todayTiles h2 {
+  margin: 0 0 0.7rem;
+  font-size: 1.1rem;
+}
+.todayTiles ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+.todayTiles li {
+  background: white;
+  border-radius: 0.8rem;
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.2rem;
+}
+.todayTiles strong {
+  font-size: 1.6rem;
+  color: #0a4f45;
+}
+.todayTiles span {
+  font-size: 0.8rem;
+  color: #3f5f5b;
+}
+.undeliveredAlert {
+  background: #fff4d6;
+  color: #6b4a00;
+  border-radius: 1rem;
+  padding: 1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.undeliveredAlert a {
+  color: #6b4a00;
+  font-weight: 750;
+}
+@media (max-width: 900px) {
+  .consoleLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @media (max-width: 700px) {
   .dashboardSummary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
