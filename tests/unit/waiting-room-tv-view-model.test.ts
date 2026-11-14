@@ -93,6 +93,14 @@ describe('waiting-room TV view model', () => {
         session: { pauseStatus: 'x', declaredDelayMinutes: 0 },
       }),
     ).toBeNull();
+    for (const bad of [Number.NaN, Infinity, -Infinity]) {
+      expect(
+        parseSnapshot({
+          ...ok,
+          session: { pauseStatus: 'paused', declaredDelayMinutes: bad },
+        }),
+      ).toBeNull();
+    }
     expect(parseSnapshot(null)).toBeNull();
   });
 });

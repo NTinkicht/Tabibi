@@ -72,6 +72,7 @@ export function parseSnapshot(
     !session ||
     (session.pauseStatus !== 'active' && session.pauseStatus !== 'paused') ||
     typeof session.declaredDelayMinutes !== 'number' ||
+    !Number.isFinite(session.declaredDelayMinutes) ||
     !Array.isArray(body.entries)
   ) {
     return null;
