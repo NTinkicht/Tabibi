@@ -225,6 +225,9 @@ export function WalkInQueue({
           t.presentNowFailed,
         );
       } else {
+        // Not awaited on purpose: the registered entry was already merged into
+        // `entries` from the POST response above, so this is a background
+        // reconcile and setState('ready')/form.reset() do not depend on it.
         void load();
       }
     } catch (error) {
