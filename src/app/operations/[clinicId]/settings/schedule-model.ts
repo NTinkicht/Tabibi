@@ -70,6 +70,25 @@ export function nextOccurrenceIndex(
     .reduce((max, t) => Math.max(max, t.occurrenceIndex + 1), 0);
 }
 
+// Whether the weekly templates snapshot matches the committed server state.
+// Additions derive occurrenceIndex from the snapshot, so they stay disabled
+// until a reload after a change has completed (or a failed one is retried).
+export type TemplateSync = 'synced' | 'refreshing' | 'stale';
+export type TemplateSyncEvent = 'refresh' | 'loaded' | 'failed';
+
+export function templateSyncReducer(
+  _state: TemplateSync,
+  event: TemplateSyncEvent,
+): TemplateSync {
+  if (event === 'loaded') return 'synced';
+  if (event === 'failed') return 'stale';
+  return 'refreshing';
+}
+
+export function canAddRange(sync: TemplateSync, busy: boolean): boolean {
+  return sync === 'synced' && !busy;
+}
+
 export type RangeError = 'time_invalid' | 'end_before_start';
 
 export function buildTemplateBody(input: {

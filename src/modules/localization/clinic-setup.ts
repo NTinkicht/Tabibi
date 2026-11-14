@@ -40,6 +40,7 @@ export const clinicSetupCopy = {
     weekRangeAdded: 'Plage ajoutée.',
     weekRangeRemoved: 'Plage retirée. Les sessions existantes ne changent pas.',
     weekOverlap: 'Cette plage chevauche une plage existante.',
+    weekReload: 'Actualiser les plages',
     weekErrors: {
       time_invalid: 'Saisissez des heures valides (HH:MM).',
       end_before_start: 'L’heure de fin doit suivre l’heure de début.',
@@ -172,6 +173,7 @@ export const clinicSetupCopy = {
     weekRangeAdded: 'تمت إضافة الفترة.',
     weekRangeRemoved: 'تمت إزالة الفترة. لا تتغير الجلسات الموجودة.',
     weekOverlap: 'تتداخل هذه الفترة مع فترة موجودة.',
+    weekReload: 'تحديث الفترات',
     weekErrors: {
       time_invalid: 'أدخل ساعات صحيحة (HH:MM).',
       end_before_start: 'يجب أن تأتي النهاية بعد البداية.',

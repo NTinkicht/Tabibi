@@ -3,6 +3,8 @@ import {
   activeRanges,
   buildGenerationBody,
   buildTemplateBody,
+  canAddRange,
+  templateSyncReducer,
   fillTemplate,
   nextOccurrenceIndex,
   parseAbsences,
@@ -161,5 +163,25 @@ describe('absences and weekdays', () => {
     expect(weekdayName(0, 'fr').toLowerCase()).toBe('dimanche');
     expect(weekdayName(1, 'fr').toLowerCase()).toBe('lundi');
     expect(weekdayName(0, 'ar')).not.toBe(weekdayName(1, 'ar'));
+  });
+});
+
+describe('template snapshot sync gate', () => {
+  it('blocks additions from a mutation until the reload has completed', () => {
+    let sync = templateSyncReducer('synced', 'refresh');
+    expect(canAddRange(sync, false)).toBe(false);
+    sync = templateSyncReducer(sync, 'loaded');
+    expect(canAddRange(sync, false)).toBe(true);
+    expect(canAddRange(sync, true)).toBe(false);
+  });
+
+  it('keeps additions blocked after a failed reload until a retry loads', () => {
+    let sync = templateSyncReducer('refreshing', 'failed');
+    expect(sync).toBe('stale');
+    expect(canAddRange(sync, false)).toBe(false);
+    sync = templateSyncReducer(sync, 'refresh');
+    expect(canAddRange(sync, false)).toBe(false);
+    sync = templateSyncReducer(sync, 'loaded');
+    expect(canAddRange(sync, false)).toBe(true);
   });
 });

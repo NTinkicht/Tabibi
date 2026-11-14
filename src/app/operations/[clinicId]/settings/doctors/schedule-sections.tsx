@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useRef,
+  useReducer,
   useState,
   type FormEvent,
 } from 'react';
@@ -15,12 +16,14 @@ import {
   activeRanges,
   buildGenerationBody,
   buildTemplateBody,
+  canAddRange,
   fillTemplate,
   formatLongDay,
   parseAbsences,
   parseGenerated,
   parseTemplates,
   periodEnd,
+  templateSyncReducer,
   weekdayName,
   type TemplateRow,
 } from '../schedule-model';
@@ -69,6 +72,8 @@ function usePanel(onForbidden: () => void, reload: () => void) {
         return null;
       }
       if (!res.ok) {
+        // A 409 means the client snapshot is stale: re-read committed state.
+        if (res.status === 409 && conflict) reload();
         setError(
           res.status === 409 && conflict ? conflict : t(locale).actionFailed,
         );
@@ -116,8 +121,13 @@ export function WeekSection({ base, doctorId, locale, onForbidden }: Props) {
   const t = clinicSetupCopy[locale];
   const [templates, setTemplates] = useState<TemplateRow[] | null>(null);
   const [tick, setTick] = useState(0);
-  const reload = useCallback(() => setTick((n) => n + 1), []);
+  const [sync, dispatchSync] = useReducer(templateSyncReducer, 'refreshing');
+  const reload = useCallback(() => {
+    dispatchSync('refresh');
+    setTick((n) => n + 1);
+  }, []);
   const panel = usePanel(onForbidden, reload);
+  const canAdd = canAddRange(sync, panel.busy);
   const [adding, setAdding] = useState<number | null>(null);
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -136,10 +146,18 @@ export function WeekSection({ base, doctorId, locale, onForbidden }: Props) {
         );
         if (res.status === 403) return onForbidden();
         const parsed = res.ok ? parseTemplates(await res.json()) : null;
-        if (parsed) setTemplates(parsed);
-        else panel.setError(t.sectionLoadError);
+        if (parsed) {
+          setTemplates(parsed);
+          dispatchSync('loaded');
+        } else {
+          dispatchSync('failed');
+          panel.setError(t.sectionLoadError);
+        }
       } catch {
-        if (!controller.signal.aborted) panel.setError(t.sectionLoadError);
+        if (!controller.signal.aborted) {
+          dispatchSync('failed');
+          panel.setError(t.sectionLoadError);
+        }
       }
     })();
     return () => controller.abort();
@@ -148,6 +166,7 @@ export function WeekSection({ base, doctorId, locale, onForbidden }: Props) {
 
   function onAdd(event: FormEvent, weekday: number) {
     event.preventDefault();
+    if (!canAdd) return;
     const built = buildTemplateBody({
       doctorId,
       weekday,
@@ -183,6 +202,11 @@ export function WeekSection({ base, doctorId, locale, onForbidden }: Props) {
       <h2 id="cs-week-title">{t.weekTitle}</h2>
       <p className="cs-help">{t.weekHelp}</p>
       <Messages {...panel} />
+      {sync === 'stale' && (
+        <Button variant="secondary" onClick={reload}>
+          {t.weekReload}
+        </Button>
+      )}
       {templates && (
         <ul className="cs-list">
           {WEEKDAY_ORDER.map((weekday) => {
@@ -247,7 +271,7 @@ export function WeekSection({ base, doctorId, locale, onForbidden }: Props) {
                         onChange={(e) => setEnd(e.target.value)}
                       />
                     </div>
-                    <Button type="submit" disabled={panel.busy}>
+                    <Button type="submit" disabled={!canAdd}>
                       {t.weekSaveRange}
                     </Button>
                   </form>
