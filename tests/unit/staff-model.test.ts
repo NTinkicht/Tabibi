@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  INVITE_ROLES,
+  inviteLink,
+  parseCreatedInvite,
+  parseInvites,
   parseStaff,
   patchBody,
   planRoleChange,
@@ -70,5 +74,45 @@ describe('removalConflict', () => {
   it('names the 409 reason from the removed member role', () => {
     expect(removalConflict('clinic_admin')).toBe('last_admin');
     expect(removalConflict('doctor')).toBe('doctor_without_profile');
+  });
+});
+
+describe('invites', () => {
+  const invite = (over: Record<string, unknown> = {}) => ({
+    inviteId: 'i1',
+    email: 'a@x.dz',
+    role: 'doctor',
+    status: 'expired',
+    expiresAt: '2026-11-01T00:00:00.000Z',
+    ...over,
+  });
+
+  it('parses the list and rejects an unknown role or status', () => {
+    expect(parseInvites({ invites: [invite()] })).toHaveLength(1);
+    expect(
+      parseInvites({ invites: [invite({ role: 'clinic_admin' })] }),
+    ).toBeNull();
+    expect(
+      parseInvites({ invites: [invite({ status: 'accepted' })] }),
+    ).toBeNull();
+    expect(parseInvites({})).toBeNull();
+  });
+
+  it('never offers administrator as an invite role', () => {
+    expect(INVITE_ROLES).toEqual(['receptionist', 'doctor']);
+  });
+
+  it('puts the token in the fragment only', () => {
+    const link = inviteLink('https://app.tabibi.dz', 'abc');
+    expect(link).toBe('https://app.tabibi.dz/staff/invite#abc');
+    expect(new URL(link).search).toBe('');
+    expect(new URL(link).hash).toBe('#abc');
+  });
+
+  it('reads the created invite and rejects a response without a token', () => {
+    expect(
+      parseCreatedInvite({ invite: { inviteId: 'i1', token: 'abc' } }),
+    ).toEqual({ inviteId: 'i1', token: 'abc' });
+    expect(parseCreatedInvite({ invite: { inviteId: 'i1' } })).toBeNull();
   });
 });

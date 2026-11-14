@@ -74,3 +74,55 @@ export function removalConflict(role: StaffRole): RemovalConflict {
 export function patchBody(role: 'clinic_admin' | 'receptionist') {
   return { role };
 }
+
+// Invites (G-18). Administrators are never invited.
+export type InviteRole = 'receptionist' | 'doctor';
+export const INVITE_ROLES: readonly InviteRole[] = ['receptionist', 'doctor'];
+
+export interface PendingInvite {
+  inviteId: string;
+  email: string;
+  role: InviteRole;
+  status: 'pending' | 'expired';
+  expiresAt: string;
+}
+
+export function parseInvites(raw: unknown): PendingInvite[] | null {
+  const list = (raw as { invites?: unknown } | null)?.invites;
+  if (!Array.isArray(list)) return null;
+  const rows: PendingInvite[] = [];
+  for (const i of list as Record<string, unknown>[]) {
+    if (
+      typeof i?.inviteId !== 'string' ||
+      typeof i.email !== 'string' ||
+      !INVITE_ROLES.includes(i.role as InviteRole) ||
+      (i.status !== 'pending' && i.status !== 'expired') ||
+      typeof i.expiresAt !== 'string'
+    )
+      return null;
+    rows.push({
+      inviteId: i.inviteId,
+      email: i.email,
+      role: i.role as InviteRole,
+      status: i.status,
+      expiresAt: i.expiresAt,
+    });
+  }
+  return rows;
+}
+
+// The token goes in the fragment only: it never reaches the server or a URL
+// the app logs.
+export function inviteLink(origin: string, token: string): string {
+  return `${origin}/staff/invite#${token}`;
+}
+
+// POST /staff-invites response; the token is held in component state only.
+export function parseCreatedInvite(
+  raw: unknown,
+): { inviteId: string; token: string } | null {
+  const i = (raw as { invite?: Record<string, unknown> } | null)?.invite;
+  if (typeof i?.inviteId !== 'string' || typeof i.token !== 'string')
+    return null;
+  return { inviteId: i.inviteId, token: i.token };
+}

@@ -3,17 +3,23 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
-import { Button, SegmentedControl } from '@/app/ui';
+import { Button, Chip, SegmentedControl } from '@/app/ui';
 import { clinicSetupCopy } from '@/modules/localization/clinic-setup';
 import '../settings.css';
 import { SettingsTabs } from '../settings-tabs';
 import {
+  INVITE_ROLES,
   STAFF_ROLES,
+  inviteLink,
+  parseCreatedInvite,
+  parseInvites,
   parseStaff,
   patchBody,
   planRoleChange,
   removalConflict,
   sortStaff,
+  type InviteRole,
+  type PendingInvite,
   type StaffMember,
   type StaffRole,
 } from '../staff-model';
@@ -25,8 +31,8 @@ type Pending =
   | { kind: 'leave_doctor'; member: StaffMember; role: StaffRole };
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
-// Personnel tab, members part (docs/design/clinic-setup.md). Invitations and
-// the invite page restyle are the next slice of #830.
+// Personnel tab (docs/design/clinic-setup.md): members, invite link, pending
+// invites. The /staff/invite restyle is the last slice of #830.
 export function StaffSettingsClient({
   clinicId,
   initialLocale,
@@ -45,6 +51,14 @@ export function StaffSettingsClient({
   const [needDoctor, setNeedDoctor] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
+  const [invites, setInvites] = useState<PendingInvite[] | null>([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<InviteRole>('receptionist');
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  // One-time token: component state only, never URL, storage or logs.
+  const [link, setLink] = useState<string | null>(null);
+  const [copyNote, setCopyNote] = useState<string | null>(null);
+  const linkRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -79,6 +93,16 @@ export function StaffSettingsClient({
         const rows = res.ok ? parseStaff(await res.json()) : null;
         if (!rows) return setLoad('error');
         setMembers(sortStaff(rows, locale));
+        try {
+          const inv = await fetch(`${base}/staff-invites`, {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            signal: controller.signal,
+          });
+          setInvites(inv.ok ? parseInvites(await inv.json()) : null);
+        } catch {
+          if (!controller.signal.aborted) setInvites(null);
+        }
         setLoad('ready');
       } catch {
         if (!controller.signal.aborted) setLoad('error');
@@ -125,6 +149,77 @@ export function StaffSettingsClient({
     } finally {
       setBusy(false);
       closeDialog();
+    }
+  }
+
+  async function onCreateInvite(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setInviteError(null);
+    setOk(null);
+    setLink(null);
+    setCopyNote(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`${base}/staff-invites`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      });
+      if (res.status === 403) return setLoad('forbidden');
+      if (res.status === 409) setInviteError(t.inviteDuplicate);
+      else if (res.status === 400) setInviteError(t.inviteEmailInvalid);
+      else {
+        const created = res.ok ? parseCreatedInvite(await res.json()) : null;
+        if (!created) setInviteError(t.actionFailed);
+        else {
+          setLink(inviteLink(window.location.origin, created.token));
+          setInviteEmail('');
+          reload();
+        }
+      }
+    } catch {
+      setInviteError(t.actionFailed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onCopy() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopyNote(t.inviteCopied);
+    } catch {
+      setCopyNote(t.inviteCopyFailed);
+      linkRef.current?.select();
+    }
+  }
+
+  function closeLink() {
+    setLink(null);
+    setCopyNote(null);
+  }
+
+  async function onRevoke(invite: PendingInvite) {
+    setError(null);
+    setOk(null);
+    setBusy(true);
+    try {
+      const res = await fetch(
+        `${base}/staff-invites/${encodeURIComponent(invite.inviteId)}`,
+        { method: 'DELETE', credentials: 'same-origin' },
+      );
+      if (res.status === 403) return setLoad('forbidden');
+      // 404: accepted or revoked meanwhile; the refreshed list is the truth.
+      if (res.ok) setOk(t.inviteRevoked);
+      else if (res.status !== 404) setError(t.actionFailed);
+      reload();
+    } catch {
+      setError(t.actionFailed);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -248,6 +343,126 @@ export function StaffSettingsClient({
                 </tbody>
               </table>
             </div>
+          </section>
+          <section className="cs-card" aria-labelledby="cs-invite-title">
+            <h2 id="cs-invite-title">{t.inviteTitle}</h2>
+            <p className="cs-help">{t.inviteHelp}</p>
+            <form className="cs-inline" onSubmit={onCreateInvite} noValidate>
+              <div className="cs-field">
+                <label htmlFor="cs-invite-email">{t.inviteEmail}</label>
+                <input
+                  id="cs-invite-email"
+                  type="email"
+                  dir="ltr"
+                  autoComplete="off"
+                  value={inviteEmail}
+                  aria-invalid={inviteError ? true : undefined}
+                  aria-describedby={inviteError ? 'cs-invite-error' : undefined}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                />
+              </div>
+              <div className="cs-field">
+                <label htmlFor="cs-invite-role">{t.inviteRole}</label>
+                <select
+                  id="cs-invite-role"
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value as InviteRole)}
+                >
+                  {INVITE_ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {t.roles[r]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button type="submit" disabled={busy || !inviteEmail.trim()}>
+                {t.inviteCreate}
+              </Button>
+            </form>
+            {inviteError && (
+              <p id="cs-invite-error" className="cs-error" role="alert">
+                {inviteError}
+              </p>
+            )}
+            {link && (
+              <div data-testid="invite-link-panel">
+                <div className="cs-field">
+                  <label htmlFor="cs-invite-link">{t.inviteLinkLabel}</label>
+                  <input
+                    id="cs-invite-link"
+                    ref={linkRef}
+                    type="text"
+                    dir="ltr"
+                    readOnly
+                    value={link}
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                </div>
+                <p className="cs-help">{t.inviteLinkNote}</p>
+                <div className="cs-inline">
+                  <Button variant="secondary" onClick={() => void onCopy()}>
+                    {t.inviteCopy}
+                  </Button>
+                  <Button variant="secondary" onClick={closeLink}>
+                    {t.inviteClose}
+                  </Button>
+                </div>
+                {copyNote && (
+                  <p className="cs-ok" role="status">
+                    {copyNote}
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+          <section className="cs-card" aria-labelledby="cs-pending-title">
+            <h2 id="cs-pending-title">{t.pendingTitle}</h2>
+            {invites === null && <p role="alert">{t.loadError}</p>}
+            {invites?.length === 0 && <p>{t.pendingEmpty}</p>}
+            {invites && invites.length > 0 && (
+              <div className="cs-table-wrap">
+                <table className="cs-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">{t.pendingColEmail}</th>
+                      <th scope="col">{t.pendingColRole}</th>
+                      <th scope="col">{t.pendingColExpires}</th>
+                      <th scope="col">{t.staffColAccess}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invites.map((i) => (
+                      <tr key={i.inviteId} data-testid={`invite-${i.inviteId}`}>
+                        <th scope="row" dir="ltr">
+                          {i.email}
+                        </th>
+                        <td>{t.roles[i.role]}</td>
+                        <td>
+                          <time dateTime={i.expiresAt}>
+                            {new Intl.DateTimeFormat(locale, {
+                              dateStyle: 'medium',
+                              timeZone: 'Africa/Algiers',
+                            }).format(new Date(i.expiresAt))}
+                          </time>{' '}
+                          {i.status === 'expired' && (
+                            <Chip tone="warning">{t.pendingExpired}</Chip>
+                          )}
+                        </td>
+                        <td>
+                          <Button
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() => void onRevoke(i)}
+                          >
+                            {t.inviteRevoke}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
         </>
       )}
