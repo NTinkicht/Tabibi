@@ -152,3 +152,17 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+.cs-specs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--tb-space-1) var(--tb-space-4);
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--tb-space-4);
+}
+.cs-specs label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tb-space-2);
+  min-block-size: 44px;
+}
