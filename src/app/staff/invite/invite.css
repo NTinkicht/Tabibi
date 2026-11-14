@@ -1,7 +1,7 @@
 /* Invite acceptance (docs/design/clinic-setup.md): the sign-in card plus these few extras. */
 .si-facts {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: var(--tb-space-2) var(--tb-space-6);
   margin: 0 0 var(--tb-space-7);
   font-size: var(--tb-text-meta);
@@ -12,6 +12,7 @@
 }
 .si-facts dd {
   margin: 0;
+  overflow-wrap: anywhere;
   color: var(--tb-text);
 }
 .si-hint {
