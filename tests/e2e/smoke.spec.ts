@@ -104,13 +104,19 @@ test('receptionist handles Arabic/French sessions and a contact-less walk-in on 
     page.getByRole('heading', { name: 'File des patients sans rendez-vous' }),
   ).toBeVisible();
   await page.getByLabel('Nom à l’accueil').fill('Patient test');
-  await expect(page.getByLabel('Langue préférée du patient')).toHaveValue('ar');
+  // Side panel defaults: patient language follows the UI language, and the
+  // "patient is here" box is on. This flow needs a waiting entry, so opt out
+  // of the immediate check-in and choose Arabic explicitly.
+  await expect(page.getByLabel('Français', { exact: true })).toBeChecked();
+  await expect(page.getByLabel(/Le patient est là/)).toBeChecked();
+  await page.getByLabel(/Le patient est là/).uncheck();
+  await page.getByLabel('Arabe', { exact: true }).check();
   const registrationResponsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&
       response.url().endsWith(`/sessions/${sessionId}/queue`),
   );
-  await page.getByRole('button', { name: 'Ajouter un patient' }).click();
+  await page.getByRole('button', { name: 'Ajouter à la file' }).click();
   const registrationResponse = await registrationResponsePromise;
   const registrationBody = await registrationResponse.text();
   expect(registrationResponse.status(), registrationBody).toBe(201);

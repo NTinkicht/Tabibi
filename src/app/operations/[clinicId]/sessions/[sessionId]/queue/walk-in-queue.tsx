@@ -313,7 +313,6 @@ export function WalkInQueue({
             ? error.message
             : t.queueError),
       );
-      if (failureMessage) void load();
     } finally {
       setPendingEntry(null);
     }
