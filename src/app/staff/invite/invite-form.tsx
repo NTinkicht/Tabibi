@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import '../sign-in/sign-in.css';
+import './invite.css';
+import { Button } from '@/app/ui';
 import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
 import { inviteStrings, type InviteLocale } from './strings';
 
@@ -44,6 +47,12 @@ export function InviteForm({ initialLocale }: { initialLocale: InviteLocale }) {
   const [failure, setFailure] = useState<FailureKey | null>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const t = inviteStrings[locale];
+  const passwordInvalid =
+    failure === 'too_short' ||
+    failure === 'too_long' ||
+    failure === 'matches_identity';
+  const confirmInvalid = failure === 'mismatch';
+  const nameInvalid = failure === 'invalidInput';
 
   useEffect(() => {
     // Keep the token in memory only and drop it from the address bar and
@@ -132,100 +141,117 @@ export function InviteForm({ initialLocale }: { initialLocale: InviteLocale }) {
 
   return (
     <main
-      className="pageShell"
+      className="si"
       lang={locale}
       dir={locale === 'ar' ? 'rtl' : 'ltr'}
       data-testid="staff-invite"
     >
       <DocumentLocaleSync locale={locale} />
-      <h1>{done ? t.doneTitle : t.title}</h1>
-      {failure ? (
-        <div
-          ref={summaryRef}
-          tabIndex={-1}
-          role="alert"
-          data-testid="invite-error"
-        >
-          <strong>{t.errorSummary}</strong>
-          <p>{t[failure]}</p>
-        </div>
-      ) : null}
-      {loading ? <p aria-live="polite">{t.loading}</p> : null}
-      {done ? (
-        <>
-          <p data-testid="invite-done">{t.done}</p>
-          <p>
-            <a href={`/staff/sign-in?locale=${locale}`}>{t.signIn}</a>
+      <div className="si-card">
+        <p className="si-brand" lang="fr" dir="ltr">
+          Tabibi
+        </p>
+        <h1>{done ? t.doneTitle : t.title}</h1>
+        {failure ? (
+          <div
+            ref={summaryRef}
+            className="si-error"
+            tabIndex={-1}
+            role="alert"
+            data-testid="invite-error"
+          >
+            <strong>{t.errorSummary}</strong>
+            <p>{t[failure]}</p>
+          </div>
+        ) : null}
+        {loading ? (
+          <p className="si-subtitle" aria-live="polite">
+            {t.loading}
           </p>
-        </>
-      ) : preview ? (
-        <>
-          <p data-testid="invite-summary">
-            {t.invitedAs(preview.clinicName, t.roles[preview.role])}
-          </p>
-          <dl>
-            <dt>{t.email}</dt>
-            <dd dir="ltr">{preview.email}</dd>
-            <dt>{t.expires}</dt>
-            <dd>{dateFormat.format(new Date(preview.expiresAt))}</dd>
-          </dl>
-          <form onSubmit={submit} method="post" action="#" noValidate>
-            <p>
-              <label htmlFor="invite-name">{t.displayName}</label>
-              <br />
-              <input
-                id="invite-name"
-                name="displayName"
-                type="text"
-                autoComplete="name"
-                required
-                maxLength={120}
-              />
+        ) : null}
+        {done ? (
+          <>
+            <p className="si-subtitle" data-testid="invite-done">
+              {t.done}
             </p>
-            <p>
-              <label htmlFor="invite-password">{t.password}</label>
-              <br />
-              <input
-                id="invite-password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                aria-describedby="invite-password-hint"
-                required
-                maxLength={256}
-                dir="ltr"
-              />
-              <br />
-              <small id="invite-password-hint">{t.passwordHint}</small>
+            <a className="si-link" href={`/staff/sign-in?locale=${locale}`}>
+              {t.signIn}
+            </a>
+          </>
+        ) : preview ? (
+          <>
+            <p className="si-subtitle" data-testid="invite-summary">
+              {t.invitedAs(preview.clinicName, t.roles[preview.role])}
             </p>
-            <p>
-              <label htmlFor="invite-confirm">{t.confirm}</label>
-              <br />
-              <input
-                id="invite-confirm"
-                name="confirm"
-                type="password"
-                autoComplete="new-password"
-                required
-                maxLength={256}
-                dir="ltr"
-              />
-            </p>
-            <button type="submit" disabled={pending}>
-              {pending ? t.submitting : t.submit}
-            </button>
-          </form>
-        </>
-      ) : null}
-      <p>
-        <button
-          type="button"
-          lang={locale === 'ar' ? 'fr' : 'ar'}
-          onClick={() => setLocale(locale === 'ar' ? 'fr' : 'ar')}
-        >
-          {t.otherLanguage}
-        </button>
-      </p>
+            <dl className="si-facts">
+              <dt>{t.email}</dt>
+              <dd dir="ltr">{preview.email}</dd>
+              <dt>{t.expires}</dt>
+              <dd>{dateFormat.format(new Date(preview.expiresAt))}</dd>
+            </dl>
+            <form onSubmit={submit} method="post" action="#" noValidate>
+              <div className="si-field">
+                <label htmlFor="invite-name">{t.displayName}</label>
+                <input
+                  id="invite-name"
+                  name="displayName"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  maxLength={120}
+                  aria-invalid={nameInvalid || undefined}
+                />
+              </div>
+              <div className="si-field">
+                <label htmlFor="invite-password">{t.password}</label>
+                <input
+                  id="invite-password"
+                  name="password"
+                  type="password"
+                  autoComplete="new-password"
+                  aria-describedby="invite-password-hint"
+                  required
+                  maxLength={256}
+                  dir="ltr"
+                  aria-invalid={passwordInvalid || undefined}
+                />
+                <small id="invite-password-hint" className="si-hint">
+                  {t.passwordHint}
+                </small>
+              </div>
+              <div className="si-field">
+                <label htmlFor="invite-confirm">{t.confirm}</label>
+                <input
+                  id="invite-confirm"
+                  name="confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  maxLength={256}
+                  dir="ltr"
+                  aria-invalid={confirmInvalid || undefined}
+                />
+              </div>
+              <Button
+                type="submit"
+                variant="primary"
+                className="si-submit"
+                disabled={pending}
+              >
+                {pending ? t.submitting : t.submit}
+              </Button>
+            </form>
+          </>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        className="si-language"
+        lang={locale === 'ar' ? 'fr' : 'ar'}
+        onClick={() => setLocale(locale === 'ar' ? 'fr' : 'ar')}
+      >
+        {t.otherLanguage}
+      </button>
     </main>
   );
 }
