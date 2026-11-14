@@ -5,7 +5,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 // docs/design/reception-console.md "Tablet". Mirrors the CSS media query that
 // restyles the console, so the side panel becomes a modal dialog only where
 // the CSS shows it as one.
-export const TABLET_QUERY = '(max-width: 1199px) and (pointer: coarse)';
+export const TABLET_QUERY =
+  '(min-width: 700px) and (max-width: 1199px) and (pointer: coarse)';
 
 export function useTabletMode(): boolean {
   const [tablet, setTablet] = useState(false);

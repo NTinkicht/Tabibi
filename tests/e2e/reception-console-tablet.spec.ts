@@ -113,8 +113,9 @@ for (const [locale, add, close, side] of [
     expect(
       await page.evaluate(
         () =>
-          window.matchMedia('(max-width: 1199px) and (pointer: coarse)')
-            .matches,
+          window.matchMedia(
+            '(min-width: 700px) and (max-width: 1199px) and (pointer: coarse)',
+          ).matches,
       ),
     ).toBe(true);
     await expect(page.locator('.queueRow.consoleRow').first()).toBeVisible();
@@ -153,6 +154,21 @@ for (const [locale, add, close, side] of [
       .first()
       .boundingBox();
     expect(row!.height).toBeGreaterThanOrEqual(64);
+    // All six row cells share one line: the actions do not wrap under the
+    // others, so the row stays a single band within its own box.
+    const rowShape = await page.evaluate(() => {
+      const r = document.querySelector('.queueRow.consoleRow')!;
+      const box = r.getBoundingClientRect();
+      const mids = Array.from(r.children).map((c) => {
+        const b = c.getBoundingClientRect();
+        return b.top + b.height / 2 - box.top;
+      });
+      return { cells: r.children.length, height: box.height, mids };
+    });
+    expect(rowShape.cells).toBe(6);
+    expect(rowShape.height).toBeLessThan(96);
+    for (const mid of rowShape.mids)
+      expect(Math.abs(mid - rowShape.height / 2)).toBeLessThan(24);
 
     // The walk-in panel is closed, hidden from the tab order, and opens as a
     // modal dialog on the inline-end side.
@@ -224,4 +240,36 @@ test('desktop pointer keeps the side panel inline (negative control)', async ({
   await expect(page.locator('input[name="privateDisplayName"]')).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await context.close();
+});
+
+test('coarse phone width keeps the stacked layout (no tablet panel)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mock(page);
+  await page.goto(
+    `/operations/${clinicId}/sessions/${sessionId}/queue?locale=fr`,
+  );
+  await expect(page.locator('.queueRow.consoleRow').first()).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        window.matchMedia(
+          '(min-width: 700px) and (max-width: 1199px) and (pointer: coarse)',
+        ).matches,
+    ),
+  ).toBe(false);
+  await expect(
+    page.getByRole('button', { name: 'Ajouter un patient' }),
+  ).toHaveCount(0);
+  await expect(page.locator('input[name="privateDisplayName"]')).toBeVisible();
+  const serving = await page.locator('.servingRegion').boundingBox();
+  expect(serving!.width).toBeGreaterThan(300);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
 });

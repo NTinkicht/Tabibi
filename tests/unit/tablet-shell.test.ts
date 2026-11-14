@@ -6,7 +6,9 @@ import {
 
 describe('tablet shell', () => {
   it('uses the spec media query', () => {
-    expect(TABLET_QUERY).toBe('(max-width: 1199px) and (pointer: coarse)');
+    expect(TABLET_QUERY).toBe(
+      '(min-width: 700px) and (max-width: 1199px) and (pointer: coarse)',
+    );
   });
 
   it('wraps focus forwards and backwards inside the panel', () => {

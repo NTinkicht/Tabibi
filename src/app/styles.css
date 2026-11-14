@@ -329,7 +329,7 @@ h1 {
 }
 .queueRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 1rem;
   align-items: center;
   padding: 1rem 1.1rem;
@@ -833,7 +833,7 @@ h1 {
 .tabletBackdrop {
   display: none;
 }
-@media (max-width: 1199px) and (pointer: coarse) {
+@media (min-width: 700px) and (max-width: 1199px) and (pointer: coarse) {
   .desk {
     max-width: 100%;
     overflow-x: hidden;
@@ -881,7 +881,7 @@ h1 {
   }
   .queueRow.consoleRow {
     min-height: 4rem;
-    grid-template-columns: 2rem 4.5rem minmax(0, 1fr) auto auto;
+    grid-template-columns: 2rem 4.5rem minmax(0, 1fr) auto auto auto;
   }
   .queueRow.consoleRow .waitCell,
   .queueRow.consoleRow .queueState {
