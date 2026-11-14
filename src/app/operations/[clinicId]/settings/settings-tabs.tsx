@@ -12,7 +12,7 @@ export function SettingsTabs({
 }: {
   clinicId: string;
   locale: Locale;
-  active: 'clinic' | 'doctors';
+  active: 'clinic' | 'doctors' | 'staff';
 }) {
   const t = clinicSetupCopy[locale];
   const other: Locale = locale === 'ar' ? 'fr' : 'ar';
@@ -32,6 +32,12 @@ export function SettingsTabs({
         {...current('doctors')}
       >
         {t.tabDoctors}
+      </Link>
+      <Link
+        href={`${root}/settings/staff?locale=${locale}`}
+        {...current('staff')}
+      >
+        {t.tabStaff}
       </Link>
       <Link href={`${root}?locale=${locale}`}>{t.backToDesk}</Link>
       <Link href={`${root}/settings/${active}?locale=${other}`} lang={other}>
