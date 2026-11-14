@@ -7,6 +7,7 @@ import { BulkAppointmentNoShowAction } from './BulkAppointmentNoShowAction';
 import { SessionBar } from './session-bar';
 import { TodayTilesPanel, UndeliveredAlert, WalkInPanel } from './side-panel';
 import { SidePanelShell } from './tablet-shell';
+import { TabletHeaderBar, countsLine } from './tablet-header';
 import { useUndeliveredCount } from './use-undelivered-count';
 import {
   buildConsoleView,
@@ -636,6 +637,13 @@ export function WalkInQueue({
     },
   };
 
+  const sessionHour = (iso: string) =>
+    new Date(iso).toLocaleTimeString(locale === 'ar' ? 'ar-DZ' : 'fr-DZ', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: timezone,
+    });
+
   return (
     <main className="desk" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <DocumentLocaleSync locale={locale} />
@@ -645,6 +653,23 @@ export function WalkInQueue({
           <h1>{t.queueTitle}</h1>
           <p>{t.queueSubtitle}</p>
         </div>
+        {session && consoleView && (
+          <TabletHeaderBar
+            href={`/operations/${clinicId}?locale=${locale}`}
+            switchLabel={t.backSessions}
+            doctor={session.doctorDisplayName}
+            hours={`${sessionHour(session.startsAt)}–${sessionHour(session.endsAt)}`}
+            counts={countsLine(
+              {
+                arrived: t.tileArrived,
+                notArrived: t.tileNotArrived,
+                completed: t.tileCompleted,
+                noShow: t.tileNoShow,
+              },
+              todayTiles(entries),
+            )}
+          />
+        )}
         <button
           className="locale"
           onClick={() => setLocale(locale === 'ar' ? 'fr' : 'ar')}
