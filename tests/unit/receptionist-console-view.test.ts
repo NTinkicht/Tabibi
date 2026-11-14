@@ -4,6 +4,7 @@ import {
   formatLastAction,
   formatWaitRange,
   steppedDelay,
+  todayTiles,
   type ConsoleEntry,
 } from '@/modules/receptionist-dashboard/console-view';
 import { receptionistCopy } from '@/modules/localization/receptionist';
@@ -205,5 +206,34 @@ describe('reception console view model', () => {
         receptionistCopy.fr,
       ),
     ).toBe('—');
+  });
+});
+
+describe('todayTiles', () => {
+  it('counts only the four spec tiles from the snapshot states', () => {
+    const states = [
+      'checked_in',
+      'checked_in',
+      'waiting',
+      'called',
+      'in_consultation',
+      'completed',
+      'completed',
+      'completed',
+      'no_show',
+      'cancelled',
+    ];
+    expect(todayTiles(states.map((state) => ({ state })))).toEqual({
+      arrived: 2,
+      notArrived: 1,
+      completed: 3,
+      noShow: 1,
+    });
+    expect(todayTiles([])).toEqual({
+      arrived: 0,
+      notArrived: 0,
+      completed: 0,
+      noShow: 0,
+    });
   });
 });

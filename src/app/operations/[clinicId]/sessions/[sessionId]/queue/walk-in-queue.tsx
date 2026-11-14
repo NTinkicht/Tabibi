@@ -5,9 +5,12 @@ import Link from 'next/link';
 import { receptionistCopy } from '@/modules/localization/receptionist';
 import { BulkAppointmentNoShowAction } from './BulkAppointmentNoShowAction';
 import { SessionBar } from './session-bar';
+import { TodayTilesPanel, UndeliveredAlert, WalkInPanel } from './side-panel';
+import { useUndeliveredCount } from './use-undelivered-count';
 import {
   buildConsoleView,
   formatLastAction,
+  todayTiles,
   type ConsoleEntry,
 } from '@/modules/receptionist-dashboard/console-view';
 import { QueueRows, ServingCards, type PanelAction } from './console-regions';
@@ -84,6 +87,7 @@ export function WalkInQueue({
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const [stale, setStale] = useState(false);
   const [timezone, setTimezone] = useState('UTC');
+  const undelivered = useUndeliveredCount(clinicId);
   const pendingKeysRef = useRef(new Map<string, string>());
   const loadRequestRef = useRef(0);
   const hasSnapshotRef = useRef(false);
@@ -167,6 +171,7 @@ export function WalkInQueue({
         | 'ar'
         | 'fr',
     };
+    const presentNow = data.get('presentNow') !== null;
     const opId = JSON.stringify(payload);
     let idempotencyKey = pendingKeysRef.current.get(opId);
     if (!idempotencyKey) {
@@ -210,7 +215,21 @@ export function WalkInQueue({
       );
       setState('ready');
       form.reset();
-      void load();
+      if (presentNow) {
+        // Two-step: the entry exists as `waiting`; a failed check-in leaves it
+        // there and says so instead of rolling the registration back.
+        await command(
+          registeredEntry,
+          'check_in',
+          undefined,
+          t.presentNowFailed,
+        );
+      } else {
+        // Not awaited on purpose: the registered entry was already merged into
+        // `entries` from the POST response above, so this is a background
+        // reconcile and setState('ready')/form.reset() do not depend on it.
+        void load();
+      }
     } catch (error) {
       setMessage(
         error instanceof Error && error.message ? error.message : t.queueError,
@@ -236,6 +255,7 @@ export function WalkInQueue({
       | 'start_consultation'
       | 'complete_consultation',
     panelReason?: string,
+    failureMessage?: string,
   ) {
     let reason: string | undefined = panelReason;
     let cancellationSource: 'patient' | 'clinic' | undefined;
@@ -291,7 +311,10 @@ export function WalkInQueue({
       await load();
     } catch (error) {
       setMessage(
-        error instanceof Error && error.message ? error.message : t.queueError,
+        failureMessage ??
+          (error instanceof Error && error.message
+            ? error.message
+            : t.queueError),
       );
     } finally {
       setPendingEntry(null);
@@ -530,81 +553,70 @@ export function WalkInQueue({
         </div>
       )}
 
-      <section className="createPanel">
-        <h2>{t.addWalkIn}</h2>
-        <p>{t.contactOptionalHint}</p>
-        <form className="walkInForm" onSubmit={(event) => void register(event)}>
-          <label>
-            {t.guestName}
-            <input required maxLength={120} name="privateDisplayName" />
-          </label>
-          <label>
-            {t.phoneOptional}
-            <input maxLength={32} name="contactPhone" inputMode="tel" />
-          </label>
-          <label>
-            {t.emailOptional}
-            <input maxLength={254} name="contactEmail" type="email" />
-          </label>
-          <label>
-            {t.patientLanguage}
-            <select defaultValue="ar" name="preferredLocale">
-              <option value="ar">{t.patientLanguageArabic}</option>
-              <option value="fr">{t.patientLanguageFrench}</option>
-            </select>
-          </label>
-          <button disabled={pending}>
-            {pending ? t.pending : t.addWalkIn}
-          </button>
-        </form>
-      </section>
-
-      {state === 'ready' &&
-        session &&
-        !['closed', 'cancelled'].includes(session.status) &&
-        entries.some((entry) => entry.state === 'waiting') && (
-          <BulkAppointmentNoShowAction
-            clinicId={clinicId}
-            sessionId={sessionId}
-            locale={locale}
-            enabled={!stale && pendingEntry === null && !pending}
-            onResolved={load}
-          />
-        )}
-
-      {state === 'loading' && (
-        <div className="state" aria-live="polite">
-          <span className="spinner" />
-          {t.queueLoading}
-        </div>
-      )}
-      {state === 'error' && !message && (
-        <div className="state error">{t.queueError}</div>
-      )}
-      {state === 'ready' && entries.length === 0 && (
-        <div className="state">
-          <span className="emptyIcon">○</span>
-          <p>{t.noWaiting}</p>
-        </div>
-      )}
-      {state === 'ready' && consoleView && (
-        <>
-          {lastAction && (
-            <div className="lastAction" role="status">
-              {lastAction}
+      <div className="consoleLayout">
+        <div className="consoleMain">
+          {state === 'loading' && (
+            <div className="state" aria-live="polite">
+              <span className="spinner" />
+              {t.queueLoading}
             </div>
           )}
-          <ServingCards rows={consoleView.serving} h={regions} />
-          {consoleView.queue.length > 0 && (
-            <QueueRows
-              rows={consoleView.queue}
-              arrived={consoleView.arrivedCount}
-              notArrived={consoleView.notArrivedCount}
-              h={regions}
-            />
+          {state === 'error' && !message && (
+            <div className="state error">{t.queueError}</div>
           )}
-        </>
-      )}
+          {state === 'ready' && entries.length === 0 && (
+            <div className="state">
+              <span className="emptyIcon">○</span>
+              <p>{t.noWaiting}</p>
+            </div>
+          )}
+          {state === 'ready' && consoleView && (
+            <>
+              {lastAction && (
+                <div className="lastAction" role="status">
+                  {lastAction}
+                </div>
+              )}
+              <ServingCards rows={consoleView.serving} h={regions} />
+              {consoleView.queue.length > 0 && (
+                <QueueRows
+                  rows={consoleView.queue}
+                  arrived={consoleView.arrivedCount}
+                  notArrived={consoleView.notArrivedCount}
+                  h={regions}
+                />
+              )}
+            </>
+          )}
+        </div>
+        <aside className="consoleSide" aria-label={t.sidePanelLabel}>
+          <WalkInPanel
+            t={t}
+            locale={locale}
+            pending={pending}
+            onSubmit={(event) => void register(event)}
+          />
+          {consoleView && <TodayTilesPanel t={t} tiles={todayTiles(entries)} />}
+          <UndeliveredAlert
+            t={t}
+            clinicId={clinicId}
+            locale={locale}
+            count={undelivered}
+          />
+          {state === 'ready' &&
+            session &&
+            !['closed', 'cancelled'].includes(session.status) &&
+            entries.some((entry) => entry.state === 'waiting') && (
+              <BulkAppointmentNoShowAction
+                clinicId={clinicId}
+                sessionId={sessionId}
+                locale={locale}
+                enabled={!stale && pendingEntry === null && !pending}
+                onResolved={load}
+              />
+            )}
+        </aside>
+      </div>
     </main>
   );
 }
