@@ -293,3 +293,53 @@ test('console: appointment-backed entries get neither Transfer nor Restore', asy
   await expect(page.locator('.lastAction')).toContainText('A-01 Patient 1');
   await expect(page.locator('.lastAction').getByRole('button')).toHaveCount(0);
 });
+
+test('console: prioritising another entry clears the Restore target', async ({
+  page,
+}) => {
+  await authenticate(page);
+  const posts: Post[] = [];
+  const secondId = '20000000-0000-4000-8000-000000000102';
+  let first = 'checked_in';
+  const second = () => ({
+    ...entry('checked_in'),
+    id: secondId,
+    publicDisplayLabel: 'A-02',
+    privateDisplayName: 'Patient 2',
+    registrationOrder: 2,
+    eligibilityOrder: 2,
+  });
+  await mockApi(
+    page,
+    {
+      entries: () => [entry(first), second()],
+      onPost: (path) => {
+        if (path.endsWith('/reorder'))
+          return {
+            status: 200,
+            json: { queueOrderVersion: 2, orderedEntryIds: [secondId] },
+          };
+        first = 'no_show';
+        return { status: 200, json: { entry: entry(first) } };
+      },
+    },
+    posts,
+  );
+  await page.goto(
+    `/operations/${clinicId}/sessions/${sessionId}/queue?locale=fr`,
+  );
+  await page.getByRole('button', { name: copy.fr.more }).click();
+  await page.locator('.rowPanel input').fill('absent');
+  await page.getByRole('button', { name: 'Absent' }).click();
+  const bar = page.locator('.lastAction');
+  await expect(
+    bar.getByRole('button', { name: copy.fr.restore }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Plus d’actions pour A-02' }).click();
+  await page.locator('.rowPanel input').fill('urgence');
+  await page.getByRole('button', { name: 'Prioriser' }).click();
+  await expect(bar).toContainText('A-02');
+  await expect(bar.getByRole('button', { name: copy.fr.restore })).toHaveCount(
+    0,
+  );
+});

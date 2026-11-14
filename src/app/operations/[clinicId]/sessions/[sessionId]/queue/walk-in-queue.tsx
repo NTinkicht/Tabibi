@@ -372,6 +372,9 @@ export function WalkInQueue({
         throw new Error(body.message);
       pendingKeysRef.current.delete(operation);
       setLastAction(formatLastAction(t.lastAction, entry, t.priorityBadge));
+      // The status bar now describes this action: drop any restore target.
+      setRestorable(null);
+      setRestoreReason('');
       await load();
     } catch (error) {
       setMessage(
@@ -416,10 +419,11 @@ export function WalkInQueue({
       setRestoreReason('');
       await load();
     } catch (error) {
-      setMessage(
-        error instanceof Error && error.message ? error.message : t.queueError,
-      );
+      const failure =
+        error instanceof Error && error.message ? error.message : t.queueError;
       await load();
+      // load() clears the message on success; keep the mutation failure visible.
+      setMessage(failure);
     } finally {
       setPendingEntry(null);
     }
@@ -454,10 +458,11 @@ export function WalkInQueue({
       setRestorable(null);
       await load();
     } catch (error) {
-      setMessage(
-        error instanceof Error && error.message ? error.message : t.queueError,
-      );
+      const failure =
+        error instanceof Error && error.message ? error.message : t.queueError;
       await load();
+      // load() clears the message on success; keep the mutation failure visible.
+      setMessage(failure);
     } finally {
       setPendingEntry(null);
     }
