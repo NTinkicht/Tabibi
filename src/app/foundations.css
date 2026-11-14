@@ -193,3 +193,101 @@ textarea {
   align-items: center;
   text-decoration: none;
 }
+
+/* TAB-UI-08 (#805): guest booking details and confirmation (docs/design/find-and-book.md screens 3-4). */
+.gb-page {
+  display: grid;
+  gap: var(--tb-space-6);
+  max-inline-size: 720px;
+  margin-inline: auto;
+  padding: var(--tb-space-6);
+}
+.gb-card {
+  display: grid;
+  gap: var(--tb-space-4);
+  padding: var(--tb-space-6);
+  border: 1px solid var(--tb-border);
+  border-radius: var(--tb-radius-card);
+  background: var(--tb-surface);
+}
+.gb-card label {
+  display: grid;
+  gap: var(--tb-space-2);
+  font-weight: 600;
+}
+.gb-card input[type='text'],
+.gb-card input[type='tel'],
+.gb-card input[type='email'] {
+  min-block-size: var(--tb-touch-target);
+  padding-inline: var(--tb-space-4);
+  border: 1px solid var(--tb-border-strong);
+  border-radius: var(--tb-radius-control);
+  font-size: var(--tb-text-control);
+}
+.gb-card label[data-emphasis='true'] {
+  color: var(--tb-primary-strong);
+}
+.gb-card label[data-emphasis='true'] input {
+  border: 2px solid var(--tb-primary);
+}
+.gb-hint {
+  margin: 0;
+  color: var(--tb-text-muted);
+  font-size: var(--tb-text-meta);
+}
+.gb-explain {
+  margin: 0;
+  padding: var(--tb-space-4);
+  border-radius: var(--tb-radius-tile);
+  background: var(--tb-primary-wash);
+  color: var(--tb-primary-strong);
+}
+.gb-seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tb-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.gb-seg legend {
+  margin-block-end: var(--tb-space-2);
+  padding: 0;
+  font-weight: 600;
+}
+.gb-seg label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tb-space-2);
+  min-block-size: var(--tb-touch-target);
+  padding-inline: var(--tb-space-5);
+  border: 2px solid var(--tb-border-strong);
+  border-radius: var(--tb-radius-pill);
+  font-size: var(--tb-text-control);
+  cursor: pointer;
+}
+.gb-seg label:has(input:checked) {
+  border-color: var(--tb-primary);
+  background: var(--tb-segmented-selected-bg);
+}
+.gb-ticket {
+  margin: 0;
+  font-size: var(--tb-text-ticket);
+  font-weight: 700;
+}
+.gb-keep-open {
+  padding: var(--tb-space-4);
+  border: 1px solid var(--tb-warning-border);
+  border-radius: var(--tb-radius-tile);
+  background: var(--tb-warning-tint);
+  color: var(--tb-warning-text);
+}
+.gb-keep-open p {
+  margin: var(--tb-space-2) 0 0;
+}
+.gb-page a.tb-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
