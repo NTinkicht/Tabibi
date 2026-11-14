@@ -6,6 +6,7 @@ import { receptionistCopy } from '@/modules/localization/receptionist';
 import { BulkAppointmentNoShowAction } from './BulkAppointmentNoShowAction';
 import { SessionBar } from './session-bar';
 import { TodayTilesPanel, UndeliveredAlert, WalkInPanel } from './side-panel';
+import { SidePanelShell } from './tablet-shell';
 import { useUndeliveredCount } from './use-undelivered-count';
 import {
   buildConsoleView,
@@ -80,6 +81,7 @@ export function WalkInQueue({
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [pendingEntry, setPendingEntry] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState('');
   // Entry whose cancel/no-show is the action shown in the status bar.
@@ -785,12 +787,21 @@ export function WalkInQueue({
             </>
           )}
         </div>
-        <aside className="consoleSide" aria-label={t.sidePanelLabel}>
+        <SidePanelShell
+          label={t.sidePanelLabel}
+          openLabel={t.addWalkIn}
+          closeLabel={t.close}
+          open={panelOpen}
+          onOpenChange={setPanelOpen}
+        >
           <WalkInPanel
             t={t}
             locale={locale}
             pending={pending}
-            onSubmit={(event) => void register(event)}
+            onSubmit={(event) => {
+              void register(event);
+              setPanelOpen(false);
+            }}
           />
           {consoleView && <TodayTilesPanel t={t} tiles={todayTiles(entries)} />}
           <UndeliveredAlert
@@ -811,7 +822,7 @@ export function WalkInQueue({
                 onResolved={load}
               />
             )}
-        </aside>
+        </SidePanelShell>
       </div>
     </main>
   );

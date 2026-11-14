@@ -824,3 +824,141 @@ h1 {
   min-height: 2.75rem;
   min-width: 2.75rem;
 }
+/* Reception console, tablet (docs/design/reception-console.md "Tablet"):
+   touch, up to 1199px. Same data and commands; larger targets, a 300px
+   "in progress" column beside the queue, and the walk-in form as a modal panel
+   on the inline-end side (right in French, left in Arabic). */
+.tabletAddButton,
+.tabletClose,
+.tabletBackdrop {
+  display: none;
+}
+@media (max-width: 1199px) and (pointer: coarse) {
+  .desk {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  .deskHeader,
+  .queueToolbar {
+    min-height: 3.75rem;
+  }
+  .desk button,
+  .desk .secondaryLink,
+  .desk .locale {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  .sessionBar {
+    padding: 0.75rem 1rem;
+  }
+  .sessionBar button {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  .sessionBar .callNext {
+    min-height: 3.75rem;
+    padding-inline: 1.5rem;
+  }
+  .consoleLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .consoleMain {
+    display: grid;
+    grid-template-columns: 18.75rem minmax(0, 1fr);
+    column-gap: 1.25rem;
+    align-items: start;
+  }
+  .consoleMain > :not(.servingRegion):not(.queueRegion) {
+    grid-column: 1 / -1;
+  }
+  .servingCards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .servingCard button,
+  .servingCard .rowPanel button {
+    min-height: 3.25rem;
+    width: 100%;
+  }
+  .queueRow.consoleRow {
+    min-height: 4rem;
+    grid-template-columns: 2rem 4.5rem minmax(0, 1fr) auto auto;
+  }
+  .queueRow.consoleRow .waitCell,
+  .queueRow.consoleRow .queueState {
+    grid-column: auto;
+  }
+  .queueRow.consoleRow button {
+    min-height: 3rem;
+  }
+  .rowPanel {
+    min-width: 0;
+  }
+  .rowPanel input,
+  .rowPanel button {
+    min-height: 2.75rem;
+  }
+  .desk button.tabletAddButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    inset-block-end: 1.25rem;
+    inset-inline-end: 1.25rem;
+    z-index: 30;
+    min-height: 3.5rem;
+    padding: 0 1.5rem;
+    border: 0;
+    border-radius: 999px;
+    background: #0a6f61;
+    color: #fff;
+    font-weight: 800;
+    box-shadow: 0 8px 24px #174c4440;
+  }
+  .tabletBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: #0b1f1c80;
+  }
+  .consoleSide.tabletPanel {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-end: 0;
+    z-index: 50;
+    inline-size: min(25rem, 100vw);
+    margin: 0;
+    padding: 1rem;
+    overflow-y: auto;
+    background: #f4faf9;
+    box-shadow: 0 0 40px #0b1f1c60;
+    align-content: start;
+  }
+  .consoleSide.tabletPanel[hidden] {
+    display: none;
+  }
+  .tabletClose {
+    display: inline-flex;
+    align-items: center;
+    justify-self: end;
+    min-height: 2.75rem;
+    padding: 0 1.25rem;
+    border: 1px solid #c9dcda;
+    border-radius: 999px;
+    background: #fff;
+    color: #164d45;
+    font-weight: 750;
+  }
+  .consoleSide .createPanel input:not([type='radio']):not([type='checkbox']) {
+    min-height: 3.25rem;
+  }
+  .consoleSide .createPanel input[type='radio'],
+  .consoleSide .createPanel input[type='checkbox'] {
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+  }
+  .consoleSide .createPanel button[type='submit'],
+  .consoleSide .createPanel form > button {
+    min-height: 3.25rem;
+  }
+}
