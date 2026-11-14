@@ -1,0 +1,27 @@
+/* Invite acceptance (docs/design/clinic-setup.md): the sign-in card plus these few extras. */
+.si-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--tb-space-2) var(--tb-space-6);
+  margin: 0 0 var(--tb-space-7);
+  font-size: var(--tb-text-meta);
+}
+.si-facts dt {
+  color: var(--tb-text-secondary);
+  font-weight: 600;
+}
+.si-facts dd {
+  margin: 0;
+  color: var(--tb-text);
+}
+.si-hint {
+  color: var(--tb-text-muted);
+  font-size: var(--tb-text-meta);
+}
+.si-link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--tb-touch-target);
+  color: var(--tb-info);
+  font-weight: 600;
+}

@@ -50,12 +50,25 @@ test('invite link fr: shows the invite, hides the token, accepts once', async ({
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
+    // Foundations card (same as sign-in): brand, 44 px+ fields, 52 px submit.
+    await expect(page.locator('.si-card .si-brand')).toHaveText('Tabibi');
+    for (const field of ['#invite-name', '#invite-password', '#invite-confirm'])
+      expect(
+        (await page.locator(field).boundingBox())!.height,
+      ).toBeGreaterThanOrEqual(44);
+    expect(
+      (await page.locator('.si-submit').boundingBox())!.height,
+    ).toBeGreaterThanOrEqual(52);
 
     await page.locator('#invite-name').fill('Nouvelle Réception');
     await page.locator('#invite-password').fill(PASSWORD);
     await page.locator('#invite-confirm').fill(`${PASSWORD} typo`);
     await page.getByRole('button', { name: 'Rejoindre la clinique' }).click();
     await expect(page.getByTestId('invite-error')).toBeFocused();
+    await expect(page.locator('#invite-confirm')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
 
     await page.locator('#invite-confirm').fill(PASSWORD);
     await page.getByRole('button', { name: 'Rejoindre la clinique' }).click();
@@ -79,6 +92,7 @@ test('invite link ar without a token: rtl, focused error, no form', async ({
   await page.goto('/staff/invite?locale=ar');
   const main = page.getByTestId('staff-invite');
   await expect(main).toHaveAttribute('dir', 'rtl');
+  await expect(page.locator('.si-card .si-brand')).toHaveText('Tabibi');
   await expect(page.getByTestId('invite-error')).toBeFocused();
   await expect(page.locator('#invite-password')).toHaveCount(0);
 });
