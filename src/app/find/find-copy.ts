@@ -1,0 +1,66 @@
+import type { PublicLocale } from '../public-discovery-clinics';
+
+// FR/AR strings of docs/design/find-and-book.md screens 1-2.
+export const findCopy = {
+  fr: {
+    title: 'Trouver un médecin',
+    specialty: 'Spécialité',
+    wilaya: 'Wilaya',
+    anySpecialty: 'Toutes les spécialités',
+    anyWilaya: 'Toutes les wilayas',
+    language: 'Langue du médecin',
+    languageAll: 'Toutes',
+    languageAr: 'العربية',
+    languageFr: 'Français',
+    mode: 'Mode de recherche',
+    modeBook: 'Réserver en ligne',
+    modeDirectory: 'Tous les cabinets',
+    directoryHint: 'Pour réserver, utilisez « Réserver en ligne ».',
+    count: (n: number) =>
+      `${n} cabinet${n === 1 ? '' : 's'} trouvé${n === 1 ? '' : 's'}`,
+    empty: 'Aucun résultat pour ces filtres.',
+    error: 'La recherche est momentanément indisponible.',
+    retry: 'Réessayer',
+    loading: 'Chargement…',
+    nextSession: 'Prochaine session',
+    viewSessions: 'Voir les sessions',
+    more: 'Plus de résultats',
+    back: 'Retour aux résultats',
+    sessions: 'Sessions disponibles',
+    book: 'Réserver',
+    sessionNote:
+      'Vous réservez une place dans une session, pas une heure précise ; l’heure d’arrivée suggérée apparaît après la réservation.',
+    footer:
+      'Les informations viennent des cabinets ; aucun patient ni contact privé n’est affiché.',
+  },
+  ar: {
+    title: 'ابحث عن طبيب',
+    specialty: 'التخصص',
+    wilaya: 'الولاية',
+    anySpecialty: 'كل التخصصات',
+    anyWilaya: 'كل الولايات',
+    language: 'لغة الطبيب',
+    languageAll: 'الكل',
+    languageAr: 'العربية',
+    languageFr: 'Français',
+    mode: 'طريقة البحث',
+    modeBook: 'الحجز عبر الإنترنت',
+    modeDirectory: 'كل العيادات',
+    directoryHint: 'للحجز، استعمل «الحجز عبر الإنترنت».',
+    count: (n: number) => `عدد العيادات: ${n}`,
+    empty: 'لا توجد نتائج لهذه الفلاتر.',
+    error: 'البحث غير متاح مؤقتًا.',
+    retry: 'إعادة المحاولة',
+    loading: 'جارٍ التحميل…',
+    nextSession: 'الجلسة القادمة',
+    viewSessions: 'عرض الجلسات',
+    more: 'المزيد من النتائج',
+    back: 'العودة إلى النتائج',
+    sessions: 'الجلسات المتاحة',
+    book: 'احجز',
+    sessionNote:
+      'أنت تحجز مكانًا في جلسة وليس ساعة محددة؛ يظهر وقت الحضور المقترح بعد الحجز.',
+    footer:
+      'المعلومات مصدرها العيادات؛ لا تُعرض أسماء مرضى ولا وسائل اتصال خاصة.',
+  },
+} satisfies Record<PublicLocale, unknown>;
