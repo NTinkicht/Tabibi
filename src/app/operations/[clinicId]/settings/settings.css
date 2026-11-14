@@ -189,3 +189,46 @@
   background: var(--tb-surface);
   color: var(--tb-text);
 }
+
+/* TAB-UI-16 Personnel tab: members table and confirmation dialog. */
+.cs-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+.cs-table th {
+  text-align: start;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tb-text-secondary);
+  padding: var(--tb-space-2) var(--tb-space-3);
+  border-block-end: 1px solid var(--tb-divider);
+}
+.cs-table td {
+  padding: var(--tb-space-3);
+  border-block-end: 1px solid var(--tb-divider);
+  vertical-align: middle;
+}
+.cs-table-wrap {
+  overflow-x: auto;
+}
+.cs-dialog {
+  max-inline-size: 28rem;
+  border: 1px solid var(--tb-border);
+  border-radius: 16px;
+  padding: var(--tb-space-6);
+  background: var(--tb-surface);
+  color: var(--tb-text);
+}
+.cs-dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+.cs-dialog h2 {
+  margin: 0 0 var(--tb-space-3);
+  font-size: 17px;
+}
+.cs-dialog-actions {
+  display: flex;
+  gap: var(--tb-space-3);
+  justify-content: flex-end;
+  margin-block-start: var(--tb-space-4);
+}
