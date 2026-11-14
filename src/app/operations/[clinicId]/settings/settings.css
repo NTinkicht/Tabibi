@@ -166,3 +166,26 @@
   gap: var(--tb-space-2);
   min-block-size: 44px;
 }
+.cs-day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tb-space-3);
+  padding-block: var(--tb-space-2);
+}
+.cs-day strong {
+  min-inline-size: 7rem;
+}
+.cs-range {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tb-space-2);
+}
+.cs-field input[type='time'] {
+  min-block-size: 44px;
+  padding-inline: var(--tb-space-3);
+  border: 1px solid var(--tb-border-strong);
+  border-radius: 10px;
+  background: var(--tb-surface);
+  color: var(--tb-text);
+}

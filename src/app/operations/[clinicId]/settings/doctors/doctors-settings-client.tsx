@@ -26,6 +26,11 @@ import {
   type MemberRow,
 } from '../doctor-model';
 import { SettingsTabs } from '../settings-tabs';
+import {
+  AbsencesSection,
+  GenerateSection,
+  WeekSection,
+} from './schedule-sections';
 
 type Locale = 'ar' | 'fr';
 type Load = 'loading' | 'forbidden' | 'error' | 'ready';
@@ -54,6 +59,7 @@ export function DoctorsSettingsClient({
   const [busy, setBusy] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
   const reload = useCallback(() => setTick((n) => n + 1), []);
+  const onForbidden = useCallback(() => setLoad('forbidden'), []);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -281,6 +287,31 @@ export function DoctorsSettingsClient({
                 </fieldset>
               </form>
             </section>
+          )}
+          {selected && (
+            <>
+              <WeekSection
+                key={`week-${selected.id}`}
+                base={base}
+                doctorId={selected.id}
+                locale={locale}
+                onForbidden={onForbidden}
+              />
+              <GenerateSection
+                key={`gen-${selected.id}`}
+                base={base}
+                doctorId={selected.id}
+                locale={locale}
+                onForbidden={onForbidden}
+              />
+              <AbsencesSection
+                key={`abs-${selected.id}`}
+                base={base}
+                doctorId={selected.id}
+                locale={locale}
+                onForbidden={onForbidden}
+              />
+            </>
           )}
         </>
       )}
