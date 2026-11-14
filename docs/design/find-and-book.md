@@ -6,7 +6,7 @@ Visual reference: https://claude.ai/artifact/RRe557S5McvDYnLFc7QLEm (row "Patien
 doctor and book": search, sessions, details, confirmation; the first artboard of each language
 is a clickable flow). Serves `PRODUCT.md` TAB-P0-03 (discovery) and the guest booking rows.
 
-Surfaces: the public home `/` (`PublicDiscoveryLandingClient`, server-rendered) for search,
+Surfaces: the public home `/` (`src/app/page.tsx` with `find/FindDoctorClient`, server-rendered; `/find` redirects to `/`) for search,
 results and a doctor's sessions; the existing booking step of
 `/guest/live-queue/[selectionReference]` (`GuestLiveQueueHostClient`) for details and
 confirmation. No account, no new authority.

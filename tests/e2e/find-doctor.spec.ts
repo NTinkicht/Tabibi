@@ -65,7 +65,7 @@ for (const language of ['fr', 'ar'] as const) {
       await page.setViewportSize(viewport);
       const seen: string[] = [];
       await mock(page, seen);
-      await page.goto('/find');
+      await page.goto('/');
       await expect(page.locator('html')).toHaveAttribute('lang', language);
       await expect(page.locator('html')).toHaveAttribute(
         'dir',
@@ -176,7 +176,7 @@ test.describe('find doctor paging and recovery', () => {
         },
       });
     });
-    await page.goto('/find');
+    await page.goto('/');
     await page.getByRole('button', { name: 'Tous les cabinets' }).click();
     await page.getByRole('button', { name: 'Réserver en ligne' }).click();
     await count(page, 1);
@@ -214,7 +214,7 @@ test.describe('find doctor paging and recovery', () => {
         },
       });
     });
-    await page.goto('/find');
+    await page.goto('/');
     await page.getByRole('button', { name: 'Tous les cabinets' }).click();
     await page.getByRole('button', { name: 'Réserver en ligne' }).click();
     await count(page, 1);
@@ -239,7 +239,7 @@ test.describe('find doctor paging and recovery', () => {
         },
       }),
     );
-    await page.goto('/find');
+    await page.goto('/');
     await page.getByRole('button', { name: 'Tous les cabinets' }).click();
     await page.getByRole('button', { name: 'Réserver en ligne' }).click();
     await count(page, 1);
@@ -263,7 +263,7 @@ test.describe('find doctor paging and recovery', () => {
             },
           }),
     );
-    await page.goto('/find');
+    await page.goto('/');
     await page.getByRole('button', { name: 'Tous les cabinets' }).click();
     failing = true;
     await page.getByRole('button', { name: 'Réserver en ligne' }).click();
