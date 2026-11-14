@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import {
   useCallback,
   useEffect,
@@ -13,6 +12,7 @@ import { Button } from '@/app/ui';
 import { WILAYAS } from '@/modules/clinic/wilayas';
 import { clinicSetupCopy } from '@/modules/localization/clinic-setup';
 import '../settings.css';
+import { SettingsTabs } from '../settings-tabs';
 import { ClosuresSection, ConsultationTypesSection } from './clinic-sections';
 import {
   timezoneOptions,
@@ -60,7 +60,6 @@ export function ClinicSettingsClient({
   const locale = initialLocale;
   const t = clinicSetupCopy[locale];
   const base = `/api/clinics/${encodeURIComponent(clinicId)}`;
-  const other = locale === 'ar' ? 'fr' : 'ar';
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const [profile, setProfile] = useState<ClinicProfile | null>(null);
   const [form, setForm] = useState<ProfileForm | null>(null);
@@ -159,25 +158,7 @@ export function ClinicSettingsClient({
     <main className="cs">
       <DocumentLocaleSync locale={locale} />
       <h1>{t.pageTitle}</h1>
-      <nav className="cs-tabs" aria-label={t.tabsLabel}>
-        <Link
-          href={`/operations/${encodeURIComponent(clinicId)}/settings/clinic?locale=${locale}`}
-          aria-current="page"
-        >
-          {t.tabClinic}
-        </Link>
-        <Link
-          href={`/operations/${encodeURIComponent(clinicId)}?locale=${locale}`}
-        >
-          {t.backToDesk}
-        </Link>
-        <Link
-          href={`/operations/${encodeURIComponent(clinicId)}/settings/clinic?locale=${other}`}
-          lang={other}
-        >
-          {other === 'fr' ? 'Français' : 'العربية'}
-        </Link>
-      </nav>
+      <SettingsTabs clinicId={clinicId} locale={locale} active="clinic" />
       {load.kind === 'loading' && <p role="status">{t.loading}</p>}
       {load.kind === 'forbidden' && <p role="alert">{t.adminOnly}</p>}
       {load.kind === 'error' && <p role="alert">{t.loadError}</p>}
