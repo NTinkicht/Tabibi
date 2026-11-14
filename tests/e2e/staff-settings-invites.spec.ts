@@ -179,3 +179,31 @@ for (const [locale, create, revoke, duplicate, expired] of [
     });
   }
 }
+
+test('invalid e-mail (400) shows the field error and no link', async ({
+  page,
+}) => {
+  const { calls, setCreate } = await setup(page);
+  await page.goto(`/operations/${clinicId}/settings/staff?locale=fr`);
+  setCreate(400);
+  await page.locator('#cs-invite-email').fill('pas-un-email');
+  await page
+    .getByRole('button', { name: 'Créer le lien d’invitation' })
+    .click();
+  await expect(page.locator('#cs-invite-error')).toContainText(
+    'adresse e-mail valide',
+  );
+  await expect(page.locator('#cs-invite-email')).toHaveAttribute(
+    'aria-invalid',
+    'true',
+  );
+  await expect(page.locator('#cs-invite-link')).toHaveCount(0);
+  expect(calls).toHaveLength(1);
+  // Positive control: a valid retry clears the error and shows the link.
+  setCreate(201);
+  await page
+    .getByRole('button', { name: 'Créer le lien d’invitation' })
+    .click();
+  await expect(page.locator('#cs-invite-error')).toHaveCount(0);
+  await expect(page.locator('#cs-invite-link')).toBeVisible();
+});

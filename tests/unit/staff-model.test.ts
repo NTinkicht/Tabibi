@@ -98,6 +98,35 @@ describe('invites', () => {
     expect(parseInvites({})).toBeNull();
   });
 
+  it('rejects a row missing inviteId, email or expiresAt', () => {
+    for (const key of ['inviteId', 'email', 'expiresAt']) {
+      const row: Record<string, unknown> = invite();
+      delete row[key];
+      expect(parseInvites({ invites: [row] })).toBeNull();
+    }
+  });
+
+  it('rejects wrong field types and non-object rows', () => {
+    expect(parseInvites({ invites: [invite({ inviteId: 7 })] })).toBeNull();
+    expect(parseInvites({ invites: [invite({ email: null })] })).toBeNull();
+    expect(parseInvites({ invites: [invite({ expiresAt: 123 })] })).toBeNull();
+    expect(parseInvites({ invites: [null] })).toBeNull();
+    expect(parseInvites({ invites: 'nope' })).toBeNull();
+    expect(parseInvites(null)).toBeNull();
+    // One bad row rejects the whole list, even next to a valid one.
+    expect(
+      parseInvites({ invites: [invite(), invite({ inviteId: 7 })] }),
+    ).toBeNull();
+  });
+
+  it('accepts an empty list and keeps pending and expired rows', () => {
+    expect(parseInvites({ invites: [] })).toEqual([]);
+    const rows = parseInvites({
+      invites: [invite({ status: 'pending' }), invite({ inviteId: 'i2' })],
+    });
+    expect(rows?.map((r) => r.status)).toEqual(['pending', 'expired']);
+  });
+
   it('never offers administrator as an invite role', () => {
     expect(INVITE_ROLES).toEqual(['receptionist', 'doctor']);
   });
