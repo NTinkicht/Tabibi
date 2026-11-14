@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  INVITE_ROLES,
+  inviteLink,
+  parseCreatedInvite,
+  parseInvites,
   parseStaff,
   patchBody,
   planRoleChange,
@@ -70,5 +74,74 @@ describe('removalConflict', () => {
   it('names the 409 reason from the removed member role', () => {
     expect(removalConflict('clinic_admin')).toBe('last_admin');
     expect(removalConflict('doctor')).toBe('doctor_without_profile');
+  });
+});
+
+describe('invites', () => {
+  const invite = (over: Record<string, unknown> = {}) => ({
+    inviteId: 'i1',
+    email: 'a@x.dz',
+    role: 'doctor',
+    status: 'expired',
+    expiresAt: '2026-11-01T00:00:00.000Z',
+    ...over,
+  });
+
+  it('parses the list and rejects an unknown role or status', () => {
+    expect(parseInvites({ invites: [invite()] })).toHaveLength(1);
+    expect(
+      parseInvites({ invites: [invite({ role: 'clinic_admin' })] }),
+    ).toBeNull();
+    expect(
+      parseInvites({ invites: [invite({ status: 'accepted' })] }),
+    ).toBeNull();
+    expect(parseInvites({})).toBeNull();
+  });
+
+  it('rejects a row missing inviteId, email or expiresAt', () => {
+    for (const key of ['inviteId', 'email', 'expiresAt']) {
+      const row: Record<string, unknown> = invite();
+      delete row[key];
+      expect(parseInvites({ invites: [row] })).toBeNull();
+    }
+  });
+
+  it('rejects wrong field types and non-object rows', () => {
+    expect(parseInvites({ invites: [invite({ inviteId: 7 })] })).toBeNull();
+    expect(parseInvites({ invites: [invite({ email: null })] })).toBeNull();
+    expect(parseInvites({ invites: [invite({ expiresAt: 123 })] })).toBeNull();
+    expect(parseInvites({ invites: [null] })).toBeNull();
+    expect(parseInvites({ invites: 'nope' })).toBeNull();
+    expect(parseInvites(null)).toBeNull();
+    // One bad row rejects the whole list, even next to a valid one.
+    expect(
+      parseInvites({ invites: [invite(), invite({ inviteId: 7 })] }),
+    ).toBeNull();
+  });
+
+  it('accepts an empty list and keeps pending and expired rows', () => {
+    expect(parseInvites({ invites: [] })).toEqual([]);
+    const rows = parseInvites({
+      invites: [invite({ status: 'pending' }), invite({ inviteId: 'i2' })],
+    });
+    expect(rows?.map((r) => r.status)).toEqual(['pending', 'expired']);
+  });
+
+  it('never offers administrator as an invite role', () => {
+    expect(INVITE_ROLES).toEqual(['receptionist', 'doctor']);
+  });
+
+  it('puts the token in the fragment only', () => {
+    const link = inviteLink('https://app.tabibi.dz', 'abc');
+    expect(link).toBe('https://app.tabibi.dz/staff/invite#abc');
+    expect(new URL(link).search).toBe('');
+    expect(new URL(link).hash).toBe('#abc');
+  });
+
+  it('reads the created invite and rejects a response without a token', () => {
+    expect(
+      parseCreatedInvite({ invite: { inviteId: 'i1', token: 'abc' } }),
+    ).toEqual({ inviteId: 'i1', token: 'abc' });
+    expect(parseCreatedInvite({ invite: { inviteId: 'i1' } })).toBeNull();
   });
 });

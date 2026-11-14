@@ -19,6 +19,9 @@ async function setup(page: Page, opts: { forbidden?: boolean } = {}) {
   ]);
   const calls: Array<{ method: string; path: string; body: unknown }> = [];
   let removeStatus = 200;
+  await page.route(`**/api/clinics/${clinicId}/staff-invites`, (route) =>
+    route.fulfill({ json: { invites: [] } }),
+  );
   await page.route(`**${base}**`, async (route) => {
     const req = route.request();
     const path = new URL(req.url()).pathname;
