@@ -114,6 +114,27 @@ test('keeps bilingual public queues clinic-isolated', async ({ page }) => {
         correlationId: 'release-browser-fr-register',
       },
     );
+    // The TV lists only checked-in patients (waiting ones are counted).
+    await queue.command(
+      { clinicId: ids.clinicA, actorUserId: ids.receptionistA },
+      ids.sessionA,
+      registrationA.entry.id,
+      {
+        command: 'check_in',
+        idempotencyKey: 'release-browser-ar-checkin',
+        correlationId: 'release-browser-ar-checkin',
+      },
+    );
+    await queue.command(
+      { clinicId: ids.clinicB, actorUserId: ids.receptionistB },
+      ids.sessionB,
+      registrationB.entry.id,
+      {
+        command: 'check_in',
+        idempotencyKey: 'release-browser-fr-checkin',
+        correlationId: 'release-browser-fr-checkin',
+      },
+    );
 
     await page.goto(`/waiting-room/${ids.clinicA}/${ids.sessionA}`);
     await expect(page.locator('main')).toHaveAttribute('dir', 'rtl');

@@ -267,18 +267,20 @@ test('WU50 converges after delayed refresh without duplicate mutation or privacy
       correlationId: `wu50-public-call-${run}`,
     });
     await page.reload();
-    const publicRow = page
-      .locator('li')
-      .filter({ hasText: publicPatient.entry.publicDisplayLabel });
+    const publicRow = page.locator('.tv-called');
+    await expect(publicRow).toContainText(
+      publicPatient.entry.publicDisplayLabel,
+    );
     await expect(publicRow).toContainText('تم النداء');
     body = await page.locator('body').innerText();
     expect(body).not.toContain(other.entry.publicDisplayLabel);
 
     await page.goto(`/waiting-room/${clinicId}/${sessionId}?lang=fr`);
     await expect(page.locator('main')).toHaveAttribute('dir', 'ltr');
-    const publicRowFr = page
-      .locator('li')
-      .filter({ hasText: publicPatient.entry.publicDisplayLabel });
+    const publicRowFr = page.locator('.tv-called');
+    await expect(publicRowFr).toContainText(
+      publicPatient.entry.publicDisplayLabel,
+    );
     await expect(publicRowFr).toContainText('Appelé');
     body = await page.locator('body').innerText();
     expect(body).not.toContain(publicPatient.patient.privateDisplayName);

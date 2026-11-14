@@ -64,6 +64,16 @@ test('proves the WU49 bilingual public projection renders a real row without pri
         correlationId: `wu49-public-proof-${run}`,
       },
     );
+    await new QueueService(pool).command(
+      { clinicId, actorUserId: receptionistId },
+      sessionId,
+      registration.entry.id,
+      {
+        command: 'check_in',
+        idempotencyKey: `wu49-public-proof-checkin-${run}`,
+        correlationId: `wu49-public-proof-checkin-${run}`,
+      },
+    );
 
     await page.goto(`/waiting-room/${clinicId}/${sessionId}`);
     const publicMain = page.locator('main');

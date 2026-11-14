@@ -62,6 +62,16 @@ test('public waiting-room renders Arabic RTL and French LTR without PII', async 
         correlationId: 'waiting-room-browser-register',
       },
     );
+    await new QueueService(pool).command(
+      { clinicId, actorUserId: receptionistId },
+      sessionId,
+      registration.entry.id,
+      {
+        command: 'check_in',
+        idempotencyKey: 'waiting-room-browser-checkin',
+        correlationId: 'waiting-room-browser-checkin',
+      },
+    );
 
     await page.goto(`/waiting-room/${clinicId}/${sessionId}`);
     await expect(page.locator('main')).toHaveAttribute('dir', 'rtl');
@@ -71,7 +81,9 @@ test('public waiting-room renders Arabic RTL and French LTR without PII', async 
     await expect(
       page.getByText(registration.entry.publicDisplayLabel),
     ).toBeVisible();
-    await expect(page.getByText('في الانتظار')).toBeVisible();
+    await expect(page.locator('.tv-next')).toContainText(
+      registration.entry.publicDisplayLabel,
+    );
 
     const arabicBody = await page.locator('body').innerText();
     expect(arabicBody).not.toContain(privateName);
@@ -88,7 +100,7 @@ test('public waiting-room renders Arabic RTL and French LTR without PII', async 
     await expect(
       page.getByText(registration.entry.publicDisplayLabel),
     ).toBeVisible();
-    await expect(page.getByText('En attente')).toBeVisible();
+    await expect(page.locator('.tv-next')).toContainText('Prochains');
 
     const frenchBody = await page.locator('body').innerText();
     expect(frenchBody).not.toContain(privateName);
