@@ -82,6 +82,12 @@ export function WalkInQueue({
   const [pending, setPending] = useState(false);
   const [pendingEntry, setPendingEntry] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState('');
+  // Entry whose cancel/no-show is the action shown in the status bar.
+  const [restorable, setRestorable] = useState<WaitingEntry | null>(null);
+  const [restoreReason, setRestoreReason] = useState('');
+  const [transferTargets, setTransferTargets] = useState<
+    Array<{ id: string; label: string }>
+  >([]);
   const [queueOrderVersion, setQueueOrderVersion] = useState(0);
   const [session, setSession] = useState<DashboardSession | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
@@ -308,6 +314,14 @@ export function WalkInQueue({
           t.queueStatuses[body.entry.state] ?? '',
         ),
       );
+      // The restore API only covers walk-in cancel/no-show outcomes.
+      setRestorable(
+        (body.entry.state === 'cancelled' || body.entry.state === 'no_show') &&
+          (entry as unknown as ConsoleEntry).origin === 'walk_in'
+          ? entry
+          : null,
+      );
+      setRestoreReason('');
       await load();
     } catch (error) {
       setMessage(
@@ -368,6 +382,137 @@ export function WalkInQueue({
       setPendingEntry(null);
     }
   }
+
+  /** Restore exactly the action shown in the status bar (reason required). */
+  async function restoreLast() {
+    const entry = restorable;
+    const reason = restoreReason.trim();
+    if (!entry || !reason) return;
+    const operation = `${entry.id}:restore:${reason}`;
+    const idempotencyKey = pendingKeysRef.current.get(operation) ?? key();
+    pendingKeysRef.current.set(operation, idempotencyKey);
+    setPendingEntry(entry.id);
+    setMessage('');
+    try {
+      const response = await fetch(
+        `/api/clinics/${clinicId}/sessions/${sessionId}/queue/${entry.id}/restore`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'idempotency-key': idempotencyKey,
+          },
+          body: JSON.stringify({ reason, checkIn: false }),
+        },
+      );
+      const body = (await response.json()) as {
+        entry?: WaitingEntry;
+        message?: string;
+      };
+      if (!response.ok || !body.entry) throw new Error(body.message);
+      pendingKeysRef.current.delete(operation);
+      setLastAction(formatLastAction(t.lastAction, entry, t.restored));
+      setRestorable(null);
+      setRestoreReason('');
+      await load();
+    } catch (error) {
+      setMessage(
+        error instanceof Error && error.message ? error.message : t.queueError,
+      );
+      await load();
+    } finally {
+      setPendingEntry(null);
+    }
+  }
+
+  async function transfer(
+    entry: WaitingEntry,
+    targetSessionId: string,
+    reason: string,
+  ) {
+    const operation = `${entry.id}:transfer:${targetSessionId}:${reason}`;
+    const idempotencyKey = pendingKeysRef.current.get(operation) ?? key();
+    pendingKeysRef.current.set(operation, idempotencyKey);
+    setPendingEntry(entry.id);
+    setMessage('');
+    try {
+      const response = await fetch(
+        `/api/clinics/${clinicId}/sessions/${sessionId}/queue/${entry.id}/transfer`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'idempotency-key': idempotencyKey,
+          },
+          body: JSON.stringify({ reason, targetSessionId }),
+        },
+      );
+      const body = (await response.json()) as { message?: string };
+      if (!response.ok) throw new Error(body.message);
+      pendingKeysRef.current.delete(operation);
+      setLastAction(formatLastAction(t.lastAction, entry, t.transferred));
+      setRestorable(null);
+      await load();
+    } catch (error) {
+      setMessage(
+        error instanceof Error && error.message ? error.message : t.queueError,
+      );
+      await load();
+    } finally {
+      setPendingEntry(null);
+    }
+  }
+
+  const sessionStartsAt = session?.startsAt;
+  const sessionDoctor = session?.doctorDisplayName;
+  useEffect(() => {
+    if (!sessionStartsAt || !sessionDoctor) return;
+    const controller = new AbortController();
+    const date = new Date(sessionStartsAt).toLocaleDateString('en-CA', {
+      timeZone: timezone,
+    });
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/clinics/${clinicId}/sessions?date=${date}`,
+          { cache: 'no-store', signal: controller.signal },
+        );
+        const body = (await response.json()) as {
+          sessions?: Array<{
+            id: string;
+            doctorDisplayName: string;
+            startsAt: string;
+            endsAt: string;
+            status: string;
+          }>;
+        };
+        if (!response.ok || !Array.isArray(body.sessions)) return;
+        const locales = locale === 'ar' ? 'ar-DZ' : 'fr-DZ';
+        const hm = (iso: string) =>
+          new Date(iso).toLocaleTimeString(locales, {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: timezone,
+          });
+        setTransferTargets(
+          body.sessions
+            .filter(
+              (item) =>
+                item.id !== sessionId &&
+                item.doctorDisplayName === sessionDoctor &&
+                ['planned', 'open', 'paused'].includes(item.status),
+            )
+            .map((item) => ({
+              id: item.id,
+              label: `${item.doctorDisplayName} · ${hm(item.startsAt)}–${hm(item.endsAt)}`,
+            })),
+        );
+      } catch {
+        // Targets are optional; without them Transfer is simply not offered.
+      }
+    })();
+    return () => controller.abort();
+  }, [clinicId, sessionId, sessionStartsAt, sessionDoctor, timezone, locale]);
 
   async function sessionMutation(
     path: 'commands' | 'delay',
@@ -470,6 +615,15 @@ export function WalkInQueue({
       if (target) void command(target, name);
     },
     onPanel: panelAction,
+    transferTargets,
+    onTransfer: (
+      entry: ConsoleEntry,
+      targetSessionId: string,
+      reason: string,
+    ) => {
+      const target = entries.find((item) => item.id === entry.id);
+      if (target) void transfer(target, targetSessionId, reason);
+    },
   };
 
   return (
@@ -573,8 +727,42 @@ export function WalkInQueue({
           {state === 'ready' && consoleView && (
             <>
               {lastAction && (
-                <div className="lastAction" role="status">
-                  {lastAction}
+                <div
+                  className={`lastAction${restorable ? ' withRestore' : ''}`}
+                  role="status"
+                >
+                  <span>{lastAction}</span>
+                  {restorable && (
+                    <form
+                      className="restoreForm"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void restoreLast();
+                      }}
+                    >
+                      <input
+                        aria-label={t.restoreReason}
+                        placeholder={t.restoreReason}
+                        value={restoreReason}
+                        maxLength={200}
+                        onChange={(event) =>
+                          setRestoreReason(event.target.value)
+                        }
+                      />
+                      <button
+                        type="submit"
+                        className="quiet"
+                        disabled={
+                          restoreReason.trim() === '' ||
+                          pending ||
+                          pendingEntry !== null ||
+                          stale
+                        }
+                      >
+                        {t.restore}
+                      </button>
+                    </form>
+                  )}
                 </div>
               )}
               <ServingCards rows={consoleView.serving} h={regions} />

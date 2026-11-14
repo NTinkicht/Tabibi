@@ -22,7 +22,16 @@ export interface RegionHandlers {
   pendingEntryId: string | null;
   onPrimary: (entry: ConsoleEntry, command: QueueCommand) => void;
   onPanel: (entry: ConsoleEntry, action: PanelAction, reason: string) => void;
+  /** Other planned/open/paused sessions of the same doctor (server re-checks). */
+  transferTargets: ReadonlyArray<{ id: string; label: string }>;
+  onTransfer: (
+    entry: ConsoleEntry,
+    targetSessionId: string,
+    reason: string,
+  ) => void;
 }
+
+const TRANSFERABLE = ['waiting', 'checked_in', 'called'];
 
 const PRIMARY_LABEL: Partial<Record<QueueCommand, keyof Copy>> = {
   check_in: 'checkIn',
@@ -54,12 +63,18 @@ function entryMeta(entry: ConsoleEntry, h: RegionHandlers): string {
 function ReasonPanel({ row, h }: { row: ConsoleRow; h: RegionHandlers }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
+  const [target, setTarget] = useState('');
   const { entry } = row;
-  if (row.actions.panel.length === 0) return null;
+  const canTransfer =
+    entry.origin === 'walk_in' &&
+    TRANSFERABLE.includes(entry.state) &&
+    h.transferTargets.length > 0;
+  if (row.actions.panel.length === 0 && !canTransfer) return null;
   const panelId = `panel-${entry.id}`;
   const close = () => {
     setOpen(false);
     setReason('');
+    setTarget('');
   };
   return (
     <div
@@ -108,6 +123,35 @@ function ReasonPanel({ row, h }: { row: ConsoleRow; h: RegionHandlers }) {
               </button>
             ))}
           </div>
+          {canTransfer && (
+            <div className="rowPanelActions">
+              <label>
+                {h.t.transferTarget}
+                <select
+                  value={target}
+                  onChange={(event) => setTarget(event.target.value)}
+                >
+                  <option value="">{h.t.transferTargetPlaceholder}</option>
+                  {h.transferTargets.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="quiet"
+                disabled={h.busy || reason.trim() === '' || target === ''}
+                onClick={() => {
+                  h.onTransfer(entry, target, reason.trim());
+                  close();
+                }}
+              >
+                {h.t.transfer}
+              </button>
+            </div>
+          )}
           <small>{h.t.auditedHint}</small>
         </div>
       )}

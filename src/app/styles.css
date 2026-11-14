@@ -1033,3 +1033,25 @@ h1 {
 .takeNext {
   min-height: 44px;
 }
+.lastAction.withRestore {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.lastAction .restoreForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-inline-start: auto;
+  font-weight: 400;
+}
+.lastAction .restoreForm input,
+.rowPanel select {
+  min-height: 2.75rem;
+}
+.lastAction .restoreForm button {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+}
