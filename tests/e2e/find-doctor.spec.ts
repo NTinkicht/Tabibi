@@ -72,6 +72,16 @@ for (const language of ['fr', 'ar'] as const) {
         language === 'ar' ? 'rtl' : 'ltr',
       );
 
+      // The server render may hold real (here empty) data; switching modes
+      // makes the page load from the mocked APIs in either environment.
+      const modeButton = (name: string) => page.getByRole('button', { name });
+      await modeButton(
+        language === 'ar' ? 'كل العيادات' : 'Tous les cabinets',
+      ).click();
+      await modeButton(
+        language === 'ar' ? 'الحجز عبر الإنترنت' : 'Réserver en ligne',
+      ).click();
+
       // Default mode is booking: next session line and sessions button.
       const viewButton = page.getByRole('button', {
         name: language === 'ar' ? 'عرض الجلسات' : 'Voir les sessions',
@@ -84,7 +94,7 @@ for (const language of ['fr', 'ar'] as const) {
       await expect
         .poll(() => seen.some((u) => u.includes('wilaya=09')))
         .toBe(true);
-      expect(seen.every((u) => u.includes('bookable-sessions'))).toBe(true);
+      expect(seen[seen.length - 1]).toContain('/api/public/bookable-sessions');
 
       // Sessions view; Réserver navigates to the booking route.
       await viewButton.click();
