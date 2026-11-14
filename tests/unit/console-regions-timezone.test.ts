@@ -39,6 +39,8 @@ function render(timezone: string): string {
         pendingEntryId: null,
         onPrimary: () => undefined,
         onPanel: () => undefined,
+        transferTargets: [],
+        onTransfer: () => undefined,
       },
     }),
   );
