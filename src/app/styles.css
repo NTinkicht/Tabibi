@@ -848,7 +848,7 @@ h1 {
     gap: 1rem;
   }
   .deskHeader h1,
-  .deskHeader p,
+  .deskHeader > div:first-child p,
   .queueToolbar .secondaryLink,
   .consoleSide .todayTiles {
     display: none;

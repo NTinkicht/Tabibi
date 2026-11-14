@@ -148,6 +148,7 @@ for (const [locale, add, close, side, counts, back] of [
     );
     await expect(switcher).toHaveAttribute('aria-label', new RegExp(back));
     expect((await switcher.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await expect(page.locator('.countsLine')).toBeVisible();
     await expect(page.locator('.countsLine')).toHaveText(counts);
     await expect(page.locator('.todayTiles')).toBeHidden();
 
