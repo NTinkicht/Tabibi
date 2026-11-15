@@ -15,7 +15,8 @@ the independent reviewer.
 
 | Moment | What the guest sees | Delivered as |
 |---|---|---|
-| Right after allowing notifications | "Notifications activées. Touchez pour ouvrir votre suivi." | a guest-link intent (`initial`) carrying a fresh single-use exchange link |
+| Right after allowing notifications on the booking confirmation page (booking-origin bearer, no status cookie yet) | "Notifications activées. Touchez pour ouvrir votre suivi." | a guest-link intent (`initial`) carrying a fresh single-use exchange link |
+| Right after allowing notifications on `/guest/status` (status cookie already held) | the card's "Notifications activées sur cet appareil." only; no push is sent | — |
 | Turn approaching, called, estimate changed materially, session delayed, session cancelled, entry cancelled | the existing template copy (`turn_approaching.v1`, `patient_called.v1`, …), fr or ar | the notification outbox, `push` channel |
 | Transfer to another session or doctor | "Votre passage a été déplacé. Touchez pour voir votre nouveau suivi." | a guest-link intent (`transfer`) carrying a fresh exchange link for the target |
 | Status cookie expired or missing on tap | the status page offers "M’envoyer un nouveau lien" | a guest-link intent (`resend`) to the same subscription |
@@ -79,7 +80,7 @@ Routes (all `no-store`, `Referrer-Policy: no-referrer`, same-origin, bounded bod
   - **In one transaction:**
     - upsert the binding for the credential's entry (the same endpoint re-binds rather than duplicates; at most 3 active subscriptions per entry);
     - record a `push` notification preference with `consentState: 'granted'` for the entry's `visit_patient` subject;
-    - issue a system exchange (`contact_kind = 'push'`) and create an `initial` guest-link intent;
+    - **only when authenticated by the booking-origin bearer**: issue a system exchange (`contact_kind = 'push'`) and create an `initial` guest-link intent. A subscriber holding the status cookie already has access in that browser, so no link is issued;
     - append audit `guest_push_subscribed` with metadata `{ subscriptionId, locale }` only.
   - **Response:** `{ subscribed: true }`, with nothing secret.
 - **`DELETE /api/guest/push-subscription`**:
@@ -103,6 +104,20 @@ Lifecycle:
 - **Expiry:** a binding lives until the entry reaches a terminal state, plus the existing 15-minute terminal grace, and at most 24 hours. Then it is revoked as `expired` and scrubbed.
 - **Transfer:** inside `QueueTransferService`'s transaction, active bindings move to the target entry. The AAD is re-sealed and the `push` preference is copied. The existing `transfer` intent then reaches the guest by push. The source binding no longer exists, so the old entry can't notify.
 - **Gone:** a push service answering 404 or 410 means the subscription is gone. The binding is revoked as `gone` and scrubbed.
+
+Credential rotation for push exchanges:
+
+- `GuestAccessService.consume` today refuses any exchange while the entry has an unrevoked status credential, even an expired one (`src/modules/guest-access/index.ts`, the `liveCredential` check). Without a change, a `resend` link to a guest whose cookie expired or was lost, and an `initial` link to a booking-origin guest who also opened a status link, would always be rejected.
+- **Rule:** consuming an exchange with `contact_kind = 'push'` revokes every unrevoked status credential of that entry, with `revocation_reason = 'rotated'`. This happens in the same transaction and under the same `FOR UPDATE` lock, just before the new credential is minted. One live status credential per entry still holds.
+- **Why only push:** only the device holding the subscription's private keys can read a push link, so rotation can only be triggered by the subscribed device itself. A device that is rotated out sees the usual generic denial and can ask for a fresh link if it is the subscribed one.
+- Staff-issued exchanges (`phone`, `email`) keep the current rule unchanged.
+- Audit `guest_credential_rotated` with `{ exchangeKind: 'push' }` only.
+
+Transfer for push-only guests:
+
+- `QueueTransferService.transfer` today creates the target exchange and `transfer` intent only when the patient record has `contact_phone` or `contact_email`, and `GuestAccessService.issueInTransaction` enforces the same rule. A push-only guest would lose status access on transfer and receive nothing.
+- **Rule:** within the transfer transaction, after the bindings move to the target entry, the target entry has an active push binding → issue a **system** exchange (`contact_kind = 'push'`) for the target and create the `transfer` intent. Otherwise, if the patient has a phone or email → the current staff-issued path, unchanged. Otherwise → no target guest authority, as today.
+- System issuance checks, inside the same transaction, that the target entry and session are active and that an active binding exists for the target entry. It never relaxes the contact rule for staff issuance.
 
 ### 4. Web Push sender (#886, security review: Claude)
 
@@ -176,7 +191,9 @@ installed app does not share cookies with Safari, so it starts with no status ac
   - the cap of 3 subscriptions per entry and rebinding the same endpoint;
   - consent granted on subscribe and revoked on unsubscribe;
   - resend answering identically for unknown and known endpoints, with its rate limits;
-  - transfer moving bindings atomically;
+  - transfer moving bindings atomically, and a push-only guest (no phone, no email) receiving a working `transfer` link for the target;
+  - a push `resend` link opening after the earlier cookie expired or was lost (rotation), the old credential revoked as `rotated`, and a staff-issued exchange still refused while a live credential exists;
+  - subscribing with the status cookie issuing no link, and subscribing with the booking bearer issuing exactly one `initial` link;
   - expiry and terminal revocation;
   - 410 revoking the binding.
 - The sender is tested against a local fake push service: it checks VAPID headers and decrypts the `aes128gcm` payload to assert its exact shape. The tests also assert:
