@@ -70,3 +70,12 @@ server-side `patient_sessions` row (verifier only). The token is signed with a k
 derived from `STAFF_SESSION_SECRET` under a patient-only context and the row lives
 in its own table, so patient and staff sessions never verify on each other's
 routes.
+
+### Patient registration (slice 3)
+
+`POST /api/patient/register` `{ email, displayName, password }` (same-origin,
+bounded strict body, 5 attempts per email and one ingress bucket per 15 minutes)
+creates the account and answers `202 { status: "accepted" }` for a new and an
+already-registered email alike, with no session or cookie, so it cannot enumerate
+or take over accounts; the patient then signs in. Invalid input is one generic 400.
+Identity verification and recovery are later slices.
