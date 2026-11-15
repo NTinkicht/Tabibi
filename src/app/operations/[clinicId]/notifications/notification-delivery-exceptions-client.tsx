@@ -309,6 +309,9 @@ function NotificationDeliveryExceptionsView({
   );
 
   const refresh = useCallback(() => {
+    // Serialize with the handled mutation: a list read started before the POST
+    // commits could otherwise finish after it and restore the handled row.
+    if (handling.current) return;
     setState({ kind: 'loading' });
     setGeneration((current) => current + 1);
   }, []);
@@ -403,7 +406,7 @@ function NotificationDeliveryExceptionsView({
         variant="secondary"
         className="notificationExceptionsRefresh"
         onClick={refresh}
-        disabled={state.kind === 'loading'}
+        disabled={state.kind === 'loading' || pendingId !== null}
       >
         {t.refresh}
       </Button>

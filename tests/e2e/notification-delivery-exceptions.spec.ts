@@ -542,3 +542,58 @@ for (const [locale, label, error] of [
     await expect(button).toBeEnabled();
   });
 }
+
+test('refresh is disabled while a handled request is pending, so a stale list read cannot restore the handled row', async ({
+  page,
+}) => {
+  await authenticate(page);
+  let handled = false;
+  let listReads = 0;
+  const release: { current: (() => void) | null } = { current: null };
+  const gate = new Promise<void>((resolve) => {
+    release.current = resolve;
+  });
+  await page.route(DEAD_LETTERS_URL, async (route) => {
+    listReads += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        deadLettersBody(
+          handled
+            ? []
+            : [
+                {
+                  eventKey: 'patient_called',
+                  queueLabel: 'A-041',
+                  attemptCount: 3,
+                  maxAttempts: 5,
+                  outcomeAt: '2026-09-13T11:00:00.000Z',
+                },
+              ],
+        ),
+      ),
+    });
+  });
+  await page.route(HANDLED_URL, async (route) => {
+    await gate;
+    handled = true;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ intentId: rawQueueEntryId }),
+    });
+  });
+  await page.goto(`/operations/${clinicId}/notifications?locale=fr`);
+  await expect(page.getByText('A-041')).toBeVisible();
+  const readsBefore = listReads;
+  const refreshButton = page.getByRole('button', { name: 'Actualiser' });
+  await page.getByRole('button', { name: 'Marquer comme traitée' }).click();
+  await expect(refreshButton).toBeDisabled();
+  release.current?.();
+  await expect(page.getByText('A-041')).toHaveCount(0);
+  await expect(refreshButton).toBeEnabled();
+  expect(listReads).toBe(readsBefore);
+  await refreshButton.click();
+  await expect(page.getByText('A-041')).toHaveCount(0);
+});
