@@ -82,25 +82,42 @@ export async function POST(request: Request): Promise<Response> {
       rateLimited = true;
       return { status: 429, body: { error: 'rate_limited' } };
     }
-    let changed;
+    // One transaction: the credential row lock, the hash swap and the revocation
+    // of other sessions commit together or not at all, and a concurrent sign-in
+    // that verified the old password cannot insert a session afterwards.
+    const client = await getPool().connect();
     try {
-      changed = await changePatientPassword(
-        getPool(),
-        patient.userId,
-        body.currentPassword,
-        body.newPassword,
-      );
+      await client.query('BEGIN');
+      let changed;
+      try {
+        changed = await changePatientPassword(
+          client,
+          patient.userId,
+          body.currentPassword,
+          body.newPassword,
+        );
+      } catch (error) {
+        await client.query('ROLLBACK');
+        if (error instanceof PasswordPolicyError)
+          return {
+            status: 400,
+            body: { error: 'password_policy', code: error.code },
+          };
+        throw error;
+      }
+      if (!changed.ok) {
+        // Commit so the failed-attempt counter persists.
+        await client.query('COMMIT');
+        return { status: 403, body: { error: 'current_password_invalid' } };
+      }
+      await revokeOtherPatientSessions(request, client);
+      await client.query('COMMIT');
     } catch (error) {
-      if (error instanceof PasswordPolicyError)
-        return {
-          status: 400,
-          body: { error: 'password_policy', code: error.code },
-        };
+      await client.query('ROLLBACK').catch(() => undefined);
       throw error;
+    } finally {
+      client.release();
     }
-    if (!changed.ok)
-      return { status: 403, body: { error: 'current_password_invalid' } };
-    await revokeOtherPatientSessions(request);
     return { status: 200, body: { status: 'changed' } };
   });
   if (rateLimited)

@@ -6,8 +6,12 @@ import {
   GET as meGet,
   POST as signInPost,
 } from '@/app/api/patient/session/route';
-import { registerPatientAccount } from '@/modules/identity/patient-credentials';
+import {
+  registerPatientAccount,
+  verifyPatientPassword,
+} from '@/modules/identity/patient-credentials';
 import { closePool, getPool } from '@/platform/database/pool';
+import { createPatientSessionToken } from '@/platform/http/patient-auth';
 import { createStaffSessionToken } from '@/platform/http/staff-auth';
 
 // TAB-P1-01 slice 4: signed-in patient password change.
@@ -257,5 +261,92 @@ describe('POST /api/patient/password', () => {
     // Positive control: another account's budget is separate.
     const other = await login(OTHER);
     expect((await change(other, valid())).status).toBe(200);
+  });
+
+  it('rolls the hash change back when revoking other sessions fails', async () => {
+    const cookie = await login();
+    await login();
+    const before = await hashOf();
+    await pool.query(`CREATE FUNCTION fail_revoke() RETURNS trigger AS $$
+      BEGIN RAISE EXCEPTION 'revoke blocked'; END; $$ LANGUAGE plpgsql`);
+    await pool.query(`CREATE TRIGGER fail_revoke BEFORE UPDATE ON patient_sessions
+      FOR EACH ROW EXECUTE FUNCTION fail_revoke()`);
+    try {
+      expect((await change(cookie, valid())).status).toBe(500);
+    } finally {
+      await pool.query('DROP TRIGGER fail_revoke ON patient_sessions');
+      await pool.query('DROP FUNCTION fail_revoke()');
+    }
+    expect(await hashOf()).toEqual(before);
+    expect((await signIn(EMAIL, OLD)).status).toBe(200);
+    expect((await signIn(EMAIL, NEW)).status).toBe(401);
+  });
+
+  it('refuses a session for a password verified before it was rotated', async () => {
+    const cookie = await login();
+    const verified = await verifyPatientPassword(getPool(), EMAIL, OLD);
+    if (!verified.ok) throw new Error('setup failed');
+    expect((await change(cookie, valid())).status).toBe(200);
+    const expiry = new Date(Date.now() + 3600_000);
+    await expect(
+      createPatientSessionToken(
+        verified.userId,
+        expiry,
+        getPool(),
+        verified.passwordHash,
+      ),
+    ).rejects.toThrow();
+    const live = async () =>
+      Number(
+        (
+          await pool.query(
+            `SELECT count(*) FROM patient_sessions WHERE revoked_at IS NULL AND user_id = $1`,
+            [verified.userId],
+          )
+        ).rows[0].count,
+      );
+    // Only the caller's own session survives.
+    expect(await live()).toBe(1);
+    // Control: with the current hash the same call succeeds.
+    const fresh = await verifyPatientPassword(getPool(), EMAIL, NEW);
+    if (!fresh.ok) throw new Error('setup failed');
+    await createPatientSessionToken(
+      fresh.userId,
+      expiry,
+      getPool(),
+      fresh.passwordHash,
+    );
+    expect(await live()).toBe(2);
+  });
+
+  it('revokes a session being created concurrently with the change', async () => {
+    const cookie = await login();
+    const verified = await verifyPatientPassword(getPool(), EMAIL, OLD);
+    if (!verified.ok) throw new Error('setup failed');
+    const client = await pool.connect();
+    let token = '';
+    try {
+      await client.query('BEGIN');
+      token = await createPatientSessionToken(
+        verified.userId,
+        new Date(Date.now() + 3600_000),
+        client,
+        verified.passwordHash,
+      );
+      let done = false;
+      const pending = change(cookie, valid()).then((r) => {
+        done = true;
+        return r;
+      });
+      await new Promise((r) => setTimeout(r, 400));
+      // The change waits on the credential row lock held by the sign-in.
+      expect(done).toBe(false);
+      await client.query('COMMIT');
+      expect((await pending).status).toBe(200);
+    } finally {
+      client.release();
+    }
+    expect((await me(`${PCOOKIE}=${token}`)).status).toBe(401);
+    expect((await me(cookie)).status).toBe(200);
   });
 });

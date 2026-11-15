@@ -35,6 +35,12 @@ export class PatientRegistrationInputError extends Error {
   }
 }
 
+// The verified hash lets session creation fail closed if the password was
+// rotated between verification and session insert.
+export type PatientVerifyResult =
+  | (VerifyResult & { ok: false })
+  | { ok: true; userId: string; passwordHash: Buffer };
+
 export type RegisterResult = { ok: true; userId: string } | { ok: false };
 
 export function normalizePatientEmail(email: string): string | null {
@@ -105,7 +111,7 @@ export async function verifyPatientPassword(
   email: string,
   password: string,
   options?: LockoutOptions,
-): Promise<VerifyResult> {
+): Promise<PatientVerifyResult> {
   const { max, seconds } = lockoutSettings(options);
   const normalized = normalizePatientEmail(email);
   const attempt = password.length > PASSWORD_MAX_LENGTH * 4 ? '' : password;
@@ -151,7 +157,7 @@ export async function verifyPatientPassword(
       [found.user_id, found.password_hash],
     );
     return reset.rowCount === 1
-      ? { ok: true, userId: found.user_id }
+      ? { ok: true, userId: found.user_id, passwordHash: found.password_hash }
       : { ok: false };
   }
   await db.query(
@@ -196,7 +202,8 @@ export async function changePatientPassword(
     `SELECT u.auth_subject, c.password_hash
        FROM users u
        JOIN patient_credentials c ON c.user_id = u.id
-      WHERE u.id = $1 AND u.auth_subject LIKE $2`,
+      WHERE u.id = $1 AND u.auth_subject LIKE $2
+        FOR UPDATE OF c`,
     [userId, `${PATIENT_SUBJECT_PREFIX}%`],
   );
   const current = account.rows[0];
