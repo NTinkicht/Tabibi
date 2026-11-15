@@ -171,3 +171,62 @@ export async function verifyPatientPassword(
   );
   return { ok: false };
 }
+
+export type ChangePasswordResult =
+  | { ok: true }
+  | { ok: false; reason: 'current_password_invalid' };
+
+/**
+ * Replaces the password of a signed-in patient account. The new password must
+ * satisfy the shared policy (throws PasswordPolicyError before any state
+ * changes). The current password is checked through the lockout-aware
+ * verifyPatientPassword, so wrong guesses count toward the account lockout, and
+ * the hash is swapped with a compare-and-set on the hash that was verified.
+ */
+export async function changePatientPassword(
+  db: Queryable,
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<ChangePasswordResult> {
+  const account = await db.query<{
+    auth_subject: string;
+    password_hash: Buffer;
+  }>(
+    `SELECT u.auth_subject, c.password_hash
+       FROM users u
+       JOIN patient_credentials c ON c.user_id = u.id
+      WHERE u.id = $1 AND u.auth_subject LIKE $2`,
+    [userId, `${PATIENT_SUBJECT_PREFIX}%`],
+  );
+  const current = account.rows[0];
+  const subject = current?.auth_subject;
+  if (!current || !subject)
+    return { ok: false, reason: 'current_password_invalid' };
+  const email = subject.slice(PATIENT_SUBJECT_PREFIX.length);
+  validatePasswordPolicy(newPassword, email);
+  const verified = await verifyPatientPassword(db, email, currentPassword);
+  if (!verified.ok || verified.userId !== userId)
+    return { ok: false, reason: 'current_password_invalid' };
+  const salt = randomBytes(SALT_LENGTH);
+  const hash = await derive(newPassword, salt, DEFAULT_PARAMS);
+  const updated = await db.query(
+    `UPDATE patient_credentials
+        SET password_hash = $2, salt = $3, scrypt_n = $4, scrypt_r = $5,
+            scrypt_p = $6, password_changed_at = now(), failed_attempts = 0,
+            locked_until = NULL, updated_at = now()
+      WHERE user_id = $1 AND password_hash = $7`,
+    [
+      userId,
+      hash,
+      salt,
+      DEFAULT_PARAMS.n,
+      DEFAULT_PARAMS.r,
+      DEFAULT_PARAMS.p,
+      current.password_hash,
+    ],
+  );
+  return updated.rowCount === 1
+    ? { ok: true }
+    : { ok: false, reason: 'current_password_invalid' };
+}

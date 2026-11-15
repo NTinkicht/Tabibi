@@ -146,6 +146,22 @@ export async function revokePatientSession(request: Request): Promise<void> {
   );
 }
 
+// Revokes every other live session of the account that owns the request's
+// session. The request's own session stays valid. No-op without a valid session.
+export async function revokeOtherPatientSessions(
+  request: Request,
+): Promise<number> {
+  const cookie = patientSessionCookie(request);
+  const claims = cookie ? decode(cookie) : null;
+  if (!claims) return 0;
+  const revoked = await getPool().query(
+    `UPDATE patient_sessions SET revoked_at = now()
+      WHERE user_id::text = $2 AND verifier <> $1 AND revoked_at IS NULL`,
+    [sessionVerifier(claims.sid), claims.sub],
+  );
+  return revoked.rowCount ?? 0;
+}
+
 export function patientSessionSetCookie(
   token: string,
   maxAgeSeconds: number,

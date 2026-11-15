@@ -79,3 +79,15 @@ creates the account and answers `202 { status: "accepted" }` for a new and an
 already-registered email alike, with no session or cookie, so it cannot enumerate
 or take over accounts; the patient then signs in. Invalid input is one generic 400.
 Identity verification and recovery are later slices.
+
+### Patient password change (slice 4)
+
+`POST /api/patient/password` `{ currentPassword, newPassword }` requires a patient
+session (a staff cookie never authorizes it), then same-origin, a bounded strict
+body, 5 attempts per account and one ingress bucket per 15 minutes. The current
+password is checked through the lockout-aware `verifyPatientPassword` (a wrong
+one is the single 403 `current_password_invalid` and counts toward the lockout);
+the new one must pass the shared policy (400 `password_policy` with its `code`,
+nothing changed). The hash is replaced with a compare-and-set on the hash that
+was read, and every other session of the account is revoked while the calling
+session stays valid. Email-based recovery remains a later slice.
