@@ -353,12 +353,19 @@ export class GuestAccessService {
       // docs/design/pwa-push.md section 3: only the device holding a push
       // subscription's private keys can read a push link, so consuming one
       // rotates the entry's status credential. Staff-issued exchanges keep
-      // the one-live-credential refusal below.
+      // the one-live-credential refusal below. Booking-origin credentials
+      // (referenced by a public booking receipt) are a separate class that
+      // carries poll/cancel/check-in authority; rotation must not revoke them,
+      // so a push consume against such an entry still fails closed below.
       if (row.contact_kind === 'push') {
         const rotated = await client.query(
           `UPDATE guest_credentials
               SET revoked_at=$2, revocation_reason='rotated'
-            WHERE queue_entry_id=$1 AND revoked_at IS NULL`,
+            WHERE queue_entry_id=$1 AND revoked_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM public_guest_booking_receipts receipt
+                 WHERE receipt.credential_id=guest_credentials.id
+                   AND receipt.clinic_id=guest_credentials.clinic_id)`,
           [row.queue_entry_id, now],
         );
         if (rotated.rowCount)
