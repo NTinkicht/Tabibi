@@ -87,7 +87,7 @@ export class GuestPushSubscriptionStore {
       // The same endpoint re-binds instead of duplicating.
       await client.query(
         `UPDATE guest_push_subscriptions
-            SET revoked_at=$2, revocation_reason='rotated', sealed_subscription=NULL
+            SET revoked_at=GREATEST($2::timestamptz, created_at), revocation_reason='rotated', sealed_subscription=NULL
           WHERE endpoint_hash=$1 AND revoked_at IS NULL`,
         [endpointHash, now],
       );
@@ -182,7 +182,6 @@ export class GuestPushSubscriptionStore {
     target: GuestPushTarget,
     oldEndpoint: string,
     material: PushSubscriptionMaterial,
-    locale: 'ar' | 'fr',
     now: Date = new Date(),
   ): Promise<{ subscriptionId: string }> {
     // Validates both endpoints against the allow-list before any database work.
@@ -202,19 +201,25 @@ export class GuestPushSubscriptionStore {
           'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
           [`guest-push-endpoint:${hash}`],
         );
-      const replaced = await client.query<{ id: string; expires_at: Date }>(
+      // An expired-but-unrevoked binding is no match (a replacement would
+      // violate the expiry-order CHECK). The locale is inherited from it.
+      const replaced = await client.query<{
+        id: string;
+        expires_at: Date;
+        locale: 'ar' | 'fr';
+      }>(
         `UPDATE guest_push_subscriptions
-            SET revoked_at=$4, revocation_reason='rotated', sealed_subscription=NULL
+            SET revoked_at=GREATEST($4::timestamptz, created_at), revocation_reason='rotated', sealed_subscription=NULL
           WHERE clinic_id=$1 AND queue_entry_id=$2 AND endpoint_hash=$3
-            AND revoked_at IS NULL
-          RETURNING id, expires_at`,
+            AND revoked_at IS NULL AND expires_at > $4
+          RETURNING id, expires_at, locale`,
         [target.clinicId, target.queueEntryId, oldHash, now],
       );
       const old = replaced.rows[0];
       if (!old) throw new GuestPushBindingRejectedError();
       await client.query(
         `UPDATE guest_push_subscriptions
-            SET revoked_at=$2, revocation_reason='rotated', sealed_subscription=NULL
+            SET revoked_at=GREATEST($2::timestamptz, created_at), revocation_reason='rotated', sealed_subscription=NULL
           WHERE endpoint_hash=$1 AND revoked_at IS NULL`,
         [newHash, now],
       );
@@ -241,7 +246,7 @@ export class GuestPushSubscriptionStore {
           target.queueEntryId,
           newHash,
           sealed,
-          locale,
+          old.locale,
           now,
           old.expires_at,
         ],

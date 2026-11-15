@@ -40,34 +40,35 @@ function respond(status: number, body: unknown, extra = {}): Response {
   return Response.json(body, { status, headers: { ...HEADERS, ...extra } });
 }
 
+// Matches the `pushsubscriptionchange` handler in public/sw.js: the body is
+// `{ oldSubscription, newSubscription }` (PushSubscription.toJSON() shapes,
+// no locale). The locale is inherited from the replaced binding.
 function parse(input: unknown) {
   if (typeof input !== 'object' || input === null || Array.isArray(input))
     throw new SyntaxError('Body must be an object');
-  const { oldEndpoint, subscription, locale } = input as Record<
-    string,
-    unknown
-  >;
-  const sub = subscription as Record<string, unknown> | null | undefined;
+  const { oldSubscription, newSubscription } = input as Record<string, unknown>;
+  const old = oldSubscription as Record<string, unknown> | null | undefined;
+  const sub = newSubscription as Record<string, unknown> | null | undefined;
   const keys = sub?.keys as Record<string, unknown> | null | undefined;
   if (
-    typeof oldEndpoint !== 'string' ||
+    typeof old !== 'object' ||
+    old === null ||
+    typeof old.endpoint !== 'string' ||
     typeof sub !== 'object' ||
     sub === null ||
     typeof sub.endpoint !== 'string' ||
     typeof keys !== 'object' ||
     keys === null ||
     typeof keys.p256dh !== 'string' ||
-    typeof keys.auth !== 'string' ||
-    (locale !== 'fr' && locale !== 'ar')
+    typeof keys.auth !== 'string'
   )
     throw new SyntaxError('Invalid renewal');
   return {
-    oldEndpoint,
+    oldEndpoint: old.endpoint,
     material: {
       endpoint: sub.endpoint,
       keys: { p256dh: keys.p256dh, auth: keys.auth },
     },
-    locale: locale as 'ar' | 'fr',
   };
 }
 
@@ -96,7 +97,6 @@ export async function POST(request: Request): Promise<Response> {
       { clinicId: auth.clinicId, queueEntryId: auth.queueEntryId },
       parsed.oldEndpoint,
       parsed.material,
-      parsed.locale,
     );
     return respond(200, { renewed: true });
   } catch (error) {

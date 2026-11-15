@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { Pool } from 'pg';
 import {
   afterAll,
@@ -203,10 +206,14 @@ beforeEach(async () => {
 });
 afterAll(async () => pool.end());
 
+// The exact body public/sw.js sends from `pushsubscriptionchange`.
 const renewBody = (oldN: number, newN: number, extra: object = {}) => ({
-  oldEndpoint: sub(oldN).endpoint,
-  subscription: { endpoint: sub(newN).endpoint, keys: sub(newN).keys },
-  locale: 'fr',
+  oldSubscription: { endpoint: sub(oldN).endpoint, expirationTime: null },
+  newSubscription: {
+    endpoint: sub(newN).endpoint,
+    expirationTime: null,
+    keys: sub(newN).keys,
+  },
   ...extra,
 });
 const history = async (entry: string) =>
@@ -284,7 +291,7 @@ describe('POST /api/guest/push-subscription/renew', () => {
     await bind(cookie(), sub(1));
     const response = await doRenew(cookie(), {
       ...renewBody(1, 2),
-      subscription: {
+      newSubscription: {
         endpoint: 'https://evil.example/push/x',
         keys: sub(2).keys,
       },
@@ -300,12 +307,77 @@ describe('POST /api/guest/push-subscription/renew', () => {
     for (const body of [
       '{',
       '[]',
-      { ...renewBody(1, 2), locale: 'en' },
-      { ...renewBody(1, 2), oldEndpoint: 5 },
-      { oldEndpoint: sub(1).endpoint, locale: 'fr' },
+      { ...renewBody(1, 2), oldSubscription: null },
+      { ...renewBody(1, 2), oldSubscription: { endpoint: 5 } },
+      { oldSubscription: { endpoint: sub(1).endpoint } },
     ])
       expect((await doRenew(cookie(), body)).status).toBe(400);
     expect(await history(ids.entryA)).toHaveLength(1);
+  });
+
+  it('accepts the exact payload public/sw.js sends on pushsubscriptionchange', async () => {
+    await bind(cookie(), sub(1));
+    let sent = '';
+    let handler: ((event: unknown) => void) | undefined;
+    const toJSON = (n: number, withKeys: boolean) => () => ({
+      endpoint: sub(n).endpoint,
+      expirationTime: null,
+      ...(withKeys ? { keys: sub(n).keys } : {}),
+    });
+    runInNewContext(
+      readFileSync(resolve(__dirname, '../../public/sw.js'), 'utf8'),
+      {
+        self: {
+          location: { origin: ORIGIN },
+          addEventListener: (type: string, fn: (event: unknown) => void) => {
+            if (type === 'pushsubscriptionchange') handler = fn;
+          },
+          registration: {},
+        },
+        URL,
+        fetch: (_url: string, init: { body: string }) => {
+          sent = init.body;
+          return Promise.resolve();
+        },
+      },
+    );
+    const pending: Promise<unknown>[] = [];
+    handler!({
+      oldSubscription: { toJSON: toJSON(1, false) },
+      newSubscription: { toJSON: toJSON(2, true) },
+      waitUntil: (p: Promise<unknown>) => pending.push(p),
+    });
+    await Promise.all(pending);
+    expect(JSON.parse(sent)).toHaveProperty('oldSubscription');
+    const response = await doRenew(cookie(), sent);
+    expect(response.status).toBe(200);
+    expect(await active(ids.entryA)).toHaveLength(1);
+  });
+
+  it('inherits the locale of the replaced binding', async () => {
+    await bind(cookie(), sub(1, { locale: 'ar' }));
+    expect((await doRenew(cookie(), renewBody(1, 2))).status).toBe(200);
+    const rows = await pool.query(
+      `SELECT locale FROM guest_push_subscriptions
+        WHERE queue_entry_id=$1 AND revoked_at IS NULL`,
+      [ids.entryA],
+    );
+    expect(rows.rows).toEqual([{ locale: 'ar' }]);
+  });
+
+  it('refuses an expired but unrevoked binding with 401, not 500', async () => {
+    await bind(cookie(), sub(1));
+    await pool.query(
+      `UPDATE guest_push_subscriptions
+          SET created_at=now()-interval '25 hours',
+              expires_at=now()-interval '1 hour'
+        WHERE queue_entry_id=$1`,
+      [ids.entryA],
+    );
+    expect((await doRenew(cookie(), renewBody(1, 2))).status).toBe(401);
+    const rows = await history(ids.entryA);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].revoked_at).toBeNull();
   });
 
   it('rebinds a new endpoint already bound elsewhere instead of duplicating it', async () => {
