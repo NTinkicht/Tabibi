@@ -15,12 +15,27 @@ export interface DoctorOperationalStatistics {
   cancelled: number;
   /** Null when fewer than MIN_COHORT_FOR_AVERAGE timed completions exist. */
   averageConsultationSeconds: number | null;
+  /** Sessions that were actually opened (opened_at set). */
+  openedSessions: number;
+  /** Opened sessions whose opened_at is after the scheduled starts_at. */
+  lateStarts: number;
+  /** Mean start delay in minutes (early opens count as 0); null below MIN_COHORT_FOR_AVERAGE opened sessions. */
+  averageStartDelayMinutes: number | null;
+}
+
+export interface DelayTrendDay {
+  date: string;
+  sessions: number;
+  opened: number;
+  lateStarts: number;
 }
 
 export interface ClinicOperationalStatistics {
   from: string;
   to: string;
   doctors: DoctorOperationalStatistics[];
+  /** Counts only, one row per service date that has sessions. */
+  delayTrend: DelayTrendDay[];
 }
 
 export class StatisticsWindowError extends RangeError {}
@@ -53,6 +68,16 @@ interface Row {
   cancelled: string;
   timed: string;
   avg_seconds: string | null;
+  opened: string;
+  late: string;
+  avg_delay_minutes: string | null;
+}
+
+interface TrendRow {
+  day: string;
+  sessions: string;
+  opened: string;
+  late: string;
 }
 
 /**
@@ -81,7 +106,20 @@ export class ClinicStatisticsRepository {
               avg(EXTRACT(EPOCH FROM qe.completed_at - qe.in_consultation_started_at))
                 FILTER (WHERE qe.state = 'completed'
                   AND qe.in_consultation_started_at IS NOT NULL
-                  AND qe.completed_at IS NOT NULL) AS avg_seconds
+                  AND qe.completed_at IS NOT NULL) AS avg_seconds,
+              (SELECT count(*) FROM consultation_sessions s2
+                WHERE s2.clinic_id = $1 AND s2.doctor_id = cs.doctor_id
+                  AND s2.service_date BETWEEN $2::date AND $3::date
+                  AND s2.opened_at IS NOT NULL) AS opened,
+              (SELECT count(*) FROM consultation_sessions s2
+                WHERE s2.clinic_id = $1 AND s2.doctor_id = cs.doctor_id
+                  AND s2.service_date BETWEEN $2::date AND $3::date
+                  AND s2.opened_at > s2.starts_at) AS late,
+              (SELECT avg(GREATEST(0, EXTRACT(EPOCH FROM s2.opened_at - s2.starts_at) / 60))
+                 FROM consultation_sessions s2
+                WHERE s2.clinic_id = $1 AND s2.doctor_id = cs.doctor_id
+                  AND s2.service_date BETWEEN $2::date AND $3::date
+                  AND s2.opened_at IS NOT NULL) AS avg_delay_minutes
          FROM consultation_sessions cs
          JOIN doctor_profiles dp ON dp.id = cs.doctor_id
          LEFT JOIN queue_entries qe
@@ -92,9 +130,27 @@ export class ClinicStatisticsRepository {
         ORDER BY dp.display_name, cs.doctor_id`,
       [input.clinicId, input.from, input.to],
     );
+    const trend = await this.pool.query<TrendRow>(
+      `SELECT to_char(service_date, 'YYYY-MM-DD') AS day,
+              count(*) AS sessions,
+              count(*) FILTER (WHERE opened_at IS NOT NULL) AS opened,
+              count(*) FILTER (WHERE opened_at > starts_at) AS late
+         FROM consultation_sessions
+        WHERE clinic_id = $1
+          AND service_date BETWEEN $2::date AND $3::date
+        GROUP BY service_date
+        ORDER BY service_date`,
+      [input.clinicId, input.from, input.to],
+    );
     return {
       from: input.from,
       to: input.to,
+      delayTrend: trend.rows.map((r) => ({
+        date: r.day,
+        sessions: Number(r.sessions),
+        opened: Number(r.opened),
+        lateStarts: Number(r.late),
+      })),
       doctors: rows.map((r) => ({
         doctorId: r.doctor_id,
         doctorName: r.display_name,
@@ -105,6 +161,13 @@ export class ClinicStatisticsRepository {
         averageConsultationSeconds:
           Number(r.timed) >= MIN_COHORT_FOR_AVERAGE && r.avg_seconds !== null
             ? Math.round(Number(r.avg_seconds))
+            : null,
+        openedSessions: Number(r.opened),
+        lateStarts: Number(r.late),
+        averageStartDelayMinutes:
+          Number(r.opened) >= MIN_COHORT_FOR_AVERAGE &&
+          r.avg_delay_minutes !== null
+            ? Math.round(Number(r.avg_delay_minutes))
             : null,
       })),
     };

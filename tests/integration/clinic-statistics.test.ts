@@ -129,6 +129,9 @@ describe('clinic operational statistics', () => {
         noShow: 1,
         cancelled: 1,
         averageConsultationSeconds: 660,
+        openedSessions: 0,
+        lateStarts: 0,
+        averageStartDelayMinutes: null,
       },
       {
         doctorId: id.quiet,
@@ -139,6 +142,9 @@ describe('clinic operational statistics', () => {
         cancelled: 0,
         // 2 < MIN_COHORT_FOR_AVERAGE: withheld rather than exposing near-individual values.
         averageConsultationSeconds: null,
+        openedSessions: 0,
+        lateStarts: 0,
+        averageStartDelayMinutes: null,
       },
     ]);
     expect(MIN_COHORT_FOR_AVERAGE).toBe(5);
@@ -150,6 +156,86 @@ describe('clinic operational statistics', () => {
     });
     expect(wide.doctors.find((d) => d.doctorId === id.busy)?.sessions).toBe(1);
     expect(wide.doctors.find((d) => d.doctorId === id.busy)?.completed).toBe(6);
+  });
+
+  it('reports delay trends from opened_at vs starts_at with tenant scope and a small-cohort rule', async () => {
+    const mk = async (
+      clinicId: string,
+      doctorId: string,
+      day: string,
+      openedOffsetMin: number | null,
+    ): Promise<void> => {
+      await pool.query(
+        `INSERT INTO consultation_sessions(id,clinic_id,doctor_id,service_date,starts_at,ends_at,status,opened_at)
+         VALUES($1,$2,$3,$4::date,($4::date + time '09:00') AT TIME ZONE 'UTC',
+                ($4::date + time '12:00') AT TIME ZONE 'UTC','closed',
+                CASE WHEN $5::int IS NULL THEN NULL
+                     ELSE ($4::date + time '09:00') AT TIME ZONE 'UTC' + make_interval(mins => $5::int) END)`,
+        [randomUUID(), clinicId, doctorId, day, openedOffsetMin],
+      );
+    };
+    // Dr Quiet: 5 opened sessions 2026-11-02..06 (delays 0,-10 early,10,20,30) plus one never opened.
+    for (const [d, off] of [
+      ['2026-11-02', 0],
+      ['2026-11-03', -10],
+      ['2026-11-04', 10],
+      ['2026-11-05', 20],
+      ['2026-11-06', 30],
+    ] as const)
+      await mk(id.clinicA, id.quiet, d, off);
+    await mk(id.clinicA, id.quiet, '2026-11-06', null);
+    // Dr Busy: only 2 opened sessions -> average withheld, counts exact.
+    await mk(id.clinicA, id.busy, '2026-11-02', 15);
+    await mk(id.clinicA, id.busy, '2026-11-03', 5);
+    // Same doctor at another clinic and outside the window must not leak.
+    await mk(id.clinicB, id.busy, '2026-11-02', 99);
+    await mk(id.clinicA, id.busy, '2026-12-15', 99);
+
+    const repo = new ClinicStatisticsRepository(pool);
+    const stats = await repo.forWindow({
+      clinicId: id.clinicA,
+      from: '2026-11-01',
+      to: '2026-11-30',
+    });
+    const quiet = stats.doctors.find((d) => d.doctorId === id.quiet);
+    const busy = stats.doctors.find((d) => d.doctorId === id.busy);
+    expect(quiet).toMatchObject({
+      sessions: 6,
+      openedSessions: 5,
+      lateStarts: 3,
+      averageStartDelayMinutes: 12, // (0+0+10+20+30)/5
+    });
+    expect(busy).toMatchObject({
+      sessions: 2,
+      openedSessions: 2,
+      lateStarts: 2,
+      averageStartDelayMinutes: null, // 2 < MIN_COHORT_FOR_AVERAGE
+    });
+    expect(stats.delayTrend).toEqual([
+      { date: '2026-11-02', sessions: 2, opened: 2, lateStarts: 1 },
+      { date: '2026-11-03', sessions: 2, opened: 2, lateStarts: 1 },
+      { date: '2026-11-04', sessions: 1, opened: 1, lateStarts: 1 },
+      { date: '2026-11-05', sessions: 1, opened: 1, lateStarts: 1 },
+      { date: '2026-11-06', sessions: 2, opened: 1, lateStarts: 1 },
+    ]);
+    // Positive control: moving the window onto December reports only that day.
+    const dec = await repo.forWindow({
+      clinicId: id.clinicA,
+      from: '2026-12-01',
+      to: '2026-12-31',
+    });
+    expect(dec.delayTrend).toEqual([
+      { date: '2026-12-15', sessions: 1, opened: 1, lateStarts: 1 },
+    ]);
+    // Other clinic sees only its own session.
+    const other = await repo.forWindow({
+      clinicId: id.clinicB,
+      from: '2026-11-01',
+      to: '2026-11-30',
+    });
+    expect(other.delayTrend).toEqual([
+      { date: '2026-11-02', sessions: 1, opened: 1, lateStarts: 1 },
+    ]);
   });
 
   it('rejects malformed, reversed and oversized windows', async () => {
