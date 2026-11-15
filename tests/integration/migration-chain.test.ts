@@ -64,6 +64,7 @@ const committedMigrations = [
   '0053_notification_dead_letter_handlings.sql',
   '0054_patient_credentials.sql',
   '0055_patient_sessions.sql',
+  '0056_guest_push_subscriptions.sql',
 ];
 
 beforeAll(async () => {
