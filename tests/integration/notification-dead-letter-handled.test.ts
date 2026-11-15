@@ -5,6 +5,7 @@ import { migrate } from '../../scripts/db/lib';
 import { GET } from '@/app/api/clinics/[clinicId]/notifications/dead-letters/route';
 import { POST } from '@/app/api/clinics/[clinicId]/notifications/dead-letters/[intentId]/handled/route';
 import { NotificationOutboxRepository } from '@/modules/notification-outbox';
+import { NotificationDeadLetterObservabilityRepository } from '@/modules/notification-outbox/observability';
 import { closePool } from '@/platform/database/pool';
 import { createStaffSessionToken } from '@/platform/http/staff-auth';
 
@@ -176,6 +177,31 @@ describe('dead-letter handled marker (TAB-P1-06 slice 1)', () => {
       [handled.id],
     );
     expect(rows.rows).toEqual([{ handled_by: ids.receptionist }]);
+  });
+
+  it('returns the same original handling for concurrent first-time requests', async () => {
+    const intent = await deadLetter(
+      ids.clinicA,
+      'race',
+      'x',
+      '2026-09-13T10:00:00Z',
+    );
+    const repository = new NotificationDeadLetterObservabilityRepository(pool);
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        repository.markHandled({
+          clinicId: ids.clinicA,
+          intentId: intent.id,
+          actorUserId: ids.receptionist,
+        }),
+      ),
+    );
+    expect(new Set(results.map((r) => r.handledAt)).size).toBe(1);
+    const rows = await pool.query(
+      'SELECT handled_by FROM notification_dead_letter_handlings WHERE intent_id=$1',
+      [intent.id],
+    );
+    expect(rows.rows).toHaveLength(1);
   });
 
   it('answers 404 for another clinic, pending, unknown and malformed intents without changing anything', async () => {

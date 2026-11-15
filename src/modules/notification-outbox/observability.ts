@@ -97,25 +97,25 @@ export class NotificationDeadLetterObservabilityRepository {
     intentId: string;
     actorUserId: string;
   }): Promise<{ intentId: string; handledAt: string }> {
-    const result = await this.pool.query<{ handled_at: Date }>(
-      `WITH target AS (
-         SELECT id, clinic_id FROM notification_outbox
-          WHERE id=$2 AND clinic_id=$1 AND state='dead_letter'
-       ), inserted AS (
-         INSERT INTO notification_dead_letter_handlings
-           (intent_id, clinic_id, handled_by)
-         SELECT id, clinic_id, $3 FROM target
-         ON CONFLICT (intent_id) DO NOTHING
-         RETURNING handled_at
-       )
-       SELECT handled_at FROM inserted
-       UNION ALL
-       SELECT handled.handled_at
-         FROM notification_dead_letter_handlings handled
-         JOIN target ON target.id = handled.intent_id
-                    AND target.clinic_id = handled.clinic_id
-       LIMIT 1`,
+    // Two statements on purpose: under READ COMMITTED a concurrent insert that
+    // loses the ON CONFLICT race would otherwise re-read with the statement
+    // snapshot taken before the winner committed and find nothing.
+    await this.pool.query(
+      `INSERT INTO notification_dead_letter_handlings
+         (intent_id, clinic_id, handled_by)
+       SELECT id, clinic_id, $3 FROM notification_outbox
+        WHERE id=$2 AND clinic_id=$1 AND state='dead_letter'
+       ON CONFLICT (intent_id) DO NOTHING`,
       [input.clinicId, input.intentId, input.actorUserId],
+    );
+    const result = await this.pool.query<{ handled_at: Date }>(
+      `SELECT handled.handled_at
+         FROM notification_dead_letter_handlings handled
+         JOIN notification_outbox o ON o.id = handled.intent_id
+                                   AND o.clinic_id = handled.clinic_id
+        WHERE handled.intent_id=$2 AND handled.clinic_id=$1
+          AND o.state='dead_letter'`,
+      [input.clinicId, input.intentId],
     );
     const row = result.rows[0];
     if (!row) throw new NotificationDeadLetterNotFoundError();
