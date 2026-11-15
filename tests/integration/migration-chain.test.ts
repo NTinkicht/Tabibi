@@ -62,6 +62,7 @@ const committedMigrations = [
   '0051_booking_receipt_ciphertext_scrub.sql',
   '0052_doctor_clinic_departure.sql',
   '0053_notification_dead_letter_handlings.sql',
+  '0054_patient_credentials.sql',
 ];
 
 beforeAll(async () => {

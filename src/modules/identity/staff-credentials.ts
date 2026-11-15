@@ -9,9 +9,9 @@ export const PASSWORD_MAX_LENGTH = 256;
 export const DEFAULT_MAX_FAILED_ATTEMPTS = 5;
 export const DEFAULT_LOCKOUT_SECONDS = 900;
 
-const KEY_LENGTH = 32;
-const SALT_LENGTH = 16;
-const DEFAULT_PARAMS = { n: 32768, r: 8, p: 1 } as const;
+export const KEY_LENGTH = 32;
+export const SALT_LENGTH = 16;
+export const DEFAULT_PARAMS = { n: 32768, r: 8, p: 1 } as const;
 
 export type PasswordPolicyCode = 'too_short' | 'too_long' | 'matches_identity';
 
@@ -38,13 +38,13 @@ export interface LockoutOptions {
 
 export type VerifyResult = { ok: true; userId: string } | { ok: false };
 
-interface ScryptParams {
+export interface ScryptParams {
   n: number;
   r: number;
   p: number;
 }
 
-function derive(
+export function derive(
   password: string,
   salt: Buffer,
   params: ScryptParams,
@@ -80,7 +80,7 @@ export function validatePasswordPolicy(
   }
 }
 
-function lockoutSettings(options?: LockoutOptions): {
+export function lockoutSettings(options?: LockoutOptions): {
   max: number;
   seconds: number;
 } {
@@ -98,7 +98,7 @@ function lockoutSettings(options?: LockoutOptions): {
 }
 
 let dummyCredential: Promise<{ salt: Buffer; hash: Buffer }> | undefined;
-function dummy(): Promise<{ salt: Buffer; hash: Buffer }> {
+export function dummy(): Promise<{ salt: Buffer; hash: Buffer }> {
   dummyCredential ??= (async () => {
     const salt = randomBytes(SALT_LENGTH);
     return {
