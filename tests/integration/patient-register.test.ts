@@ -147,4 +147,41 @@ describe('POST /api/patient/register', () => {
     ).toBe(202);
     expect(await count()).toBe(2);
   });
+  it('refuses a body over the 4096 byte cap for that reason alone', async () => {
+    // Valid JSON padded with whitespace: schema-valid either way, so only the
+    // byte cap can differ between the two requests.
+    const body = JSON.stringify(valid());
+    const under = body + ' '.repeat(4096 - Buffer.byteLength(body));
+    expect(Buffer.byteLength(under)).toBe(4096);
+    const over = body + ' '.repeat(4097 - Buffer.byteLength(body));
+    expect(Buffer.byteLength(over)).toBe(4097);
+    const refused = await register(over);
+    expect(refused.status).toBe(400);
+    expect(await count()).toBe(0);
+    expect((await register(under)).status).toBe(202);
+    expect(await count()).toBe(1);
+  });
+
+  it('rate limits the shared ingress bucket at 60 per window across emails', async () => {
+    for (let i = 0; i < 60; i++)
+      expect(
+        (await register(valid({ email: `bulk${i}.patient@example.test` })))
+          .status,
+      ).toBe(202);
+    // Fresh email, so the per-email budget is not the reason.
+    const limited = await register(
+      valid({ email: 'late.patient@example.test' }),
+    );
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('retry-after')).toBe('900');
+    expect(await count()).toBe(60);
+    // Positive control: clearing the ingress bucket lets the same request through.
+    await pool.query(
+      `DELETE FROM staff_sign_in_rate_limit_buckets WHERE bucket_key = 'patient-register:ingress'`,
+    );
+    expect(
+      (await register(valid({ email: 'late.patient@example.test' }))).status,
+    ).toBe(202);
+    expect(await count()).toBe(61);
+  });
 });
