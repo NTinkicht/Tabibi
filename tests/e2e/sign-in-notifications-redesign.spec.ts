@@ -179,7 +179,8 @@ for (const vp of viewports) {
       );
       await page.goto(`/operations/${clinicId}/notifications?locale=${locale}`);
       await expect(page.getByRole('table')).toHaveCount(2);
-      await expect(page.locator('th[scope="col"]')).toHaveCount(10);
+      // 5 queue columns + the handled action column, plus 5 guest-link columns.
+      await expect(page.locator('th[scope="col"]')).toHaveCount(11);
       await expect(page.locator('td bdi').first()).toBeVisible();
       expect(await seriousViolations(page)).toEqual([]);
     });
