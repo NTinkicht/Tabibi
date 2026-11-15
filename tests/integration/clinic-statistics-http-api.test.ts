@@ -100,6 +100,14 @@ describe('GET /statistics role scoping', () => {
     expect(r.json.delayTrend).toEqual([
       { date: '2026-09-08', sessions: 2, opened: 2, lateStarts: 1 },
     ]);
+    expect(r.json.totals).toEqual({
+      sessions: 2,
+      completed: 0,
+      noShow: 0,
+      cancelled: 0,
+      openedSessions: 2,
+      lateStarts: 1,
+    });
   });
 
   it('a doctor sees only their own row and trend, ignoring any doctorId parameter', async () => {
@@ -114,6 +122,9 @@ describe('GET /statistics role scoping', () => {
       expect(r.json.delayTrend).toEqual([
         { date: '2026-09-08', sessions: 1, opened: 1, lateStarts: 0 },
       ]);
+      // Totals are the doctor's own, not the clinic's.
+      expect(r.json.totals.sessions).toBe(1);
+      expect(r.json.totals.lateStarts).toBe(0);
     }
     const a = await get('st-a');
     expect(a.json.doctors[0].doctorId).toBe(id.docA);
