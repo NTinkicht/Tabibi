@@ -354,6 +354,20 @@ describe('POST /api/guest/push-subscription/renew', () => {
     expect(await active(ids.entryA)).toHaveLength(1);
   });
 
+  it('renews at the 3-per-entry cap without exceeding it, and keeps the cap for subscribe', async () => {
+    for (const n of [1, 2, 3])
+      expect((await bind(cookie(), sub(n))).status).toBe(200);
+    // Renewal replaces one binding, so it is allowed at the cap...
+    expect((await doRenew(cookie(), renewBody(2, 4))).status).toBe(200);
+    expect(await active(ids.entryA)).toHaveLength(3);
+    // ...but never adds a fourth: the cap still refuses a plain subscribe.
+    expect((await bind(cookie(), sub(5))).status).toBe(409);
+    expect(await active(ids.entryA)).toHaveLength(3);
+    // The old endpoint is gone, so renewing it again is refused (no oracle).
+    expect((await doRenew(cookie(), renewBody(2, 6))).status).toBe(401);
+    expect(await active(ids.entryA)).toHaveLength(3);
+  });
+
   it('inherits the locale of the replaced binding', async () => {
     await bind(cookie(), sub(1, { locale: 'ar' }));
     expect((await doRenew(cookie(), renewBody(1, 2))).status).toBe(200);
