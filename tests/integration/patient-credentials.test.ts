@@ -75,6 +75,7 @@ describe('patient credentials (#875)', () => {
     ).toEqual({
       ok: true,
       userId: reg.ok ? reg.userId : '',
+      passwordHash: expect.any(Buffer),
     });
     const wrong = await verifyPatientPassword(pool, EMAIL, 'wrong password!!');
     expect(wrong).toEqual({ ok: false });
@@ -187,6 +188,7 @@ describe('patient credentials (#875)', () => {
     expect(await verifyPatientPassword(pool, EMAIL, GOOD)).toEqual({
       ok: true,
       userId: reg.ok ? reg.userId : '',
+      passwordHash: expect.any(Buffer),
     });
   });
 

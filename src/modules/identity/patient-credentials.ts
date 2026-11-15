@@ -35,6 +35,12 @@ export class PatientRegistrationInputError extends Error {
   }
 }
 
+// The verified hash lets session creation fail closed if the password was
+// rotated between verification and session insert.
+export type PatientVerifyResult =
+  | (VerifyResult & { ok: false })
+  | { ok: true; userId: string; passwordHash: Buffer };
+
 export type RegisterResult = { ok: true; userId: string } | { ok: false };
 
 export function normalizePatientEmail(email: string): string | null {
@@ -105,7 +111,7 @@ export async function verifyPatientPassword(
   email: string,
   password: string,
   options?: LockoutOptions,
-): Promise<VerifyResult> {
+): Promise<PatientVerifyResult> {
   const { max, seconds } = lockoutSettings(options);
   const normalized = normalizePatientEmail(email);
   const attempt = password.length > PASSWORD_MAX_LENGTH * 4 ? '' : password;
@@ -151,7 +157,7 @@ export async function verifyPatientPassword(
       [found.user_id, found.password_hash],
     );
     return reset.rowCount === 1
-      ? { ok: true, userId: found.user_id }
+      ? { ok: true, userId: found.user_id, passwordHash: found.password_hash }
       : { ok: false };
   }
   await db.query(
@@ -170,4 +176,64 @@ export async function verifyPatientPassword(
     [found.user_id, max, seconds, found.password_hash],
   );
   return { ok: false };
+}
+
+export type ChangePasswordResult =
+  | { ok: true }
+  | { ok: false; reason: 'current_password_invalid' };
+
+/**
+ * Replaces the password of a signed-in patient account. The new password must
+ * satisfy the shared policy (throws PasswordPolicyError before any state
+ * changes). The current password is checked through the lockout-aware
+ * verifyPatientPassword, so wrong guesses count toward the account lockout, and
+ * the hash is swapped with a compare-and-set on the hash that was verified.
+ */
+export async function changePatientPassword(
+  db: Queryable,
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<ChangePasswordResult> {
+  const account = await db.query<{
+    auth_subject: string;
+    password_hash: Buffer;
+  }>(
+    `SELECT u.auth_subject, c.password_hash
+       FROM users u
+       JOIN patient_credentials c ON c.user_id = u.id
+      WHERE u.id = $1 AND u.auth_subject LIKE $2
+        FOR UPDATE OF c`,
+    [userId, `${PATIENT_SUBJECT_PREFIX}%`],
+  );
+  const current = account.rows[0];
+  const subject = current?.auth_subject;
+  if (!current || !subject)
+    return { ok: false, reason: 'current_password_invalid' };
+  const email = subject.slice(PATIENT_SUBJECT_PREFIX.length);
+  validatePasswordPolicy(newPassword, email);
+  const verified = await verifyPatientPassword(db, email, currentPassword);
+  if (!verified.ok || verified.userId !== userId)
+    return { ok: false, reason: 'current_password_invalid' };
+  const salt = randomBytes(SALT_LENGTH);
+  const hash = await derive(newPassword, salt, DEFAULT_PARAMS);
+  const updated = await db.query(
+    `UPDATE patient_credentials
+        SET password_hash = $2, salt = $3, scrypt_n = $4, scrypt_r = $5,
+            scrypt_p = $6, password_changed_at = now(), failed_attempts = 0,
+            locked_until = NULL, updated_at = now()
+      WHERE user_id = $1 AND password_hash = $7`,
+    [
+      userId,
+      hash,
+      salt,
+      DEFAULT_PARAMS.n,
+      DEFAULT_PARAMS.r,
+      DEFAULT_PARAMS.p,
+      current.password_hash,
+    ],
+  );
+  return updated.rowCount === 1
+    ? { ok: true }
+    : { ok: false, reason: 'current_password_invalid' };
 }
