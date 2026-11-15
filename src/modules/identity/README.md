@@ -57,5 +57,16 @@ namespaced subject `patient:<normalized email>` plus a `patient_credentials` row
 `registerPatientAccount` returns `{ ok: true, userId }` or one uniform
 `{ ok: false }` for an existing account; `verifyPatientPassword` returns the same
 `{ ok: false }` for unknown, wrong and locked. Patient and staff credentials live in
-separate tables and never authenticate each other. HTTP routes, sessions, identity
-verification and recovery are later slices.
+separate tables and never authenticate each other. Identity
+verification, registration routes and recovery are later slices.
+
+### Patient sessions (slice 2)
+
+`POST /api/patient/session` `{ email, password }` signs in (same-origin, bounded
+strict body, 10 attempts per account and one ingress bucket per 15 minutes,
+uniform 401) and sets the HttpOnly `tabibi_patient_session` cookie; `GET` returns
+`{ account: { displayName } }`; `POST /api/patient/session/logout` revokes the
+server-side `patient_sessions` row (verifier only). The token is signed with a key
+derived from `STAFF_SESSION_SECRET` under a patient-only context and the row lives
+in its own table, so patient and staff sessions never verify on each other's
+routes.
