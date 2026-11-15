@@ -2,10 +2,12 @@ import { guestBearerSigningSecret } from '@/modules/guest-access';
 import { GuestLinkEnvelope } from '@/modules/guest-access/link-envelope';
 import { GuestLinkIntentStore } from '@/modules/guest-access/link-intents';
 import {
+  createOutcomeCountingBatchRunner,
   dispatchIntervalMs,
   runDispatchTick,
 } from '@/modules/notification-domain/dispatch-worker';
-import { createQueueInAppNotificationDispatchBatchRunner } from '@/modules/notification-domain/in-app';
+import { createQueueInAppNotificationDispatchService } from '@/modules/notification-domain/in-app';
+import { NotificationDispatchEligibilityRepository } from '@/modules/notification-outbox/dispatch-eligibility';
 import { closePool, getPool } from '@/platform/database/pool';
 
 /**
@@ -20,7 +22,11 @@ async function main(): Promise<void> {
   const pool = getPool();
   const deps = {
     pool,
-    outboxRunner: createQueueInAppNotificationDispatchBatchRunner(pool),
+    cursor: { after: null as string | null },
+    outboxRunner: createOutcomeCountingBatchRunner(
+      new NotificationDispatchEligibilityRepository(pool),
+      createQueueInAppNotificationDispatchService(pool),
+    ),
     linkStore: new GuestLinkIntentStore(
       pool,
       new GuestLinkEnvelope(guestBearerSigningSecret()),

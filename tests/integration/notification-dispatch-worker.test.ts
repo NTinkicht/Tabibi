@@ -13,8 +13,9 @@ import { migrate } from '../../scripts/db/lib';
 import { GuestLinkEnvelope } from '@/modules/guest-access/link-envelope';
 import { GuestLinkIntentStore } from '@/modules/guest-access/link-intents';
 import { NotificationDispatchService } from '@/modules/notification-domain';
-import { NotificationDispatchBatchRunner } from '@/modules/notification-domain/dispatch-batch';
 import {
+  MAX_CLINICS_PER_TICK,
+  createOutcomeCountingBatchRunner,
   dispatchIntervalMs,
   runDispatchTick,
 } from '@/modules/notification-domain/dispatch-worker';
@@ -51,10 +52,10 @@ const deliveryContext = {
   }),
 };
 
-type Dispatch = () => Promise<{ kind: 'delivered' }>;
+type Dispatch = () => Promise<{ kind: string }>;
 
 function runner(dispatch: Dispatch | ReturnType<typeof vi.fn>) {
-  return new NotificationDispatchBatchRunner(
+  return createOutcomeCountingBatchRunner(
     new NotificationDispatchEligibilityRepository(pool),
     new NotificationDispatchService(
       outbox,
@@ -263,6 +264,64 @@ describe('notification dispatch worker tick, real PostgreSQL (#884)', () => {
     expect(Object.values(counts).every((v) => typeof v === 'number')).toBe(
       true,
     );
+  });
+});
+
+describe('worker accounting and fairness (#891 review)', () => {
+  it('counts persisted outcomes, not provider completion', async () => {
+    await enqueue(clinicA, 'ok');
+    await enqueue(clinicA, 'retry');
+    await enqueue(clinicA, 'dead');
+    const kinds = ['delivered', 'retryable_failure', 'terminal_failure'];
+    const dispatch = vi.fn(async () => ({ kind: kinds.shift()! }));
+    const counts = await runDispatchTick({
+      pool,
+      outboxRunner: runner(dispatch),
+      linkStore: store,
+    });
+    expect(counts).toMatchObject({
+      claimed: 3,
+      delivered: 1,
+      retried: 1,
+      deadLettered: 1,
+      errors: 0,
+    });
+  });
+
+  it('rotates across ticks so later clinics are not starved', async () => {
+    await pool.query(
+      `INSERT INTO clinics(id,tenant_key,name)
+       SELECT gen_random_uuid(), 'bulk-' || g, 'bulk' FROM generate_series(1, $1) g`,
+      [MAX_CLINICS_PER_TICK],
+    );
+    await pool.query(`INSERT INTO notification_outbox
+        (id, clinic_id, logical_target_key, event_key, intent_version,
+         idempotency_key, state, payload)
+      SELECT gen_random_uuid(), id, 'queue-entry:x', 'turn_approaching', 1,
+             'rot:' || id, 'pending', '{"locale":"en","places":2}'::jsonb
+        FROM clinics`);
+    const total = (
+      await pool.query<{ n: number }>('SELECT count(*)::int n FROM clinics')
+    ).rows[0]!.n;
+    expect(total).toBeGreaterThan(MAX_CLINICS_PER_TICK);
+    const cursor = { after: null as string | null };
+    const dispatch = vi.fn(async () => ({ kind: 'delivered' }));
+    const deps = {
+      pool,
+      cursor,
+      outboxRunner: runner(dispatch),
+      linkStore: store,
+    };
+    const first = await runDispatchTick(deps);
+    expect(first.clinics).toBe(MAX_CLINICS_PER_TICK);
+    expect(cursor.after).not.toBeNull();
+    const second = await runDispatchTick(deps);
+    expect(second.clinics).toBe(total - MAX_CLINICS_PER_TICK);
+    expect(cursor.after).toBeNull();
+    const undelivered = await pool.query(
+      `SELECT count(*)::int n FROM notification_outbox WHERE state <> 'delivered'`,
+    );
+    expect(undelivered.rows[0].n).toBe(0);
   });
 });
 
