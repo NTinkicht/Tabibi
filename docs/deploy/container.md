@@ -23,6 +23,7 @@ docker run --rm -p 3000:3000 --env-file <your-env-file> tabibi:local
 - `STAFF_SESSION_TTL_SECONDS` (optional)
 - `GUEST_BEARER_SIGNING_SECRET`
 - `PUBLIC_AVAILABILITY_SELECTION_SECRET`
+- `GUEST_PUSH_SEAL_SECRET` (optional, at least 32 characters; without it `/api/guest/push-subscription` answers 503 and stores nothing)
 - `PORT` (default `3000`), `NODE_HEAP_MB` (default `384`)
 
 ## Migrations
