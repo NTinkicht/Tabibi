@@ -238,6 +238,82 @@ describe('clinic operational statistics', () => {
     ]);
   });
 
+  it('reconciles clinic totals with doctor rows and the daily trend, tenant-scoped', async () => {
+    for (const s of [600, 600, 600, 600, 900])
+      await entry(id.clinicA, id.busySession, 'completed', s);
+    await entry(id.clinicA, id.busySession, 'no_show');
+    await entry(id.clinicA, id.busySession, 'cancelled');
+    await entry(id.clinicA, id.quietSession, 'completed', 300);
+    // Other clinic and out-of-window entries must not reach the totals.
+    await entry(id.clinicB, id.busyOtherClinic, 'completed', 60);
+    await entry(id.clinicA, id.busyOutside, 'no_show');
+    await pool.query(
+      `UPDATE consultation_sessions SET opened_at = starts_at + interval '20 minutes'
+        WHERE id = $1`,
+      [id.busySession],
+    );
+    await pool.query(
+      `UPDATE consultation_sessions SET opened_at = starts_at WHERE id = $1`,
+      [id.quietSession],
+    );
+
+    const repo = new ClinicStatisticsRepository(pool);
+    const stats = await repo.forWindow({
+      clinicId: id.clinicA,
+      from: '2026-09-01',
+      to: '2026-09-30',
+    });
+    expect(stats.totals).toEqual({
+      sessions: 2,
+      completed: 6,
+      noShow: 1,
+      cancelled: 1,
+      openedSessions: 2,
+      lateStarts: 1,
+    });
+    const sum = (pick: (d: (typeof stats.doctors)[number]) => number): number =>
+      stats.doctors.reduce((n, d) => n + pick(d), 0);
+    expect(stats.totals.sessions).toBe(sum((d) => d.sessions));
+    expect(stats.totals.completed).toBe(sum((d) => d.completed));
+    expect(stats.totals.lateStarts).toBe(sum((d) => d.lateStarts));
+    const trend = (k: 'sessions' | 'opened' | 'lateStarts'): number =>
+      stats.delayTrend.reduce((n, d) => n + d[k], 0);
+    expect(stats.totals.sessions).toBe(trend('sessions'));
+    expect(stats.totals.openedSessions).toBe(trend('opened'));
+    expect(stats.totals.lateStarts).toBe(trend('lateStarts'));
+
+    // Doctor self-view restricts totals to that doctor.
+    const own = await repo.forWindow({
+      clinicId: id.clinicA,
+      from: '2026-09-01',
+      to: '2026-09-30',
+      doctorId: id.quiet,
+    });
+    expect(own.totals).toEqual({
+      sessions: 1,
+      completed: 1,
+      noShow: 0,
+      cancelled: 0,
+      openedSessions: 1,
+      lateStarts: 0,
+    });
+
+    // Empty window: zero totals, not absent.
+    const empty = await repo.forWindow({
+      clinicId: id.clinicA,
+      from: '2026-01-01',
+      to: '2026-01-31',
+    });
+    expect(empty.totals).toEqual({
+      sessions: 0,
+      completed: 0,
+      noShow: 0,
+      cancelled: 0,
+      openedSessions: 0,
+      lateStarts: 0,
+    });
+  });
+
   it('rejects malformed, reversed and oversized windows', async () => {
     const repo = new ClinicStatisticsRepository(pool);
     for (const [from, to] of [

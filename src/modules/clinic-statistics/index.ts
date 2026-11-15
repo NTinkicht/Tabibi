@@ -31,9 +31,21 @@ export interface DelayTrendDay {
   lateStarts: number;
 }
 
+/** Counts only (no averages), so a clinic total can never leak a small cohort. */
+export interface ClinicOperationalTotals {
+  sessions: number;
+  completed: number;
+  noShow: number;
+  cancelled: number;
+  openedSessions: number;
+  lateStarts: number;
+}
+
 export interface ClinicOperationalStatistics {
   from: string;
   to: string;
+  /** Sum of the doctor rows returned, so it reconciles with them by construction. */
+  totals: ClinicOperationalTotals;
   doctors: DoctorOperationalStatistics[];
   /** Counts only, one row per service date that has sessions. */
   delayTrend: DelayTrendDay[];
@@ -147,34 +159,52 @@ export class ClinicStatisticsRepository {
         ORDER BY service_date`,
       [input.clinicId, input.from, input.to, input.doctorId ?? null],
     );
+    const doctors = rows.map((r) => ({
+      doctorId: r.doctor_id,
+      doctorName: r.display_name,
+      sessions: Number(r.sessions),
+      completed: Number(r.completed),
+      noShow: Number(r.no_show),
+      cancelled: Number(r.cancelled),
+      averageConsultationSeconds:
+        Number(r.timed) >= MIN_COHORT_FOR_AVERAGE && r.avg_seconds !== null
+          ? Math.round(Number(r.avg_seconds))
+          : null,
+      openedSessions: Number(r.opened),
+      lateStarts: Number(r.late),
+      averageStartDelayMinutes:
+        Number(r.opened) >= MIN_COHORT_FOR_AVERAGE &&
+        r.avg_delay_minutes !== null
+          ? Math.round(Number(r.avg_delay_minutes))
+          : null,
+    }));
+    const totals: ClinicOperationalTotals = {
+      sessions: 0,
+      completed: 0,
+      noShow: 0,
+      cancelled: 0,
+      openedSessions: 0,
+      lateStarts: 0,
+    };
+    for (const d of doctors) {
+      totals.sessions += d.sessions;
+      totals.completed += d.completed;
+      totals.noShow += d.noShow;
+      totals.cancelled += d.cancelled;
+      totals.openedSessions += d.openedSessions;
+      totals.lateStarts += d.lateStarts;
+    }
     return {
       from: input.from,
       to: input.to,
+      totals,
       delayTrend: trend.rows.map((r) => ({
         date: r.day,
         sessions: Number(r.sessions),
         opened: Number(r.opened),
         lateStarts: Number(r.late),
       })),
-      doctors: rows.map((r) => ({
-        doctorId: r.doctor_id,
-        doctorName: r.display_name,
-        sessions: Number(r.sessions),
-        completed: Number(r.completed),
-        noShow: Number(r.no_show),
-        cancelled: Number(r.cancelled),
-        averageConsultationSeconds:
-          Number(r.timed) >= MIN_COHORT_FOR_AVERAGE && r.avg_seconds !== null
-            ? Math.round(Number(r.avg_seconds))
-            : null,
-        openedSessions: Number(r.opened),
-        lateStarts: Number(r.late),
-        averageStartDelayMinutes:
-          Number(r.opened) >= MIN_COHORT_FOR_AVERAGE &&
-          r.avg_delay_minutes !== null
-            ? Math.round(Number(r.avg_delay_minutes))
-            : null,
-      })),
+      doctors,
     };
   }
 }
