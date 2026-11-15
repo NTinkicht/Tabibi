@@ -7,8 +7,9 @@ status links off third-party messaging platforms. This document applies `PRODUCT
 spend. It keeps every contract in `ARCHITECTURE.md` and `SECURITY.md`. Gap register: G-22, G-23.
 
 Implementation issues: #883 (PWA shell), #884 (dispatch scheduler), #885 (subscription binding), #886 (Web Push
-sender), #887 (status page card), #888 (iPhone spike). #885, #886 and #888 issue or carry
-credentials, so Claude implements them in owner-attended sessions.
+sender), #887 (status page card), #888 (iPhone spike). All are implemented by the L5 writer. #885, #886 and #888 issue or carry
+credentials: Claude reviews those PRs against this spec at the exact head before merge, in addition to
+the independent reviewer.
 
 ## What the guest gets
 
@@ -57,7 +58,7 @@ Nothing dispatches notifications automatically today. `POST /api/clinics/{clinic
 - It logs counts only (claimed, delivered, retried, dead-lettered, suppressed, scrubbed): never ids of patients, entries, subscriptions or exchanges.
 - The staff dispatch route stays as it is.
 
-### 3. Push subscription binding (#885, owner-attended: Claude)
+### 3. Push subscription binding (#885, security review: Claude)
 
 Migration `guest_push_subscriptions`:
 - `id`, `clinic_id`, `queue_entry_id` (FK, same clinic), `endpoint_hash` (HMAC-SHA256 of the endpoint, unique while active);
@@ -99,7 +100,7 @@ Lifecycle:
 - **Transfer:** inside `QueueTransferService`'s transaction, active bindings move to the target entry. The AAD is re-sealed and the `push` preference is copied. The existing `transfer` intent then reaches the guest by push. The source binding no longer exists, so the old entry can't notify.
 - **Gone:** a push service answering 404 or 410 means the subscription is gone. The binding is revoked as `gone` and scrubbed.
 
-### 4. Web Push sender (#886, owner-attended: Claude)
+### 4. Web Push sender (#886, security review: Claude)
 
 - Dependency: `web-push` (MPL-2.0, used unmodified as a package, which that licence allows without affecting Tabibi's own code), for VAPID JWT signing and RFC 8291 `aes128gcm` payload encryption. There is no paid service and no account.
 - Configuration: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (an `https:` or `mailto:` URI the owner chooses), set in the hosting environment. If they are missing, the push sender is not registered, so its intents stay pending and expire. Startup never fails because of them, and the public key is served to the page from `GET /api/guest/push-subscription/key`.
@@ -143,7 +144,7 @@ On `/guest/status` and the booking confirmation page, below the status panel, ad
 - When opened without a valid status credential, the status page also offers "M’envoyer un nouveau lien", if `pushManager.getSubscription()` returns one. It calls the resend route and then shows "Si cet appareil est inscrit, un lien arrive dans quelques secondes."
 - `/guest/notification-help` explains what Tabibi sends, that nothing names the clinic on the lock screen, and how to switch notifications off.
 
-### 6. iPhone home-screen linking (#888, spike, owner-attended: Claude)
+### 6. iPhone home-screen linking (#888, spike, needs staging and a real iPhone)
 
 iOS delivers Web Push only to a site added to the Home Screen and opened from that icon. The
 installed app does not share cookies with Safari, so it starts with no status access. The spike tests one approach on a real iPhone: a per-visit manifest whose `start_url` is a fresh system exchange link, issued only to a page that already holds a valid status credential. If it works, the installed app opens straight into the guest's status. If it does not, iPhone guests keep the in-app centre and the printed link, and the "iPhone, not installed" copy changes to say so. No other approach (pairing codes, clipboard) is used without a new spec.
