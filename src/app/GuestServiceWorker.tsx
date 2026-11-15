@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react';
 
+import { registerGuestServiceWorker } from './guest-service-worker-register';
+
 // TAB-PWA-1 (#883): registers the push-only service worker and links the
 // manifest. Rendered only by guest pages; staff pages never include it.
 export function GuestServiceWorker() {
@@ -13,11 +15,9 @@ export function GuestServiceWorker() {
       link.href = `/manifest.webmanifest?locale=${locale}`;
       document.head.appendChild(link);
     }
-    if ('serviceWorker' in navigator) {
-      void navigator.serviceWorker
-        .register('/sw.js', { scope: '/' })
-        .catch(() => undefined);
-    }
+    void registerGuestServiceWorker(
+      'serviceWorker' in navigator ? navigator.serviceWorker : undefined,
+    );
   }, []);
   return null;
 }

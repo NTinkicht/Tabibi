@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
+import { registerGuestServiceWorker } from '@/app/guest-service-worker-register';
 import { buildManifest, manifestLocaleFromQuery } from '@/app/pwa-manifest';
 
 type Listener = (event: unknown) => void;
@@ -210,5 +211,41 @@ describe('PWA manifest (TAB-PWA-1)', () => {
     expect(buildManifest('ar')).toMatchObject({ lang: 'ar', dir: 'rtl' });
     const purposes = buildManifest('fr').icons.map((i) => i.sizes);
     expect(purposes).toEqual(['192x192', '512x512', '512x512']);
+  });
+});
+
+describe('service worker registration (TAB-PWA-1)', () => {
+  it('registers /sw.js with root scope and reports success', async () => {
+    const calls: unknown[][] = [];
+    const warnings: string[] = [];
+    const ok = await registerGuestServiceWorker(
+      { register: (...a) => (calls.push(a), Promise.resolve({})) },
+      (m) => warnings.push(m),
+    );
+    expect(ok).toBe(true);
+    expect(calls).toEqual([['/sw.js', { scope: '/' }]]);
+    expect(warnings).toEqual([]);
+  });
+
+  it('warns with the error name only when registration fails', async () => {
+    const warnings: string[] = [];
+    const err = new Error('secret-token-in-message');
+    err.name = 'SecurityError';
+    const ok = await registerGuestServiceWorker(
+      { register: () => Promise.reject(err) },
+      (m) => warnings.push(m),
+    );
+    expect(ok).toBe(false);
+    expect(warnings).toEqual([
+      'Guest service worker registration failed: SecurityError',
+    ]);
+  });
+
+  it('is a quiet no-op when service workers are unsupported', async () => {
+    const warnings: string[] = [];
+    expect(
+      await registerGuestServiceWorker(undefined, (m) => warnings.push(m)),
+    ).toBe(false);
+    expect(warnings).toEqual([]);
   });
 });
