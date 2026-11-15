@@ -4,6 +4,7 @@ import {
   randomUUID,
   timingSafeEqual,
 } from 'node:crypto';
+import { PATIENT_SUBJECT_PREFIX } from './patient-credentials';
 import type { Pool } from 'pg';
 import {
   AuthorizationError,
@@ -95,6 +96,10 @@ function verifierOf(secret: string): Buffer {
 export function normalizeInviteEmail(raw: string): string {
   const email = raw.normalize('NFKC').trim().toLowerCase();
   if (email.length > 254 || !EMAIL_PATTERN.test(email)) {
+    throw new InviteInputError('Invalid email');
+  }
+  // The patient: subject namespace belongs to patient accounts (#875).
+  if (email.startsWith(PATIENT_SUBJECT_PREFIX)) {
     throw new InviteInputError('Invalid email');
   }
   return email;
@@ -331,6 +336,10 @@ export class StaffInviteService {
       ) {
         throw new InviteRejectedError();
       }
+      // Invites predating the reserved namespace must not link a patient row.
+      if (invite.email.startsWith(PATIENT_SUBJECT_PREFIX)) {
+        throw new InviteRejectedError();
+      }
       validatePasswordPolicy(input.password, invite.email);
 
       const existing = await client.query<{ id: string }>(
@@ -338,6 +347,13 @@ export class StaffInviteService {
         [invite.email],
       );
       let userId = existing.rows[0]?.id;
+      if (userId !== undefined) {
+        const patient = await client.query(
+          'SELECT 1 FROM patient_credentials WHERE user_id = $1',
+          [userId],
+        );
+        if (patient.rowCount !== 0) throw new InviteRejectedError();
+      }
       if (userId === undefined) {
         userId = randomUUID();
         await client.query(
