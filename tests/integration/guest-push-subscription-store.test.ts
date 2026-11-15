@@ -227,6 +227,30 @@ describe('GuestPushSubscriptionStore', () => {
     expect((await prefs())[0].consent_state).toBe('granted');
   });
 
+  it('keeps patient-level push consent while another entry of the patient stays bound', async () => {
+    const otherSession = randomUUID();
+    const otherEntry = randomUUID();
+    await pool.query(
+      `INSERT INTO consultation_sessions
+       (id,clinic_id,doctor_id,service_date,starts_at,ends_at,status)
+       VALUES($1,$2,$3,'2026-09-10','2026-09-10T09:00Z','2026-09-10T12:00Z','planned')`,
+      [otherSession, ids.clinic, ids.doctor],
+    );
+    await pool.query(
+      `INSERT INTO queue_entries
+       (id,clinic_id,session_id,patient_id,state,source,registration_order,public_display_label)
+       VALUES($1,$2,$3,$4,'waiting','walk_in',1,'P-009')`,
+      [otherEntry, ids.clinic, otherSession, ids.patient],
+    );
+    const other = { clinicId: ids.clinic, queueEntryId: otherEntry };
+    await store.subscribe(target, material(1), 'fr');
+    await store.subscribe(other, material(2), 'fr');
+    await store.unsubscribe(target);
+    expect((await prefs())[0].consent_state).toBe('granted');
+    await store.unsubscribe(other);
+    expect((await prefs())[0].consent_state).toBe('revoked');
+  });
+
   it('does not unsubscribe another entry that shares an endpoint hash lookup', async () => {
     await store.subscribe(target, material(1), 'fr');
     expect(

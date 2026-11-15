@@ -156,10 +156,15 @@ export class GuestPushSubscriptionStore {
         [target.clinicId, target.queueEntryId, now, endpointHash],
       );
       const remaining = await client.query(
-        `SELECT 1 FROM guest_push_subscriptions
-          WHERE clinic_id=$1 AND queue_entry_id=$2 AND revoked_at IS NULL`,
-        [target.clinicId, target.queueEntryId],
+        `SELECT 1 FROM guest_push_subscriptions sub
+           JOIN queue_entries qe
+             ON qe.id=sub.queue_entry_id AND qe.clinic_id=sub.clinic_id
+          WHERE sub.clinic_id=$1 AND qe.patient_id=$2 AND sub.revoked_at IS NULL
+          LIMIT 1`,
+        [target.clinicId, entry.patient_id],
       );
+      // Consent is per patient, so it is revoked only when no entry of the
+      // patient keeps an active binding.
       if (remaining.rowCount === 0) {
         await client.query(
           `UPDATE notification_preferences
