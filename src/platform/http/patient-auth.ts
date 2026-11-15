@@ -49,7 +49,6 @@ export async function createPatientSessionToken(
   expiresAt: Date,
   db: Queryable = getPool(),
 ): Promise<string> {
-  signingKey();
   const exp = Math.floor(expiresAt.getTime() / 1000);
   const sid = randomBytes(32).toString('base64url');
   const issued = await db.query<{ user_id: string }>(
@@ -70,9 +69,15 @@ function decode(value: string): PatientClaims | null {
   if (parts.length !== 2) return null;
   const [payload, supplied] = parts;
   if (!payload || !supplied) return null;
-  const left = Buffer.from(supplied);
-  const right = Buffer.from(sign(payload));
-  if (left.length !== right.length || !timingSafeEqual(left, right))
+  // Compare the decoded HMAC bytes with an explicit length check, and require
+  // the canonical base64url spelling so no alias of a valid signature verifies.
+  const left = Buffer.from(supplied, 'base64url');
+  const right = createHmac('sha256', signingKey()).update(payload).digest();
+  if (
+    left.length !== right.length ||
+    left.toString('base64url') !== supplied ||
+    !timingSafeEqual(left, right)
+  )
     return null;
   let parsed: unknown;
   try {

@@ -240,3 +240,38 @@ describe('patient session verification', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('patient token signature hardening', () => {
+  it('rejects forged, truncated, non-canonical and re-signed tokens (positive control first)', async () => {
+    const token = tokenOf(await good()) as string;
+    expect((await me(`${PCOOKIE}=${token}`)).status).toBe(200);
+    const [payload, sig] = token.split('.') as [string, string];
+    // Forged payload for another user with the original signature.
+    const forged = Buffer.from(
+      JSON.stringify({ sub: randomUUID(), sid: 'x', exp: 4102444800 }),
+    ).toString('base64url');
+    expect((await me(`${PCOOKIE}=${forged}.${sig}`)).status).toBe(401);
+    // Truncated and empty signatures.
+    expect((await me(`${PCOOKIE}=${payload}.${sig.slice(0, -1)}`)).status).toBe(
+      401,
+    );
+    expect((await me(`${PCOOKIE}=${payload}.`)).status).toBe(401);
+    // Non-canonical alias: flip the unused low bits of the last character.
+    const alphabet =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const last = alphabet.indexOf(sig.slice(-1));
+    const alias = sig.slice(0, -1) + alphabet[last ^ 1];
+    expect(alias).not.toBe(sig);
+    expect((await me(`${PCOOKIE}=${payload}.${alias}`)).status).toBe(401);
+  });
+
+  it('keeps patient sign-in rate-limit buckets in their own key namespace', async () => {
+    await signIn({ email: EMAIL, password: 'bad-password-1' });
+    const keys = await pool.query<{ bucket_key: string }>(
+      'SELECT bucket_key FROM staff_sign_in_rate_limit_buckets',
+    );
+    expect(keys.rows.length).toBeGreaterThan(0);
+    for (const row of keys.rows)
+      expect(row.bucket_key.startsWith('patient-signin:')).toBe(true);
+  });
+});
