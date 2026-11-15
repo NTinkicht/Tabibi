@@ -227,6 +227,77 @@ export class GuestAccessService {
     return { exchangeId, expiresAt };
   }
 
+  /**
+   * System issuance of a push exchange (docs/design/pwa-push.md section 3).
+   * Allowed only for an entry and session that are still active and a
+   * specific, unexpired, unrevoked push binding of that same entry; there is
+   * no staff actor, and this never relaxes the contact rule for staff
+   * issuance (`issueInTransaction`). Runs inside the caller's transaction.
+   */
+  async issueSystemPushInTransaction(
+    client: PoolClient,
+    target: { clinicId: string; queueEntryId: string; subscriptionId: string },
+    now = new Date(),
+  ): Promise<{ exchangeId: string; expiresAt: Date }> {
+    const result = await client.query<{
+      session_id: string;
+      state: string;
+      session_status: string;
+      binding: string | null;
+    }>(
+      `SELECT entry.session_id, entry.state, session.status AS session_status,
+              (SELECT sub.id FROM guest_push_subscriptions sub
+                WHERE sub.id=$3 AND sub.clinic_id=entry.clinic_id
+                  AND sub.queue_entry_id=entry.id AND sub.revoked_at IS NULL
+                  AND sub.expires_at>$4) AS binding
+         FROM queue_entries entry
+         JOIN consultation_sessions session
+           ON session.id=entry.session_id AND session.clinic_id=entry.clinic_id
+        WHERE entry.id=$1 AND entry.clinic_id=$2
+        FOR UPDATE OF entry, session`,
+      [target.queueEntryId, target.clinicId, target.subscriptionId, now],
+    );
+    const row = result.rows[0];
+    if (
+      !row ||
+      !row.binding ||
+      !ACTIVE_ENTRY_STATES.includes(row.state) ||
+      !ACTIVE_SESSION_STATES.includes(row.session_status)
+    ) {
+      throw new GuestAccessRejectedError();
+    }
+    const exchangeId = secret();
+    const expiresAt = new Date(now.getTime() + EXCHANGE_TTL_MS);
+    await client.query(
+      `INSERT INTO guest_exchange_ids
+         (id,clinic_id,session_id,queue_entry_id,issued_by_user_id,
+          exchange_verifier,contact_kind,created_at,expires_at)
+       VALUES($1,$2,$3,$4,NULL,$5,'push',$6,$7)`,
+      [
+        randomUUID(),
+        target.clinicId,
+        row.session_id,
+        target.queueEntryId,
+        verifier(exchangeId),
+        now,
+        expiresAt,
+      ],
+    );
+    await appendAuditEvent(client, {
+      clinicId: target.clinicId,
+      actorUserId: null,
+      entityType: 'queue_entry',
+      entityId: target.queueEntryId,
+      action: 'guest_exchange_issued',
+      metadata: {
+        sessionId: row.session_id,
+        contactKind: 'push',
+        expiresAt: expiresAt.toISOString(),
+      },
+    });
+    return { exchangeId, expiresAt };
+  }
+
   async consume(
     exchangeId: string,
     expectedTarget?: GuestTarget,

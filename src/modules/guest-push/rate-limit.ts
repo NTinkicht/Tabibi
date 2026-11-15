@@ -2,6 +2,10 @@ import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
 
 const WINDOW_MS = 60_000;
+// Rows are only purged once older than every window in use (the longest is
+// the one-hour resend window), so a short-window call never evicts a
+// longer-window bucket.
+const PURGE_AFTER_MS = 2 * 60 * 60 * 1_000;
 
 /**
  * Fixed-window counter shared with the other guest routes
@@ -12,13 +16,14 @@ export async function consumeGuestPushBucket(
   pool: Pool,
   key: string,
   limit: number,
+  windowMs: number = WINDOW_MS,
 ): Promise<boolean> {
   const bucketKey = createHash('sha256').update(key).digest('hex');
   const result = await pool.query<{ allowed: boolean }>(
     `WITH cleanup AS (
        DELETE FROM guest_status_rate_limit_buckets
         WHERE bucket_key <> $1
-          AND window_started_at < now() - ($3::bigint * interval '1 millisecond')
+          AND window_started_at < now() - ($4::bigint * interval '1 millisecond')
      ), upserted AS (
        INSERT INTO guest_status_rate_limit_buckets
          (bucket_key,window_started_at,request_count,updated_at)
@@ -40,7 +45,7 @@ export async function consumeGuestPushBucket(
        RETURNING true AS allowed
      )
      SELECT EXISTS(SELECT 1 FROM upserted) AS allowed`,
-    [bucketKey, limit, WINDOW_MS],
+    [bucketKey, limit, windowMs, PURGE_AFTER_MS],
   );
   return result.rows[0]?.allowed === true;
 }
