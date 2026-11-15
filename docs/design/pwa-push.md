@@ -41,7 +41,7 @@ that the owner uses Tabibi.
   - **No `fetch` handler and no Cache Storage.** It caches nothing, so status, queue or patient data never lands on the device beyond what the browser already keeps.
   - `push`: parse `{ v: 1, kind: 'status' | 'link', title, body, url, tag }`, then `showNotification(title, { body, tag, lang, dir, icon })`. `tag` collapses repeats of the same kind.
   - `notificationclick`: focus an open Tabibi window or open `url`. `url` must be same-origin and start with `/guest/status` or `/api/guest/exchange/`; anything else opens `/guest/status`.
-  - `pushsubscriptionchange`: POST the new subscription to the re-subscribe route (part 3), proving possession of the old one.
+  - `pushsubscriptionchange`: POST the old and new subscriptions to the renew route (part 3) with the entry credential the page already holds; without a credential it does nothing and the page re-subscribes when next opened.
 - Registered only on guest pages (`/guest/status`, booking confirmation, live queue). Staff pages never register it.
 - The existing CSP (`default-src 'self'`) already allows a same-origin worker and manifest. No CSP change.
 
@@ -92,7 +92,11 @@ Routes (all `no-store`, `Referrer-Policy: no-referrer`, same-origin, bounded bod
   - **Always answers 202** with the same body, whether or not a binding matched, so it can't be used to test endpoints.
   - **Limits:** 3 per binding per hour and a global ingress bucket.
   - **Why the endpoint alone is enough:** the link goes only to that subscription, and only the device holding its private keys can decrypt it. Knowing an endpoint without those keys gives nothing.
-- **`POST /api/guest/push-subscription/renew`**: used by `pushsubscriptionchange`. The body carries the old and new endpoints. The binding is replaced only when the old endpoint matches an active binding. No link is issued.
+- **`POST /api/guest/push-subscription/renew`**: used by `pushsubscriptionchange`. The body carries the old and new subscriptions.
+  - **Authentication:** the same entry credential as `POST /api/guest/push-subscription` (the exchange-origin status cookie, which a same-origin service worker `fetch` sends, or the booking-origin bearer). An endpoint alone is never proof of possession, because it is not secret and is also the only input to resend. A request without a valid credential is refused with the shared 401 shape and changes nothing.
+  - **Replacement:** only when the old endpoint matches an **active binding of the credential's own entry**; a binding of any other entry is treated as no match. The new subscription goes through the same endpoint allow-list, 3-per-entry cap and one-transaction rules as subscribe.
+  - **Booking-origin entries:** a service worker cannot read the bearer, so it cannot renew them. The page re-subscribes through `POST /api/guest/push-subscription` the next time it is open, and until then the old binding stays as it was.
+  - **Limits:** a per-entry and a global ingress bucket. No link is issued.
 
 Lifecycle:
 
