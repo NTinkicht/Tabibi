@@ -11,6 +11,7 @@ import {
   MembershipUserNotFoundError,
 } from '@/modules/clinic';
 import { AuthorizationError } from '@/modules/identity';
+import { NotificationDeadLetterNotFoundError } from '@/modules/notification-outbox/observability';
 import { PasswordPolicyError } from '@/modules/identity/staff-credentials';
 import {
   InviteConflictError,
@@ -78,7 +79,8 @@ export async function operationalJson(
       error instanceof MembershipNotFoundError ||
       error instanceof MembershipUserNotFoundError ||
       error instanceof ClinicDoctorNotFoundError ||
-      error instanceof InviteNotFoundError
+      error instanceof InviteNotFoundError ||
+      error instanceof NotificationDeadLetterNotFoundError
     ) {
       status = 404;
       code = 'not_found';
