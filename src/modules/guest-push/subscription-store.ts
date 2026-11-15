@@ -170,6 +170,95 @@ export class GuestPushSubscriptionStore {
   }
 
   /**
+   * `pushsubscriptionchange` renewal (docs/design/pwa-push.md section 3): the
+   * old endpoint must be an active binding of the caller's own entry, else the
+   * one generic rejection (a binding of another entry is treated as no match).
+   * The old binding is revoked and scrubbed and the new subscription sealed in
+   * the same transaction, under the same allow-list and per-entry cap as
+   * subscribe. No link is issued, consent is left as it is, and the
+   * replacement keeps the old binding's expiry (renewal never extends it).
+   */
+  async renew(
+    target: GuestPushTarget,
+    oldEndpoint: string,
+    material: PushSubscriptionMaterial,
+    locale: 'ar' | 'fr',
+    now: Date = new Date(),
+  ): Promise<{ subscriptionId: string }> {
+    // Validates both endpoints against the allow-list before any database work.
+    const oldHash = this.sealer.endpointHash(oldEndpoint);
+    const newHash = this.sealer.endpointHash(material.endpoint);
+    return inTransaction(this.pool, async (client) => {
+      const entry = await this.lockEntry(client, target);
+      if (
+        !ACTIVE_ENTRY_STATES.includes(entry.state) ||
+        !ACTIVE_SESSION_STATES.includes(entry.session_status)
+      )
+        throw new GuestPushBindingRejectedError();
+
+      // Same lock keys as subscribe, taken in a fixed order.
+      for (const hash of [...new Set([oldHash, newHash])].sort())
+        await client.query(
+          'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+          [`guest-push-endpoint:${hash}`],
+        );
+      const replaced = await client.query<{ id: string; expires_at: Date }>(
+        `UPDATE guest_push_subscriptions
+            SET revoked_at=$4, revocation_reason='rotated', sealed_subscription=NULL
+          WHERE clinic_id=$1 AND queue_entry_id=$2 AND endpoint_hash=$3
+            AND revoked_at IS NULL
+          RETURNING id, expires_at`,
+        [target.clinicId, target.queueEntryId, oldHash, now],
+      );
+      const old = replaced.rows[0];
+      if (!old) throw new GuestPushBindingRejectedError();
+      await client.query(
+        `UPDATE guest_push_subscriptions
+            SET revoked_at=$2, revocation_reason='rotated', sealed_subscription=NULL
+          WHERE endpoint_hash=$1 AND revoked_at IS NULL`,
+        [newHash, now],
+      );
+      const active = await client.query<{ n: string }>(
+        `SELECT count(*) AS n FROM guest_push_subscriptions
+          WHERE clinic_id=$1 AND queue_entry_id=$2 AND revoked_at IS NULL`,
+        [target.clinicId, target.queueEntryId],
+      );
+      if (Number(active.rows[0]!.n) >= MAX_ACTIVE_PER_ENTRY)
+        throw new GuestPushSubscriptionCapError();
+
+      const id = randomUUID();
+      const sealed = this.sealer.seal(
+        { clinicId: target.clinicId, queueEntryId: target.queueEntryId, id },
+        material,
+      );
+      await client.query(
+        `INSERT INTO guest_push_subscriptions
+           (id,clinic_id,queue_entry_id,endpoint_hash,sealed_subscription,locale,created_at,expires_at)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [
+          id,
+          target.clinicId,
+          target.queueEntryId,
+          newHash,
+          sealed,
+          locale,
+          now,
+          old.expires_at,
+        ],
+      );
+      await appendAuditEvent(client, {
+        clinicId: target.clinicId,
+        actorUserId: null,
+        entityType: 'queue_entry',
+        entityId: target.queueEntryId,
+        action: 'guest_push_renewed',
+        metadata: { subscriptionId: id, replacedId: old.id },
+      });
+      return { subscriptionId: id };
+    });
+  }
+
+  /**
    * Revokes and scrubs the entry's binding for `endpoint`, or every active
    * binding of the entry when no endpoint is given. Push consent is revoked
    * once no active binding remains.
