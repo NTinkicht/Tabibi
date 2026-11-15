@@ -21,7 +21,7 @@ export async function appendAuditEvent(
   db: Queryable,
   event: {
     clinicId: string;
-    actorUserId: string;
+    actorUserId: string | null;
     entityType: AuditEntity;
     entityId: string;
     action: string;

@@ -239,7 +239,7 @@ export class GuestAccessService {
         clinic_id: string;
         session_id: string;
         queue_entry_id: string;
-        issued_by_user_id: string;
+        issued_by_user_id: string | null;
         expires_at: Date;
         consumed_at: Date | null;
         entry_state: string;
