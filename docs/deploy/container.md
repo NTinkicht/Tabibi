@@ -35,6 +35,16 @@ docker run --rm -e DATABASE_URL tabibi:local npm run db:migrate
 
 Migration files under `db/migrations` are immutable; add a new numbered file for any change.
 
+## Notification worker
+
+Notifications are sent automatically only while a worker runs. Run it from the same image as a second process, next to the web container:
+
+```
+docker run --rm -e DATABASE_URL -e GUEST_BEARER_SIGNING_SECRET tabibi:local npm run worker:notifications
+```
+
+Every `NOTIFICATION_DISPATCH_INTERVAL_MS` (default `15000`, range 1000 to 3600000) it dispatches due in-app intents (up to 50 per clinic), then scrubs expired guest-link intents. No guest-link sender is registered yet, so link intents stay pending until they expire. It is safe to run more than one worker. On SIGTERM it finishes the current tick and exits. Logs carry counts only. In `docker-compose.yml` the service is behind the `worker` profile.
+
 ## Image contents
 
 `.dockerignore` excludes `.env*`, tests, docs, coordination files and git metadata. `node_modules` is kept whole because `next.config.ts` needs `typescript` at start-up and the migration command needs `tsx`.
