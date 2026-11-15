@@ -1,3 +1,4 @@
+import { GuestServiceWorker } from '../../../GuestServiceWorker';
 import { GuestLiveQueueHostClient } from './GuestLiveQueueHostClient';
 
 type Props = {
@@ -8,6 +9,7 @@ export default async function GuestLiveQueuePage({ params }: Props) {
   const { selectionReference } = await params;
   return (
     <main>
+      <GuestServiceWorker />
       <GuestLiveQueueHostClient selectionReference={selectionReference} />
     </main>
   );
