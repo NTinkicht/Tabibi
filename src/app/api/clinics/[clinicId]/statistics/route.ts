@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { ClinicStatisticsRepository } from '@/modules/clinic-statistics';
+import {
+  ClinicStatisticsRepository,
+  ownDoctorId,
+} from '@/modules/clinic-statistics';
 import { requireClinicRole } from '@/modules/identity';
 import { getPool } from '@/platform/database/pool';
 import { authenticatedClinicScope } from '@/platform/http/staff-auth';
@@ -18,7 +21,13 @@ export async function GET(
     const scope = await authenticatedClinicScope(request, clinicId);
     const pool = getPool();
 
-    await requireClinicRole(pool, scope, ['clinic_admin']);
+    const role = await requireClinicRole(pool, scope, [
+      'clinic_admin',
+      'doctor',
+    ]);
+    // A doctor sees only their own figures; the id never comes from the request.
+    const doctorId =
+      role === 'doctor' ? await ownDoctorId(pool, scope) : undefined;
 
     const params = new URL(request.url).searchParams;
     const { from, to } = querySchema.parse({
@@ -29,6 +38,7 @@ export async function GET(
       clinicId: scope.clinicId,
       from,
       to,
+      doctorId,
     });
     return { status: 200, body: statistics };
   });

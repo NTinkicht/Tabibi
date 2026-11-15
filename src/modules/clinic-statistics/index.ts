@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { AuthorizationError } from '@/modules/identity';
 
 /** Averages are withheld below this many timed completions (small-cohort rule). */
 export const MIN_COHORT_FOR_AVERAGE = 5;
@@ -91,6 +92,8 @@ export class ClinicStatisticsRepository {
     clinicId: string;
     from: string;
     to: string;
+    /** When set, restrict every figure to this doctor's sessions. */
+    doctorId?: string;
   }): Promise<ClinicOperationalStatistics> {
     validateStatisticsWindow(input.from, input.to);
     const { rows } = await this.pool.query<Row>(
@@ -126,9 +129,10 @@ export class ClinicStatisticsRepository {
            ON qe.session_id = cs.id AND qe.clinic_id = cs.clinic_id
         WHERE cs.clinic_id = $1
           AND cs.service_date BETWEEN $2::date AND $3::date
+          AND ($4::uuid IS NULL OR cs.doctor_id = $4::uuid)
         GROUP BY cs.doctor_id, dp.display_name
         ORDER BY dp.display_name, cs.doctor_id`,
-      [input.clinicId, input.from, input.to],
+      [input.clinicId, input.from, input.to, input.doctorId ?? null],
     );
     const trend = await this.pool.query<TrendRow>(
       `SELECT to_char(service_date, 'YYYY-MM-DD') AS day,
@@ -138,9 +142,10 @@ export class ClinicStatisticsRepository {
          FROM consultation_sessions
         WHERE clinic_id = $1
           AND service_date BETWEEN $2::date AND $3::date
+          AND ($4::uuid IS NULL OR doctor_id = $4::uuid)
         GROUP BY service_date
         ORDER BY service_date`,
-      [input.clinicId, input.from, input.to],
+      [input.clinicId, input.from, input.to, input.doctorId ?? null],
     );
     return {
       from: input.from,
@@ -172,4 +177,22 @@ export class ClinicStatisticsRepository {
       })),
     };
   }
+}
+
+/**
+ * The caller's own doctor identity in this clinic, derived from the
+ * authenticated membership. Denied (fail closed) when there is none.
+ */
+export async function ownDoctorId(
+  pool: Pool,
+  scope: { clinicId: string; actorUserId: string },
+): Promise<string> {
+  const { rows } = await pool.query<{ id: string }>(
+    `SELECT dp.id FROM doctor_profiles dp
+       JOIN doctor_clinics dc ON dc.doctor_id = dp.id AND dc.clinic_id = $1
+      WHERE dp.user_id = $2`,
+    [scope.clinicId, scope.actorUserId],
+  );
+  if (rows.length !== 1) throw new AuthorizationError();
+  return rows[0]!.id;
 }
