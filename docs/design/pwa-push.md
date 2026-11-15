@@ -6,6 +6,10 @@ status links off third-party messaging platforms. This document applies `PRODUCT
 ("extra notification provider integrations, subject to owner budget and privacy approval") at zero
 spend. It keeps every contract in `ARCHITECTURE.md` and `SECURITY.md`. Gap register: G-22, G-23.
 
+Implementation issues: #883 (PWA shell), #884 (dispatch scheduler), #885 (subscription binding), #886 (Web Push
+sender), #887 (status page card), #888 (iPhone spike). #885, #886 and #888 issue or carry
+credentials, so Claude implements them in owner-attended sessions.
+
 ## What the guest gets
 
 | Moment | What the guest sees | Delivered as |
@@ -26,7 +30,7 @@ that the owner uses Tabibi.
 
 ## Parts
 
-### 1. PWA shell (TAB-PWA-1)
+### 1. PWA shell (#883)
 
 - `/manifest.webmanifest`:
   - `name`/`short_name` "Tabibi", `start_url: "/guest/status"`, `scope: "/"`, `display: "standalone"`;
@@ -40,7 +44,7 @@ that the owner uses Tabibi.
 - Registered only on guest pages (`/guest/status`, booking confirmation, live queue). Staff pages never register it.
 - The existing CSP (`default-src 'self'`) already allows a same-origin worker and manifest. No CSP change.
 
-### 2. Notification dispatch scheduler (TAB-PWA-2, G-23)
+### 2. Notification dispatch scheduler (#884, G-23)
 
 Nothing dispatches notifications automatically today. `POST /api/clinics/{clinicId}/notifications/dispatch` runs one batch only when staff call it, and no page calls it. Guest-link intents created by transfers have no dispatcher at all. They expire unsent and are scrubbed.
 
@@ -53,7 +57,7 @@ Nothing dispatches notifications automatically today. `POST /api/clinics/{clinic
 - It logs counts only (claimed, delivered, retried, dead-lettered, suppressed, scrubbed): never ids of patients, entries, subscriptions or exchanges.
 - The staff dispatch route stays as it is.
 
-### 3. Push subscription binding (TAB-PWA-3, owner-attended: Claude)
+### 3. Push subscription binding (#885, owner-attended: Claude)
 
 Migration `guest_push_subscriptions`:
 - `id`, `clinic_id`, `queue_entry_id` (FK, same clinic), `endpoint_hash` (HMAC-SHA256 of the endpoint, unique while active);
@@ -95,7 +99,7 @@ Lifecycle:
 - **Transfer:** inside `QueueTransferService`'s transaction, active bindings move to the target entry. The AAD is re-sealed and the `push` preference is copied. The existing `transfer` intent then reaches the guest by push. The source binding no longer exists, so the old entry can't notify.
 - **Gone:** a push service answering 404 or 410 means the subscription is gone. The binding is revoked as `gone` and scrubbed.
 
-### 4. Web Push sender (TAB-PWA-4, owner-attended: Claude)
+### 4. Web Push sender (#886, owner-attended: Claude)
 
 - Dependency: `web-push` (MPL-2.0, used unmodified as a package, which that licence allows without affecting Tabibi's own code), for VAPID JWT signing and RFC 8291 `aes128gcm` payload encryption. There is no paid service and no account.
 - Configuration: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (an `https:` or `mailto:` URI the owner chooses), set in the hosting environment. If they are missing, the push sender is not registered, so its intents stay pending and expire. Startup never fails because of them, and the public key is served to the page from `GET /api/guest/push-subscription/key`.
@@ -123,7 +127,7 @@ Lifecycle:
 - Outbound requests have a 5-second timeout, follow no redirects, and only reach allow-listed hosts.
 - Retries reuse the intent's idempotency key. The `Topic` header (at most 32 URL-safe base64 characters) is the first 32 characters of base64url(SHA-256(idempotency key)), so a push service collapses duplicates without seeing the key itself.
 
-### 5. Status page and help (TAB-PWA-5)
+### 5. Status page and help (#887)
 
 On `/guest/status` and the booking confirmation page, below the status panel, add a "Notifications" card with these states:
 
@@ -139,7 +143,7 @@ On `/guest/status` and the booking confirmation page, below the status panel, ad
 - When opened without a valid status credential, the status page also offers "M’envoyer un nouveau lien", if `pushManager.getSubscription()` returns one. It calls the resend route and then shows "Si cet appareil est inscrit, un lien arrive dans quelques secondes."
 - `/guest/notification-help` explains what Tabibi sends, that nothing names the clinic on the lock screen, and how to switch notifications off.
 
-### 6. iPhone home-screen linking (TAB-PWA-6, spike, owner-attended: Claude)
+### 6. iPhone home-screen linking (#888, spike, owner-attended: Claude)
 
 iOS delivers Web Push only to a site added to the Home Screen and opened from that icon. The
 installed app does not share cookies with Safari, so it starts with no status access. The spike tests one approach on a real iPhone: a per-visit manifest whose `start_url` is a fresh system exchange link, issued only to a page that already holds a valid status credential. If it works, the installed app opens straight into the guest's status. If it does not, iPhone guests keep the in-app centre and the printed link, and the "iPhone, not installed" copy changes to say so. No other approach (pairing codes, clipboard) is used without a new spec.
@@ -156,7 +160,7 @@ installed app does not share cookies with Safari, so it starts with no status ac
 ## Owner actions (no cost)
 
 1. When staging exists (#731), generate a VAPID key pair once with `npx web-push generate-vapid-keys`. Set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` as hosting secrets, and set `VAPID_SUBJECT` to a contact URI. Never commit them.
-2. Test on a real Android phone and, for TAB-PWA-6, a real iPhone. Push needs HTTPS, so this happens on staging, not localhost.
+2. Test on a real Android phone and, for #888, a real iPhone. Push needs HTTPS, so this happens on staging, not localhost.
 
 ## Acceptance
 
