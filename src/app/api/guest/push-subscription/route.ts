@@ -1,4 +1,8 @@
-import { GuestAccessRejectedError } from '@/modules/guest-access';
+import {
+  GuestAccessRejectedError,
+  guestBearerSigningSecret,
+} from '@/modules/guest-access';
+import { GuestLinkEnvelope } from '@/modules/guest-access/link-envelope';
 import {
   GuestPushNotConfiguredError,
   guestPushSealer,
@@ -6,6 +10,7 @@ import {
 import {
   authenticateGuestPush,
   guestPushCredentialId,
+  type GuestPushCredentialClass,
 } from '@/modules/guest-push/credential';
 import { PushEndpointRejectedError } from '@/modules/guest-push/endpoint-policy';
 import { consumeGuestPushBucket } from '@/modules/guest-push/rate-limit';
@@ -73,6 +78,7 @@ async function handle(
   run: (
     store: GuestPushSubscriptionStore,
     target: { clinicId: string; queueEntryId: string },
+    credentialClass: GuestPushCredentialClass,
   ) => Promise<Response>,
 ): Promise<Response> {
   try {
@@ -95,10 +101,14 @@ async function handle(
 
     const auth = await authenticateGuestPush(pool, request);
     const store = new GuestPushSubscriptionStore(pool, guestPushSealer());
-    return await run(store, {
-      clinicId: auth.clinicId,
-      queueEntryId: auth.queueEntryId,
-    });
+    return await run(
+      store,
+      {
+        clinicId: auth.clinicId,
+        queueEntryId: auth.queueEntryId,
+      },
+      auth.credentialClass,
+    );
   } catch (error) {
     if (error instanceof StaffCsrfError)
       return respond(403, { error: 'same_origin_required' });
@@ -123,9 +133,17 @@ async function handle(
 }
 
 export async function POST(request: Request): Promise<Response> {
-  return handle(request, async (store, target) => {
+  return handle(request, async (store, target, credentialClass) => {
     const parsed = material(await body(request));
-    await store.subscribe(target, parsed.material, parsed.locale);
+    await store.subscribe(
+      target,
+      parsed.material,
+      parsed.locale,
+      new Date(),
+      credentialClass === 'booking_bearer'
+        ? { envelope: new GuestLinkEnvelope(guestBearerSigningSecret()) }
+        : undefined,
+    );
     return respond(200, { subscribed: true });
   });
 }

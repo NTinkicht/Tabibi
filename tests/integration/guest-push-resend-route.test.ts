@@ -377,3 +377,132 @@ describe('POST /api/guest/push-subscription/resend', () => {
     expect(last).toBe(429);
   });
 });
+
+describe('push exchange credential rotation', () => {
+  // Fresh entry so the shared fixtures' credentials stay valid.
+  const rotationEntry = randomUUID();
+  const rotationPatient = randomUUID();
+  const issuePush = async (subscriptionId: string, entry = rotationEntry) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const issued = await new GuestAccessService(
+        pool,
+      ).issueSystemPushInTransaction(client, {
+        clinicId: ids.clinic,
+        queueEntryId: entry,
+        subscriptionId,
+      });
+      await client.query('COMMIT');
+      return issued.exchangeId;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  };
+
+  it('rotates a live credential on push consume, but not on staff consume', async () => {
+    await pool.query(
+      `INSERT INTO patient_operational_records(id,clinic_id,private_display_name,contact_phone)
+       VALUES($1,$2,'Rot','0555000001')`,
+      [rotationPatient, ids.clinic],
+    );
+    await pool.query(
+      `INSERT INTO queue_entries
+       (id,clinic_id,session_id,patient_id,state,source,registration_order,public_display_label)
+       VALUES($1,$2,$3,$4,'waiting','walk_in',9,'R-009')`,
+      [rotationEntry, ids.clinic, ids.session, rotationPatient],
+    );
+    const service = new GuestAccessService(pool);
+    const oldBearer = await credentialFor(rotationEntry);
+    const { subscriptionId } = await bind(rotationEntry, 30);
+
+    // Control: a staff-issued exchange is still refused while a credential is live.
+    const staff = await service.issue(targetOf(rotationEntry), ids.actor);
+    await expect(
+      service.consume(staff.exchangeId, targetOf(rotationEntry)),
+    ).rejects.toThrow();
+    await expect(service.authorize(oldBearer)).resolves.toBeDefined();
+
+    // A push exchange succeeds, revoking the old credential as rotated.
+    const fresh = await service.consume(
+      await issuePush(subscriptionId),
+      targetOf(rotationEntry),
+    );
+    await expect(service.authorize(oldBearer)).rejects.toThrow();
+    await expect(service.authorize(fresh.bearer)).resolves.toBeDefined();
+    const rows = (
+      await pool.query(
+        `SELECT revoked_at IS NOT NULL AS revoked, revocation_reason
+           FROM guest_credentials WHERE queue_entry_id=$1 ORDER BY issued_at`,
+        [rotationEntry],
+      )
+    ).rows;
+    expect(rows).toEqual([
+      { revoked: true, revocation_reason: 'rotated' },
+      { revoked: false, revocation_reason: null },
+    ]);
+    const audit = await pool.query(
+      `SELECT metadata FROM audit_events
+        WHERE entity_id=$1 AND action='guest_credential_rotated'`,
+      [rotationEntry],
+    );
+    expect(audit.rows.map((r) => r.metadata)).toEqual([
+      { exchangeKind: 'push' },
+    ]);
+  });
+
+  it('does not rotate a booking-origin credential on push consume', async () => {
+    const entry = randomUUID();
+    const patient = randomUUID();
+    await pool.query(
+      `INSERT INTO patient_operational_records(id,clinic_id,private_display_name,contact_phone)
+       VALUES($1,$2,'Bk','0555000002')`,
+      [patient, ids.clinic],
+    );
+    await pool.query(
+      `INSERT INTO queue_entries
+       (id,clinic_id,session_id,patient_id,state,source,registration_order,public_display_label)
+       VALUES($1,$2,$3,$4,'waiting','walk_in',10,'R-010')`,
+      [entry, ids.clinic, ids.session, patient],
+    );
+    const service = new GuestAccessService(pool);
+    const bookingBearer = await credentialFor(entry);
+    const credential = (
+      await pool.query<{ id: string }>(
+        'SELECT id FROM guest_credentials WHERE queue_entry_id=$1',
+        [entry],
+      )
+    ).rows[0]!.id;
+    const appointment = randomUUID();
+    await pool.query(
+      `INSERT INTO appointments
+         (id,clinic_id,doctor_id,session_id,patient_id,queue_entry_id,status,
+          scheduled_start_at,scheduled_end_at,preferred_locale,source)
+       VALUES($1,$2,$3,$4,$5,$6,'confirmed','2026-09-08 10:00Z','2026-09-08 10:20Z','ar','public')`,
+      [appointment, ids.clinic, ids.doctor, ids.session, patient, entry],
+    );
+    await pool.query(
+      `INSERT INTO public_guest_booking_receipts
+         (clinic_id,idempotency_key,request_fingerprint,patient_id,queue_entry_id,
+          appointment_id,credential_id,access_ciphertext,completed_at)
+       VALUES($1,'rot-bk',repeat('a',64),$2,$3,$4,$5,'ct',now())`,
+      [ids.clinic, patient, entry, appointment, credential],
+    );
+    const { subscriptionId } = await bind(entry, 31);
+    await expect(
+      service.consume(await issuePush(subscriptionId, entry), targetOf(entry)),
+    ).rejects.toThrow();
+    await expect(service.authorize(bookingBearer)).resolves.toBeDefined();
+    const rows = (
+      await pool.query(
+        `SELECT revoked_at IS NOT NULL AS revoked, revocation_reason
+           FROM guest_credentials WHERE queue_entry_id=$1`,
+        [entry],
+      )
+    ).rows;
+    expect(rows).toEqual([{ revoked: false, revocation_reason: null }]);
+  });
+});

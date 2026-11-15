@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
+import { GuestAccessService } from '@/modules/guest-access';
+import type { GuestLinkEnvelope } from '@/modules/guest-access/link-envelope';
+import { GuestLinkIntentStore } from '@/modules/guest-access/link-intents';
 import { inTransaction } from '@/platform/database/transaction';
 import {
   PushSubscriptionSealer,
@@ -57,6 +60,12 @@ export class GuestPushSubscriptionStore {
     material: PushSubscriptionMaterial,
     locale: 'ar' | 'fr',
     now: Date = new Date(),
+    /**
+     * Booking-origin subscribers only: issue one system push exchange and an
+     * `initial` link intent in the same transaction as the binding. A status
+     * cookie holder already has access in that browser, so passes nothing.
+     */
+    initialLink?: { envelope: GuestLinkEnvelope },
   ): Promise<{ subscriptionId: string }> {
     // Validates the allow-list and key shape before any database work.
     const endpointHash = this.sealer.endpointHash(material.endpoint);
@@ -121,6 +130,33 @@ export class GuestPushSubscriptionStore {
               OR notification_preferences.preference_state<>'enabled'`,
         [randomUUID(), target.clinicId, entry.patient_id],
       );
+      if (initialLink) {
+        const issued = await new GuestAccessService(
+          this.pool,
+        ).issueSystemPushInTransaction(
+          client,
+          {
+            clinicId: target.clinicId,
+            queueEntryId: target.queueEntryId,
+            subscriptionId: id,
+          },
+          now,
+        );
+        await new GuestLinkIntentStore(
+          this.pool,
+          initialLink.envelope,
+          () => now,
+        ).create(
+          {
+            clinicId: target.clinicId,
+            queueEntryId: target.queueEntryId,
+            intent: 'initial',
+            material: issued.exchangeId,
+            exchangeExpiresAt: issued.expiresAt,
+          },
+          client,
+        );
+      }
       await appendAuditEvent(client, {
         clinicId: target.clinicId,
         actorUserId: null,
