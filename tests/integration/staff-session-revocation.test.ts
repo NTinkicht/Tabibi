@@ -188,6 +188,7 @@ describe('staff logout', () => {
               appointmentId: ids.appointment,
               entryId: ids.entry,
               inviteId: ids.entry,
+              intentId: ids.entry,
             }),
           },
         );
@@ -196,7 +197,7 @@ describe('staff logout', () => {
       }
     }
     // Same inventory as tests/api/staff-route-boundary-matrix.test.ts.
-    expect(checked).toBe(43);
+    expect(checked).toBe(44);
   });
 
   it('treats a replayed revoked token as an idempotent no-op that stays rejected', async () => {

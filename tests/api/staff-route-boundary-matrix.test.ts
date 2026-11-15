@@ -53,6 +53,7 @@ const EXPECTED: Record<string, readonly Method[]> = {
   memberships: ['GET'],
   'memberships/[userId]': ['PATCH', 'DELETE'],
   'notifications/dead-letters': ['GET'],
+  'notifications/dead-letters/[intentId]/handled': ['POST'],
   'notifications/guest-link-failures': ['GET'],
   'notifications/dispatch': ['POST'],
   'schedule-generations': ['POST'],
@@ -127,7 +128,8 @@ function url(key: string): string {
     .replace('[absenceDate]', ids.absenceDate)
     .replace('[consultationTypeId]', ids.consultationTypeId)
     .replace('[userId]', ids.userId)
-    .replace('[inviteId]', ids.inviteId);
+    .replace('[inviteId]', ids.inviteId)
+    .replace('[intentId]', ids.inviteId);
   return `http://localhost/api/clinics/${ids.clinicId}/${path}?date=2026-10-24&limit=5`;
 }
 
@@ -198,7 +200,7 @@ describe('staff clinic route inventory', () => {
       );
     }
     expect(discovered).toEqual(EXPECTED);
-    expect(mutations).toHaveLength(29);
+    expect(mutations).toHaveLength(30);
     expect(reads).toHaveLength(14);
   });
 });
