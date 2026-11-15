@@ -48,3 +48,14 @@ password-policy failures with 400 `password_policy` and its `code`, and any
 malformed body with a generic 400 that echoes nothing. Accepting does not sign
 the person in. A doctor invited back after leaving clears the departure marker
 (G-19).
+
+## Patient credentials (TAB-P1-01 slice 1, #875)
+
+`patient-credentials.ts` registers a patient account as a `users` row with the
+namespaced subject `patient:<normalized email>` plus a `patient_credentials` row
+(same scrypt hardening and atomic lockout as staff), created in one statement.
+`registerPatientAccount` returns `{ ok: true, userId }` or one uniform
+`{ ok: false }` for an existing account; `verifyPatientPassword` returns the same
+`{ ok: false }` for unknown, wrong and locked. Patient and staff credentials live in
+separate tables and never authenticate each other. HTTP routes, sessions, identity
+verification and recovery are later slices.

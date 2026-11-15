@@ -1,10 +1,11 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import { AuthorizationError } from '@/modules/identity';
 import { bootstrapFirstClinicAdmin } from '@/modules/identity/bootstrap-admin';
+import { registerPatientAccount } from '@/modules/identity/patient-credentials';
 import { verifyStaffPassword } from '@/modules/identity/staff-credentials';
 import {
   InviteConflictError,
@@ -31,7 +32,7 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   await pool.query(
-    'TRUNCATE doctor_clinics, doctor_profiles, staff_invites, staff_credentials, audit_events, clinic_memberships, users, clinics CASCADE',
+    'TRUNCATE patient_credentials, doctor_clinics, doctor_profiles, staff_invites, staff_credentials, audit_events, clinic_memberships, users, clinics CASCADE',
   );
   for (const [id, key] of [
     [clinicA, 'invite-a'],
@@ -448,4 +449,77 @@ describe('bootstrap first clinic_admin (#727)', () => {
     expect(second.stdout).toContain('No change');
     expect(second.stdout + second.stderr).not.toContain(GOOD);
   }, 60_000);
+});
+
+describe('patient identity separation (#875)', () => {
+  it('reserves the patient: namespace in invites and bootstrap, while ordinary emails still work', async () => {
+    await expect(invite('new@x.example')).resolves.toBeTruthy();
+    await expect(invite('patient:new@x.example')).rejects.toBeInstanceOf(
+      InviteInputError,
+    );
+    await expect(invite('PATIENT:new@x.example')).rejects.toBeInstanceOf(
+      InviteInputError,
+    );
+    expect((await pool.query('SELECT 1 FROM staff_invites')).rowCount).toBe(1);
+    await expect(
+      bootstrapFirstClinicAdmin(pool, {
+        clinicId: clinicA,
+        email: 'patient:boss@x.example',
+        displayName: 'Boss',
+        password: GOOD,
+      }),
+    ).rejects.toBeInstanceOf(InviteInputError);
+  });
+
+  it('refuses to link a patient account when accepting an invite that predates the reservation', async () => {
+    const reg = await registerPatientAccount(pool, {
+      email: 'pat@x.example',
+      displayName: 'Pat',
+      password: GOOD,
+    });
+    const inviteId = randomUUID();
+    const secret = 'L'.repeat(43);
+    await pool.query(
+      `INSERT INTO staff_invites (id, clinic_id, email, role, token_verifier, invited_by, expires_at)
+       VALUES ($1,$2,'patient:pat@x.example','receptionist',$3,$4, now() + interval '1 day')`,
+      [inviteId, clinicA, createHash('sha256').update(secret).digest(), adminA],
+    );
+    await expect(
+      service.accept(`${inviteId}.${secret}`, {
+        displayName: 'Pat',
+        password: 'a different long password',
+      }),
+    ).rejects.toBeInstanceOf(InviteRejectedError);
+    expect(reg.ok).toBe(true);
+    expect((await pool.query('SELECT 1 FROM staff_credentials')).rowCount).toBe(
+      0,
+    );
+    expect(
+      (
+        await pool.query(
+          `SELECT 1 FROM clinic_memberships WHERE user_id = $1`,
+          [reg.ok ? reg.userId : null],
+        )
+      ).rowCount,
+    ).toBe(0);
+  });
+
+  it('refuses to attach staff credentials to any user that holds patient credentials', async () => {
+    const reg = await registerPatientAccount(pool, {
+      email: 'dual@x.example',
+      displayName: 'Dual',
+      password: GOOD,
+    });
+    await pool.query('UPDATE users SET auth_subject = $2 WHERE id = $1', [
+      reg.ok ? reg.userId : null,
+      'dual@x.example',
+    ]);
+    const { token } = await invite('dual@x.example');
+    await expect(
+      service.accept(token, { displayName: 'Dual', password: GOOD }),
+    ).rejects.toBeInstanceOf(InviteRejectedError);
+    expect((await pool.query('SELECT 1 FROM staff_credentials')).rowCount).toBe(
+      0,
+    );
+  });
 });
