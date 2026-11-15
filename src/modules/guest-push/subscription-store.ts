@@ -68,6 +68,13 @@ export class GuestPushSubscriptionStore {
       )
         throw new GuestPushBindingRejectedError();
 
+      // Serialize rebinding of one endpoint across entries: locking only the
+      // target entry lets two concurrent subscribes both miss each other's
+      // binding and collide on the active-endpoint unique index.
+      await client.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`guest-push-endpoint:${endpointHash}`],
+      );
       // The same endpoint re-binds instead of duplicating.
       await client.query(
         `UPDATE guest_push_subscriptions

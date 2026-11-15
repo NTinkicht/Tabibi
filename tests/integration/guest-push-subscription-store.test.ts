@@ -146,6 +146,27 @@ describe('GuestPushSubscriptionStore', () => {
     });
   });
 
+  it('serializes concurrent rebinding of one endpoint across entries', async () => {
+    const results = await Promise.all(
+      Array.from({ length: 6 }, (_, i) =>
+        store.subscribe(
+          {
+            clinicId: ids.clinic,
+            queueEntryId: i % 2 === 0 ? ids.entry : ids.entry2,
+          },
+          material(7),
+          'fr',
+        ),
+      ),
+    );
+    expect(new Set(results.map((r) => r.subscriptionId)).size).toBe(6);
+    const rows = await pool.query(
+      `SELECT count(*)::int AS n FROM guest_push_subscriptions
+        WHERE revoked_at IS NULL`,
+    );
+    expect(rows.rows[0].n).toBe(1);
+  });
+
   it('caps active subscriptions at 3 per entry', async () => {
     for (const n of [1, 2, 3]) await store.subscribe(target, material(n), 'fr');
     await expect(
