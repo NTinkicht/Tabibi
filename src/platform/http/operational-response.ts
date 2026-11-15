@@ -18,6 +18,7 @@ import {
   InviteNotFoundError,
   InviteRejectedError,
 } from '@/modules/identity/staff-invites';
+import { StatisticsWindowError } from '@/modules/clinic-statistics';
 import { QueueConflictError, QueueValidationError } from '@/modules/queue';
 import { ReceptionistDashboardNotFoundError } from '@/modules/receptionist-dashboard';
 import {
@@ -85,6 +86,7 @@ export async function operationalJson(
       error instanceof AppointmentValidationError ||
       error instanceof SessionValidationError ||
       error instanceof QueueValidationError ||
+      error instanceof StatisticsWindowError ||
       error instanceof InvalidClinicTimezoneError ||
       // G-18: one generic answer for every unusable invite token.
       error instanceof InviteRejectedError ||
