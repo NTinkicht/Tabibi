@@ -15,6 +15,8 @@ type OutcomeCategory =
   | 'delivery_storage_error'
   | 'unspecified';
 type ExceptionView = {
+  // Kept for the handled action only; never rendered into the DOM.
+  intentId: string;
   event: string;
   queueLabel: string | null;
   outcomeCategory: OutcomeCategory;
@@ -73,6 +75,9 @@ const copy = {
     title: 'Notifications non remises',
     back: 'Retour à la réception',
     refresh: 'Actualiser',
+    action: 'Action',
+    markHandled: 'Marquer comme traitée',
+    handledError: 'Impossible d’enregistrer cette action. Veuillez réessayer.',
     intro:
       'Ces notifications n’ont pas pu être remises. Le patient n’a peut-être pas été prévenu.',
     todoTitle: 'Que faire ?',
@@ -133,6 +138,9 @@ const copy = {
     title: 'إشعارات تعذّر تسليمها',
     back: 'العودة إلى الاستقبال',
     refresh: 'تحديث',
+    action: 'إجراء',
+    markHandled: 'تمت المعالجة',
+    handledError: 'تعذّر تسجيل هذا الإجراء. حاول مرة أخرى.',
     intro: 'تعذّر تسليم هذه الإشعارات. قد لا يكون المريض قد أُبلغ.',
     todoTitle: 'ماذا أفعل؟',
     todoTell: 'أبلغ المريض عند الاستقبال.',
@@ -203,6 +211,7 @@ function toExceptionViews(payload: unknown): ExceptionView[] {
   return payload.deadLetters.map((value: unknown) => {
     if (
       !isRecord(value) ||
+      typeof value.intentId !== 'string' ||
       typeof value.eventKey !== 'string' ||
       typeof value.outcomeAt !== 'string' ||
       !Number.isSafeInteger(value.attemptCount) ||
@@ -212,6 +221,7 @@ function toExceptionViews(payload: unknown): ExceptionView[] {
     )
       throw new Error('Invalid response');
     return {
+      intentId: value.intentId,
       event: value.eventKey,
       queueLabel: value.queueLabel as string | null,
       outcomeCategory: categorizeOutcome(value.outcomeCode),
@@ -261,7 +271,42 @@ function NotificationDeliveryExceptionsView({
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [generation, setGeneration] = useState(0);
   const requestId = useRef(0);
+  const handling = useRef(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [handledFailed, setHandledFailed] = useState(false);
   const t = copy[locale];
+
+  const markHandled = useCallback(
+    async (intentId: string) => {
+      if (handling.current) return;
+      handling.current = true;
+      setPendingId(intentId);
+      setHandledFailed(false);
+      try {
+        const response = await fetch(
+          `/api/clinics/${encodeURIComponent(clinicId)}/notifications/dead-letters/${encodeURIComponent(intentId)}/handled`,
+          { method: 'POST', credentials: 'same-origin', cache: 'no-store' },
+        );
+        if (!response.ok) throw new Error('Rejected');
+        setState((current) =>
+          current.kind === 'ready'
+            ? {
+                ...current,
+                records: current.records.filter(
+                  (record) => record.intentId !== intentId,
+                ),
+              }
+            : current,
+        );
+      } catch {
+        setHandledFailed(true);
+      } finally {
+        handling.current = false;
+        setPendingId(null);
+      }
+    },
+    [clinicId],
+  );
 
   const refresh = useCallback(() => {
     setState({ kind: 'loading' });
@@ -383,11 +428,12 @@ function NotificationDeliveryExceptionsView({
                   <th scope="col">{t.outcome}</th>
                   <th scope="col">{t.attempt}</th>
                   <th scope="col">{t.at}</th>
+                  <th scope="col">{t.action}</th>
                 </tr>
               </thead>
               <tbody>
-                {state.records.map((record, index) => (
-                  <tr key={index}>
+                {state.records.map((record) => (
+                  <tr key={record.intentId}>
                     <td>
                       {Object.prototype.hasOwnProperty.call(
                         t.events,
@@ -412,12 +458,22 @@ function NotificationDeliveryExceptionsView({
                     <td>
                       <bdi>{when(record.at)}</bdi>
                     </td>
+                    <td>
+                      <Button
+                        variant="secondary"
+                        onClick={() => void markHandled(record.intentId)}
+                        disabled={pendingId !== null}
+                      >
+                        {t.markHandled}
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ) : null}
+        {handledFailed ? <p role="alert">{t.handledError}</p> : null}
       </section>
       {state.kind === 'ready' ? (
         <section

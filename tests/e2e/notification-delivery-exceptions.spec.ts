@@ -45,8 +45,12 @@ function deadLettersBody(
   }>,
 ) {
   return {
-    deadLetters: records.map((record) => ({
-      intentId: rawQueueEntryId,
+    deadLetters: records.map((record, index) => ({
+      // Distinct ids per row; the first keeps the id asserted absent from the DOM.
+      intentId:
+        index === 0
+          ? rawQueueEntryId
+          : `30000000-0000-4000-8000-0000000001${String(index).padStart(2, '0')}`,
       eventKey: record.eventKey,
       queueLabel: record.queueLabel,
       outcomeCode: record.outcomeCode ?? 'provider_unknown',
@@ -439,3 +443,102 @@ test('a failing guest-link endpoint shows the error state instead of an empty li
     page.getByText('Aucun lien de suivi en échec de livraison.'),
   ).toHaveCount(0);
 });
+
+const HANDLED_URL = `**/api/clinics/${clinicId}/notifications/dead-letters/*/handled`;
+
+for (const [locale, label, error] of [
+  ['fr', 'Marquer comme traitée', 'Impossible d’enregistrer cette action.'],
+  ['ar', 'تمت المعالجة', 'تعذّر تسجيل هذا الإجراء.'],
+] as const) {
+  test(`${locale}: marking a dead letter handled posts once, removes only that row, and hides the raw id`, async ({
+    page,
+  }) => {
+    await authenticate(page);
+    const posts: string[] = [];
+    const release: { current: (() => void) | null } = { current: null };
+    const gate = new Promise<void>((resolve) => {
+      release.current = resolve;
+    });
+    await page.route(DEAD_LETTERS_URL, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          deadLettersBody([
+            {
+              eventKey: 'patient_called',
+              queueLabel: 'A-041',
+              attemptCount: 3,
+              maxAttempts: 5,
+              outcomeAt: '2026-09-13T11:00:00.000Z',
+            },
+            {
+              eventKey: 'turn_approaching',
+              queueLabel: 'A-042',
+              attemptCount: 5,
+              maxAttempts: 5,
+              outcomeAt: '2026-09-13T11:05:00.000Z',
+            },
+          ]),
+        ),
+      });
+    });
+    await page.route(HANDLED_URL, async (route) => {
+      posts.push(`${route.request().method()} ${route.request().url()}`);
+      await gate;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ intentId: rawQueueEntryId }),
+      });
+    });
+
+    await page.goto(`/operations/${clinicId}/notifications?locale=${locale}`);
+    await expect(page.getByText('A-041')).toBeVisible();
+    const buttons = page.getByRole('button', { name: label });
+    await expect(buttons).toHaveCount(2);
+    await buttons.first().click();
+    // Single-flight: every action is disabled while the request is held open.
+    await expect(buttons.first()).toBeDisabled();
+    await expect(buttons.nth(1)).toBeDisabled();
+    release.current?.();
+    await expect(page.getByText('A-041')).toHaveCount(0);
+    await expect(page.getByText('A-042')).toBeVisible();
+    expect(posts).toEqual([
+      `POST http://127.0.0.1:3000/api/clinics/${clinicId}/notifications/dead-letters/${rawQueueEntryId}/handled`,
+    ]);
+    expect(await page.content()).not.toContain(rawQueueEntryId);
+  });
+
+  test(`${locale}: a failed handled request keeps the row, shows an error and allows retry`, async ({
+    page,
+  }) => {
+    await authenticate(page);
+    await page.route(DEAD_LETTERS_URL, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          deadLettersBody([
+            {
+              eventKey: 'patient_called',
+              queueLabel: 'A-041',
+              attemptCount: 3,
+              maxAttempts: 5,
+              outcomeAt: '2026-09-13T11:00:00.000Z',
+            },
+          ]),
+        ),
+      });
+    });
+    await page.route(HANDLED_URL, async (route) => {
+      await route.fulfill({ status: 503, body: '{}' });
+    });
+    await page.goto(`/operations/${clinicId}/notifications?locale=${locale}`);
+    const button = page.getByRole('button', { name: label });
+    await button.click();
+    await expect(page.getByText(error)).toBeVisible();
+    await expect(page.getByText('A-041')).toBeVisible();
+    await expect(button).toBeEnabled();
+  });
+}
