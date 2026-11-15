@@ -25,7 +25,8 @@
     "db:seed": "tsx scripts/db/seed.ts",
     "db:reset:test": "tsx scripts/db/reset-test.ts",
     "db:rehearse-recovery": "tsx scripts/db/rehearse-backup-restore.ts",
-    "db:clinic-day-load": "tsx scripts/load/clinic-day.ts"
+    "db:clinic-day-load": "tsx scripts/load/clinic-day.ts",
+    "worker:notifications": "tsx scripts/worker/notification-dispatch.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "5.3.0",

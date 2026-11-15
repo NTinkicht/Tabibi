@@ -15,5 +15,19 @@ services:
     volumes:
       - tabibi-postgres:/var/lib/postgresql/data
 
+  # Notification dispatch scheduler. Opt in with: docker compose --profile worker up
+  # Needs the image built from Dockerfile and secrets supplied at run time.
+  worker:
+    profiles: ['worker']
+    build: .
+    command: ['npm', 'run', 'worker:notifications']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://tabibi:tabibi_dev_only@postgres:5432/tabibi
+      GUEST_BEARER_SIGNING_SECRET: ${GUEST_BEARER_SIGNING_SECRET:?set at run time}
+      NOTIFICATION_DISPATCH_INTERVAL_MS: ${NOTIFICATION_DISPATCH_INTERVAL_MS:-15000}
+
 volumes:
   tabibi-postgres:
