@@ -311,13 +311,14 @@ export class GuestAccessService {
         session_id: string;
         queue_entry_id: string;
         issued_by_user_id: string | null;
+        contact_kind: string;
         expires_at: Date;
         consumed_at: Date | null;
         entry_state: string;
         session_status: string;
       }>(
         `SELECT exchange.id,exchange.clinic_id,exchange.session_id,exchange.queue_entry_id,
-                exchange.issued_by_user_id,exchange.expires_at,exchange.consumed_at,
+                exchange.issued_by_user_id,exchange.contact_kind,exchange.expires_at,exchange.consumed_at,
                 entry.state AS entry_state,session.status AS session_status
            FROM guest_exchange_ids exchange
            JOIN queue_entries entry ON entry.id=exchange.queue_entry_id
@@ -349,6 +350,27 @@ export class GuestAccessService {
       )
         throw new GuestAccessRejectedError();
 
+      // docs/design/pwa-push.md section 3: only the device holding a push
+      // subscription's private keys can read a push link, so consuming one
+      // rotates the entry's status credential. Staff-issued exchanges keep
+      // the one-live-credential refusal below.
+      if (row.contact_kind === 'push') {
+        const rotated = await client.query(
+          `UPDATE guest_credentials
+              SET revoked_at=$2, revocation_reason='rotated'
+            WHERE queue_entry_id=$1 AND revoked_at IS NULL`,
+          [row.queue_entry_id, now],
+        );
+        if (rotated.rowCount)
+          await appendAuditEvent(client, {
+            clinicId: row.clinic_id,
+            actorUserId: null,
+            entityType: 'queue_entry',
+            entityId: row.queue_entry_id,
+            action: 'guest_credential_rotated',
+            metadata: { exchangeKind: 'push' },
+          });
+      }
       const liveCredential = await client.query<{ id: string }>(
         `SELECT id
            FROM guest_credentials

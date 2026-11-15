@@ -377,3 +377,80 @@ describe('POST /api/guest/push-subscription/resend', () => {
     expect(last).toBe(429);
   });
 });
+
+describe('push exchange credential rotation', () => {
+  // Fresh entry so the shared fixtures' credentials stay valid.
+  const rotationEntry = randomUUID();
+  const rotationPatient = randomUUID();
+  const issuePush = async (subscriptionId: string) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const issued = await new GuestAccessService(
+        pool,
+      ).issueSystemPushInTransaction(client, {
+        clinicId: ids.clinic,
+        queueEntryId: rotationEntry,
+        subscriptionId,
+      });
+      await client.query('COMMIT');
+      return issued.exchangeId;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  };
+
+  it('rotates a live credential on push consume, but not on staff consume', async () => {
+    await pool.query(
+      `INSERT INTO patient_operational_records(id,clinic_id,private_display_name,contact_phone)
+       VALUES($1,$2,'Rot','0555000001')`,
+      [rotationPatient, ids.clinic],
+    );
+    await pool.query(
+      `INSERT INTO queue_entries
+       (id,clinic_id,session_id,patient_id,state,source,registration_order,public_display_label)
+       VALUES($1,$2,$3,$4,'waiting','walk_in',9,'R-009')`,
+      [rotationEntry, ids.clinic, ids.session, rotationPatient],
+    );
+    const service = new GuestAccessService(pool);
+    const oldBearer = await credentialFor(rotationEntry);
+    const { subscriptionId } = await bind(rotationEntry, 30);
+
+    // Control: a staff-issued exchange is still refused while a credential is live.
+    const staff = await service.issue(targetOf(rotationEntry), ids.actor);
+    await expect(
+      service.consume(staff.exchangeId, targetOf(rotationEntry)),
+    ).rejects.toThrow();
+    await expect(service.authorize(oldBearer)).resolves.toBeDefined();
+
+    // A push exchange succeeds, revoking the old credential as rotated.
+    const fresh = await service.consume(
+      await issuePush(subscriptionId),
+      targetOf(rotationEntry),
+    );
+    await expect(service.authorize(oldBearer)).rejects.toThrow();
+    await expect(service.authorize(fresh.bearer)).resolves.toBeDefined();
+    const rows = (
+      await pool.query(
+        `SELECT revoked_at IS NOT NULL AS revoked, revocation_reason
+           FROM guest_credentials WHERE queue_entry_id=$1 ORDER BY issued_at`,
+        [rotationEntry],
+      )
+    ).rows;
+    expect(rows).toEqual([
+      { revoked: true, revocation_reason: 'rotated' },
+      { revoked: false, revocation_reason: null },
+    ]);
+    const audit = await pool.query(
+      `SELECT metadata FROM audit_events
+        WHERE entity_id=$1 AND action='guest_credential_rotated'`,
+      [rotationEntry],
+    );
+    expect(audit.rows.map((r) => r.metadata)).toEqual([
+      { exchangeKind: 'push' },
+    ]);
+  });
+});

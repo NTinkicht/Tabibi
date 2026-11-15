@@ -91,6 +91,22 @@ const exchanges = async () =>
       .n,
   );
 
+const initialIntents = async (entry: string) =>
+  (
+    await pool.query(
+      `SELECT intent, state FROM guest_link_intents WHERE queue_entry_id=$1`,
+      [entry],
+    )
+  ).rows;
+const pushExchanges = async (entry: string) =>
+  (
+    await pool.query(
+      `SELECT issued_by_user_id FROM guest_exchange_ids
+        WHERE queue_entry_id=$1 AND contact_kind='push'`,
+      [entry],
+    )
+  ).rows;
+
 async function credentialFor(entry: string): Promise<string> {
   const service = new GuestAccessService(pool);
   const issued = await service.issue(targetOf(entry), ids.actor);
@@ -198,6 +214,39 @@ describe('POST/DELETE /api/guest/push-subscription', () => {
     expect(response.status).toBe(200);
     expect(await active(ids.entryB)).toHaveLength(1);
     expect(await active(ids.entryA)).toHaveLength(0);
+  });
+
+  it('issues exactly one initial link only for the booking-origin bearer', async () => {
+    const cookieIntents = (await initialIntents(ids.entryA)).length;
+    const cookieExchanges = (await pushExchanges(ids.entryA)).length;
+    await call('POST', cookie(), sub(20));
+    expect(await initialIntents(ids.entryA)).toHaveLength(cookieIntents);
+    expect(await pushExchanges(ids.entryA)).toHaveLength(cookieExchanges);
+
+    const before = (await initialIntents(ids.entryB)).length;
+    const beforeEx = (await pushExchanges(ids.entryB)).length;
+    expect((await call('POST', bearer(), sub(21))).status).toBe(200);
+    const intents = await initialIntents(ids.entryB);
+    expect(intents).toHaveLength(before + 1);
+    expect(intents.at(-1)).toMatchObject({ intent: 'initial' });
+    const exchangesB = await pushExchanges(ids.entryB);
+    expect(exchangesB).toHaveLength(beforeEx + 1);
+    expect(exchangesB.at(-1)!.issued_by_user_id).toBeNull();
+  });
+
+  it('rolls the binding back when the initial link cannot be issued', async () => {
+    const savedSecret = process.env.GUEST_BEARER_SIGNING_SECRET;
+    const bindingsBefore = (await active(ids.entryB)).length;
+    const exchangesBefore = await exchanges();
+    delete process.env.GUEST_BEARER_SIGNING_SECRET;
+    try {
+      const response = await call('POST', bearer(), sub(22));
+      expect(response.status).toBeGreaterThanOrEqual(500);
+    } finally {
+      process.env.GUEST_BEARER_SIGNING_SECRET = savedSecret;
+    }
+    expect(await active(ids.entryB)).toHaveLength(bindingsBefore);
+    expect(await exchanges()).toBe(exchangesBefore);
   });
 
   it('never converts one credential class into the other', async () => {
