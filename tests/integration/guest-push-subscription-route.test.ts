@@ -103,7 +103,7 @@ beforeAll(async () => {
     'route-test-only-push-seal-secret-0123456789abcdef';
   await pool.query(`TRUNCATE guest_push_subscriptions,notification_preferences,
     guest_exchange_ids,guest_credentials,public_guest_booking_receipts,
-    guest_status_rate_limit_buckets,audit_events,queue_entries,
+    guest_push_rate_limit_buckets,audit_events,queue_entries,
     patient_operational_records,consultation_sessions,doctor_clinics,
     doctor_profiles,clinic_memberships,clinics,users CASCADE`);
   await pool.query(
@@ -170,7 +170,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await pool.query(
-    'TRUNCATE guest_push_subscriptions,guest_status_rate_limit_buckets',
+    'TRUNCATE guest_push_subscriptions,guest_push_rate_limit_buckets',
   );
   await pool.query('DELETE FROM notification_preferences');
   process.env.GUEST_PUSH_SEAL_SECRET =
@@ -261,11 +261,11 @@ describe('POST/DELETE /api/guest/push-subscription', () => {
       JSON.stringify({ ...sub(6), pad: 'x'.repeat(5000) }),
     ];
     for (const body of bad) {
-      await pool.query('TRUNCATE guest_status_rate_limit_buckets');
+      await pool.query('TRUNCATE guest_push_rate_limit_buckets');
       expect((await call('POST', cookie(), body)).status).toBe(400);
     }
     expect(await active(ids.entryA)).toHaveLength(0);
-    await pool.query('TRUNCATE guest_status_rate_limit_buckets');
+    await pool.query('TRUNCATE guest_push_rate_limit_buckets');
     expect((await call('POST', cookie(), sub(6))).status).toBe(200);
   });
 

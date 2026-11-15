@@ -84,7 +84,7 @@ beforeAll(async () => {
     'route-test-only-push-seal-secret-0123456789abcdef';
   await pool.query(`TRUNCATE guest_push_subscriptions,notification_preferences,
     guest_exchange_ids,guest_credentials,public_guest_booking_receipts,
-    guest_status_rate_limit_buckets,audit_events,queue_entries,
+    guest_push_rate_limit_buckets,audit_events,queue_entries,
     patient_operational_records,consultation_sessions,doctor_clinics,
     doctor_profiles,clinic_memberships,clinics,users CASCADE`);
   await pool.query(
@@ -151,7 +151,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await pool.query(
-    'TRUNCATE guest_push_subscriptions,guest_status_rate_limit_buckets',
+    'TRUNCATE guest_push_subscriptions,guest_push_rate_limit_buckets',
   );
   await pool.query('DELETE FROM notification_preferences');
   process.env.GUEST_PUSH_SEAL_SECRET =
@@ -220,7 +220,7 @@ describe('GET /api/guest/push-subscription/key', () => {
 describe('POST /api/guest/push-subscription/resend', () => {
   beforeEach(async () => {
     await pool.query(
-      'TRUNCATE guest_link_intents,guest_exchange_ids,guest_status_rate_limit_buckets',
+      'TRUNCATE guest_link_intents,guest_exchange_ids,guest_push_rate_limit_buckets',
     );
     await pool.query(`UPDATE queue_entries SET state='waiting'`);
     // Rows created by credentialFor were truncated; credentials stay valid.
@@ -349,6 +349,25 @@ describe('POST /api/guest/push-subscription/resend', () => {
     delete process.env.GUEST_PUSH_SEAL_SECRET;
     expect((await post({ endpoint: sub(1).endpoint })).status).toBe(503);
     expect(await intents()).toHaveLength(0);
+  });
+
+  it('keeps the hourly counter when other guest routes purge their shared table', async () => {
+    await bind(ids.entryA, 1);
+    for (let i = 0; i < 3; i += 1) await post({ endpoint: sub(1).endpoint });
+    // What status/inbox/stream routes do: purge every old bucket of THEIR
+    // table with a 60-second window. Age the push bucket first.
+    await pool.query(
+      `UPDATE guest_push_rate_limit_buckets SET window_started_at=now()-interval '10 minutes'`,
+    );
+    await pool.query(
+      `UPDATE guest_status_rate_limit_buckets SET window_started_at=now()-interval '10 minutes'`,
+    );
+    await pool.query(
+      `DELETE FROM guest_status_rate_limit_buckets
+        WHERE window_started_at < now() - interval '60 seconds'`,
+    );
+    await post({ endpoint: sub(1).endpoint });
+    expect(await intents()).toHaveLength(3);
   });
 
   it('rate limits the ingress bucket', async () => {
