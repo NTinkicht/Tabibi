@@ -122,6 +122,8 @@ export async function POST(request: Request): Promise<Response> {
     const token = await createPatientSessionToken(
       verified.userId,
       new Date(Date.now() + ttl * 1000),
+      getPool(),
+      verified.passwordHash,
     );
     setCookie = patientSessionSetCookie(token, ttl);
     const account = await getPool().query<{ display_name: string }>(

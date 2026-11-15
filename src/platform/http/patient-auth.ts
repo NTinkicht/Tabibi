@@ -4,6 +4,7 @@ import {
   randomBytes,
   timingSafeEqual,
 } from 'node:crypto';
+import type { Pool } from 'pg';
 import { getPool } from '@/platform/database/pool';
 import { StaffAuthenticationError } from './staff-auth';
 
@@ -48,16 +49,22 @@ export async function createPatientSessionToken(
   userId: string,
   expiresAt: Date,
   db: Queryable = getPool(),
+  expectedPasswordHash?: Buffer,
 ): Promise<string> {
   const exp = Math.floor(expiresAt.getTime() / 1000);
   const sid = randomBytes(32).toString('base64url');
   const issued = await db.query<{ user_id: string }>(
     `INSERT INTO patient_sessions (verifier, user_id, expires_at)
-     VALUES ($1, $2, to_timestamp($3))
+     SELECT $1, c.user_id, to_timestamp($3)
+       FROM patient_credentials c
+      WHERE c.user_id = $2 AND ($4::bytea IS NULL OR c.password_hash = $4)
+        FOR SHARE OF c
      RETURNING user_id`,
-    [sessionVerifier(sid), userId, exp],
+    [sessionVerifier(sid), userId, exp, expectedPasswordHash ?? null],
   );
-  if (!issued.rows[0]) throw new Error('Unknown patient account');
+  // No row: unknown account, or the password changed after it was verified.
+  // Fail closed as an ordinary authentication failure.
+  if (!issued.rows[0]) throw new StaffAuthenticationError();
   const payload = Buffer.from(
     JSON.stringify({ sub: userId, sid, exp }),
   ).toString('base64url');
@@ -144,6 +151,23 @@ export async function revokePatientSession(request: Request): Promise<void> {
       WHERE verifier = $1 AND user_id::text = $2 AND revoked_at IS NULL`,
     [sessionVerifier(claims.sid), claims.sub],
   );
+}
+
+// Revokes every other live session of the account that owns the request's
+// session. The request's own session stays valid. No-op without a valid session.
+export async function revokeOtherPatientSessions(
+  request: Request,
+  db: Pick<Pool, 'query'> = getPool(),
+): Promise<number> {
+  const cookie = patientSessionCookie(request);
+  const claims = cookie ? decode(cookie) : null;
+  if (!claims) return 0;
+  const revoked = await db.query(
+    `UPDATE patient_sessions SET revoked_at = now()
+      WHERE user_id::text = $2 AND verifier <> $1 AND revoked_at IS NULL`,
+    [sessionVerifier(claims.sid), claims.sub],
+  );
+  return revoked.rowCount ?? 0;
 }
 
 export function patientSessionSetCookie(
