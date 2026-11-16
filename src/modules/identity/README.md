@@ -102,3 +102,16 @@ cookie. Malformed, unknown, superseded, expired and replayed tokens are one 400
 `invalid_token`; a policy failure is 400 `password_policy` and leaves a valid
 token unconsumed. Requesting a reset (and delivering the token) is a later slice
 because it needs an approved delivery channel.
+
+### Patient dependent routes (slice 7)
+
+First account-owned routes behind the patient session, wiring the WU69
+`AccountDependentService`: `GET|POST /api/patient/dependents`,
+`GET|PATCH /api/patient/dependents/{id}` and
+`POST /api/patient/dependents/{id}/archive`. The owner is only ever the
+authenticated patient (a staff token, garbage cookie or logged-out session is
+401, and owner fields in a body or query are refused as unknown). Another
+account's, unknown, malformed and (for rename) archived ids are one 404.
+Mutations are same-origin, strict-bodied (2 KiB) and limited to 30 per account
+and one ingress bucket per 15 minutes. Dependent booking, delegation and UI
+stay with TAB-P1-03.
