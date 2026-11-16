@@ -93,6 +93,13 @@ async function currentSubscription(): Promise<PushSubscription | null> {
 }
 
 async function detect(): Promise<CardState> {
+  const locale = detectGuestLocale();
+  // Without a configured VAPID key the feature is off and the product behaves
+  // as it does today: no card at all, whatever the browser (spec section 5).
+  const key = await fetch('/api/guest/push-subscription/key', {
+    cache: 'no-store',
+  }).catch(() => null);
+  if (!key || !key.ok) return 'hidden';
   const hasServiceWorker = 'serviceWorker' in navigator;
   const hasPushManager = 'PushManager' in window;
   const hasNotification = 'Notification' in window;
@@ -100,24 +107,31 @@ async function detect(): Promise<CardState> {
     window.matchMedia?.('(display-mode: standalone)').matches === true ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true;
   const supported = hasServiceWorker && hasPushManager && hasNotification;
-  if (supported) {
-    // Without a configured VAPID key the feature is off and the product
-    // behaves as it does today: no card at all.
-    const key = await fetch('/api/guest/push-subscription/key', {
-      cache: 'no-store',
+  const permission = hasNotification ? Notification.permission : undefined;
+  let subscription: PushSubscription | null = null;
+  if (supported && permission === 'granted')
+    subscription = await currentSubscription().catch(() => null);
+  // A browser subscription can outlive its server binding (24 hour or terminal
+  // expiry, or another visit). Re-bind it to this entry before claiming
+  // "active"; the route upserts the same endpoint and is idempotent.
+  if (subscription) {
+    const bound = await fetch('/api/guest/push-subscription', {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({
+        ...subscription.toJSON(),
+        locale: pushRouteLocale(locale),
+      }),
     }).catch(() => null);
-    if (!key || !key.ok) return 'hidden';
+    if (!bound || !bound.ok) subscription = null;
   }
-  const subscription = supported
-    ? await currentSubscription().catch(() => null)
-    : null;
   return pushCardState({
     userAgent: navigator.userAgent,
     hasServiceWorker,
     hasPushManager,
     hasNotification,
     standalone,
-    permission: hasNotification ? Notification.permission : undefined,
+    permission,
     hasSubscription: subscription !== null,
   });
 }

@@ -186,10 +186,10 @@ for (const [name, c] of Object.entries(copies)) {
     }) => {
       await mockPush(page, { permission: 'granted', subscribed: true });
       await mockKey(page);
-      let method = '';
+      const methods: string[] = [];
       let body = '';
       await page.route('**/api/guest/push-subscription', async (route) => {
-        method = route.request().method();
+        methods.push(route.request().method());
         body = route.request().postData() ?? '';
         await route.fulfill({
           status: 200,
@@ -202,7 +202,8 @@ for (const [name, c] of Object.entries(copies)) {
       await expect(card.getByRole('status')).toHaveText(c.active);
       await card.getByRole('button', { name: c.disable }).click();
       await expect(card.getByRole('status')).toHaveText(c.available);
-      expect(method).toBe('DELETE');
+      // Page load re-binds the existing subscription before claiming active.
+      expect(methods).toEqual(['POST', 'DELETE']);
       expect(JSON.parse(body)).toEqual({
         endpoint: 'https://fcm.googleapis.com/fcm/send/mock',
       });
@@ -213,6 +214,24 @@ for (const [name, c] of Object.entries(copies)) {
               .unsubscribe,
         ),
       ).toBe(1);
+    });
+
+    test('an existing subscription whose binding was refused is not shown as active', async ({
+      page,
+    }) => {
+      await mockPush(page, { permission: 'granted', subscribed: true });
+      await mockKey(page);
+      await page.route('**/api/guest/push-subscription', (route) =>
+        route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: '{"error":"Guest access rejected"}',
+        }),
+      );
+      await page.goto('/guest/status');
+      const card = page.getByTestId('guest-push-card');
+      await expect(card.getByRole('status')).toHaveText(c.available);
+      await expect(card.getByRole('button', { name: c.enable })).toBeVisible();
     });
 
     test('a refused binding shows an alert and leaves no browser subscription', async ({
@@ -256,6 +275,7 @@ for (const [name, c] of Object.entries(copies)) {
       page,
     }) => {
       await mockPush(page, { permission: 'default', pushManager: false });
+      await mockKey(page);
       await page.goto('/guest/status');
       const card = page.getByTestId('guest-push-card');
       await expect(card.getByRole('status')).toContainText(c.unsupported);
@@ -270,6 +290,7 @@ for (const [name, c] of Object.entries(copies)) {
         pushManager: false,
         userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X)',
       });
+      await mockKey(page);
       await page.goto('/guest/status');
       const card = page.getByTestId('guest-push-card');
       await expect(card.getByRole('status')).toContainText(c.ios);
@@ -277,6 +298,24 @@ for (const [name, c] of Object.entries(copies)) {
     });
   });
 }
+
+test('an unsupported iPhone gets no card when the server has no VAPID key', async ({
+  page,
+}) => {
+  await mockPush(page, {
+    permission: 'default',
+    pushManager: false,
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X)',
+  });
+  await mockKey(page, 503);
+  const keyResponse = page.waitForResponse(
+    '**/api/guest/push-subscription/key',
+  );
+  await page.goto('/guest/status');
+  expect((await keyResponse).status()).toBe(503);
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 300)));
+  await expect(page.getByTestId('guest-push-card')).toHaveCount(0);
+});
 
 test('the card is hidden when the server has no VAPID key', async ({
   page,
