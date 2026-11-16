@@ -116,6 +116,14 @@ for (const [name, c] of Object.entries(cases)) {
           body: '{"subscribed":true}',
         });
       });
+      // A leftover status cookie must not travel with the bearer.
+      await page.context().addCookies([
+        {
+          name: 'stale_status_cookie',
+          value: 'x',
+          url: 'http://127.0.0.1:3000',
+        },
+      ]);
       await page.goto('/guest/live-queue/test-selection-ref');
       await expect(page.getByTestId('guest-push-card')).toHaveCount(0);
       await page.getByLabel(c.nameLabel).fill('Guest');
@@ -130,8 +138,10 @@ for (const [name, c] of Object.entries(cases)) {
       await card.getByRole('button', { name: c.disable }).click();
       await expect(card.getByRole('button', { name: c.enable })).toBeVisible();
       expect(calls.map((x) => x.method)).toEqual(['POST', 'DELETE']);
-      for (const call of calls)
+      for (const call of calls) {
         expect(call.headers['authorization']).toBe(`Bearer ${BEARER}`);
+        expect(call.headers['cookie']).toBeUndefined();
+      }
       expect(page.url()).not.toContain(BEARER);
       expect(await page.locator('body').innerText()).not.toContain(BEARER);
       const stored = await page.evaluate(

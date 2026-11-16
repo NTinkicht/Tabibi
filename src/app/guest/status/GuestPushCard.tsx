@@ -102,6 +102,12 @@ const JSON_HEADERS = { 'content-type': 'application/json' };
 // holds the booking-origin bearer in memory and sends it in Authorization,
 // never in a URL or storage (docs/design/pwa-push.md section 3). The route
 // accepts exactly one credential class per request.
+// A bearer request must not also carry the status cookie: the route rejects
+// requests presenting both credential classes (credential.ts).
+function credentialMode(bearer: string | undefined): RequestCredentials {
+  return bearer ? 'omit' : 'same-origin';
+}
+
 function credentialHeaders(bearer: string | undefined): Record<string, string> {
   return bearer
     ? { ...JSON_HEADERS, authorization: `Bearer ${bearer}` }
@@ -142,6 +148,7 @@ async function detect(bearer: string | undefined): Promise<Detected> {
     const bound = await fetch('/api/guest/push-subscription', {
       method: 'POST',
       headers: credentialHeaders(bearer),
+      credentials: credentialMode(bearer),
       body: JSON.stringify({
         ...subscription.toJSON(),
         locale: pushRouteLocale(locale),
@@ -227,6 +234,7 @@ export function GuestPushCard({ bearer }: { bearer?: string } = {}) {
       const response = await fetch('/api/guest/push-subscription', {
         method: 'POST',
         headers: credentialHeaders(bearer),
+        credentials: credentialMode(bearer),
         body: JSON.stringify({
           ...subscription.toJSON(),
           locale: pushRouteLocale(locale),
@@ -271,6 +279,7 @@ export function GuestPushCard({ bearer }: { bearer?: string } = {}) {
       const response = await fetch('/api/guest/push-subscription', {
         method: 'DELETE',
         headers: credentialHeaders(bearer),
+        credentials: credentialMode(bearer),
         body: JSON.stringify(
           subscription ? { endpoint: subscription.endpoint } : {},
         ),
