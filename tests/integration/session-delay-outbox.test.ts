@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import { QueueService } from '@/modules/queue';
+import { NotificationOutboxRepository } from '@/modules/notification-outbox';
 import { SessionService } from '@/modules/session';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 6 });
@@ -143,7 +144,7 @@ describe('doctor delay outbox atomicity', () => {
     expect(JSON.stringify(rows)).not.toContain('555000111');
   });
 
-  it('writes a new version on update and none on clear', async () => {
+  it('writes a new version on update and no new deliverable intent on clear', async () => {
     const declared = await delay('declare_delay', 'declare-2', 0, 10);
     const updated = await delay(
       'update_delay',
@@ -162,7 +163,60 @@ describe('doctor delay outbox atomicity', () => {
       [2, 35],
     ]);
     await delay('clear_delay', 'clear-2', updated.delayVersion);
+    const afterClear = await intents();
+    expect(afterClear.filter((row) => row.state === 'pending')).toEqual([]);
+  });
+
+  const claimable = async () => {
+    const repository = new NotificationOutboxRepository(pool);
+    const claimed: string[] = [];
+    for (const row of (
+      await pool.query<{ id: string }>(
+        `SELECT id FROM notification_outbox ORDER BY created_at, id`,
+      )
+    ).rows) {
+      const claim = await repository.claimPendingIntent({
+        clinicId: ids.clinic,
+        intentId: row.id,
+        leaseMs: 60_000,
+      });
+      if (claim) claimed.push(claim.intent.eventKey);
+    }
+    return claimed;
+  };
+
+  it('keeps the delay intents deliverable while the delay is not cleared', async () => {
+    await delay('declare_delay', 'declare-ctl', 0, 20);
+    expect(await claimable()).toEqual(['session_delayed', 'session_delayed']);
+  });
+
+  it('withdraws undelivered delay intents on clear so none can be dispatched', async () => {
+    const declared = await delay('declare_delay', 'declare-clr', 0, 20);
+    expect(await intents()).toHaveLength(2);
+    await delay('clear_delay', 'clear-clr', declared.delayVersion);
+    const rows = await intents();
+    expect(rows.filter((row) => row.state === 'superseded')).toHaveLength(2);
+    expect(rows.filter((row) => row.state === 'suppressed')).toHaveLength(2);
+    expect(await claimable()).toEqual([]);
+    const retry = await delay(
+      'clear_delay',
+      'clear-clr',
+      declared.delayVersion,
+    );
+    expect(retry.declaredDelayMinutes).toBeNull();
     expect(await intents()).toHaveLength(4);
+  });
+
+  it('does not touch an already delivered delay intent on clear', async () => {
+    const declared = await delay('declare_delay', 'declare-dlv', 0, 20);
+    await pool.query(
+      `UPDATE notification_outbox SET state='delivered', dispatch_attempt_count=1,
+         dispatch_last_attempt_at=now(), dispatch_outcome_at=now()`,
+    );
+    await delay('clear_delay', 'clear-dlv', declared.delayVersion);
+    const rows = await intents();
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.state === 'delivered')).toBe(true);
   });
 
   it('writes no intent for a refused delay command', async () => {

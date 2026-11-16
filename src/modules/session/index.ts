@@ -718,6 +718,33 @@ export class SessionService {
            WHERE session.id=$1 AND session.clinic_id=$2 AND doctor.id=session.doctor_id RETURNING ${selection}`,
             [sessionId, scope.clinicId, minutes, scope.actorUserId],
           );
+          if (minutes === null) {
+            // Recovery: withdraw undelivered delay notices so patients never
+            // receive an obsolete delay message. No replacement is sent.
+            const active = await client.query<{ id: string }>(
+              `SELECT id FROM queue_entries
+                WHERE clinic_id = $1 AND session_id = $2
+                ORDER BY registration_order`,
+              [scope.clinicId, sessionId],
+            );
+            for (const entry of active.rows) {
+              await NotificationOutboxRepository.withdrawOutstandingInTransaction(
+                client,
+                {
+                  clinicId: scope.clinicId,
+                  queueEntryId: entry.id,
+                  logicalTargetKey: `queue-entry:${entry.id}`,
+                  eventKey: 'session_delayed',
+                  idempotencyKey: `session-delay-clear:${createHash('sha256')
+                    .update(
+                      `${scope.clinicId}:${scope.actorUserId}:${input.idempotencyKey}:${entry.id}`,
+                    )
+                    .digest('hex')}`,
+                  outcomeCode: 'delay_cleared',
+                },
+              );
+            }
+          }
           if (minutes !== null) {
             // Atomic base outbox intent per affected entry; payload is the
             // locale and declared minutes only. A failure rolls everything back.
