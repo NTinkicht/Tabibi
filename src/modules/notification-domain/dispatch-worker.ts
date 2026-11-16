@@ -83,6 +83,7 @@ export interface DispatchTickCounts {
   suppressed: number;
   errors: number;
   scrubbed: number;
+  pushExpired: number;
 }
 
 /** Mutable across ticks so a full page of clinics cannot starve later ones. */
@@ -98,6 +99,8 @@ export interface DispatchTickDeps {
   linkStore: Pick<GuestLinkIntentStore, 'dispatchNext' | 'scrubExpired'>;
   /** Per-channel registry entry. Absent: link intents stay pending and expire. */
   linkSender?: LinkSender;
+  /** Revokes and scrubs due push bindings (guest-push expiry sweep). */
+  pushExpirySweep?: () => Promise<number>;
 }
 
 /** Clinics that currently have outbox intents the claim fence may accept. */
@@ -138,6 +141,7 @@ export async function runDispatchTick(
     suppressed: 0,
     errors: 0,
     scrubbed: 0,
+    pushExpired: 0,
   };
 
   // 1. Outbox batches per clinic with due intents.
@@ -193,6 +197,13 @@ export async function runDispatchTick(
     counts.scrubbed = await deps.linkStore.scrubExpired();
   } catch {
     counts.errors += 1;
+  }
+  if (deps.pushExpirySweep) {
+    try {
+      counts.pushExpired = await deps.pushExpirySweep();
+    } catch {
+      counts.errors += 1;
+    }
   }
   return counts;
 }

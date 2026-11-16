@@ -210,6 +210,27 @@ describe('notification dispatch worker tick, real PostgreSQL (#884)', () => {
     expect(left.rows[0].n).toBe(0);
   });
 
+  it('runs the push expiry sweep each tick and counts failures without aborting', async () => {
+    const sweep = vi.fn(async () => 3);
+    const ok = await runDispatchTick({
+      pool,
+      outboxRunner: runner(vi.fn()),
+      linkStore: store,
+      pushExpirySweep: sweep,
+    });
+    expect(sweep).toHaveBeenCalledTimes(1);
+    expect(ok).toMatchObject({ pushExpired: 3, errors: 0 });
+    const failed = await runDispatchTick({
+      pool,
+      outboxRunner: runner(vi.fn()),
+      linkStore: store,
+      pushExpirySweep: async () => {
+        throw new Error('boom');
+      },
+    });
+    expect(failed).toMatchObject({ pushExpired: 0, errors: 1 });
+  });
+
   it('skips link dispatch without a sender and scrubs expired intents', async () => {
     const [pendingId] = await addLinkIntents(2);
     const [expiredId] = (

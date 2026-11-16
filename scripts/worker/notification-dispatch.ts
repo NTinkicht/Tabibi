@@ -1,5 +1,6 @@
 import { guestBearerSigningSecret } from '@/modules/guest-access';
 import { GuestLinkEnvelope } from '@/modules/guest-access/link-envelope';
+import { sweepExpiredPushBindings } from '@/modules/guest-push/expiry-sweep';
 import { GuestLinkIntentStore } from '@/modules/guest-access/link-intents';
 import {
   createOutcomeCountingBatchRunner,
@@ -31,6 +32,7 @@ async function main(): Promise<void> {
       pool,
       new GuestLinkEnvelope(guestBearerSigningSecret()),
     ),
+    pushExpirySweep: () => sweepExpiredPushBindings(pool),
   };
 
   let stopping = false;
