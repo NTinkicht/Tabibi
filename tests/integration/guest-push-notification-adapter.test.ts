@@ -14,6 +14,7 @@ import {
   pushTopic,
   type PushFetch,
 } from '../../src/modules/guest-push/push-transport';
+import { PushNotificationProviderAdapter } from '../../src/modules/guest-push/push-notification-adapter';
 import { PushSubscriptionSealer } from '../../src/modules/guest-push/subscription-seal';
 import { GuestPushSubscriptionStore } from '../../src/modules/guest-push/subscription-store';
 import { NotificationPreferenceRepository } from '../../src/modules/notification-preferences';
@@ -301,6 +302,79 @@ describe('push notification adapter through queue dispatch, real PostgreSQL (#90
     expect(haystack).not.toContain(sub.subscription.keys.p256dh);
     expect(haystack).not.toContain(sub.subscription.keys.auth);
     expect(await stateOf(intent.id)).toMatchObject({ state: 'delivered' });
+  });
+
+  it('sends only the generic template title as the body, never the queue position', async () => {
+    const sub = newSubscriber('https://fcm.googleapis.com/fcm/send/status-6');
+    await bindings.subscribe(target, sub.subscription, 'fr', T0);
+    const { seen, service } = pushService(201);
+    event += 1;
+    const intent = await new QueueNotificationProducer(
+      new NotificationOutboxRepository(pool),
+    ).produce({
+      clinicId: ids.clinic,
+      queueEntryId: ids.entry,
+      sourceEventId: `push-notif-${event}`,
+      sourceVersion: event,
+      notification: { eventKey: 'turn_approaching', locale: 'fr', position: 7 },
+    });
+    await service.dispatchOne({ clinicId: ids.clinic, intentId: intent.id });
+    const payload = decryptAes128gcm(seen[0]!.body, sub) as { body: string };
+    expect(payload.body).toBe('Votre tour approche');
+    expect(payload.body).not.toMatch(/\d/);
+    expect(seen[0]!.headers.Urgency).toBe('high');
+  });
+
+  it('keeps the intent retryable when revoking a gone binding fails', async () => {
+    await bindings.subscribe(
+      target,
+      newSubscriber('https://fcm.googleapis.com/fcm/send/status-7')
+        .subscription,
+      'fr',
+      T0,
+    );
+    const failingPool = {
+      query: (sql: string, params?: unknown[]) =>
+        /^\s*UPDATE guest_push_subscriptions/.test(sql)
+          ? Promise.reject(new Error('db down'))
+          : pool.query(sql, params),
+    } as unknown as Pool;
+    const adapter = new PushNotificationProviderAdapter({
+      pool: failingPool,
+      sealer,
+      transport: new WebPushTransport(vapid, async () => ({
+        status: 410,
+        headers: { get: () => null },
+      })),
+    });
+    const result = await adapter.dispatch(
+      {
+        channel: 'push',
+        locale: 'fr',
+        direction: 'ltr',
+        templateId: 'queue_entry_created.v1',
+        title: 'Ajout à la file d’attente',
+        body: 'x',
+        providerIdempotencyKey: 'k',
+      },
+      {
+        clinicId: ids.clinic,
+        queueEntryId: ids.entry,
+        deliveryContext: {
+          target: {
+            subjectKind: 'visit_patient',
+            subjectId: ids.patient,
+            channel: 'push',
+          },
+          preference: null,
+        },
+      },
+    );
+    expect(result).toEqual({
+      kind: 'retryable_failure',
+      code: 'push_revocation_failure',
+    });
+    expect((await binding()).revocation_reason).toBeNull();
   });
 
   it('registers push only when VAPID and the seal secret are both configured', () => {

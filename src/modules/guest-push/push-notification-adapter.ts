@@ -94,7 +94,11 @@ export class PushNotificationProviderAdapter
         v: 1,
         kind: 'status',
         title: 'Tabibi',
-        body: request.body,
+        // The template title is a static generic sentence ("Votre tour
+        // approche"). The in-app body can carry the queue position or time
+        // windows, which must never reach a lock screen (spec: Lock-screen
+        // privacy), so it is never forwarded.
+        body: request.title,
         url: '/guest/status',
         tag: request.templateId,
       },
@@ -117,7 +121,9 @@ export class PushNotificationProviderAdapter
             [binding.id, now, clinicId],
           );
         } catch {
-          // The terminal result below still stands; the expiry sweep revokes it.
+          // Not revoked: stay retryable so the dead endpoint is hit again
+          // and revocation is retried, never silently dead-lettered.
+          return { kind: 'retryable_failure', code: 'push_revocation_failure' };
         }
         return { kind: 'terminal_failure', code: 'push_subscription_gone' };
       case 'rejected':
