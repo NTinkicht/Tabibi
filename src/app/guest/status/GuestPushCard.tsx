@@ -18,6 +18,8 @@ type Copy = {
   enable: string;
   disable: string;
   failed: string;
+  resend: string;
+  resendSent: string;
 };
 
 // docs/design/pwa-push.md section 5. English is the status page's existing
@@ -38,6 +40,9 @@ const COPY: Record<SupportedLocale, Copy> = {
     enable: 'Turn on notifications',
     disable: 'Turn off',
     failed: 'Could not change notifications. Please try again.',
+    resend: 'Send me a new link',
+    resendSent:
+      'If this device is registered, a link will arrive in a few seconds.',
   },
   fr: {
     heading: 'Notifications',
@@ -54,6 +59,9 @@ const COPY: Record<SupportedLocale, Copy> = {
     enable: 'Activer les notifications',
     disable: 'Désactiver',
     failed: 'Impossible de modifier les notifications. Veuillez réessayer.',
+    resend: 'M’envoyer un nouveau lien',
+    resendSent:
+      'Si cet appareil est inscrit, un lien arrive dans quelques secondes.',
   },
   ar: {
     heading: 'الإشعارات',
@@ -70,6 +78,8 @@ const COPY: Record<SupportedLocale, Copy> = {
     enable: 'تفعيل الإشعارات',
     disable: 'إيقاف',
     failed: 'تعذر تغيير الإشعارات. يرجى المحاولة مرة أخرى.',
+    resend: 'أرسل لي رابطًا جديدًا',
+    resendSent: 'إذا كان هذا الجهاز مسجلاً، سيصلك رابط خلال ثوانٍ قليلة.',
   },
 };
 
@@ -92,14 +102,16 @@ async function currentSubscription(): Promise<PushSubscription | null> {
   return registration.pushManager.getSubscription();
 }
 
-async function detect(): Promise<CardState> {
+type Detected = { state: CardState; resendEndpoint: string | null };
+
+async function detect(): Promise<Detected> {
   const locale = detectGuestLocale();
   // Without a configured VAPID key the feature is off and the product behaves
   // as it does today: no card at all, whatever the browser (spec section 5).
   const key = await fetch('/api/guest/push-subscription/key', {
     cache: 'no-store',
   }).catch(() => null);
-  if (!key || !key.ok) return 'hidden';
+  if (!key || !key.ok) return { state: 'hidden', resendEndpoint: null };
   const hasServiceWorker = 'serviceWorker' in navigator;
   const hasPushManager = 'PushManager' in window;
   const hasNotification = 'Notification' in window;
@@ -114,6 +126,7 @@ async function detect(): Promise<CardState> {
   // A browser subscription can outlive its server binding (24 hour or terminal
   // expiry, or another visit). Re-bind it to this entry before claiming
   // "active"; the route upserts the same endpoint and is idempotent.
+  let resendEndpoint: string | null = null;
   if (subscription) {
     const bound = await fetch('/api/guest/push-subscription', {
       method: 'POST',
@@ -123,9 +136,14 @@ async function detect(): Promise<CardState> {
         locale: pushRouteLocale(locale),
       }),
     }).catch(() => null);
-    if (!bound || !bound.ok) subscription = null;
+    if (!bound || !bound.ok) {
+      // 401 means this visit holds no valid status credential: the browser
+      // still has a subscription, so offer a possession-based fresh link.
+      if (bound?.status === 401) resendEndpoint = subscription.endpoint;
+      subscription = null;
+    }
   }
-  return pushCardState({
+  const state = pushCardState({
     userAgent: navigator.userAgent,
     hasServiceWorker,
     hasPushManager,
@@ -134,6 +152,10 @@ async function detect(): Promise<CardState> {
     permission,
     hasSubscription: subscription !== null,
   });
+  return {
+    state,
+    resendEndpoint: state === 'available' ? resendEndpoint : null,
+  };
 }
 
 /** Notifications card on /guest/status. Credential: the status cookie only. */
@@ -146,14 +168,18 @@ export function GuestPushCard() {
   const [state, setState] = useState<CardState>('checking');
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [resendEndpoint, setResendEndpoint] = useState<string | null>(null);
+  const [resent, setResent] = useState(false);
   const copy = COPY[locale];
 
   useEffect(() => {
     let cancelled = false;
     void detect()
-      .catch((): CardState => 'hidden')
+      .catch((): Detected => ({ state: 'hidden', resendEndpoint: null }))
       .then((next) => {
-        if (!cancelled) setState(next);
+        if (cancelled) return;
+        setState(next.state);
+        setResendEndpoint(next.resendEndpoint);
       });
     return () => {
       cancelled = true;
@@ -202,6 +228,25 @@ export function GuestPushCard() {
     }
   }
 
+  async function resend() {
+    if (!resendEndpoint) return;
+    setBusy(true);
+    setFailed(false);
+    try {
+      const response = await fetch('/api/guest/push-subscription/resend', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ endpoint: resendEndpoint }),
+      });
+      if (!response.ok) throw new Error('resend');
+      setResent(true);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function disable() {
     setBusy(true);
     setFailed(false);
@@ -237,7 +282,7 @@ export function GuestPushCard() {
         <h2 id="gs-push-heading">{copy.heading}</h2>
         <p role="status">{copy.states[state]}</p>
         {failed ? <p role="alert">{copy.failed}</p> : null}
-        {state === 'available' ? (
+        {state === 'available' && !resendEndpoint ? (
           <button
             type="button"
             className="tb-button tb-button--primary"
@@ -247,6 +292,17 @@ export function GuestPushCard() {
             {copy.enable}
           </button>
         ) : null}
+        {resendEndpoint && !resent ? (
+          <button
+            type="button"
+            className="tb-button tb-button--secondary"
+            disabled={busy}
+            onClick={() => void resend()}
+          >
+            {copy.resend}
+          </button>
+        ) : null}
+        {resent ? <p role="status">{copy.resendSent}</p> : null}
         {state === 'active' ? (
           <button
             type="button"

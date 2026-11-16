@@ -109,6 +109,9 @@ const copies = {
     denied: 'Notifications bloquées dans le navigateur.',
     active: 'Notifications activées sur cet appareil.',
     disable: 'Désactiver',
+    resend: 'M’envoyer un nouveau lien',
+    resendSent:
+      'Si cet appareil est inscrit, un lien arrive dans quelques secondes.',
     unsupported: 'Votre navigateur ne permet pas les notifications.',
     ios: 'Sur iPhone : touchez Partager',
     dir: 'ltr',
@@ -120,6 +123,8 @@ const copies = {
     denied: 'الإشعارات محظورة في المتصفح.',
     active: 'الإشعارات مفعّلة على هذا الجهاز.',
     disable: 'إيقاف',
+    resend: 'أرسل لي رابطًا جديدًا',
+    resendSent: 'إذا كان هذا الجهاز مسجلاً، سيصلك رابط خلال ثوانٍ قليلة.',
     unsupported: 'متصفحك لا يدعم الإشعارات.',
     ios: 'على iPhone: اضغط على مشاركة',
     dir: 'rtl',
@@ -231,7 +236,98 @@ for (const [name, c] of Object.entries(copies)) {
       await page.goto('/guest/status');
       const card = page.getByTestId('guest-push-card');
       await expect(card.getByRole('status')).toHaveText(c.available);
+      await expect(card.getByRole('button', { name: c.resend })).toBeVisible();
+      await expect(card.getByRole('button', { name: c.enable })).toHaveCount(0);
+    });
+
+    test('no valid credential with a browser subscription offers a fresh link', async ({
+      page,
+    }) => {
+      await mockPush(page, { permission: 'granted', subscribed: true });
+      await mockKey(page);
+      await page.route('**/api/guest/push-subscription', (route) =>
+        route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: '{"error":"Guest access rejected"}',
+        }),
+      );
+      const bodies: string[] = [];
+      await page.route('**/api/guest/push-subscription/resend', (route) => {
+        bodies.push(route.request().postData() ?? '');
+        return route.fulfill({
+          status: 202,
+          contentType: 'application/json',
+          body: '{"accepted":true}',
+        });
+      });
+      await page.goto('/guest/status');
+      const card = page.getByTestId('guest-push-card');
+      // Enabling cannot work without a credential and would drop the
+      // subscription the resend needs, so only the resend action is offered.
+      await expect(card.getByRole('button', { name: c.enable })).toHaveCount(0);
+      await card.getByRole('button', { name: c.resend }).click();
+      await expect(card.getByText(c.resendSent)).toBeVisible();
+      await expect(card.getByRole('button', { name: c.resend })).toHaveCount(0);
+      expect(bodies).toEqual([
+        JSON.stringify({
+          endpoint: 'https://fcm.googleapis.com/fcm/send/mock',
+        }),
+      ]);
+    });
+
+    test('a failed resend shows the alert and keeps the resend action', async ({
+      page,
+    }) => {
+      await mockPush(page, { permission: 'granted', subscribed: true });
+      await mockKey(page);
+      await page.route('**/api/guest/push-subscription', (route) =>
+        route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: '{}',
+        }),
+      );
+      await page.route('**/api/guest/push-subscription/resend', (route) =>
+        route.fulfill({
+          status: 429,
+          contentType: 'application/json',
+          body: '{}',
+        }),
+      );
+      await page.goto('/guest/status');
+      const card = page.getByTestId('guest-push-card');
+      await card.getByRole('button', { name: c.resend }).click();
+      await expect(card.getByRole('alert')).toBeVisible();
+      await expect(card.getByText(c.resendSent)).toHaveCount(0);
+      await expect(card.getByRole('button', { name: c.resend })).toBeVisible();
+    });
+
+    test('no resend offer without a browser subscription or on a non-credential failure', async ({
+      page,
+    }) => {
+      await mockPush(page, { permission: 'default' });
+      await mockKey(page);
+      await page.goto('/guest/status');
+      const card = page.getByTestId('guest-push-card');
       await expect(card.getByRole('button', { name: c.enable })).toBeVisible();
+      await expect(card.getByRole('button', { name: c.resend })).toHaveCount(0);
+    });
+
+    test('a 500 while re-binding does not offer a resend', async ({ page }) => {
+      await mockPush(page, { permission: 'granted', subscribed: true });
+      await mockKey(page);
+      await page.route('**/api/guest/push-subscription', (route) =>
+        route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: '{}',
+        }),
+      );
+      await page.goto('/guest/status');
+      const card = page.getByTestId('guest-push-card');
+      await expect(card.getByRole('button', { name: c.enable })).toBeVisible();
+      await expect(card.getByRole('button', { name: c.resend })).toHaveCount(0);
     });
 
     test('a refused binding shows an alert and leaves no browser subscription', async ({
