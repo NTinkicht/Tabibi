@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { GuestLinkEnvelope } from '@/modules/guest-access/link-envelope';
 import { guestBearerSigningSecret } from '@/modules/guest-access';
+import { optionalPushSealer } from '@/modules/guest-push/config';
 import { QueueTransferService } from '@/modules/queue/transfer';
 import { getPool } from '@/platform/database/pool';
 import {
@@ -36,6 +37,7 @@ export async function POST(
     const result = await new QueueTransferService(
       getPool(),
       new GuestLinkEnvelope(guestBearerSigningSecret()),
+      optionalPushSealer(),
     ).transfer(scope, sessionId, entryId, {
       reason: input.reason,
       targetSessionId: input.targetSessionId,

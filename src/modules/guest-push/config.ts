@@ -19,3 +19,17 @@ export function guestPushSealer(): PushSubscriptionSealer {
   }
   return new PushSubscriptionSealer(secret);
 }
+
+/**
+ * For flows that only move or scrub existing bindings (queue transfer): the
+ * sealer when configured, otherwise undefined, in which case bindings are
+ * revoked and scrubbed instead of re-sealed (fail closed, never a 503).
+ */
+export function optionalPushSealer(): PushSubscriptionSealer | undefined {
+  try {
+    return guestPushSealer();
+  } catch (error) {
+    if (error instanceof GuestPushNotConfiguredError) return undefined;
+    throw error;
+  }
+}
