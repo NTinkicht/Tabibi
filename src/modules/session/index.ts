@@ -2,6 +2,7 @@ import { lockActiveDoctorAssociation } from '@/modules/clinic/active-doctor';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
+import { NotificationOutboxRepository } from '@/modules/notification-outbox';
 import {
   AuthorizationError,
   type ClinicScope,
@@ -551,13 +552,18 @@ export class SessionService {
                 ? await client.query<{
                     id: string;
                     prior_state: 'waiting' | 'checked_in' | 'called';
+                    preferred_locale: string;
                   }>(
-                    `SELECT id, state AS prior_state
-                       FROM queue_entries
-                      WHERE clinic_id = $1 AND session_id = $2
-                        AND state = ANY($3::queue_entry_status[])
-                      ORDER BY registration_order
-                      FOR UPDATE`,
+                    `SELECT entry.id, entry.state AS prior_state,
+                            patient.preferred_locale
+                       FROM queue_entries entry
+                       JOIN patient_operational_records patient
+                         ON patient.id = entry.patient_id
+                        AND patient.clinic_id = entry.clinic_id
+                      WHERE entry.clinic_id = $1 AND entry.session_id = $2
+                        AND entry.state = ANY($3::queue_entry_status[])
+                      ORDER BY entry.registration_order
+                      FOR UPDATE OF entry`,
                     [
                       scope.clinicId,
                       sessionId,
@@ -588,6 +594,23 @@ export class SessionService {
                   idempotencyKey: input.idempotencyKey,
                 },
               });
+              // Atomic base outbox intent per cancelled entry; payload is the
+              // locale only. A failure rolls the whole cancellation back.
+              await NotificationOutboxRepository.enqueueNextVersionInTransaction(
+                client,
+                {
+                  clinicId: scope.clinicId,
+                  queueEntryId: entry.id,
+                  logicalTargetKey: `queue-entry:${entry.id}`,
+                  eventKey: 'session_cancelled',
+                  idempotencyKey: `session-event:${createHash('sha256')
+                    .update(
+                      `${scope.clinicId}:${scope.actorUserId}:${input.idempotencyKey}:${entry.id}`,
+                    )
+                    .digest('hex')}`,
+                  payload: { locale: entry.preferred_locale },
+                },
+              );
             }
             await appendAuditEvent(client, {
               ...scope,
