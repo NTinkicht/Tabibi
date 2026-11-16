@@ -1,4 +1,8 @@
 import {
+  AccountDependentNotFoundError,
+  AccountDependentValidationError,
+} from '@/modules/account-dependent';
+import {
   AppointmentConflictError,
   AppointmentValidationError,
 } from '@/modules/appointment';
@@ -80,7 +84,8 @@ export async function operationalJson(
       error instanceof MembershipUserNotFoundError ||
       error instanceof ClinicDoctorNotFoundError ||
       error instanceof InviteNotFoundError ||
-      error instanceof NotificationDeadLetterNotFoundError
+      error instanceof NotificationDeadLetterNotFoundError ||
+      error instanceof AccountDependentNotFoundError
     ) {
       status = 404;
       code = 'not_found';
@@ -94,6 +99,7 @@ export async function operationalJson(
       error instanceof InviteRejectedError ||
       error instanceof InviteInputError ||
       error instanceof PasswordPolicyError ||
+      error instanceof AccountDependentValidationError ||
       error instanceof ZodError ||
       error instanceof SyntaxError
     ) {
