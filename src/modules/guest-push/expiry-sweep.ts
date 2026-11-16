@@ -58,6 +58,18 @@ export async function sweepExpiredPushBindings(
     const patients = new Map<string, string>();
     for (const row of due.rows) patients.set(row.patient_id, row.clinic_id);
     for (const [patientId, clinicId] of patients) {
+      // Serialize with a concurrent subscribe: it inserts its binding and then
+      // upserts this consent row, so taking the row lock first makes the
+      // remaining-binding check below see (or wait for) its binding and never
+      // revoke consent that a just-created binding depends on.
+      const pref = await client.query(
+        `SELECT 1 FROM notification_preferences
+          WHERE clinic_id=$1 AND patient_id=$2 AND channel='push'
+            AND consent_state='granted'
+          FOR UPDATE`,
+        [clinicId, patientId],
+      );
+      if (pref.rowCount === 0) continue;
       const remaining = await client.query(
         `SELECT 1 FROM guest_push_subscriptions sub
            JOIN queue_entries entry

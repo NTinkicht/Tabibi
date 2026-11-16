@@ -204,6 +204,42 @@ describe('sweepExpiredPushBindings', () => {
     expect((await rowOf(other)).revoked_at).toBeNull();
   });
 
+  it('does not revoke consent that a concurrent, uncommitted subscribe depends on', async () => {
+    await bind(ids.entry, 1);
+    await finishEntry(ids.entry, minutes(30));
+    const subscriber = await pool.connect();
+    try {
+      await subscriber.query('BEGIN');
+      // What subscribe does for the patient's other entry: binding first,
+      // then the consent upsert (taking the preference row lock).
+      await subscriber.query(
+        `INSERT INTO guest_push_subscriptions
+           (id,clinic_id,queue_entry_id,endpoint_hash,sealed_subscription,locale,created_at,expires_at)
+         VALUES($1,$2,$3,$4,'sealed','fr',$5,$6)`,
+        [
+          randomUUID(),
+          ids.clinic,
+          ids.entry3,
+          'a'.repeat(64),
+          minutes(59),
+          minutes(59 + 24 * 60),
+        ],
+      );
+      await subscriber.query(
+        `UPDATE notification_preferences SET revision=revision+1
+          WHERE patient_id=$1 AND channel='push'`,
+        [ids.patient],
+      );
+      const sweep = sweepExpiredPushBindings(pool, minutes(60));
+      await new Promise((r) => setTimeout(r, 300));
+      await subscriber.query('COMMIT');
+      expect(await sweep).toBe(1);
+    } finally {
+      subscriber.release();
+    }
+    expect(await consent()).toBe('granted');
+  });
+
   it('skips a row locked by a concurrent transaction instead of waiting, then sweeps it', async () => {
     const id = await bind();
     const holder = await pool.connect();
