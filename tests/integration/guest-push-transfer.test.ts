@@ -332,4 +332,50 @@ describe('push bindings on queue transfer (#894)', () => {
     expect(other).toHaveLength(1);
     expect(other[0]!.revoked_at).toBeNull();
   });
+
+  it('takes the endpoint lock before any subscription row lock (no deadlock with subscribe)', async () => {
+    const a = await walkIn('A');
+    await store.subscribe(
+      { clinicId: ids.clinic, queueEntryId: a },
+      material(8),
+      'fr',
+    );
+    const hash = (await bindings(a))[0]!.endpoint_hash;
+    const holder = await pool.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`guest-push-endpoint:${hash}`],
+      );
+      const pending = transfer(a);
+      // Wait until the transfer is blocked on the advisory lock.
+      for (let i = 0; i < 100; i++) {
+        const waiting = await pool.query(
+          `SELECT 1 FROM pg_locks WHERE locktype='advisory' AND NOT granted`,
+        );
+        if (waiting.rowCount) break;
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      const probe = await pool.connect();
+      try {
+        await probe.query('BEGIN');
+        // Would fail with 55P03 if the transfer already held the row lock.
+        const row = await probe.query(
+          `SELECT id FROM guest_push_subscriptions
+            WHERE queue_entry_id=$1 AND revoked_at IS NULL FOR UPDATE NOWAIT`,
+          [a],
+        );
+        expect(row.rowCount).toBe(1);
+        await probe.query('ROLLBACK');
+      } finally {
+        probe.release();
+      }
+      await holder.query('COMMIT');
+      const result = await pending;
+      expect(await bindings(result.target.id)).toHaveLength(1);
+    } finally {
+      holder.release();
+    }
+  });
 });

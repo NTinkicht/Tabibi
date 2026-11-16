@@ -31,6 +31,21 @@ export async function rebindPushSubscriptionsForTransfer(
   entries: { clinicId: string; sourceEntryId: string; targetEntryId: string },
   now: Date = new Date(),
 ): Promise<string[]> {
+  // Lock order matches subscribe and renew: endpoint advisory locks (sorted)
+  // first, subscription rows second. Hashes are read unlocked, then the rows
+  // are re-read under lock, so a concurrent re-subscribe cannot deadlock.
+  const hashes = await client.query<{ endpoint_hash: string }>(
+    `SELECT DISTINCT endpoint_hash FROM guest_push_subscriptions
+      WHERE clinic_id=$1 AND queue_entry_id=$2 AND revoked_at IS NULL
+      ORDER BY endpoint_hash`,
+    [entries.clinicId, entries.sourceEntryId],
+  );
+  if (hashes.rows.length === 0) return [];
+  for (const row of hashes.rows)
+    await client.query(
+      'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+      [`guest-push-endpoint:${row.endpoint_hash}`],
+    );
   const source = await client.query<SourceBinding>(
     `SELECT id, endpoint_hash, sealed_subscription, locale, expires_at
        FROM guest_push_subscriptions
@@ -39,14 +54,6 @@ export async function rebindPushSubscriptionsForTransfer(
       FOR UPDATE`,
     [entries.clinicId, entries.sourceEntryId],
   );
-  if (source.rows.length === 0) return [];
-
-  // Same lock key as subscribe and renew, in sorted order.
-  for (const row of source.rows)
-    await client.query(
-      'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
-      [`guest-push-endpoint:${row.endpoint_hash}`],
-    );
 
   const moved: string[] = [];
   for (const row of source.rows) {
