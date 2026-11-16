@@ -801,8 +801,8 @@ export class QueueService {
           client,
           {
             clinicId: scope.clinicId,
-            queueEntryId: entryId,
-            logicalTargetKey: `queue-entry:${entryId}`,
+            queueEntryId: row.id,
+            logicalTargetKey: `queue-entry:${row.id}`,
             eventKey: notificationEvent,
             idempotencyKey: `queue-event:${createHash('sha256')
               .update(

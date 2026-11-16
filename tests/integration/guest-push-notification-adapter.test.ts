@@ -180,6 +180,10 @@ describe('push notification adapter through queue dispatch, real PostgreSQL (#90
     expect(seen[1]!.headers.Urgency).toBe('high');
     expect(Number(seen[1]!.headers.TTL)).toBe(600);
 
+    // A cancellation is only deliverable while the entry is actually cancelled.
+    await pool.query(`UPDATE queue_entries SET state='cancelled' WHERE id=$1`, [
+      ids.entry,
+    ]);
     const cancelled = await produce('queue_entry_cancelled');
     await service.dispatchOne({ clinicId: ids.clinic, intentId: cancelled.id });
     expect(Number(seen[2]!.headers.TTL)).toBe(1800);

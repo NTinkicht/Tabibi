@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
+import { QueueInAppNotificationTargetResolver } from '@/modules/notification-domain/queue-in-app-target-resolver';
+import type { NotificationIntent } from '@/modules/notification-outbox';
 import { QueueService } from '@/modules/queue';
+import { QueueRestoreService } from '@/modules/queue/restore';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 6 });
 const ids = {
@@ -203,5 +206,61 @@ describe('queue command outbox atomicity', () => {
     await run('call', entries[0]!, 'call-0');
     const rows = await intents();
     expect(rows.every((row) => row.clinic_id === ids.clinic)).toBe(true);
+  });
+
+  it('persists the canonical lowercase id for an uppercase request id', async () => {
+    await run('cancel', entries[0]!.toUpperCase(), 'cancel-up', {
+      reason: 'upper',
+      cancellationSource: 'clinic',
+    });
+    const rows = await pool.query<{
+      queue_entry_id: string;
+      logical_target_key: string;
+    }>('SELECT queue_entry_id,logical_target_key FROM notification_outbox');
+    expect(rows.rows).toEqual([
+      {
+        queue_entry_id: entries[0],
+        logical_target_key: `queue-entry:${entries[0]}`,
+      },
+    ]);
+    const resolver = new QueueInAppNotificationTargetResolver(pool);
+    const intent = await pool.query(
+      `SELECT id, clinic_id AS "clinicId", queue_entry_id AS "queueEntryId",
+              logical_target_key AS "logicalTargetKey", event_key AS "eventKey"
+         FROM notification_outbox`,
+    );
+    expect(
+      await resolver.resolveTarget(intent.rows[0] as NotificationIntent),
+    ).not.toBeNull();
+  });
+
+  it('does not deliver a cancellation after the entry was restored', async () => {
+    await run('cancel', entries[0]!, 'cancel-r', {
+      reason: 'mistake',
+      cancellationSource: 'clinic',
+    });
+    const resolver = new QueueInAppNotificationTargetResolver(pool);
+    const load = async () =>
+      (
+        await pool.query(
+          `SELECT id, clinic_id AS "clinicId", queue_entry_id AS "queueEntryId",
+                  logical_target_key AS "logicalTargetKey", event_key AS "eventKey"
+             FROM notification_outbox WHERE event_key='queue_entry_cancelled'`,
+        )
+      ).rows[0] as NotificationIntent;
+    // Positive control: while cancelled the intent resolves.
+    expect(await resolver.resolveTarget(await load())).not.toBeNull();
+    await new QueueRestoreService(pool).restore(
+      scope,
+      ids.session,
+      entries[0]!,
+      {
+        checkIn: false,
+        reason: 'restore',
+        idempotencyKey: 'restore-r',
+        correlationId: 'restore-r',
+      },
+    );
+    expect(await resolver.resolveTarget(await load())).toBeNull();
   });
 });

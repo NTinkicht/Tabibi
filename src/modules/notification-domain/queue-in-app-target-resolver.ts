@@ -43,6 +43,13 @@ export class QueueInAppNotificationTargetResolver
     const row = result.rows[0];
     const patientId = row?.patient_id?.trim() ?? '';
     if (!patientId) return null;
+    // Fail closed on stale cancellations: a cancel that was restored before
+    // dispatch must never tell a patient with an active visit they were cancelled.
+    if (
+      intent.eventKey === 'queue_entry_cancelled' &&
+      row?.state !== 'cancelled'
+    )
+      return null;
     if (
       row?.state &&
       terminalQueueEntryStates.has(row.state) &&
