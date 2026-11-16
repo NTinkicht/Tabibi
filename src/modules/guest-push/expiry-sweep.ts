@@ -7,7 +7,7 @@ import { inTransaction } from '@/platform/database/transaction';
 // most 24 hours (the row's expires_at). Then it is revoked as `expired` and its
 // sealed subscription scrubbed. The sweep needs no seal secret: it never opens
 // a subscription.
-const TERMINAL_GRACE = '15 minutes';
+const TERMINAL_GRACE_MS = 15 * 60 * 1_000;
 const SWEEP_BATCH = 200;
 
 /**
@@ -38,14 +38,14 @@ export async function sweepExpiredPushBindings(
           AND (sub.expires_at <= $1
             OR (entry.state IN ('completed','cancelled','no_show')
                 AND COALESCE(entry.completed_at, entry.updated_at)
-                    + interval '${TERMINAL_GRACE}' <= $1)
+                    + ($2::int * interval '1 millisecond') <= $1)
             OR (session.status IN ('closed','cancelled')
                 AND COALESCE(session.closed_at, session.updated_at)
-                    + interval '${TERMINAL_GRACE}' <= $1))
+                    + ($2::int * interval '1 millisecond') <= $1))
         ORDER BY sub.id
-        LIMIT ${SWEEP_BATCH}
+        LIMIT $3
         FOR UPDATE OF sub SKIP LOCKED`,
-      [now],
+      [now, TERMINAL_GRACE_MS, SWEEP_BATCH],
     );
     if (due.rowCount === 0) return 0;
     await client.query(

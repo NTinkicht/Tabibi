@@ -162,27 +162,38 @@ describe('sweepExpiredPushBindings', () => {
     expect((await rowOf(id)).revocation_reason).toBe('expired');
   });
 
-  it('expires bindings of a closed session after the grace, not before', async () => {
+  it('treats a no_show entry like a terminal one', async () => {
     const id = await bind();
-    // The close guard forbids closing with active entries; the sweep must still
-    // treat a closed session as terminal for any binding left behind, so bypass
-    // the trigger for this fixture only.
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query("SET LOCAL session_replication_role = 'replica'");
-      await client.query(
-        `UPDATE consultation_sessions SET status='closed', closed_at=$2, updated_at=$2 WHERE id=$1`,
-        [ids.session, minutes(30)],
-      );
-      await client.query('COMMIT');
-    } finally {
-      client.release();
-    }
+    await finishEntry(ids.entry, minutes(30), 'no_show');
     expect(await sweepExpiredPushBindings(pool, minutes(44))).toBe(0);
     expect(await sweepExpiredPushBindings(pool, minutes(46))).toBe(1);
-    expect((await rowOf(id)).sealed_subscription).toBeNull();
+    expect((await rowOf(id)).revocation_reason).toBe('expired');
   });
+
+  it.each(['closed', 'cancelled'])(
+    'expires bindings of a %s session after the grace, not before',
+    async (status) => {
+      const id = await bind();
+      // The close guard forbids closing with active entries; the sweep must still
+      // treat a closed session as terminal for any binding left behind, so bypass
+      // the trigger for this fixture only.
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("SET LOCAL session_replication_role = 'replica'");
+        await client.query(
+          `UPDATE consultation_sessions SET status=$3, closed_at=$2, updated_at=$2 WHERE id=$1`,
+          [ids.session, minutes(30), status],
+        );
+        await client.query('COMMIT');
+      } finally {
+        client.release();
+      }
+      expect(await sweepExpiredPushBindings(pool, minutes(44))).toBe(0);
+      expect(await sweepExpiredPushBindings(pool, minutes(46))).toBe(1);
+      expect((await rowOf(id)).sealed_subscription).toBeNull();
+    },
+  );
 
   it('keeps push consent while the patient has another active binding', async () => {
     const expiring = await bind(ids.entry, 1);
