@@ -404,6 +404,45 @@ describe('push notification adapter through queue dispatch, real PostgreSQL (#90
       headers: { get: () => null },
     }));
 
+    it.each([
+      [400, 'terminal_failure', 'push_rejected', false],
+      [403, 'terminal_failure', 'push_rejected', false],
+      [413, 'terminal_failure', 'push_rejected', false],
+      [404, 'terminal_failure', 'push_subscription_gone', true],
+      [410, 'terminal_failure', 'push_subscription_gone', true],
+      [429, 'retryable_failure', 'push_unavailable', false],
+      [500, 'retryable_failure', 'push_unavailable', false],
+      [503, 'retryable_failure', 'push_unavailable', false],
+      [302, 'terminal_failure', 'push_rejected', false],
+      [202, 'delivered', 'push_delivered', false],
+    ] as const)(
+      'maps push service status %i to %s %s (binding revoked: %s)',
+      async (status, kind, code, revoked) => {
+        await bindings.subscribe(
+          target,
+          newSubscriber(`https://fcm.googleapis.com/fcm/send/map-${status}`)
+            .subscription,
+          'fr',
+          T0,
+        );
+        const adapter = new PushNotificationProviderAdapter({
+          pool,
+          sealer,
+          transport: new WebPushTransport(vapid, async () => ({
+            status,
+            headers: { get: () => null },
+          })),
+        });
+        expect(await adapter.dispatch(request, dispatchContext())).toEqual({
+          kind,
+          code,
+        });
+        expect((await binding()).revocation_reason).toBe(
+          revoked ? 'gone' : null,
+        );
+      },
+    );
+
     it('returns a retryable failure when the binding lookup fails', async () => {
       const adapter = new PushNotificationProviderAdapter({
         pool: {
