@@ -70,10 +70,14 @@ export async function POST(request: Request): Promise<Response> {
       INGRESS_BUCKET,
       INGRESS_LIMIT,
     );
-    const withinToken = await consumeSignInBudget(
-      `patient-recovery-redeem:token:${keyDigest(body.token)}`,
-      TOKEN_LIMIT,
-    );
+    // Sequential on purpose: once the shared ingress budget is spent, the
+    // request is refused before any per-token bucket row can be written.
+    const withinToken =
+      withinSource &&
+      (await consumeSignInBudget(
+        `patient-recovery-redeem:token:${keyDigest(body.token)}`,
+        TOKEN_LIMIT,
+      ));
     if (!withinSource || !withinToken) {
       rateLimited = true;
       return { status: 429, body: { error: 'rate_limited' } };

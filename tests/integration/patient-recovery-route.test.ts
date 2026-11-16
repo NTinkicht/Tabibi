@@ -195,4 +195,26 @@ describe('POST /api/patient/recovery/redeem', () => {
     expect(statuses).toEqual([400, 400, 400, 400, 400, 429]);
     expect(last?.headers.get('retry-after')).not.toBeNull();
   });
+
+  it('writes no per-token bucket row once the ingress budget is exhausted', async () => {
+    const buckets = async () =>
+      Number(
+        (
+          await pool.query(
+            'SELECT count(*) AS n FROM staff_sign_in_rate_limit_buckets',
+          )
+        ).rows[0].n,
+      );
+    let first429 = -1;
+    for (let i = 0; i < 70 && first429 < 0; i += 1) {
+      const token = i.toString(36).padStart(43, 'C');
+      if ((await redeem({ token, newPassword: NEW })).status === 429)
+        first429 = i;
+    }
+    expect(first429).toBeGreaterThan(0);
+    const before = await buckets();
+    const res = await redeem({ token: 'Z'.repeat(43), newPassword: NEW });
+    expect(res.status).toBe(429);
+    expect(await buckets()).toBe(before);
+  });
 });
