@@ -4,6 +4,7 @@ import type {
   NotificationDispatchOutcome,
   NotificationIntent,
 } from '@/modules/notification-outbox';
+import { MAX_RETRY_AFTER_SECONDS } from '@/modules/notification-outbox';
 import {
   notificationSuppressionReason,
   type NotificationDeliveryContext,
@@ -71,9 +72,6 @@ export {
   type NotificationDispatchRenderer,
   type NotificationDispatchTemplateInputResolver,
 } from '@/modules/notification-domain/rendered-dispatch-renderer';
-
-/** Upper bound for a provider Retry-After hint (the longest standard back-off). */
-export const MAX_RETRY_AFTER_SECONDS = 4 * 60 * 60;
 
 export type NotificationProviderResult =
   | { kind: 'delivered'; code?: string | null }

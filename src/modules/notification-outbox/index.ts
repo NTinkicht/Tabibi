@@ -62,6 +62,9 @@ export interface NotificationDispatchClaim {
   expiresAt: string;
 }
 
+/** Upper bound for a provider Retry-After hint (the longest standard back-off). */
+export const MAX_RETRY_AFTER_SECONDS = 4 * 60 * 60;
+
 export interface CompleteNotificationDispatchInput {
   clinicId: string;
   intentId: string;
@@ -523,7 +526,10 @@ export class NotificationOutboxRepository {
       typeof rawInput.retryAfterSeconds === 'number' &&
       Number.isFinite(rawInput.retryAfterSeconds) &&
       rawInput.retryAfterSeconds > 0
-        ? Math.min(Math.floor(rawInput.retryAfterSeconds), 4 * 60 * 60)
+        ? Math.min(
+            Math.floor(rawInput.retryAfterSeconds),
+            MAX_RETRY_AFTER_SECONDS,
+          )
         : 0;
     if (!clinicId || !intentId || !claimToken)
       throw new NotificationOutboxValidationError(
