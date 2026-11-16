@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { requireClinicRole } from '@/modules/identity';
-import { createQueueInAppNotificationDispatchBatchRunner } from '@/modules/notification-domain/in-app';
+import { createQueueNotificationDispatchBatchRunner } from '@/modules/guest-push/dispatch-runtime';
 import { getPool } from '@/platform/database/pool';
 import {
   authenticatedClinicScope,
@@ -34,9 +34,7 @@ export async function POST(
     const { limit } = querySchema.parse({
       limit: new URL(request.url).searchParams.get('limit') ?? undefined,
     });
-    const summary = await createQueueInAppNotificationDispatchBatchRunner(
-      pool,
-    ).run({
+    const summary = await createQueueNotificationDispatchBatchRunner(pool).run({
       clinicId: scope.clinicId,
       limit: limit ?? DEFAULT_BATCH_LIMIT,
     });
