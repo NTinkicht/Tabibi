@@ -7,6 +7,7 @@ import type { GuestLinkEnvelope } from '@/modules/guest-access/link-envelope';
 import { GuestLinkIntentStore } from '@/modules/guest-access/link-intents';
 import { appendAuditEvent } from '@/modules/audit';
 import { inTransaction } from '@/platform/database/transaction';
+import { pushLinkMaterial } from './push-link-material';
 import { consumeGuestPushBucket } from './rate-limit';
 import type { PushSubscriptionSealer } from './subscription-seal';
 
@@ -67,7 +68,7 @@ export async function resendGuestPushLink(
           clinicId: binding.clinic_id,
           queueEntryId: binding.queue_entry_id,
           intent: 'resend',
-          material: issued.exchangeId,
+          material: pushLinkMaterial(issued.exchangeId, binding.id),
           exchangeExpiresAt: issued.expiresAt,
         },
         client,

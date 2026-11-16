@@ -35,12 +35,30 @@ export interface DispatchContext {
   intentId: string;
   /** Stable across retries so the provider can deduplicate. */
   idempotencyKey: string;
+  clinicId: string;
+  queueEntryId: string;
+  intent: GuestLinkIntentKind;
+  /**
+   * Latest moment the link may be delivered. It is the intent deadline, which
+   * is never later than the exchange expiry, so a sender that bounds its TTL
+   * by it can never outlive the exchange.
+   */
+  exchangeExpiresAt: Date;
 }
+
+/**
+ * A sender may finish the claim without retrying: `no_channel` (the entry has
+ * no usable channel), `gone` (the provider says the destination no longer
+ * exists) or `rejected` (the provider permanently refused). All dead-letter
+ * and scrub at once. Returning nothing means delivered; throwing stays
+ * retryable.
+ */
+export type LinkSenderOutcome = 'no_channel' | 'gone' | 'rejected';
 
 export type LinkSender = (
   material: string,
   context: DispatchContext,
-) => Promise<void>;
+) => Promise<void | LinkSenderOutcome>;
 
 export interface DispatchOptions {
   leaseMs?: number;
@@ -191,8 +209,16 @@ export class GuestLinkIntentStore {
         ? 'dead_letter'
         : 'none';
     }
+    let outcome: void | LinkSenderOutcome;
     try {
-      await sender(material, { intentId: row.id, idempotencyKey: row.id });
+      outcome = await sender(material, {
+        intentId: row.id,
+        idempotencyKey: row.id,
+        clinicId: row.clinic_id,
+        queueEntryId: row.queue_entry_id,
+        intent: row.intent,
+        exchangeExpiresAt: row.expires_at,
+      });
     } catch {
       const retryAt = new Date(
         this.clock().getTime() + backoffMs * 2 ** (row.attempts - 1),
@@ -210,6 +236,15 @@ export class GuestLinkIntentStore {
         [row.clinic_id, row.id, retryAt, claimToken],
       );
       return retried.rowCount === 1 ? 'retry_scheduled' : 'none';
+    }
+    if (
+      outcome === 'no_channel' ||
+      outcome === 'gone' ||
+      outcome === 'rejected'
+    ) {
+      return (await this.finishClaim(row, claimToken, 'dead_letter'))
+        ? 'dead_letter'
+        : 'none';
     }
     return (await this.finishClaim(row, claimToken, 'delivered'))
       ? 'delivered'
