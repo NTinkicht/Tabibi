@@ -37,3 +37,7 @@ audit event and command receipt (`NotificationOutboxRepository.enqueueNextVersio
 The payload is `{locale}` only. An outbox failure rolls the whole command back, and an
 exact retry is answered from the receipt without a second intent. Delivery, consent and
 destination resolution stay downstream.
+
+Whole-session cancellation (`SessionService.command` `cancel`) likewise writes one `session_cancelled`
+intent (payload `{locale}` only) per cascaded active entry in the same transaction; an outbox failure
+rolls the cancellation back and an exact retry adds none.
