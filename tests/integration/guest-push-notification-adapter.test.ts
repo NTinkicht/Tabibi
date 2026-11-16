@@ -377,6 +377,107 @@ describe('push notification adapter through queue dispatch, real PostgreSQL (#90
     expect((await binding()).revocation_reason).toBeNull();
   });
 
+  describe('adapter error paths', () => {
+    const request = {
+      channel: 'push' as const,
+      locale: 'fr' as const,
+      direction: 'ltr' as const,
+      templateId: 'queue_entry_created.v1' as const,
+      title: 'Ajout à la file d’attente',
+      body: 'x',
+      providerIdempotencyKey: 'k',
+    };
+    const dispatchContext = () => ({
+      clinicId: ids.clinic,
+      queueEntryId: ids.entry,
+      deliveryContext: {
+        target: {
+          subjectKind: 'visit_patient' as const,
+          subjectId: ids.patient,
+          channel: 'push' as const,
+        },
+        preference: null,
+      },
+    });
+    const okTransport = new WebPushTransport(vapid, async () => ({
+      status: 201,
+      headers: { get: () => null },
+    }));
+
+    it('returns a retryable failure when the binding lookup fails', async () => {
+      const adapter = new PushNotificationProviderAdapter({
+        pool: {
+          query: () => Promise.reject(new Error('db down')),
+        } as unknown as Pool,
+        sealer,
+        transport: okTransport,
+      });
+      expect(await adapter.dispatch(request, dispatchContext())).toEqual({
+        kind: 'retryable_failure',
+        code: 'push_binding_lookup_failure',
+      });
+    });
+
+    it('dead-letters as no_channel when the sealed binding cannot be opened, without sending', async () => {
+      await bindings.subscribe(
+        target,
+        newSubscriber('https://fcm.googleapis.com/fcm/send/status-8')
+          .subscription,
+        'fr',
+        T0,
+      );
+      let sent = 0;
+      const adapter = new PushNotificationProviderAdapter({
+        pool,
+        sealer: new PushSubscriptionSealer(
+          'a-different-seal-secret-0123456789abcdef',
+        ),
+        transport: {
+          send: async () => {
+            sent += 1;
+            return { kind: 'delivered' as const };
+          },
+        },
+      });
+      expect(await adapter.dispatch(request, dispatchContext())).toEqual({
+        kind: 'terminal_failure',
+        code: 'push_no_channel',
+      });
+      expect(sent).toBe(0);
+      // Positive control: the right sealer opens the same binding and sends.
+      const control = new PushNotificationProviderAdapter({
+        pool,
+        sealer,
+        transport: okTransport,
+      });
+      expect(await control.dispatch(request, dispatchContext())).toMatchObject({
+        kind: 'delivered',
+      });
+    });
+
+    it('reports unknown on a network failure or timeout and keeps the binding', async () => {
+      await bindings.subscribe(
+        target,
+        newSubscriber('https://fcm.googleapis.com/fcm/send/status-9')
+          .subscription,
+        'fr',
+        T0,
+      );
+      const adapter = new PushNotificationProviderAdapter({
+        pool,
+        sealer,
+        transport: new WebPushTransport(vapid, async () => {
+          throw new Error('ETIMEDOUT');
+        }),
+      });
+      expect(await adapter.dispatch(request, dispatchContext())).toEqual({
+        kind: 'unknown',
+        code: 'push_unknown',
+      });
+      expect((await binding()).revocation_reason).toBeNull();
+    });
+  });
+
   it('registers push only when VAPID and the seal secret are both configured', () => {
     expect(loadPushRuntimeDeps(null, sealer)).toBeUndefined();
     expect(loadPushRuntimeDeps(vapid, null)).toBeUndefined();
