@@ -90,4 +90,15 @@ one is the single 403 `current_password_invalid` and counts toward the lockout);
 the new one must pass the shared policy (400 `password_policy` with its `code`,
 nothing changed). The hash is replaced with a compare-and-set on the hash that
 was read, and every other session of the account is revoked while the calling
-session stays valid. Email-based recovery remains a later slice.
+session stays valid.
+
+### Patient recovery redemption (slice 6)
+
+`POST /api/patient/recovery/redeem` `{ token, newPassword }` (same-origin, bounded
+strict body, 5 attempts per token and one ingress bucket per 15 minutes) redeems
+a slice-5 reset token: it replaces the password, clears the lockout and revokes
+every session of the account, then answers `200 { status: "changed" }` with no
+cookie. Malformed, unknown, superseded, expired and replayed tokens are one 400
+`invalid_token`; a policy failure is 400 `password_policy` and leaves a valid
+token unconsumed. Requesting a reset (and delivering the token) is a later slice
+because it needs an approved delivery channel.
