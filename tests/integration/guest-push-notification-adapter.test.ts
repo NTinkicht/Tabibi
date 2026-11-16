@@ -237,6 +237,50 @@ describe('push notification adapter through queue dispatch, real PostgreSQL (#90
     expect((await binding()).revocation_reason).toBeNull();
   });
 
+  it('honours the push service Retry-After by lengthening the outbox back-off', async () => {
+    await bindings.subscribe(
+      target,
+      newSubscriber('https://fcm.googleapis.com/fcm/send/retry-after')
+        .subscription,
+      'fr',
+      T0,
+    );
+    const dispatchWith = async (retryAfter: string | null) => {
+      const service = createQueueNotificationDispatchService(pool, {
+        sealer,
+        transport: new WebPushTransport(vapid, async () => ({
+          status: 429,
+          headers: {
+            get: (name: string) =>
+              name.toLowerCase() === 'retry-after' ? retryAfter : null,
+          },
+        })),
+      });
+      const execution = await service.dispatchOne({
+        clinicId: ids.clinic,
+        intentId: (await produce('queue_entry_created')).id,
+      });
+      expect(execution.status).toBe('completed');
+      const done = execution as Extract<
+        typeof execution,
+        { status: 'completed' }
+      >;
+      expect(done.providerResult).toMatchObject({
+        kind: 'retryable_failure',
+        code: 'push_unavailable',
+      });
+      return (
+        new Date(done.intent.nextAttemptAt!).getTime() -
+        new Date(done.intent.dispatchOutcomeAt!).getTime()
+      );
+    };
+    expect(await dispatchWith('900')).toBe(900_000);
+    expect(await dispatchWith('5')).toBe(60_000);
+    expect(await dispatchWith(null)).toBe(60_000);
+    expect(await dispatchWith('999999999')).toBe(4 * 3_600_000);
+    expect((await binding()).revocation_reason).toBeNull();
+  });
+
   it('keeps in-app routing and never contacts the push service without an active binding', async () => {
     await new NotificationPreferenceRepository(pool).change({
       clinicId: ids.clinic,

@@ -68,6 +68,11 @@ export interface CompleteNotificationDispatchInput {
   claimToken: string;
   outcome: NotificationDispatchOutcome;
   outcomeCode?: string | null;
+  /**
+   * Provider Retry-After hint in seconds. Only lengthens the standard back-off
+   * (never shortens it) and is clamped to 4 hours.
+   */
+  retryAfterSeconds?: number;
 }
 
 export class NotificationOutboxValidationError extends Error {}
@@ -514,6 +519,12 @@ export class NotificationOutboxRepository {
     const intentId = rawInput.intentId.trim();
     const claimToken = rawInput.claimToken.trim();
     const outcomeCode = rawInput.outcomeCode?.trim() || null;
+    const retryAfterSeconds =
+      typeof rawInput.retryAfterSeconds === 'number' &&
+      Number.isFinite(rawInput.retryAfterSeconds) &&
+      rawInput.retryAfterSeconds > 0
+        ? Math.min(Math.floor(rawInput.retryAfterSeconds), 4 * 60 * 60)
+        : 0;
     if (!clinicId || !intentId || !claimToken)
       throw new NotificationOutboxValidationError(
         'Clinic id, intent id and claim token are required',
@@ -544,13 +555,16 @@ export class NotificationOutboxRepository {
               next_attempt_at=CASE
                 WHEN $4::notification_outbox_state IN ('failed', 'unknown')
                      AND dispatch_attempt_count < dispatch_max_attempts
-                  THEN now() + CASE dispatch_attempt_count
-                    WHEN 1 THEN interval '1 minute'
-                    WHEN 2 THEN interval '5 minutes'
-                    WHEN 3 THEN interval '15 minutes'
-                    WHEN 4 THEN interval '1 hour'
-                    ELSE interval '4 hours'
-                  END
+                  THEN now() + GREATEST(
+                    CASE dispatch_attempt_count
+                      WHEN 1 THEN interval '1 minute'
+                      WHEN 2 THEN interval '5 minutes'
+                      WHEN 3 THEN interval '15 minutes'
+                      WHEN 4 THEN interval '1 hour'
+                      ELSE interval '4 hours'
+                    END,
+                    make_interval(secs => $6::int)
+                  )
                 ELSE NULL
               END,
               dispatch_claim_token=NULL,
@@ -567,7 +581,14 @@ export class NotificationOutboxRepository {
                   dispatch_attempt_count, dispatch_last_attempt_at,
                   dispatch_outcome_at, dispatch_outcome_code,
                   next_attempt_at, dispatch_max_attempts`,
-      [clinicId, intentId, claimToken, rawInput.outcome, outcomeCode],
+      [
+        clinicId,
+        intentId,
+        claimToken,
+        rawInput.outcome,
+        outcomeCode,
+        retryAfterSeconds,
+      ],
     );
     const row = result.rows[0];
     return row ? toIntent(row) : null;

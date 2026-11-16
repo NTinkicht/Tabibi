@@ -72,9 +72,17 @@ export {
   type NotificationDispatchTemplateInputResolver,
 } from '@/modules/notification-domain/rendered-dispatch-renderer';
 
+/** Upper bound for a provider Retry-After hint (the longest standard back-off). */
+export const MAX_RETRY_AFTER_SECONDS = 4 * 60 * 60;
+
 export type NotificationProviderResult =
   | { kind: 'delivered'; code?: string | null }
-  | { kind: 'retryable_failure'; code?: string | null }
+  | {
+      kind: 'retryable_failure';
+      code?: string | null;
+      /** Provider back-pressure hint; only ever lengthens the standard back-off. */
+      retryAfterSeconds?: number;
+    }
   | { kind: 'unknown'; code?: string | null }
   | { kind: 'terminal_failure'; code?: string | null };
 
@@ -132,7 +140,11 @@ function normalizeProviderResult(result: unknown): NotificationProviderResult {
   if (!result || typeof result !== 'object')
     return { kind: 'unknown', code: 'provider_indeterminate_result' };
 
-  const candidate = result as { kind?: unknown; code?: unknown };
+  const candidate = result as {
+    kind?: unknown;
+    code?: unknown;
+    retryAfterSeconds?: unknown;
+  };
   const validKind =
     candidate.kind === 'delivered' ||
     candidate.kind === 'retryable_failure' ||
@@ -146,9 +158,21 @@ function normalizeProviderResult(result: unknown): NotificationProviderResult {
   if (!validKind || !validCode)
     return { kind: 'unknown', code: 'provider_indeterminate_result' };
 
+  const retryAfterSeconds =
+    candidate.kind === 'retryable_failure' &&
+    typeof candidate.retryAfterSeconds === 'number' &&
+    Number.isFinite(candidate.retryAfterSeconds) &&
+    candidate.retryAfterSeconds > 0
+      ? Math.min(
+          Math.floor(candidate.retryAfterSeconds),
+          MAX_RETRY_AFTER_SECONDS,
+        )
+      : undefined;
+
   return {
     kind: candidate.kind,
     ...(candidate.code === undefined ? {} : { code: candidate.code }),
+    ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
   } as NotificationProviderResult;
 }
 
@@ -372,6 +396,10 @@ export class NotificationDispatchService {
       claimToken: claim.claimToken,
       outcome: toPersistedOutcome(providerResult),
       outcomeCode: providerResult.code ?? null,
+      ...(providerResult.kind === 'retryable_failure' &&
+      providerResult.retryAfterSeconds !== undefined
+        ? { retryAfterSeconds: providerResult.retryAfterSeconds }
+        : {}),
     });
 
     if (!completed) {
