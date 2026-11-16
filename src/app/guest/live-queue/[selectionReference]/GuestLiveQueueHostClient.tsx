@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
+import { GuestPushCard } from '../../status/GuestPushCard';
 import { Button } from '../../../ui';
 
 type SupportedLocale = 'ar' | 'fr';
@@ -880,6 +881,9 @@ function LiveQueueView({
   // Captured once on mount; later re-renders may pass `undefined` once the
   // host clears its own copy, but this ref keeps the value this view needs.
   const initialBearerRef = useRef(bearer);
+  // The Notifications card keeps its own in-memory copy (never a URL or
+  // storage) so it can authenticate after the host drops its reference.
+  const [pushBearer] = useState(bearer);
   // Distinguishes a real unmount from React Strict Mode's dev-only effect
   // replay (mount -> cleanup -> mount again, synchronously, on the same
   // instance): a replay's re-setup bumps this before the deferred cleanup
@@ -1453,6 +1457,7 @@ function LiveQueueView({
         ) : null}
       </div>
       <div id="guest-visit-status">{content}</div>
+      <GuestPushCard bearer={pushBearer} />
       <p>
         <a
           href="/guest/help"
