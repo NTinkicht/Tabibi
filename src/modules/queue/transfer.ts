@@ -11,6 +11,8 @@ import {
   type StaffQueueEntry,
 } from '@/modules/queue';
 import type { QueueEntryState } from '@/modules/queue/lifecycle-contract';
+import type { PushSubscriptionSealer } from '@/modules/guest-push/subscription-seal';
+import { rebindPushSubscriptionsForTransfer } from '@/modules/guest-push/transfer-rebind';
 import { inTransaction } from '@/platform/database/transaction';
 
 /**
@@ -101,6 +103,7 @@ export class QueueTransferService {
   constructor(
     private readonly pool: Pool,
     private readonly linkEnvelope?: GuestLinkEnvelope,
+    private readonly pushSealer?: PushSubscriptionSealer,
   ) {}
 
   async transfer(
@@ -303,7 +306,39 @@ export class QueueTransferService {
           WHERE clinic_id=$1 AND id=ANY($2::uuid[])`,
         [scope.clinicId, [sessionId, targetSessionId]],
       );
-      if (hadGuestAccess.rows[0]) {
+      // Push bindings move with the guest (docs/design/pwa-push.md section 3).
+      // A push-only guest then gets a system push exchange for the target;
+      // otherwise the staff-issued contact path below is unchanged.
+      const movedPush = await rebindPushSubscriptionsForTransfer(
+        client,
+        this.pushSealer,
+        {
+          clinicId: scope.clinicId,
+          sourceEntryId: entryId,
+          targetEntryId,
+        },
+      );
+      if (movedPush.length > 0) {
+        if (!this.linkEnvelope)
+          throw new Error('Guest link envelope is not configured');
+        const issued = await new GuestAccessService(
+          this.pool,
+        ).issueSystemPushInTransaction(client, {
+          clinicId: scope.clinicId,
+          queueEntryId: targetEntryId,
+          subscriptionId: movedPush[0]!,
+        });
+        await new GuestLinkIntentStore(this.pool, this.linkEnvelope).create(
+          {
+            clinicId: scope.clinicId,
+            queueEntryId: targetEntryId,
+            intent: 'transfer',
+            material: issued.exchangeId,
+            exchangeExpiresAt: issued.expiresAt,
+          },
+          client,
+        );
+      } else if (hadGuestAccess.rows[0]) {
         const contact = await client.query(
           `SELECT 1 FROM patient_operational_records
             WHERE id=$1 AND clinic_id=$2
