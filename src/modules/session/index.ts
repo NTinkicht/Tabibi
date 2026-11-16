@@ -718,6 +718,48 @@ export class SessionService {
            WHERE session.id=$1 AND session.clinic_id=$2 AND doctor.id=session.doctor_id RETURNING ${selection}`,
             [sessionId, scope.clinicId, minutes, scope.actorUserId],
           );
+          if (minutes !== null) {
+            // Atomic base outbox intent per affected entry; payload is the
+            // locale and declared minutes only. A failure rolls everything back.
+            const affected = await client.query<{
+              id: string;
+              preferred_locale: string;
+            }>(
+              `SELECT entry.id, patient.preferred_locale
+                 FROM queue_entries entry
+                 JOIN patient_operational_records patient
+                   ON patient.id = entry.patient_id
+                  AND patient.clinic_id = entry.clinic_id
+                WHERE entry.clinic_id = $1 AND entry.session_id = $2
+                  AND entry.state = ANY($3::queue_entry_status[])
+                ORDER BY entry.registration_order`,
+              [
+                scope.clinicId,
+                sessionId,
+                [...SESSION_CANCELLATION_CASCADE_QUEUE_STATES],
+              ],
+            );
+            for (const entry of affected.rows) {
+              await NotificationOutboxRepository.enqueueNextVersionInTransaction(
+                client,
+                {
+                  clinicId: scope.clinicId,
+                  queueEntryId: entry.id,
+                  logicalTargetKey: `queue-entry:${entry.id}`,
+                  eventKey: 'session_delayed',
+                  idempotencyKey: `session-delay:${createHash('sha256')
+                    .update(
+                      `${scope.clinicId}:${scope.actorUserId}:${input.idempotencyKey}:${entry.id}`,
+                    )
+                    .digest('hex')}`,
+                  payload: {
+                    locale: entry.preferred_locale,
+                    delayMinutes: minutes,
+                  },
+                },
+              );
+            }
+          }
           await appendAuditEvent(client, {
             ...scope,
             entityType: 'consultation_session',
