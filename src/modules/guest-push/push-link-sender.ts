@@ -3,6 +3,7 @@ import type {
   DispatchContext,
   LinkSender,
 } from '@/modules/guest-access/link-intents';
+import { parsePushLinkMaterial } from './push-link-material';
 import type { PushSubscriptionSealer } from './subscription-seal';
 import type { WebPushTransport } from './push-transport';
 
@@ -24,11 +25,8 @@ const BODY: Record<string, string> = {
   resend: 'Touchez pour ouvrir votre suivi.',
 };
 
-/** The exchange id is the last path segment of the material; see exchange route. */
-function exchangeUrl(material: string): string | undefined {
-  return /^[A-Za-z0-9_-]{16,256}$/.test(material)
-    ? `/api/guest/exchange/${material}`
-    : undefined;
+function exchangeUrl(exchangeId: string): string {
+  return `/api/guest/exchange/${exchangeId}`;
 }
 
 export function createPushGuestLinkSender(deps: {
@@ -45,8 +43,9 @@ export function createPushGuestLinkSender(deps: {
     );
     // Too late to be useful: finish without sending.
     if (remainingSeconds < MIN_REMAINING_SECONDS) return 'no_channel';
-    const url = exchangeUrl(material);
-    if (!url) return 'rejected';
+    const parsed = parsePushLinkMaterial(material);
+    if (!parsed) return 'rejected';
+    const url = exchangeUrl(parsed.exchangeId);
 
     const found = await deps.pool.query<{
       id: string;
@@ -56,8 +55,9 @@ export function createPushGuestLinkSender(deps: {
       `SELECT id, sealed_subscription, locale FROM guest_push_subscriptions
         WHERE clinic_id=$1 AND queue_entry_id=$2
           AND revoked_at IS NULL AND expires_at>$3
+          AND ($4::uuid IS NULL OR id=$4::uuid)
         ORDER BY created_at DESC, id LIMIT 1`,
-      [context.clinicId, context.queueEntryId, now],
+      [context.clinicId, context.queueEntryId, now, parsed.subscriptionId],
     );
     const binding = found.rows[0];
     if (!binding) return 'no_channel';

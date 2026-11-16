@@ -4,6 +4,7 @@ import { appendAuditEvent } from '@/modules/audit';
 import { GuestAccessService } from '@/modules/guest-access';
 import type { GuestLinkEnvelope } from '@/modules/guest-access/link-envelope';
 import { GuestLinkIntentStore } from '@/modules/guest-access/link-intents';
+import { pushLinkMaterial } from './push-link-material';
 import { inTransaction } from '@/platform/database/transaction';
 import {
   PushSubscriptionSealer,
@@ -151,7 +152,7 @@ export class GuestPushSubscriptionStore {
             clinicId: target.clinicId,
             queueEntryId: target.queueEntryId,
             intent: 'initial',
-            material: issued.exchangeId,
+            material: pushLinkMaterial(issued.exchangeId, id),
             exchangeExpiresAt: issued.expiresAt,
           },
           client,

@@ -11,6 +11,7 @@ import {
   pushTopic,
   type PushFetch,
 } from '../../src/modules/guest-push/push-transport';
+import { pushLinkMaterial } from '../../src/modules/guest-push/push-link-material';
 import { PushSubscriptionSealer } from '../../src/modules/guest-push/subscription-seal';
 import { GuestPushSubscriptionStore } from '../../src/modules/guest-push/subscription-store';
 import {
@@ -46,9 +47,10 @@ const EXCHANGE = randomBytes(32).toString('base64url');
 const target = { clinicId: ids.clinic, queueEntryId: ids.entry };
 
 function pushService(status: number) {
-  const seen: { headers: Record<string, string>; body: Buffer }[] = [];
-  const fetchImpl: PushFetch = async (_url, init) => {
-    seen.push({ headers: init.headers, body: init.body });
+  const seen: { url: string; headers: Record<string, string>; body: Buffer }[] =
+    [];
+  const fetchImpl: PushFetch = async (url, init) => {
+    seen.push({ url, headers: init.headers, body: init.body });
     return { status, headers: { get: () => null } };
   };
   const sender = createPushGuestLinkSender({
@@ -59,12 +61,12 @@ function pushService(status: number) {
   });
   return { seen, sender };
 }
-const create = (deadlineMs = 10 * 60_000) =>
+const create = (deadlineMs = 10 * 60_000, material = EXCHANGE) =>
   intents.create({
     clinicId: ids.clinic,
     queueEntryId: ids.entry,
     intent: 'resend',
-    material: EXCHANGE,
+    material,
     exchangeExpiresAt: new Date(T0.getTime() + deadlineMs),
   });
 const stateOf = async (id: string) =>
@@ -234,5 +236,58 @@ describe('push guest-link sender, real PostgreSQL (#886)', () => {
     for (const secret of [EXCHANGE, 'dev-6', sub.subscription.keys.p256dh]) {
       expect(dump).not.toContain(secret);
     }
+  });
+
+  it('delivers a resend only to the binding that asked, never the newest one', async () => {
+    const older = newSubscriber('https://fcm.googleapis.com/fcm/send/older');
+    const newer = newSubscriber('https://fcm.googleapis.com/fcm/send/newer');
+    const a = await bindings.subscribe(target, older.subscription, 'fr', T0);
+    await bindings.subscribe(
+      target,
+      newer.subscription,
+      'fr',
+      new Date(T0.getTime() + 1000),
+    );
+    const { seen, sender } = pushService(201);
+    await create(10 * 60_000, pushLinkMaterial(EXCHANGE, a.subscriptionId));
+    expect(await intents.dispatchNext(sender)).toBe('delivered');
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.url).toBe(older.subscription.endpoint);
+    expect(decryptAes128gcm(seen[0]!.body, older)).toMatchObject({
+      url: `/api/guest/exchange/${EXCHANGE}`,
+    });
+  });
+
+  it('never falls back to another device when the requesting binding is gone', async () => {
+    const older = newSubscriber('https://fcm.googleapis.com/fcm/send/older2');
+    const newer = newSubscriber('https://fcm.googleapis.com/fcm/send/newer2');
+    const a = await bindings.subscribe(target, older.subscription, 'fr', T0);
+    await bindings.subscribe(
+      target,
+      newer.subscription,
+      'fr',
+      new Date(T0.getTime() + 1000),
+    );
+    await bindings.unsubscribe(target, older.subscription.endpoint, T0);
+    const { seen, sender } = pushService(201);
+    await create(10 * 60_000, pushLinkMaterial(EXCHANGE, a.subscriptionId));
+    expect(await intents.dispatchNext(sender)).toBe('dead_letter');
+    expect(seen).toHaveLength(0);
+  });
+
+  it('without a pinned binding (transfer) uses the most recent one', async () => {
+    const older = newSubscriber('https://fcm.googleapis.com/fcm/send/older3');
+    const newer = newSubscriber('https://fcm.googleapis.com/fcm/send/newer3');
+    await bindings.subscribe(target, older.subscription, 'fr', T0);
+    await bindings.subscribe(
+      target,
+      newer.subscription,
+      'fr',
+      new Date(T0.getTime() + 1000),
+    );
+    const { seen, sender } = pushService(201);
+    await create();
+    expect(await intents.dispatchNext(sender)).toBe('delivered');
+    expect(seen[0]!.url).toBe(newer.subscription.endpoint);
   });
 });
