@@ -209,13 +209,7 @@ test('rehearses one bounded bilingual clinic day without tenant or patient leaka
       idempotencyKey: `wu49-scheduled-call-${run}`,
       correlationId: `wu49-scheduled-call-${run}`,
     });
-    await notificationProducer.produce({
-      clinicId: ids.clinic,
-      queueEntryId: scheduled.entry.id,
-      sourceEventId: `wu49-called-${run}`,
-      sourceVersion: 1,
-      notification: { eventKey: 'patient_called', locale: 'ar' },
-    });
+    // patient_called is now written atomically by the call command itself.
     await queue.command(scope, ids.session, scheduled.entry.id, {
       command: 'start_consultation',
       idempotencyKey: `wu49-scheduled-start-${run}`,
@@ -296,7 +290,15 @@ test('rehearses one bounded bilingual clinic day without tenant or patient leaka
       'queue_entry_created',
       'estimate_changed_materially',
       'patient_called',
+      'patient_called',
     ]);
+    // Each call command wrote its own intent atomically, one per called entry.
+    expect(
+      notifications.rows
+        .filter((row) => row.event_key === 'patient_called')
+        .map((row) => row.queue_entry_id)
+        .sort(),
+    ).toEqual([scheduled.entry.id, walkIn.entry.id].sort());
     expect(
       notifications.rows.every((row) => row.clinic_id === ids.clinic),
     ).toBe(true);

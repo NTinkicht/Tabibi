@@ -305,56 +305,61 @@ async function loadByIdempotencyKey(
   return result.rows[0] ?? null;
 }
 
-/** Durable provider-neutral notification intent store. */
-export class NotificationOutboxRepository {
-  constructor(private readonly pool: Pool) {}
+async function enqueueWithClient(
+  client: PoolClient,
+  rawInput: EnqueueNotificationIntentInput,
+  autoVersion: boolean,
+): Promise<NotificationIntent> {
+  const input = normalizeInput(rawInput);
+  {
+    await client.query(
+      'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+      [
+        `notification-outbox:${input.clinicId}:${input.logicalTargetKey}:${input.eventKey}`,
+      ],
+    );
 
-  async enqueue(
-    rawInput: EnqueueNotificationIntentInput,
-  ): Promise<NotificationIntent> {
-    const input = normalizeInput(rawInput);
+    const retry = await loadByIdempotencyKey(
+      client,
+      input.clinicId,
+      input.idempotencyKey,
+    );
+    if (retry) {
+      if (
+        !sameIntent(
+          retry,
+          autoVersion
+            ? { ...input, intentVersion: Number(retry.intent_version) }
+            : input,
+        )
+      )
+        throw new NotificationOutboxConflictError(
+          'Idempotency key was already used for a different notification intent',
+        );
+      return toIntent(retry);
+    }
 
-    return inTransaction(this.pool, async (client) => {
-      await client.query(
-        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
-        [
-          `notification-outbox:${input.clinicId}:${input.logicalTargetKey}:${input.eventKey}`,
-        ],
-      );
-
-      const retry = await loadByIdempotencyKey(
-        client,
-        input.clinicId,
-        input.idempotencyKey,
-      );
-      if (retry) {
-        if (!sameIntent(retry, input))
-          throw new NotificationOutboxConflictError(
-            'Idempotency key was already used for a different notification intent',
-          );
-        return toIntent(retry);
-      }
-
-      const latest = await client.query<Pick<IntentRow, 'intent_version'>>(
-        `SELECT intent_version
+    const latest = await client.query<Pick<IntentRow, 'intent_version'>>(
+      `SELECT intent_version
            FROM notification_outbox
           WHERE clinic_id=$1 AND logical_target_key=$2 AND event_key=$3
           ORDER BY intent_version DESC
           LIMIT 1
           FOR UPDATE`,
-        [input.clinicId, input.logicalTargetKey, input.eventKey],
+      [input.clinicId, input.logicalTargetKey, input.eventKey],
+    );
+    const latestVersion = latest.rows[0]
+      ? Number(latest.rows[0].intent_version)
+      : 0;
+    const intentVersion = autoVersion ? latestVersion + 1 : input.intentVersion;
+    if (intentVersion <= latestVersion)
+      throw new NotificationOutboxConflictError(
+        'Intent version must advance the latest persisted version for this target and event',
       );
-      const latestVersion = latest.rows[0]
-        ? Number(latest.rows[0].intent_version)
-        : 0;
-      if (input.intentVersion <= latestVersion)
-        throw new NotificationOutboxConflictError(
-          'Intent version must advance the latest persisted version for this target and event',
-        );
 
-      const id = randomUUID();
-      const inserted = await client.query<IntentRow>(
-        `INSERT INTO notification_outbox (
+    const id = randomUUID();
+    const inserted = await client.query<IntentRow>(
+      `INSERT INTO notification_outbox (
            id, clinic_id, queue_entry_id, logical_target_key, event_key,
            intent_version, idempotency_key, payload
          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
@@ -364,20 +369,20 @@ export class NotificationOutboxRepository {
                    dispatch_attempt_count, dispatch_last_attempt_at,
                    dispatch_outcome_at, dispatch_outcome_code,
                    next_attempt_at, dispatch_max_attempts`,
-        [
-          id,
-          input.clinicId,
-          input.queueEntryId,
-          input.logicalTargetKey,
-          input.eventKey,
-          input.intentVersion,
-          input.idempotencyKey,
-          JSON.stringify(input.payload),
-        ],
-      );
+      [
+        id,
+        input.clinicId,
+        input.queueEntryId,
+        input.logicalTargetKey,
+        input.eventKey,
+        intentVersion,
+        input.idempotencyKey,
+        JSON.stringify(input.payload),
+      ],
+    );
 
-      await client.query(
-        `UPDATE notification_outbox
+    await client.query(
+      `UPDATE notification_outbox
             SET state='superseded',
                 superseded_by_id=$4,
                 superseded_at=now(),
@@ -390,16 +395,42 @@ export class NotificationOutboxRepository {
             AND event_key=$3
             AND id<>$4
             AND state IN ('pending', 'failed', 'unknown')`,
-        [input.clinicId, input.logicalTargetKey, input.eventKey, id],
-      );
+      [input.clinicId, input.logicalTargetKey, input.eventKey, id],
+    );
 
-      const row = inserted.rows[0];
-      if (!row)
-        throw new NotificationOutboxConflictError(
-          'Notification intent could not be persisted',
-        );
-      return toIntent(row);
-    });
+    const row = inserted.rows[0];
+    if (!row)
+      throw new NotificationOutboxConflictError(
+        'Notification intent could not be persisted',
+      );
+    return toIntent(row);
+  }
+}
+
+/** Durable provider-neutral notification intent store. */
+export class NotificationOutboxRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async enqueue(
+    rawInput: EnqueueNotificationIntentInput,
+  ): Promise<NotificationIntent> {
+    return inTransaction(this.pool, (client) =>
+      enqueueWithClient(client, rawInput, false),
+    );
+  }
+
+  /**
+   * Enqueues inside the caller's transaction so the intent commits or rolls
+   * back atomically with the caller's own writes. The intent version is the
+   * next version for this target and event, assigned under the same advisory
+   * lock and row lock as `enqueue`. An exact retry (same idempotency key and
+   * content) returns the persisted intent.
+   */
+  static enqueueNextVersionInTransaction(
+    client: PoolClient,
+    rawInput: Omit<EnqueueNotificationIntentInput, 'intentVersion'>,
+  ): Promise<NotificationIntent> {
+    return enqueueWithClient(client, { ...rawInput, intentVersion: 1 }, true);
   }
 
   async claimPendingIntent(
