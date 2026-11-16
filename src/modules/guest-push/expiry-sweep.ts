@@ -55,6 +55,9 @@ export async function sweepExpiredPushBindings(
         WHERE id = ANY($1::uuid[]) AND revoked_at IS NULL`,
       [due.rows.map((row) => row.id), now],
     );
+    // Keyed by patient id alone on purpose: patient_operational_records.id is the
+    // table's PRIMARY KEY (db/migrations/0004_walkin_queue_foundation.sql) and each
+    // record carries exactly one clinic_id, so a patient id maps to one clinic.
     const patients = new Map<string, string>();
     for (const row of due.rows) patients.set(row.patient_id, row.clinic_id);
     for (const [patientId, clinicId] of patients) {
