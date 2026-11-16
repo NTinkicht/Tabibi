@@ -236,7 +236,8 @@ for (const [name, c] of Object.entries(copies)) {
       await page.goto('/guest/status');
       const card = page.getByTestId('guest-push-card');
       await expect(card.getByRole('status')).toHaveText(c.available);
-      await expect(card.getByRole('button', { name: c.enable })).toBeVisible();
+      await expect(card.getByRole('button', { name: c.resend })).toBeVisible();
+      await expect(card.getByRole('button', { name: c.enable })).toHaveCount(0);
     });
 
     test('no valid credential with a browser subscription offers a fresh link', async ({
@@ -262,6 +263,9 @@ for (const [name, c] of Object.entries(copies)) {
       });
       await page.goto('/guest/status');
       const card = page.getByTestId('guest-push-card');
+      // Enabling cannot work without a credential and would drop the
+      // subscription the resend needs, so only the resend action is offered.
+      await expect(card.getByRole('button', { name: c.enable })).toHaveCount(0);
       await card.getByRole('button', { name: c.resend }).click();
       await expect(card.getByText(c.resendSent)).toBeVisible();
       await expect(card.getByRole('button', { name: c.resend })).toHaveCount(0);
@@ -270,6 +274,33 @@ for (const [name, c] of Object.entries(copies)) {
           endpoint: 'https://fcm.googleapis.com/fcm/send/mock',
         }),
       ]);
+    });
+
+    test('a failed resend shows the alert and keeps the resend action', async ({
+      page,
+    }) => {
+      await mockPush(page, { permission: 'granted', subscribed: true });
+      await mockKey(page);
+      await page.route('**/api/guest/push-subscription', (route) =>
+        route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: '{}',
+        }),
+      );
+      await page.route('**/api/guest/push-subscription/resend', (route) =>
+        route.fulfill({
+          status: 429,
+          contentType: 'application/json',
+          body: '{}',
+        }),
+      );
+      await page.goto('/guest/status');
+      const card = page.getByTestId('guest-push-card');
+      await card.getByRole('button', { name: c.resend }).click();
+      await expect(card.getByRole('alert')).toBeVisible();
+      await expect(card.getByText(c.resendSent)).toHaveCount(0);
+      await expect(card.getByRole('button', { name: c.resend })).toBeVisible();
     });
 
     test('no resend offer without a browser subscription or on a non-credential failure', async ({

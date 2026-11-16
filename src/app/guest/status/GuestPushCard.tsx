@@ -282,7 +282,7 @@ export function GuestPushCard() {
         <h2 id="gs-push-heading">{copy.heading}</h2>
         <p role="status">{copy.states[state]}</p>
         {failed ? <p role="alert">{copy.failed}</p> : null}
-        {state === 'available' ? (
+        {state === 'available' && !resendEndpoint ? (
           <button
             type="button"
             className="tb-button tb-button--primary"
