@@ -296,7 +296,7 @@ describe('patient dependent routes', () => {
       { displayName: '' },
       { displayName: '   ' },
       { displayName: 'bad\u0000name' },
-      { displayName: 'x'.repeat(201) },
+      { displayName: 'x'.repeat(161) },
       { displayName: 5 },
       '{not json',
       JSON.stringify({ displayName: 'x', pad: 'y'.repeat(4096) }),
@@ -304,6 +304,28 @@ describe('patient dependent routes', () => {
       expect((await create(a, body)).status).toBe(400);
     expect(await rows()).toEqual([]);
     expect((await create(a, { displayName: 'ok' })).status).toBe(201);
+  });
+
+  it('measures name length in NFC code points, not raw UTF-16 units', async () => {
+    const a = await login(A);
+    // 110 decomposed e+acute = 220 raw units but 110 code points after NFC.
+    const decomposed = 'e\u0301'.repeat(110);
+    const made = await create(a, { displayName: decomposed });
+    expect(made.status).toBe(201);
+    const dep = (await made.json()).dependent;
+    expect(dep.displayName).toBe('\u00e9'.repeat(110));
+    const renamed = await itemPatch(
+      req('PATCH', `${BASE}/${dep.id}`, a, { displayName: decomposed }),
+      ctx(dep.id),
+    );
+    expect(renamed.status).toBe(200);
+    // Positive control: a genuinely over-long name is still refused.
+    expect(
+      (await create(a, { displayName: '\u00e9'.repeat(161) })).status,
+    ).toBe(400);
+    expect(
+      (await create(a, { displayName: '\u00e9'.repeat(160) })).status,
+    ).toBe(201);
   });
 
   it('rate limits mutations per account with 429 and Retry-After', async () => {

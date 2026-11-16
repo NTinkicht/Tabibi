@@ -19,9 +19,7 @@ const MAX_BODY_BYTES = 2048;
 const ACCOUNT_LIMIT = 30;
 const INGRESS_LIMIT = 600;
 const INGRESS_BUCKET = 'patient-dependents:ingress';
-const updateSchema = z
-  .object({ displayName: z.string().min(1).max(200) })
-  .strict();
+const updateSchema = z.object({ displayName: z.string() }).strict();
 
 export async function GET(
   request: Request,

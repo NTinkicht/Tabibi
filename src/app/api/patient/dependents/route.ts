@@ -19,9 +19,7 @@ const ACCOUNT_LIMIT = 30;
 const INGRESS_LIMIT = 600;
 const INGRESS_BUCKET = 'patient-dependents:ingress';
 
-const createSchema = z
-  .object({ displayName: z.string().min(1).max(200) })
-  .strict();
+const createSchema = z.object({ displayName: z.string() }).strict();
 const listSchema = z
   .object({ includeArchived: z.enum(['true', 'false']).optional() })
   .strict();
