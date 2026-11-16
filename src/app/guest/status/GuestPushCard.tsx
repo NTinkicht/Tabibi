@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
+import './guest-status.css';
 import {
   pushCardState,
   pushRouteLocale,
@@ -97,6 +98,22 @@ function subscribeToGuestLocale(): () => void {
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
+// The status page relies on its same-origin cookie alone. The booking page
+// holds the booking-origin bearer in memory and sends it in Authorization,
+// never in a URL or storage (docs/design/pwa-push.md section 3). The route
+// accepts exactly one credential class per request.
+// A bearer request must not also carry the status cookie: the route rejects
+// requests presenting both credential classes (credential.ts).
+function credentialMode(bearer: string | undefined): RequestCredentials {
+  return bearer ? 'omit' : 'same-origin';
+}
+
+function credentialHeaders(bearer: string | undefined): Record<string, string> {
+  return bearer
+    ? { ...JSON_HEADERS, authorization: `Bearer ${bearer}` }
+    : JSON_HEADERS;
+}
+
 async function currentSubscription(): Promise<PushSubscription | null> {
   const registration = await navigator.serviceWorker.ready;
   return registration.pushManager.getSubscription();
@@ -104,7 +121,7 @@ async function currentSubscription(): Promise<PushSubscription | null> {
 
 type Detected = { state: CardState; resendEndpoint: string | null };
 
-async function detect(): Promise<Detected> {
+async function detect(bearer: string | undefined): Promise<Detected> {
   const locale = detectGuestLocale();
   // Without a configured VAPID key the feature is off and the product behaves
   // as it does today: no card at all, whatever the browser (spec section 5).
@@ -130,7 +147,8 @@ async function detect(): Promise<Detected> {
   if (subscription) {
     const bound = await fetch('/api/guest/push-subscription', {
       method: 'POST',
-      headers: JSON_HEADERS,
+      headers: credentialHeaders(bearer),
+      credentials: credentialMode(bearer),
       body: JSON.stringify({
         ...subscription.toJSON(),
         locale: pushRouteLocale(locale),
@@ -158,8 +176,11 @@ async function detect(): Promise<Detected> {
   };
 }
 
-/** Notifications card on /guest/status. Credential: the status cookie only. */
-export function GuestPushCard() {
+/**
+ * Notifications card. On /guest/status the credential is the status cookie;
+ * on the booking confirmation the caller passes the in-memory booking bearer.
+ */
+export function GuestPushCard({ bearer }: { bearer?: string } = {}) {
   const locale = useSyncExternalStore<SupportedLocale>(
     subscribeToGuestLocale,
     detectGuestLocale,
@@ -174,7 +195,7 @@ export function GuestPushCard() {
 
   useEffect(() => {
     let cancelled = false;
-    void detect()
+    void detect(bearer)
       .catch((): Detected => ({ state: 'hidden', resendEndpoint: null }))
       .then((next) => {
         if (cancelled) return;
@@ -184,6 +205,8 @@ export function GuestPushCard() {
     return () => {
       cancelled = true;
     };
+    // The bearer is captured once by the caller; it never changes identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function enable() {
@@ -210,7 +233,8 @@ export function GuestPushCard() {
       });
       const response = await fetch('/api/guest/push-subscription', {
         method: 'POST',
-        headers: JSON_HEADERS,
+        headers: credentialHeaders(bearer),
+        credentials: credentialMode(bearer),
         body: JSON.stringify({
           ...subscription.toJSON(),
           locale: pushRouteLocale(locale),
@@ -254,7 +278,8 @@ export function GuestPushCard() {
       const subscription = await currentSubscription();
       const response = await fetch('/api/guest/push-subscription', {
         method: 'DELETE',
-        headers: JSON_HEADERS,
+        headers: credentialHeaders(bearer),
+        credentials: credentialMode(bearer),
         body: JSON.stringify(
           subscription ? { endpoint: subscription.endpoint } : {},
         ),
