@@ -31,16 +31,16 @@ Record for every row: tester, target build SHA, date, result (refused for the st
 | --- | --- | --- |
 | Inspect discovery and bookable-session responses (`src/app/api/public/discovery/route.ts`, `src/app/api/public/bookable-sessions/route.ts`) for contacts, patient data or other tenant data | Privacy-minimal fields only | `tests/api/public-discovery.test.ts`, `tests/api/public-bookable-sessions.test.ts` |
 | Read the public waiting-room display for names, patient ids or queue-entry ids (`src/app/api/public/clinics/[clinicId]/sessions/[sessionId]/waiting-room/route.ts`) | Display labels only, rendered row present (positive control) | `tests/integration/waiting-room-public.test.ts` |
-| Replay a booking request, or swap ciphertext between two bookings (`src/app/api/public/bookings/route.ts`) | One booking per key, authentic-but-foreign ciphertext rejected | `tests/api/public-guest-booking.test.ts` |
+| Replay a booking request, or swap ciphertext between two bookings (`src/app/api/public/bookings/route.ts`) | One booking per key, authentic-but-foreign ciphertext rejected | `tests/integration/public-guest-booking.test.ts` (replay convergence; 'rejects swapping two genuine encrypted replay receipts between bookings') |
 | Cancel or check in with a foreign or malformed bearer (`src/app/api/public/bookings/cancel/route.ts`, `src/app/api/public/bookings/check-in/route.ts`) | Rejected, entry unchanged | `tests/api/guest-credential-class-boundary.test.ts` |
 
 ## 4. Patient accounts
 
 | Attack | Expected | Automated coverage |
 | --- | --- | --- |
-| Use a staff token on patient routes, or a patient token on staff routes (``tests/integration/patient-session.test.ts` |
+| Use a staff token on patient routes, or a patient token on staff routes (`src/app/api/patient/session/route.ts`) | Rejected with the unauthenticated response; neither class is accepted by the other's routes | `tests/integration/patient-session.test.ts` |
 | Access another account's dependent by id (`src/app/api/patient/dependents/[dependentId]/route.ts`) | Not found | `tests/integration/patient-dependents-route.test.ts` |
-| Brute-force sign-in or recovery redemption (`src/app/api/patient/recovery/`tests/integration/patient-recovery-route.test.ts` (verify throttling and enumeration by hand and record) |
+| Brute-force sign-in or recovery redemption (`src/app/api/patient/recovery/redeem/route.ts`) | Uniform refusal with no account enumeration; throttling to be confirmed by hand and recorded | `tests/integration/patient-recovery-route.test.ts` |
 
 ## 5. Notification delivery
 
