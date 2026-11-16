@@ -30,3 +30,10 @@ the target entry is `waiting` (from waiting) or `checked_in` at the target tail
 consulting, terminal and appointment-backed entries are refused. ETA,
 notifications and appointment-specific no-show rules remain outside this
 bounded work unit.
+
+Queue `call` and `cancel` commands write one provider-neutral `patient_called` /
+`queue_entry_cancelled` outbox intent in the same transaction as the state change,
+audit event and command receipt (`NotificationOutboxRepository.enqueueNextVersionInTransaction`).
+The payload is `{locale}` only. An outbox failure rolls the whole command back, and an
+exact retry is answered from the receipt without a second intent. Delivery, consent and
+destination resolution stay downstream.

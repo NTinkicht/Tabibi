@@ -184,6 +184,7 @@ describe('clinic/doctor eta_prior_epoch (real PostgreSQL)', () => {
     );
     expect(await priorEpoch(ids.doctor)).toBe(2);
     // Removing a sample (receipts reference the entry, so clear them first).
+    await pool.query(`DELETE FROM notification_outbox`);
     await pool.query(`DELETE FROM queue_command_receipts`);
     await pool.query(`DELETE FROM queue_registration_receipts`);
     await pool.query(`DELETE FROM queue_entries WHERE id=$1`, [entry]);
@@ -261,6 +262,7 @@ describe('clinic/doctor eta_prior_epoch (real PostgreSQL)', () => {
     await runToStart(entry);
     await entryCommand(entry, 'complete_consultation');
     expect(await priorEpoch(ids.doctor)).toBe(1);
+    await pool.query(`DELETE FROM notification_outbox`);
     await pool.query(`DELETE FROM queue_command_receipts`);
     await pool.query(`DELETE FROM queue_registration_receipts`);
     const client = await pool.connect();

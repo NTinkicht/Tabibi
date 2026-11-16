@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { appendAuditEvent } from '@/modules/audit';
+import { NotificationOutboxRepository } from '@/modules/notification-outbox';
 import {
   AuthorizationError,
   type ClinicScope,
@@ -787,6 +788,30 @@ export class QueueService {
           idempotencyKey: rawInput.idempotencyKey,
         },
       });
+      // Atomic base outbox intent: committed with the state change, audit
+      // event and receipt, or not at all. Payload carries only the locale.
+      const notificationEvent =
+        rawInput.command === 'call'
+          ? 'patient_called'
+          : rawInput.command === 'cancel'
+            ? 'queue_entry_cancelled'
+            : null;
+      if (notificationEvent)
+        await NotificationOutboxRepository.enqueueNextVersionInTransaction(
+          client,
+          {
+            clinicId: scope.clinicId,
+            queueEntryId: entryId,
+            logicalTargetKey: `queue-entry:${entryId}`,
+            eventKey: notificationEvent,
+            idempotencyKey: `queue-event:${createHash('sha256')
+              .update(
+                `${scope.clinicId}:${scope.actorUserId}:${rawInput.idempotencyKey}`,
+              )
+              .digest('hex')}`,
+            payload: { locale: row.preferred_locale },
+          },
+        );
       await client.query(
         `INSERT INTO queue_command_receipts
           (clinic_id,actor_user_id,idempotency_key,request_fingerprint,queue_entry_id,response)
