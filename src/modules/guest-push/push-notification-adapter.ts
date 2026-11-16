@@ -129,7 +129,13 @@ export class PushNotificationProviderAdapter
       case 'rejected':
         return { kind: 'terminal_failure', code: 'push_rejected' };
       case 'unavailable':
-        return { kind: 'retryable_failure', code: 'push_unavailable' };
+        return {
+          kind: 'retryable_failure',
+          code: 'push_unavailable',
+          ...(result.retryAfterSeconds === undefined
+            ? {}
+            : { retryAfterSeconds: result.retryAfterSeconds }),
+        };
       default:
         return { kind: 'unknown', code: 'push_unknown' };
     }

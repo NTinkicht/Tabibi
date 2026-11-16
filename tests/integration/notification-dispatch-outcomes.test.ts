@@ -316,3 +316,34 @@ describe('notification dispatch outcomes', () => {
     expect(persisted.rows[0]?.state).toBe('superseded');
   });
 });
+
+describe('provider Retry-After hint', () => {
+  async function failOnce(key: string, retryAfterSeconds?: number) {
+    const repository = new NotificationOutboxRepository(pool);
+    const intent = await repository.enqueue(input(1, key));
+    const dispatchClaim = await claim(repository, intent.id);
+    const completed = await repository.completeDispatchAttempt({
+      clinicId: clinicA,
+      intentId: intent.id,
+      claimToken: dispatchClaim.claimToken,
+      outcome: 'failed',
+      outcomeCode: 'push_unavailable',
+      ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
+    });
+    return (
+      new Date(completed!.nextAttemptAt!).getTime() -
+      new Date(completed!.dispatchOutcomeAt!).getTime()
+    );
+  }
+
+  it.each([
+    ['absent', undefined, 60_000],
+    ['shorter than the standard back-off (never shortens)', 10, 60_000],
+    ['longer than the standard back-off (lengthens)', 600, 600_000],
+    ['clamped to 4 hours', 10 * 86_400, 4 * 3_600_000],
+    ['non-positive is ignored', -5, 60_000],
+    ['non-finite is ignored', Number.NaN, 60_000],
+  ] as const)('%s', async (label, hint, expectedMs) => {
+    expect(await failOnce(`retry-after-${label}`, hint)).toBe(expectedMs);
+  });
+});
