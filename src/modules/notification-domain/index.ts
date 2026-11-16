@@ -83,6 +83,8 @@ export type NotificationProviderRequest = RenderedNotificationDispatchEnvelope;
 export interface NotificationProviderDispatchContext {
   clinicId: string;
   deliveryContext: NotificationDeliveryContext;
+  /** Server-side queue entry of the claimed intent; never caller supplied. */
+  queueEntryId?: string | null;
 }
 
 export interface NotificationProviderAdapter {
@@ -351,10 +353,12 @@ export class NotificationDispatchService {
     let providerResult: NotificationProviderResult;
     try {
       const rawProviderResult =
-        providerRequest.channel === 'in_app'
+        providerRequest.channel === 'in_app' ||
+        providerRequest.channel === 'push'
           ? await this.provider.dispatch(providerRequest, {
               clinicId: claim.intent.clinicId,
               deliveryContext: currentDeliveryContext!,
+              queueEntryId: claim.intent.queueEntryId,
             })
           : await this.provider.dispatch(providerRequest);
       providerResult = normalizeProviderResult(rawProviderResult);
