@@ -68,6 +68,7 @@ const committedMigrations = [
   '0057_guest_exchange_push_contact_kind.sql',
   '0058_guest_push_rate_limit_buckets.sql',
   '0059_guest_credential_revocation_reason.sql',
+  '0060_patient_password_reset_tokens.sql',
 ];
 
 beforeAll(async () => {
