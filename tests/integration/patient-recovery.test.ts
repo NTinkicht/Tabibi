@@ -10,6 +10,7 @@ import {
   issuePatientPasswordReset,
   redeemPatientPasswordReset,
 } from '@/modules/identity/patient-recovery';
+import { createPatientSessionToken } from '@/platform/http/patient-auth';
 import { PasswordPolicyError } from '@/modules/identity/staff-credentials';
 
 // TAB-P1-01 slice 5: patient password recovery token service.
@@ -43,6 +44,8 @@ const issue = async (email = EMAIL, ttl?: number) => {
 };
 
 beforeAll(async () => {
+  process.env.STAFF_SESSION_SECRET =
+    'patient-recovery-secret-at-least-32-characters';
   await migrate();
 });
 beforeEach(async () => {
@@ -185,5 +188,64 @@ describe('redeemPatientPasswordReset', () => {
       ),
     );
     expect(results.filter((r) => r.ok)).toHaveLength(1);
+  });
+});
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+describe('concurrency barriers', () => {
+  it('revokes a session whose sign-in committed while the reset waited on the credential lock', async () => {
+    const id = await userId(EMAIL);
+    const token = await issue();
+    const signIn = await pool.connect();
+    try {
+      await signIn.query('BEGIN');
+      // In-flight sign-in: holds FOR SHARE on the credential, session uncommitted.
+      await createPatientSessionToken(
+        id,
+        new Date(Date.now() + 3_600_000),
+        signIn,
+      );
+      let settled = false;
+      const redeem = redeemPatientPasswordReset(pool, token, NEW).then((r) => {
+        settled = true;
+        return r;
+      });
+      await sleep(400);
+      expect(settled).toBe(false);
+      await signIn.query('COMMIT');
+      expect((await redeem).ok).toBe(true);
+    } finally {
+      signIn.release();
+    }
+    expect(await liveSessions(id)).toBe(0);
+  });
+
+  it('serializes overlapping issuances so only the newest token is redeemable', async () => {
+    const first = await pool.connect();
+    let firstToken: string;
+    let secondToken: string;
+    try {
+      await first.query('BEGIN');
+      const a = await issuePatientPasswordReset(first, EMAIL);
+      firstToken = (a as { token: string }).token;
+      let settled = false;
+      const secondIssue = issuePatientPasswordReset(pool, EMAIL).then((r) => {
+        settled = true;
+        return r;
+      });
+      await sleep(400);
+      expect(settled).toBe(false);
+      await first.query('COMMIT');
+      secondToken = ((await secondIssue) as { token: string }).token;
+    } finally {
+      first.release();
+    }
+    expect(await redeemPatientPasswordReset(pool, firstToken, NEW)).toEqual({
+      ok: false,
+    });
+    expect((await redeemPatientPasswordReset(pool, secondToken, NEW)).ok).toBe(
+      true,
+    );
   });
 });
