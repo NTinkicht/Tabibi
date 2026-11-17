@@ -6,6 +6,10 @@ const mocks = vi.hoisted(() => ({
   staff: vi.fn(),
   rate: vi.fn(),
   guest: vi.fn(),
+  receipts: vi.fn(),
+}));
+vi.mock('@/modules/public-guest-booking', () => ({
+  scrubExpiredBookingReceipts: mocks.receipts,
 }));
 vi.mock('@/modules/identity/patient-auth-retention', () => ({
   purgeExpiredPatientAuthArtifacts: mocks.patient,
@@ -30,12 +34,19 @@ beforeEach(() => {
   mocks.staff.mockReset().mockResolvedValue({ sessions: 3, invites: 4 });
   mocks.rate.mockReset().mockResolvedValue(5);
   mocks.guest.mockReset().mockResolvedValue({ exchangeIds: 6, linkIntents: 7 });
+  mocks.receipts.mockReset().mockResolvedValue(8);
 });
 
 describe('runRetentionSweep', () => {
   it('runs every purge with the shared clock and reports counts', async () => {
     const result = await runRetentionSweep(pool, NOW);
-    for (const fn of [mocks.patient, mocks.staff, mocks.rate, mocks.guest])
+    for (const fn of [
+      mocks.patient,
+      mocks.staff,
+      mocks.rate,
+      mocks.guest,
+      mocks.receipts,
+    ])
       expect(fn).toHaveBeenCalledWith(pool, NOW);
     expect(result).toEqual({
       deleted: {
@@ -43,6 +54,7 @@ describe('runRetentionSweep', () => {
         staff_auth: 7,
         sign_in_rate_limit: 5,
         guest_exchange: 13,
+        booking_receipt_scrub: 8,
       },
       failed: [],
     });
@@ -56,8 +68,17 @@ describe('runRetentionSweep', () => {
       patient_auth: 3,
       sign_in_rate_limit: 5,
       guest_exchange: 13,
+      booking_receipt_scrub: 8,
     });
     expect(JSON.stringify(result)).not.toContain('secret-row-detail');
     expect(mocks.guest).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a failing receipt scrub by name without stopping earlier tasks', async () => {
+    mocks.receipts.mockRejectedValue(new Error('ciphertext-detail'));
+    const result = await runRetentionSweep(pool, NOW);
+    expect(result.failed).toEqual(['booking_receipt_scrub']);
+    expect(result.deleted.guest_exchange).toBe(13);
+    expect(JSON.stringify(result)).not.toContain('ciphertext-detail');
   });
 });
