@@ -6,6 +6,7 @@ export const clinicSetupCopy = {
     tabClinic: 'Clinique',
     tabDoctors: 'Médecins et horaires',
     tabStaff: 'Personnel',
+    statisticsLink: 'Statistiques',
     staffTitle: 'Membres',
     staffHelp:
       'Les personnes ayant accès à cette clinique. Le rôle détermine ce qu’elles peuvent faire.',
@@ -197,6 +198,7 @@ export const clinicSetupCopy = {
     tabClinic: 'العيادة',
     tabDoctors: 'الأطباء والمواعيد',
     tabStaff: 'الموظفون',
+    statisticsLink: 'الإحصاءات',
     staffTitle: 'الأعضاء',
     staffHelp:
       'الأشخاص الذين لديهم صلاحية الوصول إلى هذه العيادة. يحدّد الدور ما يمكنهم فعله.',

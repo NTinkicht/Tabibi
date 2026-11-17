@@ -39,6 +39,9 @@ export function SettingsTabs({
       >
         {t.tabStaff}
       </Link>
+      <Link href={`${root}/statistics?locale=${locale}`}>
+        {t.statisticsLink}
+      </Link>
       <Link href={`${root}?locale=${locale}`}>{t.backToDesk}</Link>
       <Link href={`${root}/settings/${active}?locale=${other}`} lang={other}>
         {other === 'fr' ? 'Français' : 'العربية'}
