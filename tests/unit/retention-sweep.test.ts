@@ -10,6 +10,10 @@ const mocks = vi.hoisted(() => ({
   inbox: vi.fn(),
   guestRate: vi.fn(),
   push: vi.fn(),
+  checkIn: vi.fn(),
+}));
+vi.mock('@/modules/public-guest-booking-check-in/retention', () => ({
+  purgeExpiredGuestCheckInOperations: mocks.checkIn,
 }));
 vi.mock('@/modules/guest-push/retention', () => ({
   purgeRevokedPushBindings: mocks.push,
@@ -50,6 +54,7 @@ beforeEach(() => {
   mocks.inbox.mockReset().mockResolvedValue(9);
   mocks.guestRate.mockReset().mockResolvedValue(10);
   mocks.push.mockReset().mockResolvedValue(11);
+  mocks.checkIn.mockReset().mockResolvedValue(12);
 });
 
 describe('runRetentionSweep', () => {
@@ -64,6 +69,7 @@ describe('runRetentionSweep', () => {
       mocks.inbox,
       mocks.guestRate,
       mocks.push,
+      mocks.checkIn,
     ])
       expect(fn).toHaveBeenCalledWith(pool, NOW);
     expect(result).toEqual({
@@ -76,6 +82,7 @@ describe('runRetentionSweep', () => {
         booking_receipt_scrub: 8,
         visit_inbox: 9,
         push_binding: 11,
+        guest_check_in_operation: 12,
       },
       failed: [],
     });
@@ -93,6 +100,7 @@ describe('runRetentionSweep', () => {
       booking_receipt_scrub: 8,
       visit_inbox: 9,
       push_binding: 11,
+      guest_check_in_operation: 12,
     });
     expect(JSON.stringify(result)).not.toContain('secret-row-detail');
     expect(mocks.guest).toHaveBeenCalledTimes(1);
@@ -130,5 +138,25 @@ describe('runRetentionSweep push bindings', () => {
     expect(result.failed).toEqual(['push_binding']);
     expect(result.deleted.visit_inbox).toBe(9);
     expect(JSON.stringify(result)).not.toContain('endpoint-hash-detail');
+  });
+});
+
+describe('runRetentionSweep guest check-in operations', () => {
+  it('reports a failing check-in operation purge by name without stopping other tasks', async () => {
+    mocks.checkIn.mockRejectedValue(new Error('operation-id-detail'));
+    const result = await runRetentionSweep(pool, NOW);
+    expect(result.failed).toEqual(['guest_check_in_operation']);
+    expect(result.deleted.push_binding).toBe(11);
+    expect(JSON.stringify(result)).not.toContain('operation-id-detail');
+  });
+});
+
+describe('runRetentionSweep guest check-in operations', () => {
+  it('reports a failing check-in operation purge by name without stopping other tasks', async () => {
+    mocks.checkIn.mockRejectedValue(new Error('operation-id-detail'));
+    const result = await runRetentionSweep(pool, NOW);
+    expect(result.failed).toEqual(['guest_check_in_operation']);
+    expect(result.deleted.push_binding).toBe(11);
+    expect(JSON.stringify(result)).not.toContain('operation-id-detail');
   });
 });
