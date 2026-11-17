@@ -7,27 +7,30 @@ import {
   dispatchIntervalMs,
   runDispatchTick,
 } from '@/modules/notification-domain/dispatch-worker';
-import { createQueueInAppNotificationDispatchService } from '@/modules/notification-domain/in-app';
+import { composeWorkerChannels } from '@/modules/guest-push/worker-composition';
 import { NotificationDispatchEligibilityRepository } from '@/modules/notification-outbox/dispatch-eligibility';
 import { closePool, getPool } from '@/platform/database/pool';
 
 /**
  * Scheduler for notification dispatch (TAB-PWA-2). Logs counts only.
- * No link sender is registered yet, so guest-link intents stay pending and
- * expire as before; only in-app delivery and scrubbing run.
+ * In-app delivery always runs. Push delivery and the guest-link sender are
+ * registered only when VAPID keys and the push seal secret are configured;
+ * otherwise guest-link intents stay pending and expire as before.
  */
 async function main(): Promise<void> {
   const intervalMs = dispatchIntervalMs(
     process.env.NOTIFICATION_DISPATCH_INTERVAL_MS,
   );
   const pool = getPool();
+  const channels = composeWorkerChannels(pool);
   const deps = {
     pool,
     cursor: { after: null as string | null },
     outboxRunner: createOutcomeCountingBatchRunner(
       new NotificationDispatchEligibilityRepository(pool),
-      createQueueInAppNotificationDispatchService(pool),
+      channels.dispatchService,
     ),
+    linkSender: channels.linkSender,
     linkStore: new GuestLinkIntentStore(
       pool,
       new GuestLinkEnvelope(guestBearerSigningSecret()),
