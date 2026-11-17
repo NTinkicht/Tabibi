@@ -28,6 +28,11 @@ services:
       DATABASE_URL: postgresql://tabibi:tabibi_dev_only@postgres:5432/tabibi
       GUEST_BEARER_SIGNING_SECRET: ${GUEST_BEARER_SIGNING_SECRET:?set at run time}
       NOTIFICATION_DISPATCH_INTERVAL_MS: ${NOTIFICATION_DISPATCH_INTERVAL_MS:-15000}
+      # Optional guest push channel. Push stays off unless all four are set.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      GUEST_PUSH_SEAL_SECRET: ${GUEST_PUSH_SEAL_SECRET:-}
 
 volumes:
   tabibi-postgres:
