@@ -8,6 +8,7 @@ import {
   PublicGuestBookingRejectedError,
   PublicGuestBookingService,
   PublicGuestBookingValidationError,
+  scrubExpiredBookingReceipts,
 } from '@/modules/public-guest-booking';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
@@ -604,5 +605,26 @@ describe('public guest booking transaction', () => {
     ).rejects.toThrow(/public_guest_booking_receipts_state_check/);
     await pool.query(`UPDATE guest_credentials SET revoked_at = $1`, [now]);
     expect(await service.scrubExpiredReceipts()).toBe(1);
+  });
+
+  it('scrubs through the pool-level function the retention sweep calls', async () => {
+    const now = new Date('2099-02-01T00:00:00.000Z');
+    const seeded = await seed(now);
+    const service = new PublicGuestBookingService(
+      pool,
+      seeded.selections,
+      () => now,
+    );
+    await service.book(input(seeded.reference, 'scrub-pool-fn'));
+    // Positive control: a live credential keeps its replay ciphertext.
+    expect(await scrubExpiredBookingReceipts(pool, now)).toBe(0);
+    const later = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+    expect(await scrubExpiredBookingReceipts(pool, later)).toBe(1);
+    expect(await scrubExpiredBookingReceipts(pool, later)).toBe(0);
+    const row = await pool.query(
+      `SELECT access_ciphertext, scrubbed_at FROM public_guest_booking_receipts`,
+    );
+    expect(row.rows[0].access_ciphertext).toBeNull();
+    expect(row.rows[0].scrubbed_at).toEqual(later);
   });
 });
