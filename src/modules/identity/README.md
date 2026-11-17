@@ -115,3 +115,11 @@ account's, unknown, malformed and (for rename) archived ids are one 404.
 Mutations are same-origin, strict-bodied (2 KiB) and limited to 30 per account
 and one ingress bucket per 15 minutes. Dependent booking, delegation and UI
 stay with TAB-P1-03.
+
+### Patient auth retention (TAB-P0-15)
+
+`purgeExpiredPatientAuthArtifacts(pool, now)` deletes `patient_sessions` and
+`patient_password_reset_tokens` rows that expired, were revoked or were used more
+than 7 days ago (verifiers only, one bounded batch of 500 per kind per call,
+locked rows skipped). Live and recently ended rows are never touched. Scheduling
+the sweep is a later slice.
