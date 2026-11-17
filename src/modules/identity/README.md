@@ -131,3 +131,10 @@ were revoked more than 7 days ago, and never-accepted `staff_invites` that expir
 were revoked more than 7 days ago (verifiers only, one bounded batch of 500 per kind
 per call, locked rows skipped). Live and recently ended rows and accepted invites are
 never touched. Scheduling the sweep is a later slice.
+
+### Sign-in rate-limit bucket retention (TAB-P0-15)
+
+`purgeStaleSignInRateLimitBuckets(pool, now)` deletes `staff_sign_in_rate_limit_buckets`
+rows whose 15 minute window began more than 24 hours ago (digested keys only, one
+bounded batch of 500 per call, locked rows skipped). Buckets inside the grace, including
+exhausted ones that are still throttling, are never touched. Scheduling is a later slice.
