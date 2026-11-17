@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import { STAFF_AUTH_RETENTION_MS } from '@/modules/identity/staff-auth-retention';
 import { RATE_LIMIT_BUCKET_RETENTION_MS } from '@/modules/identity/rate-limit-retention';
+import { VISIT_INBOX_RETENTION_MS } from '@/modules/notification-inbox/retention';
 import { runRetentionSweep } from '@/modules/maintenance/retention-sweep';
 
 // TAB-P0-15: the sweep runner really deletes stale rows and keeps live ones.
@@ -79,5 +80,52 @@ describe('retention sweep runner', () => {
         .rowCount === 1;
     expect(await sessionPresent(oldSession)).toBe(false);
     expect(await sessionPresent(liveSession)).toBe(true);
+  });
+
+  it('deletes an old visit inbox row and keeps a recent one', async () => {
+    const clinic = randomUUID();
+    const patient = randomUUID();
+    await pool.query(
+      `INSERT INTO clinics(id,tenant_key,name) VALUES ($1,$2,'Sweep Inbox')`,
+      [clinic, `sweep-inbox-${tag}`],
+    );
+    await pool.query(
+      `INSERT INTO patient_operational_records(id,clinic_id,private_display_name)
+       VALUES ($1,$2,'Private')`,
+      [patient, clinic],
+    );
+    const add = async (age: number) => {
+      const id = randomUUID();
+      await pool.query(
+        `INSERT INTO notification_inbox_items
+           (id,clinic_id,subject_kind,patient_id,provider_idempotency_key,template_id,
+            locale,direction,title,body,created_at)
+         VALUES ($1,$2,'visit_patient',$3,$4,'t','fr','ltr','T','B',$5)`,
+        [id, clinic, patient, `sweep-${id}`, new Date(NOW.getTime() - age)],
+      );
+      return id;
+    };
+    const old = await add(VISIT_INBOX_RETENTION_MS + DAY);
+    const recent = await add(DAY);
+    const result = await runRetentionSweep(pool, NOW);
+    expect(result.failed).toEqual([]);
+    expect(result.deleted.visit_inbox).toBeGreaterThanOrEqual(1);
+    const has = async (id: string) =>
+      (
+        await pool.query('SELECT 1 FROM notification_inbox_items WHERE id=$1', [
+          id,
+        ])
+      ).rowCount === 1;
+    expect(await has(old)).toBe(false);
+    expect(await has(recent)).toBe(true);
+    await pool.query(
+      'DELETE FROM notification_inbox_items WHERE clinic_id=$1',
+      [clinic],
+    );
+    await pool.query(
+      'DELETE FROM patient_operational_records WHERE clinic_id=$1',
+      [clinic],
+    );
+    await pool.query('DELETE FROM clinics WHERE id=$1', [clinic]);
   });
 });

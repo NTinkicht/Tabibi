@@ -142,7 +142,7 @@ exhausted ones that are still throttling, are never touched. The sweep runs via 
 
 `runRetentionSweep(pool, now)` (`src/modules/maintenance/retention-sweep.ts`) runs the
 patient auth, staff auth, sign-in rate-limit and guest exchange purges and the WU59
-booking-receipt ciphertext scrub (`scrubExpiredBookingReceipts`) with one shared
+booking-receipt ciphertext scrub (`scrubExpiredBookingReceipts`) and the visit-patient notification inbox purge with one shared
 clock. A failing task never stops the others and is reported by task name only.
 `npm run worker:retention` is a one-shot entry point for an external scheduler: it logs
 counts and failed task names and exits non-zero if any task failed. Scheduler
