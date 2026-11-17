@@ -41,3 +41,7 @@ destination resolution stay downstream.
 Whole-session cancellation (`SessionService.command` `cancel`) likewise writes one `session_cancelled`
 intent (payload `{locale}` only) per cascaded active entry in the same transaction; an outbox failure
 rolls the cancellation back and an exact retry adds none.
+
+Doctor delay `declare`/`update` (`SessionService.delay`) writes one `session_delayed` intent (payload
+`{locale, delayMinutes}` only) per waiting, checked-in or called entry in the same transaction; `clear`
+writes none, an outbox failure rolls the delay back and an exact retry adds none.
