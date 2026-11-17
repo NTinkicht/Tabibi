@@ -121,8 +121,7 @@ stay with TAB-P1-03.
 `purgeExpiredPatientAuthArtifacts(pool, now)` deletes `patient_sessions` and
 `patient_password_reset_tokens` rows that expired, were revoked or were used more
 than 7 days ago (verifiers only, one bounded batch of 500 per kind per call,
-locked rows skipped). Live and recently ended rows are never touched. Scheduling
-the sweep is a later slice.
+locked rows skipped). Live and recently ended rows are never touched. The sweep runs via `npm run worker:retention` (see below).
 
 ### Staff auth retention (TAB-P0-15)
 
@@ -130,11 +129,20 @@ the sweep is a later slice.
 were revoked more than 7 days ago, and never-accepted `staff_invites` that expired or
 were revoked more than 7 days ago (verifiers only, one bounded batch of 500 per kind
 per call, locked rows skipped). Live and recently ended rows and accepted invites are
-never touched. Scheduling the sweep is a later slice.
+never touched. The sweep runs via `npm run worker:retention`.
 
 ### Sign-in rate-limit bucket retention (TAB-P0-15)
 
 `purgeStaleSignInRateLimitBuckets(pool, now)` deletes `staff_sign_in_rate_limit_buckets`
 rows whose 15 minute window began more than 24 hours ago (digested keys only, one
 bounded batch of 500 per call, locked rows skipped). Buckets inside the grace, including
-exhausted ones that are still throttling, are never touched. Scheduling is a later slice.
+exhausted ones that are still throttling, are never touched. The sweep runs via `npm run worker:retention`.
+
+### Retention sweep runner (TAB-P0-15)
+
+`runRetentionSweep(pool, now)` (`src/modules/maintenance/retention-sweep.ts`) runs the
+patient auth, staff auth, sign-in rate-limit and guest exchange purges with one shared
+clock. A failing task never stops the others and is reported by task name only.
+`npm run worker:retention` is a one-shot entry point for an external scheduler: it logs
+counts and failed task names and exits non-zero if any task failed. Scheduler
+configuration itself is deployment-owned and not part of this repository slice.
