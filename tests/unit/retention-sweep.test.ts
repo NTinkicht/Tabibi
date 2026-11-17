@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   receipts: vi.fn(),
   inbox: vi.fn(),
   guestRate: vi.fn(),
+  push: vi.fn(),
+}));
+vi.mock('@/modules/guest-push/retention', () => ({
+  purgeRevokedPushBindings: mocks.push,
 }));
 vi.mock('@/modules/guest-access/rate-limit-retention', () => ({
   purgeStaleGuestRateLimitBuckets: mocks.guestRate,
@@ -45,6 +49,7 @@ beforeEach(() => {
   mocks.receipts.mockReset().mockResolvedValue(8);
   mocks.inbox.mockReset().mockResolvedValue(9);
   mocks.guestRate.mockReset().mockResolvedValue(10);
+  mocks.push.mockReset().mockResolvedValue(11);
 });
 
 describe('runRetentionSweep', () => {
@@ -58,6 +63,7 @@ describe('runRetentionSweep', () => {
       mocks.receipts,
       mocks.inbox,
       mocks.guestRate,
+      mocks.push,
     ])
       expect(fn).toHaveBeenCalledWith(pool, NOW);
     expect(result).toEqual({
@@ -69,6 +75,7 @@ describe('runRetentionSweep', () => {
         guest_exchange: 13,
         booking_receipt_scrub: 8,
         visit_inbox: 9,
+        push_binding: 11,
       },
       failed: [],
     });
@@ -85,6 +92,7 @@ describe('runRetentionSweep', () => {
       guest_exchange: 13,
       booking_receipt_scrub: 8,
       visit_inbox: 9,
+      push_binding: 11,
     });
     expect(JSON.stringify(result)).not.toContain('secret-row-detail');
     expect(mocks.guest).toHaveBeenCalledTimes(1);
@@ -112,5 +120,15 @@ describe('runRetentionSweep', () => {
     expect(result.failed).toEqual(['guest_rate_limit']);
     expect(result.deleted.visit_inbox).toBe(9);
     expect(JSON.stringify(result)).not.toContain('bucket-key-detail');
+  });
+});
+
+describe('runRetentionSweep push bindings', () => {
+  it('reports a failing push binding purge by name without stopping other tasks', async () => {
+    mocks.push.mockRejectedValue(new Error('endpoint-hash-detail'));
+    const result = await runRetentionSweep(pool, NOW);
+    expect(result.failed).toEqual(['push_binding']);
+    expect(result.deleted.visit_inbox).toBe(9);
+    expect(JSON.stringify(result)).not.toContain('endpoint-hash-detail');
   });
 });
