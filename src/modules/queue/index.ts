@@ -362,6 +362,24 @@ export class QueueService {
           idempotencyKey: input.idempotencyKey,
         },
       });
+      // Atomic base outbox intent (contact-bearing walk-ins only: a contact-less
+      // entry has no remote notification features). Payload is the locale only.
+      if (input.contactPhone !== null || input.contactEmail !== null)
+        await NotificationOutboxRepository.enqueueNextVersionInTransaction(
+          client,
+          {
+            clinicId: scope.clinicId,
+            queueEntryId: entryId,
+            logicalTargetKey: `queue-entry:${entryId}`,
+            eventKey: 'queue_entry_created',
+            idempotencyKey: `queue-event:${createHash('sha256')
+              .update(
+                `${scope.clinicId}:${scope.actorUserId}:${input.idempotencyKey}:created`,
+              )
+              .digest('hex')}`,
+            payload: { locale: input.preferredLocale },
+          },
+        );
       await client.query(
         `INSERT INTO queue_registration_receipts
            (clinic_id, actor_user_id, idempotency_key, request_fingerprint, patient_id, queue_entry_id)
