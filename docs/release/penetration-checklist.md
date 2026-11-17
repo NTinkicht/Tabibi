@@ -49,13 +49,16 @@ Record for every row: tester, target build SHA, date, result (refused for the st
 | Inspect outbox and receipt rows at rest in a seeded database for plaintext guest link material | Envelope ciphertext only | `tests/integration/guest-link-intents.test.ts` |
 | Dispatch route with a foreign clinic id or malformed id (`src/app/api/clinics/[clinicId]/notifications/dispatch/route.ts`) | Rejected, no dispatch state change | `tests/integration/notification-dispatch-api.test.ts` |
 | Dead-letter view or handled marker across tenants (`src/app/api/clinics/[clinicId]/notifications/dead-letters/route.ts`) | Foreign rows invisible | `tests/integration/notification-dead-letter-api.test.ts` |
-| Force provider or store faults and look for false delivered state | Failure surfaced, never reported delivered | `tests/integration/notification-dispatch-resilience.test.ts` |
+| Force provider or store faults and look for false delivered state | Inbox persistence, provider/network, claim-store and completion-store failures are surfaced, never reported delivered | `tests/unit/notification-fault-injection.test.ts` |
 
 ## 6. Queue integrity under concurrency
 
 | Attack | Expected | Automated coverage |
 | --- | --- | --- |
-| Concurrent call, transfer, restore, cancel and priority moves on the same session | Exactly one winner, serialized by version CAS, no duplicate called patient | `tests/integration/queue-lifecycle.test.ts` |
+| Concurrent call versus call, and call versus transfer, on the same session | At most one called or consulting patient; the loser is rejected as stale or not next | `tests/integration/queue-lifecycle.test.ts` |
+| Concurrent restore versus cancel (or cancel versus restore) of the same entry | Both may succeed in lock order (the later command applies to the state left by the earlier one); the entry and its appointment end in the state of the last command, with no duplicate entry | `tests/integration/queue-restore-race.test.ts` |
+| Second restore queued behind a first restore, or a priority insert queued behind a transfer of the same entry | The later command is rejected and leaves no priority state | `tests/integration/queue-restore-race.test.ts` |
+| Priority move versus call or cancel of the same or another entry | Move queued behind a call or cancel is rejected as stale; a move queued ahead applies and the later call is rejected as not next | `tests/integration/queue-priority-race.test.ts` |
 | Replay a command with the same idempotency key | Exact retry returns the original result, no second event | `tests/integration/notification-outbox.test.ts` |
 
 ## 7. Operator tooling
