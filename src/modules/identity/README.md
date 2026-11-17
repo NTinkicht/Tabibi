@@ -123,3 +123,11 @@ stay with TAB-P1-03.
 than 7 days ago (verifiers only, one bounded batch of 500 per kind per call,
 locked rows skipped). Live and recently ended rows are never touched. Scheduling
 the sweep is a later slice.
+
+### Staff auth retention (TAB-P0-15)
+
+`purgeExpiredStaffAuthArtifacts(pool, now)` deletes `staff_sessions` that expired or
+were revoked more than 7 days ago, and never-accepted `staff_invites` that expired or
+were revoked more than 7 days ago (verifiers only, one bounded batch of 500 per kind
+per call, locked rows skipped). Live and recently ended rows and accepted invites are
+never touched. Scheduling the sweep is a later slice.
