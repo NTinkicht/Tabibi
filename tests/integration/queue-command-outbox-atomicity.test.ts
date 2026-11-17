@@ -67,6 +67,9 @@ beforeEach(async () => {
     });
     entries.push(item.entry.id);
   }
+  // Registration writes its own queue_entry_created intents (covered by
+  // walkin-created-outbox.test.ts); these cases assert command intents only.
+  await pool.query('TRUNCATE notification_outbox CASCADE');
 });
 afterAll(() => pool.end());
 

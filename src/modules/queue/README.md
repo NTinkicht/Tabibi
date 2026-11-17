@@ -38,6 +38,10 @@ The payload is `{locale}` only. An outbox failure rolls the whole command back, 
 exact retry is answered from the receipt without a second intent. Delivery, consent and
 destination resolution stay downstream.
 
+Walk-in registration with a phone or email writes one `queue_entry_created` intent in
+the registration transaction (payload `{locale}` only; contact-less walk-ins write none),
+so it commits or rolls back with the patient, entry, audit event and receipt.
+
 Whole-session cancellation (`SessionService.command` `cancel`) likewise writes one `session_cancelled`
 intent (payload `{locale}` only) per cascaded active entry in the same transaction; an outbox failure
 rolls the cancellation back and an exact retry adds none.
