@@ -92,7 +92,7 @@ export function StatisticsClient({
   const apply = useCallback(() => {
     if (!valid) return;
     setState({ kind: 'loading' });
-    setApplied(window_);
+    setApplied({ ...window_ });
   }, [valid, window_]);
 
   useEffect(() => {

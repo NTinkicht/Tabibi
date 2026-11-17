@@ -99,3 +99,31 @@ test('a rejected request shows an error and an over-long window blocks submit', 
   await expect(page.getByRole('button', { name: 'Afficher' })).toBeDisabled();
   await expect(page.getByText(/31 jours/)).toBeVisible();
 });
+
+test('re-submitting an unchanged window retries a failed request', async ({
+  page,
+}) => {
+  let calls = 0;
+  await page.route(STATS_URL, async (route) => {
+    calls += 1;
+    if (calls === 1) {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: '{}',
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+  });
+  await page.goto(`/operations/${clinicId}/statistics?locale=fr`);
+  await expect(page.getByText('Impossible de charger')).toBeVisible();
+  await page.getByRole('button', { name: 'Afficher' }).click();
+  await expect(page.getByText('Impossible de charger')).toBeHidden();
+  await expect(page.getByText('Dr Amine Benali')).toBeVisible();
+  expect(calls).toBe(2);
+});
