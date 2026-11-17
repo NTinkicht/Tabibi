@@ -433,6 +433,70 @@ export class NotificationOutboxRepository {
     return enqueueWithClient(client, { ...rawInput, intentVersion: 1 }, true);
   }
 
+  /**
+   * Withdraws every not-yet-delivered intent (pending, failed, unknown) for a
+   * target and event inside the caller's transaction, without sending anything.
+   * Each is superseded by a non-deliverable `suppressed` tombstone version, so
+   * no new message is produced and the withdrawal stays auditable. Returns the
+   * number of withdrawn intents; writes nothing when none are outstanding.
+   */
+  static async withdrawOutstandingInTransaction(
+    client: PoolClient,
+    input: {
+      clinicId: string;
+      queueEntryId: string;
+      logicalTargetKey: string;
+      eventKey: string;
+      idempotencyKey: string;
+      outcomeCode: string;
+    },
+  ): Promise<number> {
+    await client.query(
+      'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+      [
+        `notification-outbox:${input.clinicId}:${input.logicalTargetKey}:${input.eventKey}`,
+      ],
+    );
+    const outstanding = await client.query<{ id: string }>(
+      `SELECT id FROM notification_outbox
+        WHERE clinic_id=$1 AND logical_target_key=$2 AND event_key=$3
+          AND state IN ('pending', 'failed', 'unknown')
+        FOR UPDATE`,
+      [input.clinicId, input.logicalTargetKey, input.eventKey],
+    );
+    if (outstanding.rows.length === 0) return 0;
+    const tombstoneId = randomUUID();
+    await client.query(
+      `INSERT INTO notification_outbox (
+           id, clinic_id, queue_entry_id, logical_target_key, event_key,
+           intent_version, idempotency_key, state, payload,
+           dispatch_attempt_count, dispatch_last_attempt_at,
+           dispatch_outcome_at, dispatch_outcome_code)
+         SELECT $1, $2, $3, $4, $5, COALESCE(MAX(intent_version), 0) + 1, $6,
+                'suppressed', '{}'::jsonb, 1, now(), now(), $7
+           FROM notification_outbox
+          WHERE clinic_id=$2 AND logical_target_key=$4 AND event_key=$5`,
+      [
+        tombstoneId,
+        input.clinicId,
+        input.queueEntryId,
+        input.logicalTargetKey,
+        input.eventKey,
+        input.idempotencyKey,
+        input.outcomeCode,
+      ],
+    );
+    await client.query(
+      `UPDATE notification_outbox
+          SET state='superseded', superseded_by_id=$2, superseded_at=now(),
+              next_attempt_at=NULL, dispatch_claim_token=NULL,
+              dispatch_claimed_at=NULL, dispatch_claim_expires_at=NULL
+        WHERE clinic_id=$1 AND id = ANY($3::uuid[])`,
+      [input.clinicId, tombstoneId, outstanding.rows.map((row) => row.id)],
+    );
+    return outstanding.rows.length;
+  }
+
   async claimPendingIntent(
     rawInput: ClaimNotificationIntentInput,
   ): Promise<NotificationDispatchClaim | null> {
