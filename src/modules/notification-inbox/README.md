@@ -20,6 +20,10 @@ Suppressed or unauthorized intents never invoke the renderer or the adapter. Thi
 
 WU35 intentionally does not add an HTTP/UI surface, badge rendering, bulk acknowledgement, deletion/archive, retention behavior, or broader inbox enumeration. Those concerns must compose on top of the exact-subject repository contract rather than widening it.
 
+## Retention (TAB-P0-15)
+
+`purgeExpiredVisitInboxItems(pool, now)` (`retention.ts`) deletes `visit_patient` rows created more than 30 days ago, read or unread, in one bounded batch of 500 per call with locked rows skipped. Account-scoped rows are never purged by it, because account history retention is a separate policy. It runs in `runRetentionSweep` as task `visit_inbox` via `npm run worker:retention`.
+
 ## Persistence and privacy
 
 The inbox stores only the exact clinic/subject routing key plus bounded rendered fields needed by the application inbox: provider idempotency key, template id, locale, direction, title, body, creation time, and nullable read time.

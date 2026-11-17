@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
   rate: vi.fn(),
   guest: vi.fn(),
   receipts: vi.fn(),
+  inbox: vi.fn(),
+}));
+vi.mock('@/modules/notification-inbox/retention', () => ({
+  purgeExpiredVisitInboxItems: mocks.inbox,
 }));
 vi.mock('@/modules/public-guest-booking', () => ({
   scrubExpiredBookingReceipts: mocks.receipts,
@@ -35,6 +39,7 @@ beforeEach(() => {
   mocks.rate.mockReset().mockResolvedValue(5);
   mocks.guest.mockReset().mockResolvedValue({ exchangeIds: 6, linkIntents: 7 });
   mocks.receipts.mockReset().mockResolvedValue(8);
+  mocks.inbox.mockReset().mockResolvedValue(9);
 });
 
 describe('runRetentionSweep', () => {
@@ -46,6 +51,7 @@ describe('runRetentionSweep', () => {
       mocks.rate,
       mocks.guest,
       mocks.receipts,
+      mocks.inbox,
     ])
       expect(fn).toHaveBeenCalledWith(pool, NOW);
     expect(result).toEqual({
@@ -55,6 +61,7 @@ describe('runRetentionSweep', () => {
         sign_in_rate_limit: 5,
         guest_exchange: 13,
         booking_receipt_scrub: 8,
+        visit_inbox: 9,
       },
       failed: [],
     });
@@ -69,6 +76,7 @@ describe('runRetentionSweep', () => {
       sign_in_rate_limit: 5,
       guest_exchange: 13,
       booking_receipt_scrub: 8,
+      visit_inbox: 9,
     });
     expect(JSON.stringify(result)).not.toContain('secret-row-detail');
     expect(mocks.guest).toHaveBeenCalledTimes(1);
@@ -80,5 +88,13 @@ describe('runRetentionSweep', () => {
     expect(result.failed).toEqual(['booking_receipt_scrub']);
     expect(result.deleted.guest_exchange).toBe(13);
     expect(JSON.stringify(result)).not.toContain('ciphertext-detail');
+  });
+
+  it('reports a failing inbox purge by name without stopping other tasks', async () => {
+    mocks.inbox.mockRejectedValue(new Error('inbox-body-detail'));
+    const result = await runRetentionSweep(pool, NOW);
+    expect(result.failed).toEqual(['visit_inbox']);
+    expect(result.deleted.booking_receipt_scrub).toBe(8);
+    expect(JSON.stringify(result)).not.toContain('inbox-body-detail');
   });
 });

@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import { purgeExpiredGuestExchangeArtifacts } from '@/modules/guest-access/retention';
+import { purgeExpiredVisitInboxItems } from '@/modules/notification-inbox/retention';
 import { purgeExpiredPatientAuthArtifacts } from '@/modules/identity/patient-auth-retention';
 import { scrubExpiredBookingReceipts } from '@/modules/public-guest-booking';
 import { purgeStaleSignInRateLimitBuckets } from '@/modules/identity/rate-limit-retention';
@@ -14,7 +15,8 @@ export type RetentionTaskName =
   | 'staff_auth'
   | 'sign_in_rate_limit'
   | 'guest_exchange'
-  | 'booking_receipt_scrub';
+  | 'booking_receipt_scrub'
+  | 'visit_inbox';
 
 export interface RetentionSweepResult {
   /** Rows deleted per task that completed. */
@@ -46,6 +48,7 @@ export async function runRetentionSweep(
         sum({ ...(await purgeExpiredGuestExchangeArtifacts(pool, now)) }),
     ],
     ['booking_receipt_scrub', () => scrubExpiredBookingReceipts(pool, now)],
+    ['visit_inbox', () => purgeExpiredVisitInboxItems(pool, now)],
   ];
   const result: RetentionSweepResult = { deleted: {}, failed: [] };
   for (const [name, run] of tasks) {
