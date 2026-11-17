@@ -354,6 +354,30 @@ describe('WU61 public guest booking cancellation', () => {
     expect((await cancellationAudits(second)).rows).toHaveLength(0);
   });
 
+  it('refuses cancellation with a status-class credential (booking-class only)', async () => {
+    const booking = await createBooking('5101');
+    const service = new PublicGuestBookingCancellationService(pool, () => now);
+    await pool.query(
+      `UPDATE guest_credentials SET credential_class='status' WHERE queue_entry_id=$1`,
+      [booking.queueEntryId],
+    );
+    await expect(service.cancel(booking.bearer)).rejects.toBeInstanceOf(
+      PublicGuestBookingCancellationRejectedError,
+    );
+    expect(await state(booking)).toMatchObject({
+      appointment_status: 'confirmed',
+      queue_state: 'waiting',
+    });
+    // Positive control: the same bearer cancels once it is booking-class.
+    await pool.query(
+      `UPDATE guest_credentials SET credential_class='booking' WHERE queue_entry_id=$1`,
+      [booking.queueEntryId],
+    );
+    await expect(service.cancel(booking.bearer)).resolves.toEqual({
+      status: 'cancelled',
+    });
+  });
+
   it('fails closed on durable association drift with zero cancellation writes', async () => {
     const booking = await createBooking('4001');
     const replacementPatientId = randomUUID();
