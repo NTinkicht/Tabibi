@@ -15,8 +15,8 @@ import { requireSameOrigin, StaffCsrfError } from '@/platform/http/staff-auth';
 
 // docs/design/pwa-push.md section 3: possession-based resend. Always 202 with
 // one body, whether or not an endpoint matched, so it cannot be used to test
-// endpoints. Limits: 3 per binding per hour (in the module) plus this global
-// ingress bucket.
+// endpoints. Limits: 3 per endpoint hash per hour and 3 per binding per hour (in the
+// module) plus this global ingress bucket.
 const HEADERS = {
   'cache-control': 'no-store',
   'content-type': 'application/json; charset=utf-8',
@@ -25,7 +25,8 @@ const HEADERS = {
     "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
 };
 const MAX_BODY_BYTES = 4096;
-const INGRESS_LIMIT = 30;
+// Database-protection level only; the per-endpoint bucket is the abuse limit.
+const INGRESS_LIMIT = 300;
 const INGRESS_BUCKET = 'guest-push-resend:ingress';
 
 const respond = (status: number, body: unknown, extra = {}) =>

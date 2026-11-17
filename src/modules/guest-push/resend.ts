@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import {
   GuestAccessRejectedError,
@@ -13,6 +14,11 @@ import type { PushSubscriptionSealer } from './subscription-seal';
 
 const PER_BINDING_LIMIT = 3;
 const PER_BINDING_WINDOW_MS = 60 * 60 * 1_000;
+// Per endpoint hash, consumed before the binding lookup for every endpoint,
+// bound or not, so unknown endpoints are limited too and one client cannot
+// exhaust a shared bucket.
+const PER_ENDPOINT_LIMIT = 3;
+const PER_ENDPOINT_WINDOW_MS = 60 * 60 * 1_000;
 
 /**
  * Possession-based resend (docs/design/pwa-push.md section 3). The endpoint
@@ -30,6 +36,15 @@ export async function resendGuestPushLink(
 ): Promise<void> {
   // Throws PushEndpointRejectedError for hosts outside the allow-list.
   const endpointHash = sealer.endpointHash(endpoint);
+  if (
+    !(await consumeGuestPushBucket(
+      pool,
+      `guest-push-resend:endpoint:${endpointHash}`,
+      PER_ENDPOINT_LIMIT,
+      PER_ENDPOINT_WINDOW_MS,
+    ))
+  )
+    return;
   const found = await pool.query<{
     id: string;
     clinic_id: string;
@@ -40,7 +55,18 @@ export async function resendGuestPushLink(
     [endpointHash, now],
   );
   const binding = found.rows[0];
-  if (!binding) return;
+  if (!binding) {
+    // Same work shape as a match (hash lookup plus a bucket write) so the
+    // response time does not reveal whether the endpoint is registered. The
+    // decoy key is random, never reused, and purged with the other buckets.
+    await consumeGuestPushBucket(
+      pool,
+      `guest-push-resend:decoy:${randomUUID()}`,
+      PER_BINDING_LIMIT,
+      PER_BINDING_WINDOW_MS,
+    );
+    return;
+  }
   if (
     !(await consumeGuestPushBucket(
       pool,

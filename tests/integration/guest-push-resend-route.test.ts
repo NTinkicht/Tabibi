@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Pool } from 'pg';
@@ -377,11 +377,71 @@ describe('POST /api/guest/push-subscription/resend', () => {
     expect(await intents()).toHaveLength(3);
   });
 
-  it('rate limits the ingress bucket', async () => {
-    let last = 202;
-    for (let i = 0; i < 31; i += 1)
-      last = (await post({ endpoint: sub(50).endpoint })).status;
-    expect(last).toBe(429);
+  it('limits an unknown endpoint per hash without blocking another guest', async () => {
+    await bind(ids.entryA, 1);
+    // Junk endpoint hammered well past 3 per hour: still 202, no intents.
+    for (let i = 0; i < 10; i += 1)
+      expect((await post({ endpoint: sub(77).endpoint })).status).toBe(202);
+    const bucketKey = (k: string) =>
+      createHash('sha256').update(k).digest('hex');
+    const hash = guestPushSealer().endpointHash(sub(77).endpoint);
+    const row = await pool.query(
+      'SELECT request_count FROM guest_push_rate_limit_buckets WHERE bucket_key=$1',
+      [bucketKey(`guest-push-resend:endpoint:${hash}`)],
+    );
+    // Counter stops at the limit: refused calls do not keep counting.
+    expect(Number(row.rows[0].request_count)).toBe(3);
+    // Positive control: a different, bound endpoint still gets its link.
+    expect((await post({ endpoint: sub(1).endpoint })).status).toBe(202);
+    expect(await intents()).toHaveLength(1);
+  });
+
+  it('applies the per-endpoint limit before the binding lookup', async () => {
+    await bind(ids.entryA, 1);
+    const hash = guestPushSealer().endpointHash(sub(1).endpoint);
+    await pool.query(
+      `INSERT INTO guest_push_rate_limit_buckets
+         (bucket_key,window_started_at,request_count,updated_at)
+       VALUES ($1,now(),3,now())`,
+      [
+        createHash('sha256')
+          .update(`guest-push-resend:endpoint:${hash}`)
+          .digest('hex'),
+      ],
+    );
+    expect((await post({ endpoint: sub(1).endpoint })).status).toBe(202);
+    expect(await intents()).toHaveLength(0);
+    // The binding bucket was never touched: refusal came from the endpoint bucket.
+    const binding = await pool.query(
+      `SELECT id FROM guest_push_subscriptions WHERE queue_entry_id=$1`,
+      [ids.entryA],
+    );
+    const rows = await pool.query(
+      'SELECT 1 FROM guest_push_rate_limit_buckets WHERE bucket_key=$1',
+      [
+        createHash('sha256')
+          .update(`guest-push-resend:binding:${binding.rows[0].id}`)
+          .digest('hex'),
+      ],
+    );
+    expect(rows.rows).toHaveLength(0);
+  });
+
+  it('rate limits the ingress bucket at 300 per minute', async () => {
+    const key = createHash('sha256')
+      .update('guest-push-resend:ingress')
+      .digest('hex');
+    await pool.query(
+      `INSERT INTO guest_push_rate_limit_buckets
+         (bucket_key,window_started_at,request_count,updated_at)
+       VALUES ($1,now(),299,now())`,
+      [key],
+    );
+    // Positive control: the 300th request is still served.
+    expect((await post({ endpoint: sub(50).endpoint })).status).toBe(202);
+    const blocked = await post({ endpoint: sub(50).endpoint });
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('retry-after')).toBe('60');
   });
 });
 
