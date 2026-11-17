@@ -8,6 +8,10 @@ const mocks = vi.hoisted(() => ({
   guest: vi.fn(),
   receipts: vi.fn(),
   inbox: vi.fn(),
+  guestRate: vi.fn(),
+}));
+vi.mock('@/modules/guest-access/rate-limit-retention', () => ({
+  purgeStaleGuestRateLimitBuckets: mocks.guestRate,
 }));
 vi.mock('@/modules/notification-inbox/retention', () => ({
   purgeExpiredVisitInboxItems: mocks.inbox,
@@ -40,6 +44,7 @@ beforeEach(() => {
   mocks.guest.mockReset().mockResolvedValue({ exchangeIds: 6, linkIntents: 7 });
   mocks.receipts.mockReset().mockResolvedValue(8);
   mocks.inbox.mockReset().mockResolvedValue(9);
+  mocks.guestRate.mockReset().mockResolvedValue(10);
 });
 
 describe('runRetentionSweep', () => {
@@ -52,6 +57,7 @@ describe('runRetentionSweep', () => {
       mocks.guest,
       mocks.receipts,
       mocks.inbox,
+      mocks.guestRate,
     ])
       expect(fn).toHaveBeenCalledWith(pool, NOW);
     expect(result).toEqual({
@@ -59,6 +65,7 @@ describe('runRetentionSweep', () => {
         patient_auth: 3,
         staff_auth: 7,
         sign_in_rate_limit: 5,
+        guest_rate_limit: 10,
         guest_exchange: 13,
         booking_receipt_scrub: 8,
         visit_inbox: 9,
@@ -74,6 +81,7 @@ describe('runRetentionSweep', () => {
     expect(result.deleted).toEqual({
       patient_auth: 3,
       sign_in_rate_limit: 5,
+      guest_rate_limit: 10,
       guest_exchange: 13,
       booking_receipt_scrub: 8,
       visit_inbox: 9,
@@ -96,5 +104,13 @@ describe('runRetentionSweep', () => {
     expect(result.failed).toEqual(['visit_inbox']);
     expect(result.deleted.booking_receipt_scrub).toBe(8);
     expect(JSON.stringify(result)).not.toContain('inbox-body-detail');
+  });
+
+  it('reports a failing guest rate-limit purge by name without stopping other tasks', async () => {
+    mocks.guestRate.mockRejectedValue(new Error('bucket-key-detail'));
+    const result = await runRetentionSweep(pool, NOW);
+    expect(result.failed).toEqual(['guest_rate_limit']);
+    expect(result.deleted.visit_inbox).toBe(9);
+    expect(JSON.stringify(result)).not.toContain('bucket-key-detail');
   });
 });
