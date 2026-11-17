@@ -26,6 +26,7 @@
     "db:reset:test": "tsx scripts/db/reset-test.ts",
     "db:rehearse-recovery": "tsx scripts/db/rehearse-backup-restore.ts",
     "db:clinic-day-load": "tsx scripts/load/clinic-day.ts",
+    "worker:retention": "tsx scripts/worker/retention-sweep.ts",
     "worker:notifications": "tsx scripts/worker/notification-dispatch.ts"
   },
   "dependencies": {
