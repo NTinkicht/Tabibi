@@ -372,9 +372,9 @@ export class QueueService {
             queueEntryId: entryId,
             logicalTargetKey: `queue-entry:${entryId}`,
             eventKey: 'queue_entry_created',
-            idempotencyKey: `queue-event:${createHash('sha256')
+            idempotencyKey: `queue-registration-event:${createHash('sha256')
               .update(
-                `${scope.clinicId}:${scope.actorUserId}:${input.idempotencyKey}:created`,
+                `${scope.clinicId}:${scope.actorUserId}:${input.idempotencyKey}`,
               )
               .digest('hex')}`,
             payload: { locale: input.preferredLocale },

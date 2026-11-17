@@ -147,6 +147,27 @@ describe('walk-in registration outbox atomicity', () => {
     expect((await counts()).entries).toBe(before.entries + 1);
   });
 
+  it('does not collide with a queue command whose key ends in :created', async () => {
+    await register('visit-1', { contactPhone: '+213555000666' });
+    const other = await register('w-other', { contactPhone: '+213555000777' });
+    await service().command(scope, ids.session, other.entry.id, {
+      command: 'check_in',
+      idempotencyKey: 'ci-other',
+      correlationId: 'corr-ci',
+    });
+    const called = await service().command(scope, ids.session, other.entry.id, {
+      command: 'call',
+      idempotencyKey: 'visit-1:created',
+      correlationId: 'corr-call',
+    });
+    expect(called.state).toBe('called');
+    expect((await intents()).map((row) => row.event_key).sort()).toEqual([
+      'patient_called',
+      'queue_entry_created',
+      'queue_entry_created',
+    ]);
+  });
+
   it('creates no intent when registration is refused', async () => {
     await expect(
       service().registerWalkIn(scope, ids.closedSession, {
