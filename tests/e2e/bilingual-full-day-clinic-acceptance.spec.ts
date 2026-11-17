@@ -287,6 +287,7 @@ test('rehearses one bounded bilingual clinic day without tenant or patient leaka
       [ids.clinic, [scheduled.entry.id, walkIn.entry.id]],
     );
     expect(notifications.rows.map((row) => row.event_key)).toEqual([
+      'appointment_confirmed',
       'queue_entry_created',
       'estimate_changed_materially',
       'patient_called',
