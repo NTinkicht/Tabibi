@@ -353,19 +353,16 @@ export class GuestAccessService {
       // docs/design/pwa-push.md section 3: only the device holding a push
       // subscription's private keys can read a push link, so consuming one
       // rotates the entry's status credential. Staff-issued exchanges keep
-      // the one-live-credential refusal below. Booking-origin credentials
-      // (referenced by a public booking receipt) are a separate class that
-      // carries poll/cancel/check-in authority; rotation must not revoke them,
-      // so a push consume against such an entry still fails closed below.
+      // the one-live-status-credential refusal below. Booking credentials
+      // (credential_class='booking') are a separate class that carries
+      // poll/cancel/check-in authority: rotation never revokes them and they
+      // never block a status credential (one live credential per class).
       if (row.contact_kind === 'push') {
         const rotated = await client.query(
           `UPDATE guest_credentials
               SET revoked_at=$2, revocation_reason='rotated'
             WHERE queue_entry_id=$1 AND revoked_at IS NULL
-              AND NOT EXISTS (
-                SELECT 1 FROM public_guest_booking_receipts receipt
-                 WHERE receipt.credential_id=guest_credentials.id
-                   AND receipt.clinic_id=guest_credentials.clinic_id)`,
+              AND credential_class='status'`,
           [row.queue_entry_id, now],
         );
         if (rotated.rowCount)
@@ -382,6 +379,7 @@ export class GuestAccessService {
         `SELECT id
            FROM guest_credentials
           WHERE queue_entry_id=$1 AND revoked_at IS NULL
+            AND credential_class='status'
           FOR UPDATE`,
         [row.queue_entry_id],
       );
@@ -398,8 +396,9 @@ export class GuestAccessService {
       if (this.afterConsumeForTest) await this.afterConsumeForTest(client);
       await client.query(
         `INSERT INTO guest_credentials
-           (id,clinic_id,session_id,queue_entry_id,bearer_verifier,issued_at,expires_at)
-         VALUES($1,$2,$3,$4,$5,$6,$7)`,
+           (id,clinic_id,session_id,queue_entry_id,bearer_verifier,issued_at,expires_at,
+            credential_class)
+         VALUES($1,$2,$3,$4,$5,$6,$7,'status')`,
         [
           credentialId,
           row.clinic_id,

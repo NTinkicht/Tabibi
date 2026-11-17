@@ -191,6 +191,11 @@ beforeAll(async () => {
          FROM guest_credentials WHERE queue_entry_id=$3`,
       [ids.clinic, ids.patientB, ids.entryB, randomUUID()],
     );
+    await client.query(
+      `UPDATE guest_credentials SET credential_class='booking'
+        WHERE queue_entry_id=$1`,
+      [ids.entryB],
+    );
   } finally {
     await client.query('SET session_replication_role = DEFAULT');
     client.release();
