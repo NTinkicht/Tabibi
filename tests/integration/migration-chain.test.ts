@@ -69,6 +69,7 @@ const committedMigrations = [
   '0058_guest_push_rate_limit_buckets.sql',
   '0059_guest_credential_revocation_reason.sql',
   '0060_patient_password_reset_tokens.sql',
+  '0061_guest_credential_class.sql',
 ];
 
 beforeAll(async () => {

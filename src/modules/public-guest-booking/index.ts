@@ -482,8 +482,9 @@ export class PublicGuestBookingService {
       );
       await client.query(
         `INSERT INTO guest_credentials
-           (id, clinic_id, session_id, queue_entry_id, bearer_verifier, issued_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+           (id, clinic_id, session_id, queue_entry_id, bearer_verifier, issued_at, expires_at,
+            credential_class)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'booking')`,
         [
           credentialId,
           selection.clinicId,

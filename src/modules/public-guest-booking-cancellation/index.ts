@@ -117,6 +117,7 @@ export class PublicGuestBookingCancellationService {
           WHERE credential.id = $1
             AND credential.clinic_id = $2
             AND credential.session_id = $3
+            AND credential.credential_class = 'booking'
           FOR UPDATE OF credential, appointment, entry`,
         [credentialId, target.clinic_id, target.session_id],
       );

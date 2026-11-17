@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { Pool } from 'pg';
 import {
   afterAll,
@@ -9,7 +11,12 @@ import {
   it,
   vi,
 } from 'vitest';
-import { GuestAccessService, type GuestTarget } from '@/modules/guest-access';
+import {
+  authenticatedGuestCredentialId,
+  GuestAccessService,
+  type GuestTarget,
+} from '@/modules/guest-access';
+import { authenticateGuestPush } from '@/modules/guest-push/credential';
 import { GuestPushSubscriptionStore } from '@/modules/guest-push/subscription-store';
 import { guestPushSealer } from '@/modules/guest-push/config';
 import { migrate } from '../../scripts/db/lib';
@@ -454,7 +461,7 @@ describe('push exchange credential rotation', () => {
     ]);
   });
 
-  it('does not rotate a booking-origin credential on push consume', async () => {
+  const seedBookedEntry = async (order: number) => {
     const entry = randomUUID();
     const patient = randomUUID();
     await pool.query(
@@ -465,10 +472,9 @@ describe('push exchange credential rotation', () => {
     await pool.query(
       `INSERT INTO queue_entries
        (id,clinic_id,session_id,patient_id,state,source,registration_order,public_display_label)
-       VALUES($1,$2,$3,$4,'waiting','walk_in',10,'R-010')`,
-      [entry, ids.clinic, ids.session, patient],
+       VALUES($1,$2,$3,$4,'waiting','walk_in',$5,$6)`,
+      [entry, ids.clinic, ids.session, patient, order, `R-0${order}`],
     );
-    const service = new GuestAccessService(pool);
     const bookingBearer = await credentialFor(entry);
     const credential = (
       await pool.query<{ id: string }>(
@@ -476,6 +482,12 @@ describe('push exchange credential rotation', () => {
         [entry],
       )
     ).rows[0]!.id;
+    // Mirror public-guest-booking: the booking credential is class 'booking'
+    // and referenced by the completed receipt.
+    await pool.query(
+      `UPDATE guest_credentials SET credential_class='booking' WHERE id=$1`,
+      [credential],
+    );
     const appointment = randomUUID();
     await pool.query(
       `INSERT INTO appointments
@@ -488,21 +500,181 @@ describe('push exchange credential rotation', () => {
       `INSERT INTO public_guest_booking_receipts
          (clinic_id,idempotency_key,request_fingerprint,patient_id,queue_entry_id,
           appointment_id,credential_id,access_ciphertext,completed_at)
-       VALUES($1,'rot-bk',repeat('a',64),$2,$3,$4,$5,'ct',now())`,
-      [ids.clinic, patient, entry, appointment, credential],
+       VALUES($1,$2,repeat('a',64),$3,$4,$5,$6,'ct',now())`,
+      [ids.clinic, `rot-bk-${order}`, patient, entry, appointment, credential],
     );
+    return { entry, bookingBearer, credential };
+  };
+
+  it('gives a booked guest a status credential on push consume without touching the booking bearer', async () => {
+    const { entry, bookingBearer, credential } = await seedBookedEntry(10);
+    const service = new GuestAccessService(pool);
     const { subscriptionId } = await bind(entry, 31);
-    await expect(
-      service.consume(await issuePush(subscriptionId, entry), targetOf(entry)),
-    ).rejects.toThrow();
+
+    const first = await service.consume(
+      await issuePush(subscriptionId, entry),
+      targetOf(entry),
+    );
+    await expect(service.authorize(first.bearer)).resolves.toBeDefined();
     await expect(service.authorize(bookingBearer)).resolves.toBeDefined();
+
+    // A second push consume rotates the first status credential only.
+    const second = await service.consume(
+      await issuePush(subscriptionId, entry),
+      targetOf(entry),
+    );
+    await expect(service.authorize(first.bearer)).rejects.toThrow();
+    await expect(service.authorize(second.bearer)).resolves.toBeDefined();
+    await expect(service.authorize(bookingBearer)).resolves.toBeDefined();
+
     const rows = (
       await pool.query(
-        `SELECT revoked_at IS NOT NULL AS revoked, revocation_reason
-           FROM guest_credentials WHERE queue_entry_id=$1`,
+        `SELECT id=$2 AS is_booking, credential_class, revocation_reason,
+                revoked_at IS NOT NULL AS revoked
+           FROM guest_credentials WHERE queue_entry_id=$1
+          ORDER BY issued_at, credential_class`,
+        [entry, credential],
+      )
+    ).rows;
+    expect(rows).toEqual([
+      {
+        is_booking: true,
+        credential_class: 'booking',
+        revocation_reason: null,
+        revoked: false,
+      },
+      {
+        is_booking: false,
+        credential_class: 'status',
+        revocation_reason: 'rotated',
+        revoked: true,
+      },
+      {
+        is_booking: false,
+        credential_class: 'status',
+        revocation_reason: null,
+        revoked: false,
+      },
+    ]);
+  });
+
+  it('refuses a staff exchange only while a live status credential exists', async () => {
+    const { entry, bookingBearer } = await seedBookedEntry(11);
+    const service = new GuestAccessService(pool);
+
+    // Booked guest without a status credential: staff exchange succeeds.
+    const status = await service.consume(
+      (await service.issue(targetOf(entry), ids.actor)).exchangeId,
+      targetOf(entry),
+    );
+    await expect(service.authorize(status.bearer)).resolves.toBeDefined();
+    await expect(service.authorize(bookingBearer)).resolves.toBeDefined();
+
+    // Now a live status credential exists: the next staff exchange is refused.
+    const staff = await service.issue(targetOf(entry), ids.actor);
+    await expect(
+      service.consume(staff.exchangeId, targetOf(entry)),
+    ).rejects.toThrow();
+    await expect(service.authorize(status.bearer)).resolves.toBeDefined();
+  });
+
+  it('migration 0061 backfills booking rows only and enforces one live credential per class', async () => {
+    const { entry, credential } = await seedBookedEntry(14);
+    const service = new GuestAccessService(pool);
+    const status = await service.consume(
+      (await service.issue(targetOf(entry), ids.actor)).exchangeId,
+      targetOf(entry),
+    );
+    const statusId = authenticatedGuestCredentialId(status.bearer)!;
+    // Reset both rows to the pre-migration default, then re-run the backfill.
+    await pool.query(
+      `UPDATE guest_credentials SET revoked_at=now() WHERE id=$1`,
+      [statusId],
+    );
+    await pool.query(
+      `UPDATE guest_credentials SET credential_class='status' WHERE queue_entry_id=$1`,
+      [entry],
+    );
+    const sql = await readFile(
+      resolve('db/migrations/0061_guest_credential_class.sql'),
+      'utf8',
+    );
+    const backfill = /UPDATE guest_credentials credential[\s\S]*?;/.exec(
+      sql,
+    )![0];
+    await pool.query(backfill);
+    const rows = (
+      await pool.query<{ id: string; credential_class: string }>(
+        'SELECT id, credential_class FROM guest_credentials WHERE queue_entry_id=$1',
         [entry],
       )
     ).rows;
-    expect(rows).toEqual([{ revoked: false, revocation_reason: null }]);
+    expect(rows.find((r) => r.id === credential)?.credential_class).toBe(
+      'booking',
+    );
+    expect(rows.find((r) => r.id === statusId)?.credential_class).toBe(
+      'status',
+    );
+    await pool.query(
+      `UPDATE guest_credentials SET revoked_at=NULL WHERE id=$1`,
+      [statusId],
+    );
+    // Unknown class refused; a second live credential of one class refused.
+    await expect(
+      pool.query(
+        `UPDATE guest_credentials SET credential_class='other' WHERE id=$1`,
+        [statusId],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+    await expect(
+      pool.query(
+        `UPDATE guest_credentials SET credential_class='status' WHERE id=$1`,
+        [credential],
+      ),
+    ).rejects.toMatchObject({
+      constraint: 'guest_credentials_one_live_per_entry_class_uq',
+    });
+  });
+
+  it('authenticates push subscriptions by credential_class and rejects a column/receipt mismatch', async () => {
+    const { entry, bookingBearer, credential } = await seedBookedEntry(12);
+    const service = new GuestAccessService(pool);
+    const status = await service.consume(
+      (await service.issue(targetOf(entry), ids.actor)).exchangeId,
+      targetOf(entry),
+    );
+    const asBearer = (b: string) =>
+      new Request('https://x.test/', {
+        headers: { authorization: `Bearer ${b}` },
+      });
+    const asCookie = (b: string) =>
+      new Request('https://x.test/', {
+        headers: { cookie: `__Host-tabibi_guest=${b}` },
+      });
+    await expect(
+      authenticateGuestPush(pool, asBearer(bookingBearer)),
+    ).resolves.toMatchObject({ credentialClass: 'booking_bearer' });
+    await expect(
+      authenticateGuestPush(pool, asCookie(status.bearer)),
+    ).resolves.toMatchObject({ credentialClass: 'status_cookie' });
+    // Neither class is accepted as the other.
+    await expect(
+      authenticateGuestPush(pool, asCookie(bookingBearer)),
+    ).rejects.toThrow();
+    await expect(
+      authenticateGuestPush(pool, asBearer(status.bearer)),
+    ).rejects.toThrow();
+    // A booking-referenced credential whose column disagrees fails closed.
+    await pool.query(
+      `UPDATE guest_credentials SET revoked_at=now() WHERE id<>$1 AND queue_entry_id=$2`,
+      [credential, entry],
+    );
+    await pool.query(
+      `UPDATE guest_credentials SET credential_class='status' WHERE id=$1`,
+      [credential],
+    );
+    await expect(
+      authenticateGuestPush(pool, asBearer(bookingBearer)),
+    ).rejects.toThrow();
   });
 });

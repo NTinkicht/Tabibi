@@ -58,13 +58,25 @@ export async function authenticateGuestPush(
   if (!credentialId) throw new GuestAccessRejectedError();
 
   const target = await new GuestAccessService(pool).authorize(presented);
-  // Booking credentials are the ones a completed booking receipt points at.
-  const booking = await pool.query(
-    `SELECT 1 FROM public_guest_booking_receipts
-      WHERE credential_id=$1 AND clinic_id=$2 AND completed_at IS NOT NULL`,
+  // The class is the stored column; the completed booking receipt join is a
+  // cross-check and must agree with it.
+  const klass = await pool.query<{
+    credential_class: string;
+    has_receipt: boolean;
+  }>(
+    `SELECT credential.credential_class,
+            EXISTS (SELECT 1 FROM public_guest_booking_receipts receipt
+                     WHERE receipt.credential_id=credential.id
+                       AND receipt.clinic_id=credential.clinic_id
+                       AND receipt.completed_at IS NOT NULL) AS has_receipt
+       FROM guest_credentials credential
+      WHERE credential.id=$1 AND credential.clinic_id=$2`,
     [credentialId, target.clinicId],
   );
-  const isBooking = (booking.rowCount ?? 0) > 0;
+  const row = klass.rows[0];
+  if (!row) throw new GuestAccessRejectedError();
+  const isBooking = row.credential_class === 'booking';
+  if (isBooking !== row.has_receipt) throw new GuestAccessRejectedError();
   if (isBooking !== (bearer !== null)) throw new GuestAccessRejectedError();
 
   return {
