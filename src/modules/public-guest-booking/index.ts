@@ -305,6 +305,27 @@ async function loadCompletedBooking(
   };
 }
 
+/**
+ * Pool-level form of the receipt scrub so the TAB-P0-15 retention sweep can
+ * run it without constructing the booking service (no selection secrets).
+ */
+export async function scrubExpiredBookingReceipts(
+  pool: Pool,
+  now: Date,
+): Promise<number> {
+  const result = await pool.query(
+    `UPDATE public_guest_booking_receipts receipt
+        SET access_ciphertext = NULL, scrubbed_at = $1
+       FROM guest_credentials credential
+      WHERE credential.id = receipt.credential_id
+        AND credential.clinic_id = receipt.clinic_id
+        AND receipt.access_ciphertext IS NOT NULL
+        AND (credential.expires_at <= $1 OR credential.revoked_at IS NOT NULL)`,
+    [now],
+  );
+  return result.rowCount ?? 0;
+}
+
 export class PublicGuestBookingService {
   constructor(
     private readonly pool: Pool,
@@ -322,18 +343,7 @@ export class PublicGuestBookingService {
    * re-booking.
    */
   async scrubExpiredReceipts(): Promise<number> {
-    const now = this.clock();
-    const result = await this.pool.query(
-      `UPDATE public_guest_booking_receipts receipt
-          SET access_ciphertext = NULL, scrubbed_at = $1
-         FROM guest_credentials credential
-        WHERE credential.id = receipt.credential_id
-          AND credential.clinic_id = receipt.clinic_id
-          AND receipt.access_ciphertext IS NOT NULL
-          AND (credential.expires_at <= $1 OR credential.revoked_at IS NOT NULL)`,
-      [now],
-    );
-    return result.rowCount ?? 0;
+    return scrubExpiredBookingReceipts(this.pool, this.clock());
   }
 
   async book(
