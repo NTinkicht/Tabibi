@@ -5,6 +5,7 @@ import {
   lockActiveAccountDependentForOperation,
 } from '@/modules/account-dependent';
 import { appendAuditEvent } from '@/modules/audit';
+import { NotificationOutboxRepository } from '@/modules/notification-outbox';
 import { type ClinicScope, requireClinicRole } from '@/modules/identity';
 import { inTransaction } from '@/platform/database/transaction';
 
@@ -384,6 +385,23 @@ export class AppointmentService {
           idempotencyKey: input.idempotencyKey,
         },
       });
+      // Atomic base outbox intent: committed with the appointment, queue
+      // entry, audit event and receipt, or not at all. Payload is locale only.
+      await NotificationOutboxRepository.enqueueNextVersionInTransaction(
+        client,
+        {
+          clinicId: scope.clinicId,
+          queueEntryId: entryId,
+          logicalTargetKey: `queue-entry:${entryId}`,
+          eventKey: 'appointment_confirmed',
+          idempotencyKey: `appointment-event:${createHash('sha256')
+            .update(
+              `${scope.clinicId}:${scope.actorUserId}:${input.idempotencyKey}`,
+            )
+            .digest('hex')}`,
+          payload: { locale: patient.preferred_locale },
+        },
+      );
       await client.query(
         `INSERT INTO appointment_booking_receipts
            (clinic_id, actor_user_id, idempotency_key, request_fingerprint, appointment_id)
