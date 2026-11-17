@@ -3,6 +3,7 @@ import { purgeExpiredGuestExchangeArtifacts } from '@/modules/guest-access/reten
 import { purgeExpiredVisitInboxItems } from '@/modules/notification-inbox/retention';
 import { purgeExpiredPatientAuthArtifacts } from '@/modules/identity/patient-auth-retention';
 import { scrubExpiredBookingReceipts } from '@/modules/public-guest-booking';
+import { purgeStaleGuestRateLimitBuckets } from '@/modules/guest-access/rate-limit-retention';
 import { purgeStaleSignInRateLimitBuckets } from '@/modules/identity/rate-limit-retention';
 import { purgeExpiredStaffAuthArtifacts } from '@/modules/identity/staff-auth-retention';
 
@@ -14,6 +15,7 @@ export type RetentionTaskName =
   | 'patient_auth'
   | 'staff_auth'
   | 'sign_in_rate_limit'
+  | 'guest_rate_limit'
   | 'guest_exchange'
   | 'booking_receipt_scrub'
   | 'visit_inbox';
@@ -42,6 +44,7 @@ export async function runRetentionSweep(
       async () => sum({ ...(await purgeExpiredStaffAuthArtifacts(pool, now)) }),
     ],
     ['sign_in_rate_limit', () => purgeStaleSignInRateLimitBuckets(pool, now)],
+    ['guest_rate_limit', () => purgeStaleGuestRateLimitBuckets(pool, now)],
     [
       'guest_exchange',
       async () =>
