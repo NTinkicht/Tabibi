@@ -1,0 +1,86 @@
+/* TAB-P1-05 statistics page. Tokens + logical properties only. */
+.st {
+  max-inline-size: var(--tb-max-width);
+  margin-inline: auto;
+  padding-block: var(--tb-space-8);
+  padding-inline: var(--tb-gutter);
+}
+.st-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tb-space-6);
+}
+.st-header a {
+  color: var(--tb-info);
+  font-weight: 600;
+}
+.st h1 {
+  font-size: var(--tb-text-title);
+}
+.st h2 {
+  font-size: var(--tb-text-section);
+}
+.st-window {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--tb-space-6);
+  margin-block: var(--tb-space-6);
+}
+.st-window label {
+  display: grid;
+  gap: var(--tb-space-2);
+  color: var(--tb-text-secondary);
+  font-size: var(--tb-text-meta);
+}
+.st-error {
+  color: var(--tb-danger);
+}
+.st-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--tb-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.st-totals li {
+  padding: var(--tb-space-5) var(--tb-space-6);
+  border: 1px solid var(--tb-border);
+  border-radius: var(--tb-radius-card);
+  background: var(--tb-surface);
+}
+.st-totals strong {
+  display: block;
+  font-size: var(--tb-text-title);
+}
+.st-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--tb-border);
+  border-radius: var(--tb-radius-card);
+  background: var(--tb-surface);
+}
+.st-table {
+  inline-size: 100%;
+  min-inline-size: 640px;
+  border-collapse: collapse;
+}
+.st-table th,
+.st-table td {
+  padding: var(--tb-space-4) var(--tb-space-6);
+  border-block-end: 1px solid var(--tb-divider);
+  text-align: start;
+}
+.st-table th {
+  background: var(--tb-surface-subtle);
+  color: var(--tb-text-secondary);
+  font-size: var(--tb-text-meta);
+  font-weight: 600;
+}
+.st-note {
+  margin-block-start: var(--tb-space-8);
+  color: var(--tb-text-muted);
+  font-size: var(--tb-text-meta);
+}
