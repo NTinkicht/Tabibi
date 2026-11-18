@@ -6,6 +6,7 @@ import { scrubExpiredBookingReceipts } from '@/modules/public-guest-booking';
 import { purgeStaleGuestRateLimitBuckets } from '@/modules/guest-access/rate-limit-retention';
 import { purgeStaleSignInRateLimitBuckets } from '@/modules/identity/rate-limit-retention';
 import { purgeRevokedPushBindings } from '@/modules/guest-push/retention';
+import { purgeExpiredGuestCheckInOperations } from '@/modules/public-guest-booking-check-in/retention';
 import { purgeExpiredStaffAuthArtifacts } from '@/modules/identity/staff-auth-retention';
 
 // TAB-P0-15 retention runner. Each purge function deletes at most one bounded
@@ -20,7 +21,8 @@ export type RetentionTaskName =
   | 'guest_exchange'
   | 'booking_receipt_scrub'
   | 'visit_inbox'
-  | 'push_binding';
+  | 'push_binding'
+  | 'guest_check_in_operation';
 
 export interface RetentionSweepResult {
   /** Rows deleted per task that completed. */
@@ -55,6 +57,10 @@ export async function runRetentionSweep(
     ['booking_receipt_scrub', () => scrubExpiredBookingReceipts(pool, now)],
     ['visit_inbox', () => purgeExpiredVisitInboxItems(pool, now)],
     ['push_binding', () => purgeRevokedPushBindings(pool, now)],
+    [
+      'guest_check_in_operation',
+      () => purgeExpiredGuestCheckInOperations(pool, now),
+    ],
   ];
   const result: RetentionSweepResult = { deleted: {}, failed: [] };
   for (const [name, run] of tasks) {
