@@ -4,7 +4,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 
 ## Method and limits
 
-- Baseline: `main` at `7450a943` (PR #738; #739 merged afterwards, so TAB-P0-01 cites it). Latest green `CI` run on that commit: `41414559219` (format, lint, typecheck, unit+api, build, PostgreSQL integration, recovery rehearsal, clinic-day load, full Playwright suite).
+- Baseline: `main` at `7450a943` (PR #738; #739 merged afterwards, so TAB-P0-01 cites it). Latest green `CI` run on that commit: `41414559219` (format, lint, typecheck, unit+api, build, PostgreSQL integration, recovery rehearsal, clinic-day load, full Playwright suite). Reconciled on 2026-11-21 against `main` at `f5bec4df` (#974) for TAB-P0-06, TAB-P0-14 and TAB-P0-15 only; other rows keep the original baseline.
 - Each evidence line is machine-checkable: `node scripts/verify-p0-evidence-matrix.mjs` fails if a cited `src:` path or `test:` file/title no longer exists. `npm run test:unit` runs the same check (`tests/unit/p0-evidence-matrix.test.ts`).
 - Verdicts: COVERED = implementation and a requirement-specific test were both located and the test title matches the criterion; PARTIAL = part of the criterion is evidenced or only indirectly; MISSING = no implementation or test found. A document alone never yields COVERED. Test bodies were located, not re-derived line by line; the green `main` run is the execution evidence.
 - Independent review: every cited PR was approved by `ntk-reviewer[bot]` on its exact merged head (listed as `pr:`). PRs older than the cited ones (WU1..WU190 era) were not individually audited here and are marked `review: not audited`.
@@ -58,7 +58,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Idempotency conflict and terminal session rejection | src: src/modules/appointment/index.ts | test: tests/integration/appointment-booking.test.ts :: "rejects conflicting idempotency reuse, foreign patients, terminal sessions" | pr: review: not audited
 - [COVERED] Guest booking replay, rollback and convergence | src: src/modules/public-guest-booking/index.ts, db/migrations/0027_public_guest_booking.sql | test: tests/integration/public-guest-booking.test.ts :: "converges concurrent equivalents and rolls back every row after a late failure" | pr: #618 (ntk-reviewer APPROVED 1ae9c9463af7)
 - [COVERED] Receipt credential binding (authentic ciphertext swap) | src: src/modules/public-guest-booking/index.ts | test: tests/integration/public-guest-booking.test.ts :: "creates one privacy-safe booking and replays the same usable capability" | pr: #618 (ntk-reviewer APPROVED 1ae9c9463af7)
-- [PARTIAL] Ciphertext cleanup/retention of replay receipts (PRODUCT.md forbids claiming a scrubber exists; none found in src) | src: src/modules/public-guest-booking/index.ts | pr: review: not audited
+- [COVERED] Replay-receipt ciphertext is scrubbed only after its guest credential expires or is revoked, idempotently, and the retention sweep runs it | src: src/modules/public-guest-booking/index.ts, src/modules/maintenance | test: tests/integration/public-guest-booking.test.ts :: "scrubs replay ciphertext only after the credential expires or is revoked"; tests/unit/retention-sweep.test.ts :: "booking_receipt_scrub" | pr: #938 (merged; reviewer not audited)
 
 ## TAB-P0-07 Staff arrival, no-show, transfer, priority
 
@@ -120,7 +120,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 
 - [COVERED] Arabic mobile queue view recovers from stale conflict and switches to French | src: src/modules/localization | test: tests/e2e/queue-rtl-mobile.spec.ts :: "mobile Arabic queue view reloads safely after a stale reorder conflict and can switch back to F" | pr: review: not audited
 - [COVERED] Receptionist keyboard/bilingual accessibility | src: src/app/operations | test: tests/e2e/receptionist-bilingual-accessibility.spec.ts :: "receptionist queue stays clinic-scoped, private, bilingual, and keyboard operable" | pr: review: not audited
-- [PARTIAL] Doctor flows in both languages: no doctor-facing Playwright journey was located | src: src/app/operations | pr: none
+- [COVERED] Doctor-facing Playwright journey in French and Arabic RTL (complete, call next, delay declare/update/clear, rejected command leaves the screen unchanged) | src: src/app/operations | test: tests/e2e/doctor-view.spec.ts :: "doctor view: complete, call next, start each issue exactly one command"; tests/e2e/doctor-view.spec.ts :: "doctor view renders RTL in Arabic"; tests/e2e/doctor-view.spec.ts :: "doctor view: delay stepper declares, updates and clears, and stops at the maximum" | pr: review: not audited
 - [PARTIAL] Screen-reader label and viewport-width coverage is per-spec, not asserted as a matrix | src: src/app | test: tests/e2e/find-doctor.spec.ts :: "an API error offers a retry that recovers" | pr: review: not audited
 
 ## TAB-P0-15 Privacy/tenant security, migrations, release assurance
@@ -129,9 +129,9 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 - [COVERED] Recovery rehearsal is opt-in and refuses production | src: scripts/db | test: tests/unit/recovery-rehearsal.test.ts :: "requires explicit opt-in and refuses production mode" | pr: review: not audited
 - [COVERED] Two-clinic isolation under a synthetic clinic day | src: src/modules/queue/index.ts | test: tests/integration/release-clinic-day-isolation.test.ts :: "progresses two real clinic queues independently and rejects cross-clinic mutation" | pr: review: not audited
 - [COVERED] Container image never bakes secrets | src: Dockerfile | test: tests/unit/container-image.test.ts :: "never sets a value on a secret-looking ENV or ARG" | pr: #736 (ntk-reviewer APPROVED d89d5fea3f06)
-- [PARTIAL] Threat model is a delta document (`docs/release/release-threat-model-delta.md`); no penetration checklist or rollback drill was located | src: docs/release/release-threat-model-delta.md | pr: none
+- [PARTIAL] Threat model delta, a penetration checklist whose cited paths are machine-checked, and a cutover/rollback runbook exist; no executed forward/rollback migration drill result is recorded | src: docs/release/release-threat-model-delta.md, docs/release/penetration-checklist.md, docs/release/deployment-cutover-rollback-runbook.md | test: tests/unit/penetration-checklist.test.ts :: "only cites paths that exist in the repository" | pr: #922 (merged; reviewer not audited)
 - [MISSING] Secret scan in CI (only `npm audit` found in `.github/workflows/ci.yml`) | src: .github/workflows/ci.yml | pr: none
-- [PARTIAL] Inspection of notification ciphertext at rest and post-terminal scrub: database-level constraint and scrub are tested, but no release-time inspection procedure over a real database was located | src: src/modules/guest-access/link-intents.ts | test: tests/integration/guest-link-intents.test.ts :: "stores only envelope ciphertext, never the plaintext material" | pr: #744 (merged; reviewer not audited)
+- [PARTIAL] Inspection of notification ciphertext at rest and post-terminal scrub: database-level constraint and scrub are tested, but the release-time inspection step is written in `docs/release/penetration-checklist.md` but no executed inspection over a real database is recorded | src: src/modules/guest-access/link-intents.ts, docs/release/penetration-checklist.md | test: tests/integration/guest-link-intents.test.ts :: "stores only envelope ciphertext, never the plaintext material" | pr: #744 (merged; reviewer not audited)
 
 ## Proposed status per row (owner decides; nothing here edits PRODUCT.md)
 
@@ -142,7 +142,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 | TAB-P0-03 | VERIFY | all COVERED; review evidence present for recent PRs only |
 | TAB-P0-04 | VERIFY | all COVERED; ready once P0-01..03 pass |
 | TAB-P0-05 | VERIFY | one PARTIAL (outbox atomicity per transition) |
-| TAB-P0-06 | VERIFY | receipt cleanup PARTIAL |
+| TAB-P0-06 | VERIFY | all COVERED incl. receipt scrub (#938); review of pre-#600 PRs not audited |
 | TAB-P0-07 | VERIFY | restore races COVERED (#759, restore-versus-call #761); priority move vs call/cancel races COVERED (#763) |
 | TAB-P0-08 | VERIFY | envelope intents COVERED (#742); status-cookie cross-class negatives PARTIAL, review of pre-#600 PRs not audited |
 | TAB-P0-09 | VERIFY | COVERED; review evidence not audited |
@@ -150,8 +150,8 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 | TAB-P0-11 | VERIFY | COVERED with review evidence on #705/#709/#714/#716 |
 | TAB-P0-12 | VERIFY | all criteria COVERED incl. #748 grace test; review of pre-#600 PRs not audited |
 | TAB-P0-13 | VERIFY | scrub and dispatch worker COVERED (#744, #746); external provider and escalation PARTIAL |
-| TAB-P0-14 | VERIFY | doctor flows PARTIAL |
-| TAB-P0-15 | VERIFY | secret scan MISSING; ciphertext inspection procedure PARTIAL |
+| TAB-P0-14 | VERIFY | doctor journey COVERED; screen-reader/viewport matrix PARTIAL |
+| TAB-P0-15 | VERIFY | secret scan MISSING (CI workflow is a protected path); executed rollback drill and ciphertext inspection PARTIAL |
 
 No row is proposed as VERIFIED: the protocol also requires per-row independent review of the full implementing history, which this matrix could only confirm for the recent PRs listed.
 
@@ -159,7 +159,7 @@ No row is proposed as VERIFIED: the protocol also requires per-row independent r
 
 1. (done: #742) Envelope-encrypted exchange-link outbox intents with AAD binding (P0-08).
 2. (done: #744, #746; external provider and escalation remain, see owner decision #730) Ciphertext scrub and provider worker lifecycle (P0-13).
-3. Secret scan in CI and penetration checklist (P0-15).
-4. Doctor-facing bilingual Playwright journey (P0-14).
+3. (penetration checklist done: #922; secret scan in CI remains, protected `.github/**` path) Secret scan in CI (P0-15).
+4. (done: `tests/e2e/doctor-view.spec.ts`) Doctor-facing bilingual Playwright journey (P0-14).
 5. (15-minute grace done: #748; restore-vs-cancel and priority-vs-transfer done: #759; restore-vs-call done: #761) Named restore race and terminal-grace tests (P0-07, P0-12).
-6. Replay-receipt ciphertext retention/scrub audit (P0-06).
+6. (done: #937, #938) Replay-receipt ciphertext retention/scrub audit (P0-06).
