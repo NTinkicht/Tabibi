@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const book = vi.fn();
+const withinBudget = vi.fn();
+
+vi.mock('@/platform/http/public-booking-rate-limit', () => ({
+  PUBLIC_BOOKING_RETRY_AFTER_SECONDS: 900,
+  withinPublicBookingBudget: (...args: unknown[]) => withinBudget(...args),
+}));
 
 vi.mock('@/modules/public-availability-selection', () => ({
   PublicAvailabilitySelectionService: class {},
@@ -54,6 +60,8 @@ function request(
 describe('POST /api/public/bookings', () => {
   beforeEach(() => {
     book.mockReset();
+    withinBudget.mockReset();
+    withinBudget.mockResolvedValue(true);
     process.env.PUBLIC_AVAILABILITY_SELECTION_SECRET =
       'wu59-route-test-secret-that-is-deliberately-long-enough';
   });
@@ -88,6 +96,32 @@ describe('POST /api/public/bookings', () => {
       guestBearer: 'opaque-guest-bearer',
       guestAccessExpiresAt: '2099-03-02T00:00:00.000Z',
     });
+  });
+
+  it('answers 429 with retry-after and never books when the abuse budget is exhausted', async () => {
+    withinBudget.mockResolvedValue(false);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('900');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toEqual({
+      status: 'rate_limited',
+      requestId: 'wu59-route-request-1',
+    });
+    expect(book).not.toHaveBeenCalled();
+    expect(withinBudget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectionReference: validBody.selectionReference,
+        contactPhone: validBody.contactPhone,
+      }),
+    );
+  });
+
+  it('does not spend budget on malformed requests', async () => {
+    await POST(request({ ...validBody, clinicId: 'private-id' }));
+    expect(withinBudget).not.toHaveBeenCalled();
   });
 
   it('rejects malformed bodies and unsafe idempotency keys before booking', async () => {
