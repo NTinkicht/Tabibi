@@ -7,6 +7,10 @@ import {
 } from '@/modules/public-guest-booking';
 import { getPool } from '@/platform/database/pool';
 import {
+  PUBLIC_BOOKING_RETRY_AFTER_SECONDS,
+  withinPublicBookingBudget,
+} from '@/platform/http/public-booking-rate-limit';
+import {
   correlationPattern,
   observedJson,
 } from '@/platform/http/request-context';
@@ -45,6 +49,7 @@ function rejected(requestId: string): { body: unknown; status: number } {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  let rateLimited = false;
   const response = await observedJson(request, async (requestId) => {
     const idempotencyKey = request.headers.get('idempotency-key');
     if (!idempotencyKey || !correlationPattern.test(idempotencyKey)) {
@@ -60,6 +65,14 @@ export async function POST(request: Request): Promise<Response> {
 
     const parsed = bodySchema.safeParse(rawBody);
     if (!parsed.success) return rejected(requestId);
+
+    if (!(await withinPublicBookingBudget(parsed.data))) {
+      rateLimited = true;
+      return {
+        body: { status: 'rate_limited', requestId },
+        status: 429,
+      };
+    }
 
     try {
       const pool = getPool();
@@ -99,6 +112,12 @@ export async function POST(request: Request): Promise<Response> {
 
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
     response.headers.set(name, value);
+  }
+  if (rateLimited) {
+    response.headers.set(
+      'retry-after',
+      String(PUBLIC_BOOKING_RETRY_AFTER_SECONDS),
+    );
   }
   return response;
 }

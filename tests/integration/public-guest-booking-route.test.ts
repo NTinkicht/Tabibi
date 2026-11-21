@@ -6,6 +6,10 @@ import { POST as guestBookingRoute } from '@/app/api/public/bookings/route';
 import { GuestAccessService } from '@/modules/guest-access';
 import { PublicAvailabilitySelectionService } from '@/modules/public-availability-selection';
 import { closePool } from '@/platform/database/pool';
+import {
+  PUBLIC_BOOKING_CONTACT_LIMIT,
+  PUBLIC_BOOKING_SELECTION_LIMIT,
+} from '@/platform/http/public-booking-rate-limit';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 8 });
 const selectionSecret =
@@ -14,7 +18,7 @@ const selectionSecret =
 beforeAll(async () => migrate());
 beforeEach(async () => {
   process.env.PUBLIC_AVAILABILITY_SELECTION_SECRET = selectionSecret;
-  await pool.query(`TRUNCATE public_guest_booking_receipts, guest_credentials, guest_exchange_ids,
+  await pool.query(`TRUNCATE staff_sign_in_rate_limit_buckets, public_guest_booking_receipts, guest_credentials, guest_exchange_ids,
     audit_events, queue_reorder_receipts, queue_command_receipts, queue_registration_receipts,
     appointments, appointment_booking_receipts, queue_entries, patient_operational_records,
     session_command_receipts, consultation_sessions, schedule_templates,
@@ -269,5 +273,70 @@ describe('public guest booking HTTP route', () => {
     await expect(inactiveClinic.json()).resolves.toEqual(expected);
 
     expect(await counts()).toEqual(zeroCounts);
+  });
+
+  it('throttles one contact across selections but still serves another contact', async () => {
+    const seeded = await seed();
+    const statuses: number[] = [];
+    for (let i = 0; i < PUBLIC_BOOKING_CONTACT_LIMIT + 2; i += 1) {
+      const response = await guestBookingRoute(
+        postRequest(body(seeded.reference, { contactEmail: null }), {
+          'idempotency-key': `route-throttle-${i}`,
+        }),
+      );
+      statuses.push(response.status);
+    }
+    // Positive control: attempts inside the budget are never throttled.
+    expect(statuses.slice(0, PUBLIC_BOOKING_CONTACT_LIMIT)).not.toContain(429);
+    expect(statuses.slice(PUBLIC_BOOKING_CONTACT_LIMIT)).toEqual([429, 429]);
+
+    const throttled = await guestBookingRoute(
+      postRequest(body(seeded.reference, { contactEmail: null }), {
+        'idempotency-key': 'route-throttle-after',
+      }),
+    );
+    expect(throttled.status).toBe(429);
+    expect(throttled.headers.get('retry-after')).toBe('900');
+    expect(await throttled.json()).toMatchObject({ status: 'rate_limited' });
+
+    // A different contact on the same selection is not locked out by it.
+    const other = await guestBookingRoute(
+      postRequest(
+        body(seeded.reference, {
+          contactPhone: '+213555090909',
+          contactEmail: null,
+        }),
+        { 'idempotency-key': 'route-throttle-other' },
+      ),
+    );
+    expect(other.status).not.toBe(429);
+
+    // Only digests are stored, never the contact value or the reference.
+    const buckets = await pool.query<{ bucket_key: string }>(
+      `SELECT bucket_key FROM staff_sign_in_rate_limit_buckets`,
+    );
+    expect(buckets.rows.length).toBeGreaterThan(0);
+    for (const row of buckets.rows) {
+      expect(row.bucket_key).not.toContain('213555020202');
+      expect(row.bucket_key).not.toContain(seeded.reference);
+    }
+  });
+
+  it('throttles repeated attempts against one selection reference', async () => {
+    const seeded = await seed();
+    let first429 = -1;
+    for (let i = 0; i < PUBLIC_BOOKING_SELECTION_LIMIT + 1; i += 1) {
+      const response = await guestBookingRoute(
+        postRequest(
+          body(seeded.reference, {
+            contactPhone: `+2135550${String(10000 + i)}`,
+            contactEmail: null,
+          }),
+          { 'idempotency-key': `route-selection-${i}` },
+        ),
+      );
+      if (response.status === 429 && first429 < 0) first429 = i;
+    }
+    expect(first429).toBe(PUBLIC_BOOKING_SELECTION_LIMIT);
   });
 });
