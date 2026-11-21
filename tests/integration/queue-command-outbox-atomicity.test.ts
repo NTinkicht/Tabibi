@@ -5,6 +5,7 @@ import { migrate } from '../../scripts/db/lib';
 import { QueueInAppNotificationTargetResolver } from '@/modules/notification-domain/queue-in-app-target-resolver';
 import type { NotificationIntent } from '@/modules/notification-outbox';
 import { QueueService } from '@/modules/queue';
+import { QUEUE_COMMANDS } from '@/modules/queue/lifecycle-contract';
 import { QueueRestoreService } from '@/modules/queue/restore';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 6 });
@@ -145,6 +146,65 @@ describe('queue command outbox atomicity', () => {
     expect(retry).toEqual(first);
     expect(await intents()).toHaveLength(1);
   });
+
+  // TAB-P0-05 (#979): every transition, not only call. Each command is driven
+  // through its legal predecessor path, then retried with the same key.
+  const PATH: Record<string, string[]> = {
+    check_in: [],
+    call: ['check_in'],
+    no_show: ['check_in'],
+    cancel: ['check_in'],
+    start_consultation: ['check_in', 'call'],
+    complete_consultation: ['check_in', 'call', 'start_consultation'],
+  };
+  const EXPECTED_INTENTS: Record<string, number> = {
+    check_in: 0,
+    call: 1,
+    no_show: 0,
+    cancel: 1,
+    start_consultation: 0,
+    complete_consultation: 0,
+  };
+
+  it('covers every queue command in the per-transition table', () => {
+    expect(Object.keys(PATH).sort()).toEqual([...QUEUE_COMMANDS].sort());
+    expect(Object.keys(EXPECTED_INTENTS).sort()).toEqual(
+      [...QUEUE_COMMANDS].sort(),
+    );
+  });
+
+  it.each([...QUEUE_COMMANDS])(
+    'exact retry of %s replays the receipt and adds no audit, receipt or intent',
+    async (command) => {
+      for (const step of PATH[command]!) {
+        await run(step as never, entries[0]!, `pre-${step}`);
+      }
+      await pool.query('TRUNCATE notification_outbox CASCADE');
+      const count = async (table: string) =>
+        (await pool.query(`SELECT count(*)::int AS n FROM ${table}`)).rows[0]
+          .n as number;
+      const extra =
+        command === 'cancel'
+          ? { reason: 'patient left', cancellationSource: 'clinic' as const }
+          : command === 'no_show'
+            ? { reason: 'did not appear' }
+            : {};
+      const auditBefore = await count('audit_events');
+      const receiptsBefore = await count('queue_command_receipts');
+      const first = await run(command, entries[0]!, `key-${command}`, extra);
+      // Positive control: the first execution did write audit and receipt.
+      expect(await count('audit_events')).toBeGreaterThan(auditBefore);
+      expect(await count('queue_command_receipts')).toBe(receiptsBefore + 1);
+      const auditAfter = await count('audit_events');
+      const intentsAfter = (await intents()).length;
+      expect(intentsAfter).toBe(EXPECTED_INTENTS[command]);
+      const retry = await run(command, entries[0]!, `key-${command}`, extra);
+      expect(retry).toEqual(first);
+      expect(await count('audit_events')).toBe(auditAfter);
+      expect(await count('queue_command_receipts')).toBe(receiptsBefore + 1);
+      expect((await intents()).length).toBe(intentsAfter);
+    },
+  );
 
   it('rolls back state, audit, receipt and outbox when the outbox write fails', async () => {
     await run('check_in', entries[0]!, 'ci-0');
