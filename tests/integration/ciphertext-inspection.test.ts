@@ -196,4 +196,31 @@ describe('release-time ciphertext-at-rest inspection (TAB-P0-15)', () => {
     expect(report.guestLinkIntents.malformedCiphertext).toBe(1);
     expect(report.bookingReceipts.malformedCiphertext).toBe(1);
   });
+
+  it('flags envelopes whose separators are not literal dots', async () => {
+    const { clinicId, queueEntryId } = await bookOne();
+    const store = new GuestLinkIntentStore(
+      pool,
+      new GuestLinkEnvelope('x'.repeat(48), () => now),
+      () => now,
+    );
+    await store.create({
+      clinicId,
+      queueEntryId,
+      intent: 'initial',
+      material: MATERIAL,
+      exchangeExpiresAt: new Date(now.getTime() + 5 * 60 * 1000),
+    });
+    const body = `${'a'.repeat(16)}Y${'b'.repeat(32)}Z${'c'.repeat(22)}`;
+    await pool.query(`UPDATE guest_link_intents SET envelope_ciphertext = $1`, [
+      `gle1X${body}`,
+    ]);
+    await pool.query(
+      `UPDATE public_guest_booking_receipts SET access_ciphertext = $1`,
+      [`v1X${body}`],
+    );
+    const report = await inspectCiphertextAtRest(pool, now);
+    expect(report.guestLinkIntents.malformedCiphertext).toBe(1);
+    expect(report.bookingReceipts.malformedCiphertext).toBe(1);
+  });
 });

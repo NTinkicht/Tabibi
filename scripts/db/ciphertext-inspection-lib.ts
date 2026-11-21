@@ -27,10 +27,8 @@ export interface CiphertextInspectionReport {
 }
 
 // 12-byte IV = 16 base64url chars; 16-byte GCM tag = 22 chars (as the readers require).
-const INTENT_ENVELOPE =
-  '^gle1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{22}$';
-const RECEIPT_ENVELOPE =
-  '^v1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{22}$';
+const INTENT_ENVELOPE = String.raw`^gle1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{22}$`;
+const RECEIPT_ENVELOPE = String.raw`^v1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{22}$`;
 
 export async function inspectCiphertextAtRest(
   pool: Pick<Pool, 'query'>,
