@@ -26,6 +26,7 @@
     "db:bootstrap-admin": "tsx scripts/db/bootstrap-clinic-admin.ts",
     "db:seed": "tsx scripts/db/seed.ts",
     "db:reset:test": "tsx scripts/db/reset-test.ts",
+    "db:inspect-ciphertext": "tsx scripts/db/inspect-ciphertext.ts",
     "db:rehearse-recovery": "tsx scripts/db/rehearse-backup-restore.ts",
     "db:clinic-day-load": "tsx scripts/load/clinic-day.ts",
     "worker:retention": "tsx scripts/worker/retention-sweep.ts",
