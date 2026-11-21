@@ -5,6 +5,7 @@ import '../staff/sign-in/sign-in.css';
 import './account.css';
 import { Button } from '@/app/ui';
 import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
+import { PasswordChangeForm } from './password-change-form';
 import { accountStrings, type AccountLocale } from './strings';
 
 type Mode = 'signIn' | 'register';
@@ -179,6 +180,7 @@ export function AccountClient({
             >
               {t.signOut}
             </Button>
+            <PasswordChangeForm locale={locale} />
           </div>
         ) : checked ? (
           <>

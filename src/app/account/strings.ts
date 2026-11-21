@@ -25,6 +25,15 @@ export const accountStrings = {
       'Demande reçue. Si l’adresse est valide, vous pouvez maintenant vous connecter.',
     signedInAs: 'Connecté en tant que',
     signOut: 'Se déconnecter',
+    changePasswordTitle: 'Changer le mot de passe',
+    currentPassword: 'Mot de passe actuel',
+    newPassword: 'Nouveau mot de passe',
+    changePassword: 'Changer le mot de passe',
+    passwordChanged:
+      'Mot de passe modifié. Vos autres appareils ont été déconnectés.',
+    wrongCurrent: 'Le mot de passe actuel est incorrect.',
+    policy:
+      'Le nouveau mot de passe est refusé : au moins 12 caractères et différent de votre e-mail.',
     otherLanguage: 'العربية',
   },
   ar: {
@@ -51,6 +60,14 @@ export const accountStrings = {
       'تم استلام الطلب. إن كان العنوان صالحًا يمكنك الآن تسجيل الدخول.',
     signedInAs: 'مسجّل الدخول باسم',
     signOut: 'تسجيل الخروج',
+    changePasswordTitle: 'تغيير كلمة المرور',
+    currentPassword: 'كلمة المرور الحالية',
+    newPassword: 'كلمة المرور الجديدة',
+    changePassword: 'تغيير كلمة المرور',
+    passwordChanged: 'تم تغيير كلمة المرور. تم تسجيل الخروج من أجهزتك الأخرى.',
+    wrongCurrent: 'كلمة المرور الحالية غير صحيحة.',
+    policy:
+      'كلمة المرور الجديدة مرفوضة: 12 حرفًا على الأقل ومختلفة عن بريدك الإلكتروني.',
     otherLanguage: 'Français',
   },
 } as const;

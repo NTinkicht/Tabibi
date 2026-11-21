@@ -11,6 +11,26 @@ async function sessionStatus(page: Page): Promise<number> {
   );
 }
 
+const NEW_PASSWORD = 'another long passphrase value 961';
+
+async function signInStatus(
+  page: Page,
+  email: string,
+  password: string,
+): Promise<number> {
+  return page.evaluate(
+    async ([e, p]) =>
+      (
+        await fetch('/api/patient/session', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ email: e, password: p }),
+        })
+      ).status,
+    [email, password],
+  );
+}
+
 test('account strings have identical keys in both locales', () => {
   expect(Object.keys(accountStrings.fr).sort()).toEqual(
     Object.keys(accountStrings.ar).sort(),
@@ -117,3 +137,77 @@ test('register, sign in, see the name, sign out', async ({ page }) => {
     await pool.end();
   }
 });
+
+for (const locale of ['fr', 'ar'] as const) {
+  test(`password change ${locale}: wrong current and policy refused, success rotates`, async ({
+    page,
+  }) => {
+    const t = accountStrings[locale];
+    const email = `pw-${randomUUID()}@example.test`;
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    try {
+      await page.goto(`/account?locale=${locale}`);
+      const registered = await page.evaluate(
+        async ([e, p]) =>
+          (
+            await fetch('/api/patient/register', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email: e,
+                password: p,
+                displayName: 'Pw Test',
+              }),
+            })
+          ).status,
+        [email, PASSWORD],
+      );
+      expect(registered).toBeLessThan(300);
+      expect(await signInStatus(page, email, PASSWORD)).toBe(200);
+      await page.reload();
+      const panel = page.getByTestId('password-change');
+      await expect(panel).toBeVisible();
+      await expect(page.locator('#account-current-password')).toHaveAttribute(
+        'autocomplete',
+        'current-password',
+      );
+      await expect(page.locator('#account-new-password')).toHaveAttribute(
+        'autocomplete',
+        'new-password',
+      );
+
+      await page.locator('#account-current-password').fill('not the password');
+      await page.locator('#account-new-password').fill(NEW_PASSWORD);
+      await page.getByRole('button', { name: t.changePassword }).click();
+      await expect(page.getByTestId('password-error')).toContainText(
+        t.wrongCurrent,
+      );
+      await expect(page.getByTestId('password-error')).toBeFocused();
+      expect(await signInStatus(page, email, PASSWORD)).toBe(200);
+      expect(await signInStatus(page, email, NEW_PASSWORD)).toBe(401);
+
+      await page.locator('#account-current-password').fill(PASSWORD);
+      await page.locator('#account-new-password').fill('short');
+      await page.getByRole('button', { name: t.changePassword }).click();
+      await expect(page.getByTestId('password-error')).toContainText(t.policy);
+      expect(await signInStatus(page, email, PASSWORD)).toBe(200);
+
+      await page.locator('#account-current-password').fill(PASSWORD);
+      await page.locator('#account-new-password').fill(NEW_PASSWORD);
+      await page.getByRole('button', { name: t.changePassword }).click();
+      await expect(page.getByTestId('password-notice')).toContainText(
+        t.passwordChanged,
+      );
+      await expect(page.locator('#account-new-password')).toHaveValue('');
+      expect(await signInStatus(page, email, PASSWORD)).toBe(401);
+      expect(await signInStatus(page, email, NEW_PASSWORD)).toBe(200);
+      expect(page.url()).not.toContain('password');
+    } finally {
+      await pool.query(
+        `DELETE FROM users WHERE auth_subject = 'patient:' || $1`,
+        [email],
+      );
+      await pool.end();
+    }
+  });
+}
