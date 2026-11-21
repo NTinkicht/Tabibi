@@ -78,9 +78,9 @@ export function ResetClient({
           error?: string;
         };
         return setOutcome(
-          body.error === 'password_policy'
-            ? 'resetPolicy'
-            : 'resetInvalidToken',
+          // Only an explicit invalid_token consumes the form; any other 400
+          // (password_policy, schema invalid_request) leaves the token usable.
+          body.error === 'invalid_token' ? 'resetInvalidToken' : 'resetPolicy',
         );
       }
       setOutcome('unavailable');

@@ -270,6 +270,14 @@ for (const locale of ['fr', 'ar'] as const) {
       await expect.poll(() => page.url()).not.toContain(issued!.token);
       expect(await page.content()).not.toContain(issued!.token);
 
+      // An empty password is rejected by the schema (400 invalid_request):
+      // the form must stay available and the token usable.
+      await page.getByRole('button', { name: t.resetSubmit }).click();
+      await expect(page.getByTestId('reset-error')).toContainText(
+        t.resetPolicy,
+      );
+      await expect(page.locator('#reset-new-password')).toBeVisible();
+
       await page.locator('#reset-new-password').fill('short');
       await page.getByRole('button', { name: t.resetSubmit }).click();
       await expect(page.getByTestId('reset-error')).toContainText(
