@@ -20,6 +20,7 @@ export const accountStrings = {
       'Vérifiez les champs : adresse e-mail valide et mot de passe d’au moins 12 caractères.',
     rateLimited: 'Trop de tentatives. Réessayez plus tard.',
     unavailable: 'Service indisponible. Réessayez dans un instant.',
+    retry: 'Réessayer',
     registered:
       'Demande reçue. Si l’adresse est valide, vous pouvez maintenant vous connecter.',
     signedInAs: 'Connecté en tant que',
@@ -45,6 +46,7 @@ export const accountStrings = {
       'تحقق من الحقول: بريد إلكتروني صالح وكلمة مرور من 12 حرفًا على الأقل.',
     rateLimited: 'محاولات كثيرة. حاول لاحقًا.',
     unavailable: 'الخدمة غير متاحة. حاول بعد قليل.',
+    retry: 'إعادة المحاولة',
     registered:
       'تم استلام الطلب. إن كان العنوان صالحًا يمكنك الآن تسجيل الدخول.',
     signedInAs: 'مسجّل الدخول باسم',

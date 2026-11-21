@@ -53,6 +53,30 @@ for (const [locale, dir] of [
   });
 }
 
+test('session check failure is not shown as signed out and can be retried', async ({
+  page,
+}) => {
+  const t = accountStrings.fr;
+  let calls = 0;
+  await page.route('**/api/patient/session', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    calls += 1;
+    if (calls === 1) return route.fulfill({ status: 503, body: '{}' });
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ account: { displayName: 'Amel' } }),
+    });
+  });
+  await page.goto('/account?locale=fr');
+  await expect(page.getByTestId('account-session-error')).toContainText(
+    t.unavailable,
+  );
+  await expect(page.locator('#account-email')).toHaveCount(0);
+  await page.getByRole('button', { name: t.retry }).click();
+  await expect(page.getByTestId('account-signed-in')).toContainText('Amel');
+});
+
 test('register, sign in, see the name, sign out', async ({ page }) => {
   const email = `account-${randomUUID()}@example.test`;
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });

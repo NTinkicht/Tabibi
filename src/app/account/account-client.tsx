@@ -28,24 +28,36 @@ export function AccountClient({
   const summaryRef = useRef<HTMLDivElement>(null);
   const t = accountStrings[locale];
 
+  const [checkFailed, setCheckFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  // Only a 401 means "signed out". Network errors and 5xx are surfaced with a
+  // retry path so a valid session is never presented as absent.
   useEffect(() => {
     let live = true;
     fetch('/api/patient/session')
       .then(async (response) => {
-        if (!live || !response.ok) return;
+        if (!live) return;
+        if (response.status === 401) {
+          setCheckFailed(false);
+          setChecked(true);
+          return;
+        }
+        if (!response.ok) throw new Error('session-check-failed');
         const body = (await response.json()) as {
           account?: { displayName?: string };
         };
         setAccount(body.account?.displayName ?? '');
+        setCheckFailed(false);
+        setChecked(true);
       })
-      .catch(() => undefined)
-      .finally(() => {
-        if (live) setChecked(true);
+      .catch(() => {
+        if (live) setCheckFailed(true);
       });
     return () => {
       live = false;
     };
-  }, []);
+  }, [attempt]);
 
   useEffect(() => {
     if (failure) summaryRef.current?.focus();
@@ -143,7 +155,18 @@ export function AccountClient({
             <p>{t[failure]}</p>
           </div>
         ) : null}
-        {account !== null ? (
+        {checkFailed ? (
+          <div role="alert" data-testid="account-session-error">
+            <p>{t.unavailable}</p>
+            <Button
+              variant="secondary"
+              className="si-submit"
+              onClick={() => setAttempt((n) => n + 1)}
+            >
+              {t.retry}
+            </Button>
+          </div>
+        ) : account !== null ? (
           <div data-testid="account-signed-in">
             <p className="si-subtitle">
               {t.signedInAs} <strong>{account}</strong>
