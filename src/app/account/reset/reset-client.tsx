@@ -34,8 +34,10 @@ export function ResetClient({
 
   useEffect(() => {
     const fragment = window.location.hash.slice(1);
-    token.current = fragment;
+    // React Strict Mode replays this effect in development: the second run
+    // sees the already-cleared fragment and must not discard the token.
     if (fragment) {
+      token.current = fragment;
       window.history.replaceState(
         null,
         '',
@@ -44,7 +46,7 @@ export function ResetClient({
     }
     // Deferred so the state update is not synchronous inside the effect.
     void Promise.resolve().then(() => {
-      if (!fragment) setOutcome('resetInvalidToken');
+      if (!token.current) setOutcome('resetInvalidToken');
       setReady(true);
     });
   }, []);
