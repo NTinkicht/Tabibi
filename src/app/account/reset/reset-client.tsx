@@ -33,22 +33,36 @@ export function ResetClient({
   const t = accountStrings[locale];
 
   useEffect(() => {
-    const fragment = window.location.hash.slice(1);
-    // React Strict Mode replays this effect in development: the second run
-    // sees the already-cleared fragment and must not discard the token.
-    if (fragment) {
+    // Moves a fragment token into memory and strips it from the address bar.
+    function capture(): boolean {
+      const fragment = window.location.hash.slice(1);
+      if (!fragment) return false;
       token.current = fragment;
       window.history.replaceState(
         null,
         '',
         window.location.pathname + window.location.search,
       );
+      return true;
     }
+    // React Strict Mode replays this effect in development: the second run
+    // sees the already-cleared fragment and must not discard the token.
+    capture();
+    // Pasting a replacement link into this same page changes only the
+    // fragment (no remount): capture it and reset the form state.
+    function onHashChange() {
+      if (capture()) {
+        setOutcome(null);
+        setReady(true);
+      }
+    }
+    window.addEventListener('hashchange', onHashChange);
     // Deferred so the state update is not synchronous inside the effect.
     void Promise.resolve().then(() => {
       if (!token.current) setOutcome('resetInvalidToken');
       setReady(true);
     });
+    return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
   const failed = outcome !== null && outcome !== 'done';

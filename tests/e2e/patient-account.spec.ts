@@ -263,9 +263,11 @@ for (const locale of ['fr', 'ar'] as const) {
       // Issue a real token the way the operator command does.
       const issued = await issuePatientPasswordReset(pool, email);
       expect(issued).not.toBeNull();
-      // A fragment-only change would not reload the page; start fresh.
-      await page.goto('about:blank');
-      await page.goto(`/account/reset?locale=${locale}#${issued!.token}`);
+      // Pasting a replacement link into the same page changes only the
+      // fragment (no reload): the invalid-link screen must recover.
+      await page.evaluate((hash) => {
+        window.location.hash = hash;
+      }, issued!.token);
       await expect(page.locator('#reset-new-password')).toBeVisible();
       await expect.poll(() => page.url()).not.toContain(issued!.token);
       expect(await page.content()).not.toContain(issued!.token);
