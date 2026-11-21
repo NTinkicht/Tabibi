@@ -1,0 +1,33 @@
+/* TAB-P1-01 patient account. Reuses the sign-in card; tokens + logical properties only. */
+.ac-tabs {
+  display: flex;
+  gap: var(--tb-space-2);
+  margin-block-end: var(--tb-space-6);
+}
+.ac-tabs button {
+  flex: 1;
+  min-block-size: var(--tb-touch-target);
+  border: 1px solid var(--tb-border-strong);
+  border-radius: var(--tb-radius-control);
+  background: var(--tb-surface);
+  color: var(--tb-text);
+  font-size: var(--tb-text-control);
+  cursor: pointer;
+}
+.ac-tabs button[aria-pressed='true'] {
+  border-color: var(--tb-primary);
+  background: var(--tb-primary-tint);
+  color: var(--tb-primary-strong);
+  font-weight: 600;
+}
+.ac-notice {
+  margin-block-end: var(--tb-space-6);
+  padding: var(--tb-space-4) var(--tb-space-6);
+  border-radius: var(--tb-radius-tile);
+  background: var(--tb-primary-wash);
+  color: var(--tb-primary-strong);
+}
+.si-field small {
+  color: var(--tb-text-muted);
+  font-size: var(--tb-text-meta);
+}
