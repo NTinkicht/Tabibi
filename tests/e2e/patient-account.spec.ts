@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { Pool } from 'pg';
 import { accountStrings } from '@/app/account/strings';
+import { issuePatientPasswordReset } from '@/modules/identity/patient-recovery';
 
 const PASSWORD = 'correct horse battery staple 959';
 
@@ -202,6 +203,86 @@ for (const locale of ['fr', 'ar'] as const) {
       expect(await signInStatus(page, email, PASSWORD)).toBe(401);
       expect(await signInStatus(page, email, NEW_PASSWORD)).toBe(200);
       expect(page.url()).not.toContain('password');
+    } finally {
+      await pool.query(
+        `DELETE FROM users WHERE auth_subject = 'patient:' || $1`,
+        [email],
+      );
+      await pool.end();
+    }
+  });
+}
+
+for (const locale of ['fr', 'ar'] as const) {
+  test(`password reset link ${locale}: fragment removed, bad token neutral, policy keeps token, success signs in`, async ({
+    page,
+  }) => {
+    const t = accountStrings[locale];
+    const email = `reset-${randomUUID()}@example.test`;
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    try {
+      await page.goto(`/account?locale=${locale}`);
+      const registered = await page.evaluate(
+        async ([e, p]) =>
+          (
+            await fetch('/api/patient/register', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email: e,
+                password: p,
+                displayName: 'Reset Test',
+              }),
+            })
+          ).status,
+        [email, PASSWORD],
+      );
+      expect(registered).toBeLessThan(300);
+
+      // No token, or a query-string token: neutral refusal, no form.
+      await page.goto(`/account/reset?locale=${locale}&token=abc`);
+      await expect(page.getByTestId('patient-reset')).toHaveAttribute(
+        'lang',
+        locale,
+      );
+      await expect(page.getByTestId('reset-error')).toContainText(
+        t.resetInvalidToken,
+      );
+      await expect(page.locator('#reset-new-password')).toHaveCount(0);
+
+      // A well-formed but unknown token is refused with the same message.
+      const unknown = randomBytes(32).toString('base64url');
+      await page.goto(`/account/reset?locale=${locale}#${unknown}`);
+      await page.locator('#reset-new-password').fill(NEW_PASSWORD);
+      await page.getByRole('button', { name: t.resetSubmit }).click();
+      await expect(page.getByTestId('reset-error')).toContainText(
+        t.resetInvalidToken,
+      );
+      await expect(page.getByTestId('reset-error')).toBeFocused();
+
+      // Issue a real token the way the operator command does.
+      const issued = await issuePatientPasswordReset(pool, email);
+      expect(issued).not.toBeNull();
+      // A fragment-only change would not reload the page; start fresh.
+      await page.goto('about:blank');
+      await page.goto(`/account/reset?locale=${locale}#${issued!.token}`);
+      await expect(page.locator('#reset-new-password')).toBeVisible();
+      await expect.poll(() => page.url()).not.toContain(issued!.token);
+      expect(await page.content()).not.toContain(issued!.token);
+
+      await page.locator('#reset-new-password').fill('short');
+      await page.getByRole('button', { name: t.resetSubmit }).click();
+      await expect(page.getByTestId('reset-error')).toContainText(
+        t.resetPolicy,
+      );
+      expect(await signInStatus(page, email, PASSWORD)).toBe(200);
+
+      // The policy failure left the token usable.
+      await page.locator('#reset-new-password').fill(NEW_PASSWORD);
+      await page.getByRole('button', { name: t.resetSubmit }).click();
+      await expect(page.getByTestId('reset-notice')).toContainText(t.resetDone);
+      expect(await signInStatus(page, email, PASSWORD)).toBe(401);
+      expect(await signInStatus(page, email, NEW_PASSWORD)).toBe(200);
     } finally {
       await pool.query(
         `DELETE FROM users WHERE auth_subject = 'patient:' || $1`,
