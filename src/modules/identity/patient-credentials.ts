@@ -74,19 +74,27 @@ export async function registerPatientAccount(
   validatePasswordPolicy(input.password, email);
   const salt = randomBytes(SALT_LENGTH);
   const hash = await derive(input.password, salt, DEFAULT_PARAMS);
-  // One statement: the user and its credential are created together or not at
-  // all, and a concurrent duplicate loses on the unique auth_subject.
+  // One statement: the user, its credential and the audit row are created
+  // together or not at all, and a concurrent duplicate loses on the unique
+  // auth_subject.
   const created = await db.query<{ user_id: string }>(
     `WITH new_user AS (
        INSERT INTO users (id, auth_subject, display_name)
        VALUES ($1, $2, $3)
        ON CONFLICT (auth_subject) DO NOTHING
        RETURNING id
+     ),
+     new_credential AS (
+       INSERT INTO patient_credentials
+         (user_id, password_hash, salt, scrypt_n, scrypt_r, scrypt_p)
+       SELECT id, $4, $5, $6, $7, $8 FROM new_user
+       RETURNING user_id
+     ),
+     audited AS (
+       INSERT INTO patient_account_audit_events (user_id, actor_kind, action)
+       SELECT user_id, 'patient', 'account_registered' FROM new_credential
      )
-     INSERT INTO patient_credentials
-       (user_id, password_hash, salt, scrypt_n, scrypt_r, scrypt_p)
-     SELECT id, $4, $5, $6, $7, $8 FROM new_user
-     RETURNING user_id`,
+     SELECT user_id FROM new_credential`,
     [
       randomUUID(),
       `${PATIENT_SUBJECT_PREFIX}${email}`,
@@ -160,6 +168,8 @@ export async function verifyPatientPassword(
       ? { ok: true, userId: found.user_id, passwordHash: found.password_hash }
       : { ok: false };
   }
+  // A transition into lockout is audited by the patient_credentials trigger
+  // from migration 0062.
   await db.query(
     `UPDATE patient_credentials SET
        failed_attempts = CASE
@@ -217,12 +227,19 @@ export async function changePatientPassword(
     return { ok: false, reason: 'current_password_invalid' };
   const salt = randomBytes(SALT_LENGTH);
   const hash = await derive(newPassword, salt, DEFAULT_PARAMS);
+  // The audit row is written by the same statement, so it exists exactly when
+  // the hash was swapped (#971).
   const updated = await db.query(
-    `UPDATE patient_credentials
-        SET password_hash = $2, salt = $3, scrypt_n = $4, scrypt_r = $5,
-            scrypt_p = $6, password_changed_at = now(), failed_attempts = 0,
-            locked_until = NULL, updated_at = now()
-      WHERE user_id = $1 AND password_hash = $7`,
+    `WITH changed AS (
+       UPDATE patient_credentials
+          SET password_hash = $2, salt = $3, scrypt_n = $4, scrypt_r = $5,
+              scrypt_p = $6, password_changed_at = now(), failed_attempts = 0,
+              locked_until = NULL, updated_at = now()
+        WHERE user_id = $1 AND password_hash = $7
+        RETURNING user_id
+     )
+     INSERT INTO patient_account_audit_events (user_id, actor_kind, action)
+     SELECT user_id, 'patient', 'password_changed' FROM changed`,
     [
       userId,
       hash,

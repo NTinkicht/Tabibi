@@ -46,7 +46,9 @@ const pool = {} as Pool;
 const NOW = new Date('2026-06-01T12:00:00Z');
 
 beforeEach(() => {
-  mocks.patient.mockReset().mockResolvedValue({ sessions: 1, resetTokens: 2 });
+  mocks.patient
+    .mockReset()
+    .mockResolvedValue({ sessions: 1, resetTokens: 2, auditEvents: 0 });
   mocks.staff.mockReset().mockResolvedValue({ sessions: 3, invites: 4 });
   mocks.rate.mockReset().mockResolvedValue(5);
   mocks.guest.mockReset().mockResolvedValue({ exchangeIds: 6, linkIntents: 7 });

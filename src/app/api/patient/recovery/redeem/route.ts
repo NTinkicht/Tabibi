@@ -18,7 +18,10 @@ import { requireSameOrigin } from '@/platform/http/staff-auth';
 // account; no session or cookie is issued, the patient signs in again.
 const MAX_BODY_BYTES = 4096;
 const TOKEN_LIMIT = 5;
-const INGRESS_LIMIT = 60;
+// The per-token budget is the abuse control (tokens are 256-bit random); the
+// shared ingress budget only protects the database, so it is set high enough
+// that one client spending junk tokens cannot block every patient (#972).
+const INGRESS_LIMIT = 600;
 const INGRESS_BUCKET = 'patient-recovery-redeem:ingress';
 
 const bodySchema = z

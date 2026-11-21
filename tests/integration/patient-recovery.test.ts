@@ -38,7 +38,12 @@ const liveSessions = (id: string) =>
     `SELECT count(*) AS n FROM patient_sessions WHERE user_id = '${id}' AND revoked_at IS NULL`,
   );
 const issue = async (email = EMAIL, ttl?: number) => {
-  const issued = await issuePatientPasswordReset(pool, email, ttl);
+  const issued = await issuePatientPasswordReset(
+    pool,
+    email,
+    { label: 'test-operator' },
+    ttl,
+  );
   expect(issued).not.toBeNull();
   return (issued as { token: string }).token;
 };
@@ -69,6 +74,7 @@ describe('issuePatientPasswordReset', () => {
     const issued = await issuePatientPasswordReset(
       pool,
       ` ${EMAIL.toUpperCase()} `,
+      { label: 'test-operator' },
     );
     expect(issued).not.toBeNull();
     const token = (issued as { token: string }).token;
@@ -94,12 +100,18 @@ describe('issuePatientPasswordReset', () => {
       'not-an-email',
       'staff-only@example.test',
     ])
-      expect(await issuePatientPasswordReset(pool, email)).toBeNull();
+      expect(
+        await issuePatientPasswordReset(pool, email, {
+          label: 'test-operator',
+        }),
+      ).toBeNull();
     expect(
       await count('SELECT count(*) AS n FROM patient_password_reset_tokens'),
     ).toBe(0);
     // Positive control: a registered patient does get a token.
-    expect(await issuePatientPasswordReset(pool, EMAIL)).not.toBeNull();
+    expect(
+      await issuePatientPasswordReset(pool, EMAIL, { label: 'test-operator' }),
+    ).not.toBeNull();
   });
 
   it('supersedes the earlier unused token of the same account only', async () => {
@@ -227,10 +239,14 @@ describe('concurrency barriers', () => {
     let secondToken: string;
     try {
       await first.query('BEGIN');
-      const a = await issuePatientPasswordReset(first, EMAIL);
+      const a = await issuePatientPasswordReset(first, EMAIL, {
+        label: 'test-operator',
+      });
       firstToken = (a as { token: string }).token;
       let settled = false;
-      const secondIssue = issuePatientPasswordReset(pool, EMAIL).then((r) => {
+      const secondIssue = issuePatientPasswordReset(pool, EMAIL, {
+        label: 'test-operator',
+      }).then((r) => {
         settled = true;
         return r;
       });

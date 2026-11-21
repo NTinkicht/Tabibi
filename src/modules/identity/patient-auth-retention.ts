@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { PATIENT_ACCOUNT_AUDIT_RETENTION_MS } from './patient-account-audit';
 
 // TAB-P0-15 data retention: patient session and password-reset rows hold only
 // verifiers, but once they are long dead they have no purpose. Rows are kept for a
@@ -10,6 +11,7 @@ const PURGE_BATCH = 500;
 export interface PatientAuthPurgeResult {
   sessions: number;
   resetTokens: number;
+  auditEvents: number;
 }
 
 /**
@@ -35,8 +37,21 @@ export async function purgeExpiredPatientAuthArtifacts(
         ORDER BY verifier LIMIT $2 FOR UPDATE SKIP LOCKED)`,
     [cutoff, PURGE_BATCH],
   );
+  // Account audit rows (#971) have their own, longer window: long enough for a
+  // patient dispute or abuse investigation, but bounded (SECURITY.md retention).
+  const auditCutoff = new Date(
+    now.getTime() - PATIENT_ACCOUNT_AUDIT_RETENTION_MS,
+  );
+  const auditEvents = await pool.query(
+    `DELETE FROM patient_account_audit_events WHERE id IN (
+       SELECT id FROM patient_account_audit_events
+        WHERE occurred_at <= $1
+        ORDER BY id LIMIT $2 FOR UPDATE SKIP LOCKED)`,
+    [auditCutoff, PURGE_BATCH],
+  );
   return {
     sessions: sessions.rowCount ?? 0,
     resetTokens: resetTokens.rowCount ?? 0,
+    auditEvents: auditEvents.rowCount ?? 0,
   };
 }
