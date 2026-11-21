@@ -29,6 +29,9 @@ export function ResetClient({
   const [pending, setPending] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const token = useRef('');
+  // Bumped whenever a replacement link is captured so responses to requests
+  // made with a superseded token are ignored.
+  const generation = useRef(0);
   const summaryRef = useRef<HTMLDivElement>(null);
   const t = accountStrings[locale];
 
@@ -38,6 +41,7 @@ export function ResetClient({
       const fragment = window.location.hash.slice(1);
       if (!fragment) return false;
       token.current = fragment;
+      generation.current += 1;
       window.history.replaceState(
         null,
         '',
@@ -53,6 +57,7 @@ export function ResetClient({
     function onHashChange() {
       if (capture()) {
         setOutcome(null);
+        setPending(false);
         setReady(true);
       }
     }
@@ -75,6 +80,7 @@ export function ResetClient({
     if (pending || !token.current) return;
     const form = event.currentTarget;
     const newPassword = String(new FormData(form).get('newPassword') ?? '');
+    const submitted = generation.current;
     setPending(true);
     setOutcome(null);
     try {
@@ -83,6 +89,7 @@ export function ResetClient({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ token: token.current, newPassword }),
       });
+      if (submitted !== generation.current) return;
       if (response.status === 200) {
         token.current = '';
         form.reset();
@@ -93,6 +100,7 @@ export function ResetClient({
         const body = (await response.json().catch(() => ({}))) as {
           error?: string;
         };
+        if (submitted !== generation.current) return;
         return setOutcome(
           // Only an explicit invalid_token consumes the form; any other 400
           // (password_policy, schema invalid_request) leaves the token usable.
@@ -101,9 +109,9 @@ export function ResetClient({
       }
       setOutcome('unavailable');
     } catch {
-      setOutcome('unavailable');
+      if (submitted === generation.current) setOutcome('unavailable');
     } finally {
-      setPending(false);
+      if (submitted === generation.current) setPending(false);
     }
   }
 

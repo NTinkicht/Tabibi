@@ -272,6 +272,33 @@ for (const locale of ['fr', 'ar'] as const) {
       await expect.poll(() => page.url()).not.toContain(issued!.token);
       expect(await page.content()).not.toContain(issued!.token);
 
+      // A response to a superseded link must not overwrite the replacement
+      // link's state: hold a request made with another token, switch to the
+      // issued link, then release it.
+      await page.evaluate((hash) => {
+        window.location.hash = hash;
+      }, randomBytes(32).toString('base64url'));
+      await expect(page.locator('#reset-new-password')).toBeVisible();
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const redeemPath = '**/api/patient/recovery/redeem';
+      await page.route(redeemPath, async (route) => {
+        await gate;
+        await route.continue();
+      });
+      await page.locator('#reset-new-password').fill(NEW_PASSWORD);
+      await page.getByRole('button', { name: t.resetSubmit }).click();
+      await page.evaluate((hash) => {
+        window.location.hash = hash;
+      }, issued!.token);
+      const stale = page.waitForResponse((r) => r.url().includes('/redeem'));
+      release();
+      await stale;
+      await page.unroute(redeemPath);
+      await expect(page.getByTestId('reset-error')).toHaveCount(0);
+      await expect(page.locator('#reset-new-password')).toBeVisible();
+      await page.locator('#reset-new-password').fill('');
+
       // An empty password is rejected by the schema (400 invalid_request):
       // the form must stay available and the token usable.
       await page.getByRole('button', { name: t.resetSubmit }).click();
