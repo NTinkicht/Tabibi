@@ -70,6 +70,7 @@ const committedMigrations = [
   '0059_guest_credential_revocation_reason.sql',
   '0060_patient_password_reset_tokens.sql',
   '0061_guest_credential_class.sql',
+  '0062_patient_account_audit_events.sql',
 ];
 
 beforeAll(async () => {

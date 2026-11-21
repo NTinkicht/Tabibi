@@ -261,7 +261,9 @@ for (const locale of ['fr', 'ar'] as const) {
       await expect(page.getByTestId('reset-error')).toBeFocused();
 
       // Issue a real token the way the operator command does.
-      const issued = await issuePatientPasswordReset(pool, email);
+      const issued = await issuePatientPasswordReset(pool, email, {
+        label: 'test-operator',
+      });
       expect(issued).not.toBeNull();
       // Pasting a replacement link into the same page changes only the
       // fragment (no reload): the invalid-link screen must recover.

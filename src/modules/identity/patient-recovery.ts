@@ -1,6 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { Queryable } from './index';
 import {
+  normalizeOperator,
+  type PatientAccountOperator,
+} from './patient-account-audit';
+import {
   normalizePatientEmail,
   PATIENT_SUBJECT_PREFIX,
 } from './patient-credentials';
@@ -55,13 +59,17 @@ export type IssueResetResult = { token: string; expiresAt: Date } | null;
 /**
  * Returns a fresh token for an existing patient account, or null when the email
  * is invalid or has no patient account (the caller answers identically either
- * way). Issuing supersedes every earlier unused token of the account.
+ * way). Issuing supersedes every earlier unused token of the account. The
+ * operator who issued it is recorded in the account audit log in the same
+ * transaction (#971); an invalid operator throws before anything changes.
  */
 export async function issuePatientPasswordReset(
   db: Connectable,
   email: string,
+  operator: PatientAccountOperator,
   ttlSeconds: number = PATIENT_RESET_TOKEN_TTL_SECONDS,
 ): Promise<IssueResetResult> {
+  const by = normalizeOperator(operator);
   const normalized = normalizePatientEmail(email);
   if (normalized === null) return null;
   const token = randomBytes(TOKEN_BYTES).toString('base64url');
@@ -78,16 +86,35 @@ export async function issuePatientPasswordReset(
     );
     const userId = locked.rows[0]?.user_id;
     if (!userId) return null;
-    await tx.query(
+    const superseded = await tx.query(
       `UPDATE patient_password_reset_tokens SET used_at = now()
         WHERE user_id = $1 AND used_at IS NULL`,
       [userId],
     );
     return tx.query<{ expires_at: Date }>(
-      `INSERT INTO patient_password_reset_tokens (verifier, user_id, expires_at)
-       VALUES ($1, $2, now() + make_interval(secs => $3::int))
-       RETURNING expires_at`,
-      [verifierOf(token), userId, ttlSeconds],
+      `WITH issued AS (
+         INSERT INTO patient_password_reset_tokens (verifier, user_id, expires_at)
+         VALUES ($1, $2, now() + make_interval(secs => $3::int))
+         RETURNING user_id, expires_at
+       ),
+       audited AS (
+         INSERT INTO patient_account_audit_events
+           (user_id, actor_kind, actor_label, action, metadata)
+         SELECT user_id, 'operator', $4, 'password_reset_issued',
+                jsonb_strip_nulls(jsonb_build_object(
+                  'expiresAt', expires_at, 'hostUser', $5::text,
+                  'supersededTokens', $6::int))
+           FROM issued
+       )
+       SELECT expires_at FROM issued`,
+      [
+        verifierOf(token),
+        userId,
+        ttlSeconds,
+        by.label,
+        by.hostUser ?? null,
+        superseded.rowCount ?? 0,
+      ],
     );
   });
   const row = issued?.rows[0];
@@ -99,7 +126,8 @@ export type RedeemResetResult = { ok: true; userId: string } | { ok: false };
 /**
  * Consumes a token and replaces the account password in ONE statement: the
  * token is claimed (single use, unexpired), the hash is swapped, the lockout is
- * cleared and every session of the account is revoked, or nothing changes. A
+ * cleared, every session of the account is revoked and the redemption is
+ * audited (#971), or nothing changes. A
  * password-policy failure throws before the token is consumed.
  */
 export async function redeemPatientPasswordReset(
@@ -150,6 +178,15 @@ export async function redeemPatientPasswordReset(
        revoked AS (
          UPDATE patient_sessions SET revoked_at = now()
           WHERE user_id IN (SELECT user_id FROM changed) AND revoked_at IS NULL
+          RETURNING 1
+       ),
+       audited AS (
+         INSERT INTO patient_account_audit_events
+           (user_id, actor_kind, action, metadata)
+         SELECT user_id, 'patient', 'password_reset_redeemed',
+                jsonb_build_object('sessionsRevoked',
+                                   (SELECT count(*) FROM revoked))
+           FROM changed
        )
        SELECT user_id FROM changed`,
       [

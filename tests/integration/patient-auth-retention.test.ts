@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import { registerPatientAccount } from '@/modules/identity/patient-credentials';
+import { PATIENT_ACCOUNT_AUDIT_RETENTION_MS } from '@/modules/identity/patient-account-audit';
 import {
   PATIENT_AUTH_RETENTION_MS,
   purgeExpiredPatientAuthArtifacts,
@@ -92,6 +93,7 @@ describe('purgeExpiredPatientAuthArtifacts', () => {
     expect(await purgeExpiredPatientAuthArtifacts(pool, NOW)).toEqual({
       sessions: 4,
       resetTokens: 4,
+      auditEvents: 0,
     });
     expect(await count('patient_sessions')).toBe(6);
     expect(await count('patient_password_reset_tokens')).toBe(6);
@@ -99,6 +101,7 @@ describe('purgeExpiredPatientAuthArtifacts', () => {
     expect(await purgeExpiredPatientAuthArtifacts(pool, NOW)).toEqual({
       sessions: 0,
       resetTokens: 0,
+      auditEvents: 0,
     });
   });
 
@@ -108,6 +111,7 @@ describe('purgeExpiredPatientAuthArtifacts', () => {
     expect(await purgeExpiredPatientAuthArtifacts(pool, NOW)).toEqual({
       sessions: 1,
       resetTokens: 0,
+      auditEvents: 0,
     });
     expect(await count('patient_sessions')).toBe(1);
   });
@@ -126,5 +130,23 @@ describe('purgeExpiredPatientAuthArtifacts', () => {
       20,
     );
     expect(await count('patient_sessions')).toBe(0);
+  });
+
+  it('purges account audit rows only after the audit retention window (#971)', async () => {
+    const at = (msAgo: number) =>
+      pool.query(
+        `INSERT INTO patient_account_audit_events (user_id, actor_kind, action, occurred_at)
+         VALUES ($1, 'patient', 'signed_in', $2)`,
+        [users[0], ago(msAgo)],
+      );
+    await pool.query('DELETE FROM patient_account_audit_events');
+    await at(PATIENT_ACCOUNT_AUDIT_RETENTION_MS); // at the cutoff: due
+    await at(PATIENT_ACCOUNT_AUDIT_RETENTION_MS + DAY); // older: due
+    await at(PATIENT_ACCOUNT_AUDIT_RETENTION_MS - DAY); // inside the window: kept
+    await at(PATIENT_AUTH_RETENTION_MS + DAY); // past the session grace only: kept
+    expect(
+      (await purgeExpiredPatientAuthArtifacts(pool, NOW)).auditEvents,
+    ).toBe(2);
+    expect(await count('patient_account_audit_events')).toBe(2);
   });
 });

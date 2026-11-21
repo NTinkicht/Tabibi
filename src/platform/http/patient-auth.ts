@@ -54,12 +54,19 @@ export async function createPatientSessionToken(
   const exp = Math.floor(expiresAt.getTime() / 1000);
   const sid = randomBytes(32).toString('base64url');
   const issued = await db.query<{ user_id: string }>(
-    `INSERT INTO patient_sessions (verifier, user_id, expires_at)
-     SELECT $1, c.user_id, to_timestamp($3)
-       FROM patient_credentials c
-      WHERE c.user_id = $2 AND ($4::bytea IS NULL OR c.password_hash = $4)
-        FOR SHARE OF c
-     RETURNING user_id`,
+    `WITH issued AS (
+       INSERT INTO patient_sessions (verifier, user_id, expires_at)
+       SELECT $1, c.user_id, to_timestamp($3)
+         FROM patient_credentials c
+        WHERE c.user_id = $2 AND ($4::bytea IS NULL OR c.password_hash = $4)
+          FOR SHARE OF c
+       RETURNING user_id
+     ),
+     audited AS (
+       INSERT INTO patient_account_audit_events (user_id, actor_kind, action)
+       SELECT user_id, 'patient', 'signed_in' FROM issued
+     )
+     SELECT user_id FROM issued`,
     [sessionVerifier(sid), userId, exp, expectedPasswordHash ?? null],
   );
   // No row: unknown account, or the password changed after it was verified.
@@ -147,8 +154,13 @@ export async function revokePatientSession(request: Request): Promise<void> {
   const claims = cookie ? decode(cookie) : null;
   if (!claims) return;
   await getPool().query(
-    `UPDATE patient_sessions SET revoked_at = now()
-      WHERE verifier = $1 AND user_id::text = $2 AND revoked_at IS NULL`,
+    `WITH revoked AS (
+       UPDATE patient_sessions SET revoked_at = now()
+        WHERE verifier = $1 AND user_id::text = $2 AND revoked_at IS NULL
+        RETURNING user_id
+     )
+     INSERT INTO patient_account_audit_events (user_id, actor_kind, action)
+     SELECT user_id, 'patient', 'signed_out' FROM revoked`,
     [sessionVerifier(claims.sid), claims.sub],
   );
 }
@@ -162,12 +174,23 @@ export async function revokeOtherPatientSessions(
   const cookie = patientSessionCookie(request);
   const claims = cookie ? decode(cookie) : null;
   if (!claims) return 0;
-  const revoked = await db.query(
-    `UPDATE patient_sessions SET revoked_at = now()
-      WHERE user_id::text = $2 AND verifier <> $1 AND revoked_at IS NULL`,
+  const revoked = await db.query<{ count: number }>(
+    `WITH revoked AS (
+       UPDATE patient_sessions SET revoked_at = now()
+        WHERE user_id::text = $2 AND verifier <> $1 AND revoked_at IS NULL
+        RETURNING user_id
+     ),
+     audited AS (
+       INSERT INTO patient_account_audit_events
+         (user_id, actor_kind, action, metadata)
+       SELECT user_id, 'patient', 'sessions_revoked',
+              jsonb_build_object('count', count(*))
+         FROM revoked GROUP BY user_id
+     )
+     SELECT count(*)::int AS count FROM revoked`,
     [sessionVerifier(claims.sid), claims.sub],
   );
-  return revoked.rowCount ?? 0;
+  return revoked.rows[0]?.count ?? 0;
 }
 
 export function patientSessionSetCookie(

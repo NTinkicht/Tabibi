@@ -95,13 +95,49 @@ session stays valid.
 ### Patient recovery redemption (slice 6)
 
 `POST /api/patient/recovery/redeem` `{ token, newPassword }` (same-origin, bounded
-strict body, 5 attempts per token and one ingress bucket per 15 minutes) redeems
+strict body, 5 attempts per token and a shared ingress bucket of 600 per 15
+minutes, high enough that one client spending junk tokens cannot block other
+patients, #972) redeems
 a slice-5 reset token: it replaces the password, clears the lockout and revokes
 every session of the account, then answers `200 { status: "changed" }` with no
 cookie. Malformed, unknown, superseded, expired and replayed tokens are one 400
 `invalid_token`; a policy failure is 400 `password_policy` and leaves a valid
 token unconsumed. Requesting a reset (and delivering the token) is a later slice
 because it needs an approved delivery channel.
+
+### Operator-issued password reset (#963, #971, #972)
+
+After verifying the patient out of band, support runs
+`printf '%s\n' '<e-mail>' | PUBLIC_ORIGIN=https://<site> npm run db:issue-patient-reset -- --operator '<name>'`.
+The e-mail is read from stdin only (`--email` is refused) so it stays out of
+shell history and the process list. The command refuses to run without
+`--operator` or without an https `PUBLIC_ORIGIN` (no path; plain http only for
+localhost), prints the full single-use link once, and says the issuance was
+audited.
+
+### Patient account audit (#971)
+
+`patient_account_audit_events` (migration 0062) is the append-only audit log for
+patient accounts, which are platform-level and so cannot use the clinic-scoped
+`audit_events`. Each row is written by the same SQL statement as the change it
+records, so rolled-back work leaves no row:
+
+| Action                    | Actor                                   | Written by                                                                 | Metadata                                    |
+| ------------------------- | --------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------- |
+| `account_registered`      | patient                                 | `registerPatientAccount`                                                   | none                                        |
+| `signed_in`               | patient                                 | `createPatientSessionToken`                                                | none                                        |
+| `signed_out`              | patient                                 | `revokePatientSession` (only when a live session was revoked)              | none                                        |
+| `sessions_revoked`        | patient                                 | `revokeOtherPatientSessions` (only when the count is above 0)              | `count`                                     |
+| `account_locked`          | system                                  | trigger on `patient_credentials`, only on the move from unlocked to locked | `lockedUntil`, `failedAttempts`             |
+| `password_changed`        | patient                                 | `changePatientPassword`                                                    | none                                        |
+| `password_reset_issued`   | operator (`actor_label` = `--operator`) | `issuePatientPasswordReset`                                                | `expiresAt`, `hostUser`, `supersededTokens` |
+| `password_reset_redeemed` | patient                                 | `redeemPatientPasswordReset`                                               | `sessionsRevoked`                           |
+
+Metadata never holds tokens, verifiers, passwords, hashes, salts or e-mail
+addresses; `user_id` identifies the account. Application code only inserts.
+Rows are deleted by the retention sweep after 365 days
+(`PATIENT_ACCOUNT_AUDIT_RETENTION_MS`), and with the account if a user row is
+ever deleted.
 
 ### Patient dependent routes (slice 7)
 
@@ -121,7 +157,8 @@ stay with TAB-P1-03.
 `purgeExpiredPatientAuthArtifacts(pool, now)` deletes `patient_sessions` and
 `patient_password_reset_tokens` rows that expired, were revoked or were used more
 than 7 days ago (verifiers only, one bounded batch of 500 per kind per call,
-locked rows skipped). Live and recently ended rows are never touched. The sweep runs via `npm run worker:retention` (see below).
+locked rows skipped), and `patient_account_audit_events` rows older than 365
+days. Live and recently ended rows are never touched. The sweep runs via `npm run worker:retention` (see below).
 
 ### Staff auth retention (TAB-P0-15)
 

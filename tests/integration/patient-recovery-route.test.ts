@@ -56,7 +56,11 @@ function redeem(
   );
 }
 const issue = async (email = EMAIL) =>
-  ((await issuePatientPasswordReset(pool, email)) as { token: string }).token;
+  (
+    (await issuePatientPasswordReset(pool, email, {
+      label: 'test-operator',
+    })) as { token: string }
+  ).token;
 const hashes = async () =>
   (
     await pool.query(
@@ -127,7 +131,12 @@ describe('POST /api/patient/recovery/redeem', () => {
   it('answers malformed, unknown, superseded and expired tokens identically', async () => {
     const stale = await issue();
     const fresh = await issue();
-    const expired = (await issuePatientPasswordReset(pool, OTHER, 1)) as {
+    const expired = (await issuePatientPasswordReset(
+      pool,
+      OTHER,
+      { label: 'test-operator' },
+      1,
+    )) as {
       token: string;
     };
     await new Promise((r) => setTimeout(r, 1200));
@@ -205,16 +214,34 @@ describe('POST /api/patient/recovery/redeem', () => {
           )
         ).rows[0].n,
       );
-    let first429 = -1;
-    for (let i = 0; i < 70 && first429 < 0; i += 1) {
-      const token = i.toString(36).padStart(43, 'C');
-      if ((await redeem({ token, newPassword: NEW })).status === 429)
-        first429 = i;
-    }
-    expect(first429).toBeGreaterThan(0);
+    // Spend the shared ingress budget (600 per window, #972) directly, then
+    // show that the next request is refused before any per-token row.
+    await pool.query(
+      `INSERT INTO staff_sign_in_rate_limit_buckets
+         (bucket_key, window_started_at, request_count, updated_at)
+       VALUES ('patient-recovery-redeem:ingress', now(), 599, now())`,
+    );
+    expect(
+      (await redeem({ token: 'C'.repeat(43), newPassword: NEW })).status,
+    ).toBe(400);
+    expect(
+      (await redeem({ token: 'D'.repeat(43), newPassword: NEW })).status,
+    ).toBe(429);
     const before = await buckets();
     const res = await redeem({ token: 'Z'.repeat(43), newPassword: NEW });
     expect(res.status).toBe(429);
     expect(await buckets()).toBe(before);
+  });
+
+  it('one client spending junk tokens does not block a valid redeem (#972)', async () => {
+    const token = await issue();
+    for (let i = 0; i < 100; i += 1) {
+      const junk = i.toString(36).padStart(43, 'J');
+      expect((await redeem({ token: junk, newPassword: NEW })).status).toBe(
+        400,
+      );
+    }
+    const res = await redeem({ token, newPassword: NEW });
+    expect(res.status).toBe(200);
   });
 });
