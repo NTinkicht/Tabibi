@@ -1,7 +1,8 @@
 import type { Pool } from 'pg';
 
 /**
- * Release-time, read-only inspection of notification and replay ciphertext at
+ * Run with `npm run db:inspect-ciphertext` (exit 1 on any finding). Every count
+ * must be 0 except the informational live-ciphertext counts. Release-time, read-only inspection of notification and replay ciphertext at
  * rest (TAB-P0-15). The report only carries counts: ciphertext, plaintext
  * material and identifiers are never selected into the result.
  */
