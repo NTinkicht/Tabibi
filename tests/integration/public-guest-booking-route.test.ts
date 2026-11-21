@@ -339,4 +339,32 @@ describe('public guest booking HTTP route', () => {
     }
     expect(first429).toBe(PUBLIC_BOOKING_SELECTION_LIMIT);
   });
+
+  it('counts noncanonical spellings of one selection reference in the same budget', async () => {
+    const seeded = await seed();
+    const parts = seeded.reference.split('.');
+    const spell = (i: number) =>
+      [parts[0], parts[1], `${parts[2]}${'!'.repeat(i)}`, parts[3]].join('.');
+    // Positive control: the canonical spelling is accepted inside the budget.
+    const control = await guestBookingRoute(
+      postRequest(body(seeded.reference, { contactEmail: null })),
+    );
+    expect(control.status).not.toBe(429);
+    let first429 = -1;
+    for (let i = 1; i <= PUBLIC_BOOKING_SELECTION_LIMIT + 2; i += 1) {
+      const response = await guestBookingRoute(
+        postRequest(
+          body(spell(i), {
+            contactPhone: `+2135551${String(10000 + i)}`,
+            contactEmail: null,
+          }),
+          { 'idempotency-key': `route-spelling-${i}` },
+        ),
+      );
+      if (response.status === 429 && first429 < 0) first429 = i;
+    }
+    // One attempt was spent by the control, so the variants hit the limit
+    // one attempt earlier than fresh buckets per spelling would allow.
+    expect(first429).toBe(PUBLIC_BOOKING_SELECTION_LIMIT);
+  });
 });

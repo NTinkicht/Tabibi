@@ -29,6 +29,23 @@ function contactKeys(
   return keys;
 }
 
+// Buffer.from(_, 'base64url') ignores stray characters and non-canonical
+// trailing bits, so many spellings decode to one selection. Key on the decoded
+// bytes re-encoded canonically; any reference of another shape shares one
+// fixed bucket (it can never resolve, so it cannot lock out a real slot).
+function selectionBudgetKey(reference: string): string {
+  const parts = reference.split('.');
+  if (parts.length !== 4) return 'public-booking:selection:malformed';
+  const [version, ...encoded] = parts;
+  const canonical = [
+    version,
+    ...encoded.map((part) =>
+      Buffer.from(part, 'base64url').toString('base64url'),
+    ),
+  ].join('.');
+  return `public-booking:selection:${keyDigest(canonical)}`;
+}
+
 /** Returns false when any applicable budget is exhausted. */
 export async function withinPublicBookingBudget(input: {
   selectionReference: string;
@@ -36,7 +53,7 @@ export async function withinPublicBookingBudget(input: {
   contactEmail?: string | null;
 }): Promise<boolean> {
   let allowed = await consumeSignInBudget(
-    `public-booking:selection:${keyDigest(input.selectionReference)}`,
+    selectionBudgetKey(input.selectionReference),
     PUBLIC_BOOKING_SELECTION_LIMIT,
   );
   for (const key of contactKeys(input.contactPhone, input.contactEmail)) {
