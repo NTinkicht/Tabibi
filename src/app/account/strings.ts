@@ -34,6 +34,14 @@ export const accountStrings = {
     wrongCurrent: 'Le mot de passe actuel est incorrect.',
     policy:
       'Le nouveau mot de passe est refusé : au moins 12 caractères et différent de votre e-mail.',
+    resetTitle: 'Nouveau mot de passe',
+    resetSubmit: 'Enregistrer le mot de passe',
+    resetDone: 'Mot de passe modifié. Vous pouvez maintenant vous connecter.',
+    resetGoSignIn: 'Aller à la connexion',
+    resetInvalidToken:
+      'Ce lien est invalide, expiré ou déjà utilisé. Demandez un nouveau lien au support.',
+    resetPolicy:
+      'Le mot de passe est refusé : au moins 12 caractères et différent de votre e-mail. Ce lien reste utilisable.',
     otherLanguage: 'العربية',
   },
   ar: {
@@ -68,6 +76,14 @@ export const accountStrings = {
     wrongCurrent: 'كلمة المرور الحالية غير صحيحة.',
     policy:
       'كلمة المرور الجديدة مرفوضة: 12 حرفًا على الأقل ومختلفة عن بريدك الإلكتروني.',
+    resetTitle: 'كلمة مرور جديدة',
+    resetSubmit: 'حفظ كلمة المرور',
+    resetDone: 'تم تغيير كلمة المرور. يمكنك الآن تسجيل الدخول.',
+    resetGoSignIn: 'الانتقال إلى تسجيل الدخول',
+    resetInvalidToken:
+      'هذا الرابط غير صالح أو منتهي أو مستعمل. اطلب رابطًا جديدًا من الدعم.',
+    resetPolicy:
+      'كلمة المرور مرفوضة: 12 حرفًا على الأقل ومختلفة عن بريدك الإلكتروني. يبقى الرابط صالحًا.',
     otherLanguage: 'Français',
   },
 } as const;

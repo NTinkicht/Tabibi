@@ -22,6 +22,7 @@
     "grok:watch": "node scripts/grok-auto-start.mjs",
     "db:migrate": "tsx scripts/db/migrate.ts",
     "db:create-clinic": "tsx scripts/db/create-clinic.ts",
+    "db:issue-patient-reset": "tsx scripts/db/issue-patient-reset.ts",
     "db:bootstrap-admin": "tsx scripts/db/bootstrap-clinic-admin.ts",
     "db:seed": "tsx scripts/db/seed.ts",
     "db:reset:test": "tsx scripts/db/reset-test.ts",
