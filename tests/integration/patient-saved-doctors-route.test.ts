@@ -232,6 +232,30 @@ describe('patient saved doctor routes', () => {
     expect((await put(a, clinic, existing)).status).toBe(200);
   });
 
+  it('does not count hidden bookmarks toward the cap (no lock-out)', async () => {
+    const a = await login(A);
+    const ids: string[] = [];
+    for (let i = 0; i < SAVED_DOCTOR_LIMIT; i += 1) {
+      const id = randomUUID();
+      await seedDoctor(clinic, id, `Dr ${i}`);
+      ids.push(id);
+      expect((await put(a, clinic, id)).status).toBe(201);
+    }
+    // Positive control: a full list of available bookmarks still refuses.
+    expect((await put(a)).status).toBe(409);
+    // Departed doctors vanish from list() and must free their cap slots.
+    await pool.query(
+      'UPDATE doctor_clinics SET departed_at = now() WHERE doctor_id = ANY($1)',
+      [ids.slice(0, 3)],
+    );
+    expect((await (await list(a)).json()).doctors).toHaveLength(
+      SAVED_DOCTOR_LIMIT - 3,
+    );
+    expect((await put(a)).status).toBe(201);
+    expect((await put(a, otherClinic, doctor2)).status).toBe(201);
+    expect((await put(a, clinic, ids[10]!)).status).toBe(200);
+  });
+
   it('removes bookmarks when the account or the association is deleted', async () => {
     const a = await login(A);
     await put(a);

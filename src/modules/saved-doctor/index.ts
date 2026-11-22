@@ -116,7 +116,17 @@ export class SavedDoctorService {
       );
       if (inserted.rowCount === 1) {
         const count = await client.query<{ n: string }>(
-          'SELECT count(*) AS n FROM patient_saved_doctors WHERE owner_user_id = $1',
+          // Only bookmarks list() can show count toward the cap, so hidden
+          // (departed doctor / inactive clinic) rows can never lock a patient out.
+          `SELECT count(*) AS n
+             FROM patient_saved_doctors saved
+             JOIN clinics clinic ON clinic.id = saved.clinic_id
+             JOIN doctor_clinics association
+               ON association.clinic_id = saved.clinic_id
+              AND association.doctor_id = saved.doctor_id
+            WHERE saved.owner_user_id = $1
+              AND clinic.status = 'active'
+              AND ${activeDoctorAssociationSql('association')}`,
           [owner],
         );
         if (Number(count.rows[0]!.n) > SAVED_DOCTOR_LIMIT)
