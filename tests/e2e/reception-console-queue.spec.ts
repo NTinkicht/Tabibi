@@ -53,92 +53,128 @@ async function authenticate(page: Page) {
   ]);
 }
 
-test('console: serving cards, queue order, canonical wait range and reason-gated panel', async ({
-  page,
-}) => {
-  await authenticate(page);
-  const posts: Array<{ path: string; body: Record<string, unknown> }> = [];
-  const entries = [
-    entry(1, 'in_consultation', { activeConsultationRemainingMinutes: 7 }),
-    entry(2, 'checked_in', { eta: { minWaitMinutes: 10, maxWaitMinutes: 25 } }),
-    entry(3, 'waiting'),
-  ];
-  await page.route('**/api/clinics/**', async (route) => {
-    const request = route.request();
-    if (request.method() === 'GET')
-      return route.fulfill({ json: snapshot(entries) });
-    const path = new URL(request.url()).pathname.split('/sessions/')[1]!;
-    posts.push({ path, body: request.postDataJSON() });
-    return route.fulfill({
-      json: path.endsWith('/reorder')
-        ? { queueOrderVersion: 2, orderedEntryIds: [] }
-        : { entry: { ...entries[1], state: 'called' } },
+const copy = {
+  fr: {
+    serving: 'En cours',
+    remaining: '≈ 7 min restantes',
+    next: 'Suivant',
+    range: '≈ 10–25 min',
+    notArrived: 'Pas encore arrivé',
+    more: 'Plus d’actions pour A-02',
+    cancel: 'Annuler le passage',
+    reason: 'Motif opérationnel (obligatoire)',
+    prioritise: 'Prioriser',
+    call: 'Appeler',
+    checkIn: 'Enregistrer l’arrivée',
+    dir: 'ltr',
+  },
+  ar: {
+    serving: 'الجارية الآن',
+    remaining: '≈ 7 دقيقة متبقية',
+    next: 'التالي',
+    range: '≈ 10–25 دقيقة',
+    notArrived: 'لم يصل بعد',
+    more: 'إجراءات أخرى لـ A-02',
+    cancel: 'إلغاء الدور',
+    reason: 'السبب التشغيلي (مطلوب)',
+    prioritise: 'تقديم',
+    call: 'نداء',
+    checkIn: 'تسجيل الوصول',
+    dir: 'rtl',
+  },
+} as const;
+
+for (const locale of ['fr', 'ar'] as const) {
+  test(`console ${locale}: serving cards, queue order, canonical wait range and reason-gated panel`, async ({
+    page,
+  }) => {
+    const c = copy[locale];
+    await authenticate(page);
+    const posts: Array<{ path: string; body: Record<string, unknown> }> = [];
+    const entries = [
+      entry(1, 'in_consultation', { activeConsultationRemainingMinutes: 7 }),
+      entry(2, 'checked_in', {
+        eta: { minWaitMinutes: 10, maxWaitMinutes: 25 },
+      }),
+      entry(3, 'waiting'),
+    ];
+    await page.route('**/api/clinics/**', async (route) => {
+      const request = route.request();
+      if (request.method() === 'GET')
+        return route.fulfill({ json: snapshot(entries) });
+      const path = new URL(request.url()).pathname.split('/sessions/')[1]!;
+      posts.push({ path, body: request.postDataJSON() });
+      return route.fulfill({
+        json: path.endsWith('/reorder')
+          ? { queueOrderVersion: 2, orderedEntryIds: [] }
+          : { entry: { ...entries[1], state: 'called' } },
+      });
     });
+    await page.goto(
+      `/operations/${clinicId}/sessions/${sessionId}/queue?locale=${locale}`,
+    );
+    await expect(page.locator('main.desk')).toHaveAttribute('dir', c.dir);
+    const serving = page.getByRole('region', { name: c.serving });
+    await expect(serving).toContainText('A-01');
+    await expect(serving).toContainText(c.remaining);
+    const rows = page.locator('.consoleRow');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toContainText('A-02');
+    await expect(rows.first()).toContainText(c.next);
+    await expect(rows.first()).toContainText(c.range);
+    await expect(rows.nth(1)).toContainText(c.notArrived);
+
+    const more = page.getByRole('button', { name: c.more });
+    await more.click();
+    const cancel = page.getByRole('button', { name: c.cancel });
+    await expect(cancel).toBeDisabled();
+    await page.getByLabel(c.reason).fill('urgence');
+    await expect(cancel).toBeEnabled();
+    await page.keyboard.press('Escape');
+    await expect(cancel).toHaveCount(0);
+
+    await more.click();
+    await page.getByLabel(c.reason).fill('urgence');
+    await page.getByRole('button', { name: c.prioritise }).click();
+    expect(posts.at(-1)?.path).toContain(`queue/${id(2)}/reorder`);
+    expect(posts.at(-1)?.body).toMatchObject({
+      targetPosition: 1,
+      expectedVersion: 1,
+      reason: 'urgence',
+    });
+
+    await rows
+      .first()
+      .getByRole('button', { name: c.call, exact: true })
+      .click();
+    expect(posts.at(-1)?.body.command).toBe('call');
+    await expect(page.getByRole('status')).toContainText('A-02 Patient 2');
   });
-  await page.goto(
-    `/operations/${clinicId}/sessions/${sessionId}/queue?locale=fr`,
-  );
-  const serving = page.getByRole('region', { name: 'En cours' });
-  await expect(serving).toContainText('A-01');
-  await expect(serving).toContainText('≈ 7 min restantes');
-  const rows = page.locator('.consoleRow');
-  await expect(rows).toHaveCount(2);
-  await expect(rows.first()).toContainText('A-02');
-  await expect(rows.first()).toContainText('Suivant');
-  await expect(rows.first()).toContainText('≈ 10–25 min');
-  await expect(rows.nth(1)).toContainText('Pas encore arrivé');
 
-  const more = page.getByRole('button', { name: 'Plus d’actions pour A-02' });
-  await more.click();
-  const cancel = page.getByRole('button', { name: 'Annuler le passage' });
-  await expect(cancel).toBeDisabled();
-  await page.getByLabel('Motif opérationnel (obligatoire)').fill('urgence');
-  await expect(cancel).toBeEnabled();
-  await page.keyboard.press('Escape');
-  await expect(cancel).toHaveCount(0);
-
-  await more.click();
-  await page.getByLabel('Motif opérationnel (obligatoire)').fill('urgence');
-  await page.getByRole('button', { name: 'Prioriser' }).click();
-  expect(posts.at(-1)?.path).toContain(`queue/${id(2)}/reorder`);
-  expect(posts.at(-1)?.body).toMatchObject({
-    targetPosition: 1,
-    expectedVersion: 1,
-    reason: 'urgence',
+  test(`console ${locale}: rejected command shows the error and leaves rows unchanged; paused disables call but not check-in`, async ({
+    page,
+  }) => {
+    const c = copy[locale];
+    await authenticate(page);
+    const entries = [entry(2, 'checked_in'), entry(3, 'waiting')];
+    await page.route('**/api/clinics/**', async (route) => {
+      const request = route.request();
+      if (request.method() === 'GET')
+        return route.fulfill({ json: snapshot(entries, 'paused') });
+      return route.fulfill({ status: 409, json: { message: 'Stale entry' } });
+    });
+    await page.goto(
+      `/operations/${clinicId}/sessions/${sessionId}/queue?locale=${locale}`,
+    );
+    const rows = page.locator('.consoleRow');
+    await expect(
+      rows.first().getByRole('button', { name: c.call, exact: true }),
+    ).toBeDisabled();
+    const checkIn = rows.nth(1).getByRole('button', { name: c.checkIn });
+    await expect(checkIn).toBeEnabled();
+    await checkIn.click();
+    await expect(page.locator('.alert')).toContainText('Stale entry');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(1)).toContainText(c.notArrived);
   });
-
-  await rows
-    .first()
-    .getByRole('button', { name: 'Appeler', exact: true })
-    .click();
-  expect(posts.at(-1)?.body.command).toBe('call');
-  await expect(page.getByRole('status')).toContainText('A-02 Patient 2');
-});
-
-test('console: rejected command shows the error and leaves rows unchanged; paused disables call but not check-in', async ({
-  page,
-}) => {
-  await authenticate(page);
-  const entries = [entry(2, 'checked_in'), entry(3, 'waiting')];
-  await page.route('**/api/clinics/**', async (route) => {
-    const request = route.request();
-    if (request.method() === 'GET')
-      return route.fulfill({ json: snapshot(entries, 'paused') });
-    return route.fulfill({ status: 409, json: { message: 'Stale entry' } });
-  });
-  await page.goto(
-    `/operations/${clinicId}/sessions/${sessionId}/queue?locale=fr`,
-  );
-  const rows = page.locator('.consoleRow');
-  await expect(
-    rows.first().getByRole('button', { name: 'Appeler', exact: true }),
-  ).toBeDisabled();
-  const checkIn = rows
-    .nth(1)
-    .getByRole('button', { name: 'Enregistrer l’arrivée' });
-  await expect(checkIn).toBeEnabled();
-  await checkIn.click();
-  await expect(page.locator('.alert')).toContainText('Stale entry');
-  await expect(rows).toHaveCount(2);
-  await expect(rows.nth(1)).toContainText('Pas encore arrivé');
-});
+}
