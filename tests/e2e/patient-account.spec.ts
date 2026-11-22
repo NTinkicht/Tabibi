@@ -89,6 +89,13 @@ test('session check failure is not shown as signed out and can be retried', asyn
       body: JSON.stringify({ account: { displayName: 'Amel' } }),
     });
   });
+  await page.route('**/api/patient/dependents', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ dependents: [] }),
+    }),
+  );
   await page.goto('/account?locale=fr');
   await expect(page.getByTestId('account-session-error')).toContainText(
     t.unavailable,
@@ -331,3 +338,129 @@ for (const locale of ['fr', 'ar'] as const) {
     }
   });
 }
+
+for (const locale of ['fr', 'ar'] as const) {
+  test(`dependents ${locale}: add, rename, archive, signed-out on 401`, async ({
+    page,
+  }) => {
+    const t = accountStrings[locale];
+    const email = `deps-${randomUUID()}@example.test`;
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    try {
+      await page.goto(`/account?locale=${locale}`);
+      const statuses = await page.evaluate(
+        async ([e, p]) => {
+          const json = { 'content-type': 'application/json' };
+          const registered = await fetch('/api/patient/register', {
+            method: 'POST',
+            headers: json,
+            body: JSON.stringify({
+              email: e,
+              password: p,
+              displayName: 'Nour',
+            }),
+          });
+          const signedIn = await fetch('/api/patient/session', {
+            method: 'POST',
+            headers: json,
+            body: JSON.stringify({ email: e, password: p }),
+          });
+          return [registered.status, signedIn.status];
+        },
+        [email, PASSWORD],
+      );
+      expect(statuses[1]).toBe(200);
+      await page.reload();
+      const section = page.getByTestId('dependents');
+      await expect(section.getByRole('heading', { level: 2 })).toHaveText(
+        t.dependentsTitle,
+      );
+      await expect(page.getByTestId('dependents-empty')).toContainText(
+        t.dependentsEmpty,
+      );
+
+      await page.locator('#dependent-new-name').fill('   ');
+      await section.getByRole('button', { name: t.dependentAdd }).click();
+      await expect(page.getByTestId('dependents-error')).toBeFocused();
+      await expect(page.getByTestId('dependents-error')).toContainText(
+        t.dependentInvalid,
+      );
+
+      await page.locator('#dependent-new-name').fill('Yanis');
+      await section.getByRole('button', { name: t.dependentAdd }).click();
+      const rows = page.getByTestId('dependent-row');
+      await expect(rows).toHaveCount(1);
+      await expect(rows.first()).toContainText('Yanis');
+      await expect(page.locator('#dependent-new-name')).toHaveValue('');
+      await expect(page.getByTestId('dependents-error')).toHaveCount(0);
+
+      await rows.first().getByRole('button', { name: /Yanis/ }).first().click();
+      const edit = rows.first().locator('input[name="displayName"]');
+      await expect(edit).toBeFocused();
+      await edit.fill('Yanis B');
+      await rows.first().getByRole('button', { name: t.dependentSave }).click();
+      await expect(rows.first()).toContainText('Yanis B');
+
+      await rows
+        .first()
+        .getByRole('button', { name: `${t.dependentArchive} Yanis B` })
+        .click();
+      await expect(page.getByTestId('dependents-empty')).toBeVisible();
+
+      await page.route('**/api/patient/dependents', (route) =>
+        route.fulfill({ status: 401, body: '{}' }),
+      );
+      await page.locator('#dependent-new-name').fill('Lina');
+      await section.getByRole('button', { name: t.dependentAdd }).click();
+      await expect(page.locator('#account-email')).toBeVisible();
+      await expect(page.getByTestId('account-signed-in')).toHaveCount(0);
+    } finally {
+      await pool.query(
+        `DELETE FROM patient_dependents WHERE owner_user_id IN
+           (SELECT id FROM users WHERE auth_subject = 'patient:' || $1)`,
+        [email],
+      );
+      await pool.query(
+        `DELETE FROM users WHERE auth_subject = 'patient:' || $1`,
+        [email],
+      );
+      await pool.end();
+    }
+  });
+}
+
+test('dependents list failure is retryable and not shown as empty', async ({
+  page,
+}) => {
+  const t = accountStrings.fr;
+  await page.route('**/api/patient/session', (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ account: { displayName: 'Amel' } }),
+        })
+      : route.continue(),
+  );
+  let calls = 0;
+  await page.route('**/api/patient/dependents', (route) => {
+    calls += 1;
+    return calls === 1
+      ? route.fulfill({ status: 503, body: '{}' })
+      : route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            dependents: [{ id: 'd1', displayName: 'Sara' }],
+          }),
+        });
+  });
+  await page.goto('/account?locale=fr');
+  await expect(page.getByTestId('dependents-load-error')).toBeVisible();
+  await expect(page.getByTestId('dependents-empty')).toHaveCount(0);
+  await page
+    .getByTestId('dependents-load-error')
+    .getByRole('button', { name: t.retry })
+    .click();
+  await expect(page.getByTestId('dependent-row')).toContainText('Sara');
+});
