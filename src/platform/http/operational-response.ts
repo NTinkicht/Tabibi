@@ -26,7 +26,11 @@ import {
 } from '@/modules/identity/staff-invites';
 import { StatisticsWindowError } from '@/modules/clinic-statistics';
 import { QueueConflictError, QueueValidationError } from '@/modules/queue';
-import { PatientVisitHistoryValidationError } from '@/modules/patient-visit-history';
+import {
+  PatientVisitCancellationConflictError,
+  PatientVisitHistoryValidationError,
+  PatientVisitNotFoundError,
+} from '@/modules/patient-visit-history';
 import {
   SavedDoctorLimitError,
   SavedDoctorNotFoundError,
@@ -93,7 +97,8 @@ export async function operationalJson(
       error instanceof InviteNotFoundError ||
       error instanceof NotificationDeadLetterNotFoundError ||
       error instanceof AccountDependentNotFoundError ||
-      error instanceof SavedDoctorNotFoundError
+      error instanceof SavedDoctorNotFoundError ||
+      error instanceof PatientVisitNotFoundError
     ) {
       status = 404;
       code = 'not_found';
@@ -129,6 +134,7 @@ export async function operationalJson(
       error instanceof InviteConflictError ||
       error instanceof InviteLimitError ||
       error instanceof SavedDoctorLimitError ||
+      error instanceof PatientVisitCancellationConflictError ||
       isPostgresCheckConflict(error)
     ) {
       status = 409;
