@@ -20,6 +20,7 @@ import { PasswordPolicyError } from '@/modules/identity/staff-credentials';
 import {
   InviteConflictError,
   InviteInputError,
+  InviteLimitError,
   InviteNotFoundError,
   InviteRejectedError,
 } from '@/modules/identity/staff-invites';
@@ -117,6 +118,7 @@ export async function operationalJson(
       error instanceof LastClinicAdminError ||
       error instanceof DoctorMembershipRequiresAssociationError ||
       error instanceof InviteConflictError ||
+      error instanceof InviteLimitError ||
       isPostgresCheckConflict(error)
     ) {
       status = 409;

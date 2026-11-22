@@ -21,6 +21,9 @@ export type InvitableRole = (typeof INVITABLE_ROLES)[number];
 export const INVITE_DEFAULT_TTL_SECONDS = 7 * 24 * 3600;
 export const INVITE_MAX_TTL_SECONDS = 14 * 24 * 3600;
 
+/** Open (unrevoked, unaccepted, expired included) invites one clinic may hold. */
+export const MAX_OPEN_INVITES_PER_CLINIC = 100;
+
 const TOKEN_PATTERN = /^([0-9a-f-]{36})\.([A-Za-z0-9_-]{43})$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -36,6 +39,14 @@ export class InviteConflictError extends Error {
   constructor() {
     super('An open invite already exists for this email and clinic');
     this.name = 'InviteConflictError';
+  }
+}
+
+/** The clinic already holds MAX_OPEN_INVITES_PER_CLINIC open invites. */
+export class InviteLimitError extends Error {
+  constructor() {
+    super('Too many open invites for this clinic; revoke some first');
+    this.name = 'InviteLimitError';
   }
 }
 
@@ -141,6 +152,18 @@ export class StaffInviteService {
         throw new InviteInputError('Invalid invite lifetime');
       }
       const email = normalizeInviteEmail(input.email);
+      await client.query(
+        `SELECT pg_advisory_xact_lock(hashtextextended('staff_invite_cap:' || $1::uuid::text, 0))`,
+        [scope.clinicId],
+      );
+      const open = await client.query<{ n: string }>(
+        `SELECT count(*) AS n FROM staff_invites
+          WHERE clinic_id = $1 AND revoked_at IS NULL AND accepted_at IS NULL`,
+        [scope.clinicId],
+      );
+      if (Number(open.rows[0].n) >= MAX_OPEN_INVITES_PER_CLINIC) {
+        throw new InviteLimitError();
+      }
       const inviteId = randomUUID();
       const secret = randomBytes(32).toString('base64url');
       const expiresAt = new Date(now.getTime() + ttl * 1000);
