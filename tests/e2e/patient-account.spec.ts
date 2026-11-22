@@ -12,6 +12,16 @@ async function sessionStatus(page: Page): Promise<number> {
   );
 }
 
+async function mockNoVisits(page: Page): Promise<void> {
+  await page.route('**/api/patient/visits**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ visits: [], nextCursor: null }),
+    }),
+  );
+}
+
 const NEW_PASSWORD = 'another long passphrase value 961';
 
 async function signInStatus(
@@ -96,6 +106,7 @@ test('session check failure is not shown as signed out and can be retried', asyn
       body: JSON.stringify({ dependents: [] }),
     }),
   );
+  await mockNoVisits(page);
   await page.route('**/api/patient/saved-doctors', (route) =>
     route.fulfill({
       status: 200,
@@ -449,6 +460,7 @@ test('dependents list failure is retryable and not shown as empty', async ({
         })
       : route.continue(),
   );
+  await mockNoVisits(page);
   await page.route('**/api/patient/saved-doctors', (route) =>
     route.fulfill({
       status: 200,
@@ -515,6 +527,7 @@ for (const locale of ['fr', 'ar'] as const) {
         body: JSON.stringify({ dependents: [] }),
       }),
     );
+    await mockNoVisits(page);
     await page.route('**/api/patient/saved-doctors', (route) => {
       listCalls += 1;
       if (unauthorized) return route.fulfill({ status: 401, body: '{}' });
@@ -574,6 +587,171 @@ for (const locale of ['fr', 'ar'] as const) {
     expect(deletes).toEqual([
       `DELETE /api/patient/saved-doctors/${clinicId}/${doctorId}`,
       `DELETE /api/patient/saved-doctors/${clinicId}/${doctorId}`,
+    ]);
+
+    unauthorized = true;
+    await page.reload();
+    await expect(page.locator('#account-email')).toBeVisible();
+    await expect(page.getByTestId('account-signed-in')).toHaveCount(0);
+  });
+}
+
+for (const locale of ['fr', 'ar'] as const) {
+  test(`visits ${locale}: list, load more, cancel confirm, conflict, failure, signed-out on 401`, async ({
+    page,
+  }) => {
+    const t = accountStrings[locale];
+    const ids = [randomUUID(), randomUUID(), randomUUID()];
+    const visit = (
+      appointmentId: string,
+      status: string,
+      doctorDisplayName: string,
+      dependentId: string | null = null,
+    ) => ({
+      appointmentId,
+      clinicId: randomUUID(),
+      clinicName: 'Cabinet Amel',
+      doctorId: randomUUID(),
+      doctorDisplayName,
+      scheduledStartAt: '2026-12-01T08:30:00.000Z',
+      scheduledEndAt: '2026-12-01T09:00:00.000Z',
+      status,
+      dependentId,
+    });
+    const state = {
+      first: [
+        visit(ids[0]!, 'confirmed', 'Dr Karim'),
+        visit(ids[1]!, 'completed', 'Dr Yasmine', randomUUID()),
+      ],
+      second: [visit(ids[2]!, 'booked', 'Dr Omar')],
+    };
+    const requests: string[] = [];
+    let listCalls = 0;
+    let cancelStatus = 503;
+    let unauthorized = false;
+    await page.route('**/api/patient/session', (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ account: { displayName: 'Amel' } }),
+          })
+        : route.continue(),
+    );
+    for (const path of ['dependents', 'saved-doctors'])
+      await page.route(`**/api/patient/${path}`, (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            path === 'dependents' ? { dependents: [] } : { doctors: [] },
+          ),
+        }),
+      );
+    await page.route('**/api/patient/visits?*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ visits: state.second, nextCursor: null }),
+      }),
+    );
+    await page.route('**/api/patient/visits', (route) => {
+      listCalls += 1;
+      if (unauthorized) return route.fulfill({ status: 401, body: '{}' });
+      if (listCalls === 1) return route.fulfill({ status: 503, body: '{}' });
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ visits: state.first, nextCursor: 'cursor-2' }),
+      });
+    });
+    await page.route('**/api/patient/visits/*/cancel', (route) => {
+      requests.push(
+        `${route.request().method()} ${new URL(route.request().url()).pathname}`,
+      );
+      if (cancelStatus === 200) {
+        state.first[0] = { ...state.first[0]!, status: 'cancelled' };
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ appointmentId: ids[0], status: 'cancelled' }),
+        });
+      }
+      return route.fulfill({ status: cancelStatus, body: '{}' });
+    });
+
+    await page.goto(`/account?locale=${locale}`);
+    const section = page.getByTestId('visits');
+    await expect(section.getByRole('heading', { level: 2 })).toHaveText(
+      t.visitsTitle,
+    );
+    await expect(page.getByTestId('visits-load-error')).toContainText(
+      t.unavailable,
+    );
+    await section.getByRole('button', { name: t.retry }).click();
+    const rows = page.getByTestId('visit-row');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('Dr Karim');
+    await expect(rows.nth(0)).toContainText('Cabinet Amel');
+    await expect(rows.nth(0).getByTestId('visit-status')).toHaveText(
+      t.visitStatus.confirmed,
+    );
+    await expect(rows.nth(0)).not.toContainText(t.visitForRelative);
+    await expect(rows.nth(1)).toContainText(t.visitForRelative);
+    await expect(rows.nth(1).getByRole('button')).toHaveCount(0);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+
+    await section.getByRole('button', { name: t.visitsMore }).click();
+    await expect(rows).toHaveCount(3);
+    await expect(rows.nth(2)).toContainText('Dr Omar');
+    await expect(
+      section.getByRole('button', { name: t.visitsMore }),
+    ).toHaveCount(0);
+
+    const open = rows
+      .nth(0)
+      .getByRole('button', { name: new RegExp(`^${t.visitCancel}`) });
+    await open.click();
+    await rows.nth(0).getByRole('button', { name: t.visitCancelKeep }).click();
+    expect(requests).toEqual([]);
+    await open.click();
+    const confirm = rows
+      .nth(0)
+      .getByRole('button', { name: new RegExp(`^${t.visitCancelConfirm}`) });
+    await confirm.click();
+    await expect(page.getByTestId('visits-error')).toBeFocused();
+    await expect(page.getByTestId('visits-error')).toContainText(t.unavailable);
+    await expect(rows.nth(0).getByTestId('visit-status')).toHaveText(
+      t.visitStatus.confirmed,
+    );
+
+    cancelStatus = 409;
+    await confirm.click();
+    await expect(page.getByTestId('visits-error')).toContainText(
+      t.visitCancelConflict,
+    );
+
+    cancelStatus = 200;
+    await rows
+      .nth(0)
+      .getByRole('button', { name: new RegExp(`^${t.visitCancel}`) })
+      .click();
+    await rows
+      .nth(0)
+      .getByRole('button', { name: new RegExp(`^${t.visitCancelConfirm}`) })
+      .click();
+    await expect(rows.nth(0).getByTestId('visit-status')).toHaveText(
+      t.visitStatus.cancelled,
+    );
+    await expect(page.getByTestId('visits-error')).toHaveCount(0);
+    expect(requests).toEqual([
+      `POST /api/patient/visits/${ids[0]}/cancel`,
+      `POST /api/patient/visits/${ids[0]}/cancel`,
+      `POST /api/patient/visits/${ids[0]}/cancel`,
     ]);
 
     unauthorized = true;

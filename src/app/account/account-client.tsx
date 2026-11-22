@@ -7,6 +7,7 @@ import { Button } from '@/app/ui';
 import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
 import { DependentsSection } from './dependents-section';
 import { SavedDoctorsSection } from './saved-doctors-section';
+import { VisitsSection } from './visits-section';
 import { PasswordChangeForm } from './password-change-form';
 import { accountStrings, type AccountLocale } from './strings';
 
@@ -184,6 +185,7 @@ export function AccountClient({
               {t.signOut}
             </Button>
             <DependentsSection locale={locale} onSignedOut={signedOut} />
+            <VisitsSection locale={locale} onSignedOut={signedOut} />
             <SavedDoctorsSection locale={locale} onSignedOut={signedOut} />
             <PasswordChangeForm locale={locale} />
           </div>
