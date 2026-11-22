@@ -10,7 +10,9 @@ import { verifyStaffPassword } from '@/modules/identity/staff-credentials';
 import {
   InviteConflictError,
   InviteInputError,
+  InviteLimitError,
   InviteRejectedError,
+  MAX_OPEN_INVITES_PER_CLINIC,
   StaffInviteService,
 } from '@/modules/identity/staff-invites';
 
@@ -134,6 +136,64 @@ describe('staff invites (#727)', () => {
     );
     await service.revoke(scopeA, first.inviteId);
     await expect(invite('dup@x.example')).resolves.toBeDefined();
+  });
+
+  describe('open invite cap', () => {
+    const fill = (clinicId: string, count: number) =>
+      pool.query(
+        `INSERT INTO staff_invites
+           (id, clinic_id, email, role, token_verifier, invited_by, expires_at, created_at)
+         SELECT gen_random_uuid(), $1, 'bulk' || g || '@x.example', 'receptionist'::membership_role,
+                decode(md5(g::text) || md5(g::text), 'hex'), $2, now() + interval '1 day', now()
+           FROM generate_series(1, $3::int) g`,
+        [clinicId, adminA, count],
+      );
+    const rows = async () =>
+      Number(
+        (await pool.query('SELECT count(*) n FROM staff_invites')).rows[0].n,
+      );
+
+    it('refuses at the cap with no row and no audit, and a revoke frees one slot', async () => {
+      await fill(clinicA, MAX_OPEN_INVITES_PER_CLINIC - 1);
+      const last = await invite('last@x.example');
+      const audits = Number(
+        (await pool.query('SELECT count(*) n FROM audit_events')).rows[0].n,
+      );
+      await expect(invite('over@x.example')).rejects.toBeInstanceOf(
+        InviteLimitError,
+      );
+      expect(await rows()).toBe(MAX_OPEN_INVITES_PER_CLINIC);
+      expect(
+        Number(
+          (await pool.query('SELECT count(*) n FROM audit_events')).rows[0].n,
+        ),
+      ).toBe(audits);
+      await service.revoke(scopeA, last.inviteId);
+      await expect(invite('over@x.example')).resolves.toBeDefined();
+    });
+
+    it('does not count another clinic and still reports a duplicate as a conflict', async () => {
+      await fill(clinicB, MAX_OPEN_INVITES_PER_CLINIC);
+      await expect(invite('fine@x.example')).resolves.toBeDefined();
+      await expect(invite('fine@x.example')).rejects.toBeInstanceOf(
+        InviteConflictError,
+      );
+    });
+
+    it('concurrent creates at cap-1 admit exactly one', async () => {
+      await fill(clinicA, MAX_OPEN_INVITES_PER_CLINIC - 1);
+      const results = await Promise.allSettled(
+        Array.from({ length: 6 }, (_, i) => invite(`race${i}@x.example`)),
+      );
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(
+        results.filter(
+          (r) =>
+            r.status === 'rejected' && r.reason instanceof InviteLimitError,
+        ),
+      ).toHaveLength(5);
+      expect(await rows()).toBe(MAX_OPEN_INVITES_PER_CLINIC);
+    });
   });
 
   it('accept creates user, password and membership atomically and audits without secrets', async () => {
