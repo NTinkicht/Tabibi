@@ -4,6 +4,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../../scripts/db/lib';
 import { POST as cancelPost } from '@/app/api/patient/visits/[appointmentId]/cancel/route';
 import { POST as signInPost } from '@/app/api/patient/session/route';
+import { PatientVisitCancellationService } from '@/modules/patient-visit-history/cancellation';
+import { PatientVisitCancellationConflictError } from '@/modules/patient-visit-history/cancellation';
 import { registerPatientAccount } from '@/modules/identity/patient-credentials';
 import { closePool, getPool } from '@/platform/database/pool';
 
@@ -319,5 +321,40 @@ describe('patient visit cancellation route', () => {
     expect((await cancel(a, first)).status).toBe(200);
     expect((await stateOf(first)).priority_order).toBeNull();
     expect(Number((await stateOf(second)).priority_order)).toBe(1);
+  });
+  it('refuses with a conflict, mutating nothing, when a transfer moves the visit to another session between probe and lock', async () => {
+    const me = await userId(A);
+    const id = await seedVisit(me, inDays(2));
+    const other = await seedVisit(me, inDays(2));
+    const moved = (
+      await pool.query(`SELECT session_id FROM appointments WHERE id = $1`, [
+        other,
+      ])
+    ).rows[0].session_id;
+    const service = new PatientVisitCancellationService(
+      getPool(),
+      undefined,
+      async () => {
+        await pool.query(
+          `UPDATE queue_entries SET session_id = $2, registration_order = 2
+            WHERE id = (SELECT queue_entry_id FROM appointments WHERE id = $1)`,
+          [id, moved],
+        );
+        await pool.query(
+          `UPDATE appointments SET session_id = $2 WHERE id = $1`,
+          [id, moved],
+        );
+      },
+    );
+    await expect(service.cancel(me, id)).rejects.toBeInstanceOf(
+      PatientVisitCancellationConflictError,
+    );
+    expect((await stateOf(id)).appt).toBe('booked');
+    expect(await auditCount(id)).toBe(0);
+    // Positive control: without the race the same service cancels the visit.
+    const control = new PatientVisitCancellationService(getPool());
+    await expect(control.cancel(me, id)).resolves.toMatchObject({
+      status: 'cancelled',
+    });
   });
 });

@@ -69,6 +69,7 @@ export class PatientVisitCancellationService {
     private readonly afterOperationalMutationForTest?: (
       client: PoolClient,
     ) => Promise<void>,
+    private readonly afterProbeForTest?: () => Promise<void>,
   ) {}
 
   async cancel(
@@ -87,6 +88,7 @@ export class PatientVisitCancellationService {
       ]);
       const target = probe.rows[0];
       if (!target) throw new PatientVisitNotFoundError();
+      if (this.afterProbeForTest) await this.afterProbeForTest();
 
       await client.query(
         `SELECT id FROM consultation_sessions
@@ -99,6 +101,12 @@ export class PatientVisitCancellationService {
       );
       const row = locked.rows[0];
       if (!row) throw new PatientVisitNotFoundError();
+      // A concurrent transfer may have moved the visit to another session
+      // between the probe and the session lock; this transaction then holds
+      // the wrong serialization boundary. Fail closed (the patient retries)
+      // instead of mutating a session whose lock we do not hold.
+      if (row.session_id !== target.session_id)
+        throw new PatientVisitCancellationConflictError();
 
       if (
         row.appointment_status === 'cancelled' &&
