@@ -53,6 +53,11 @@ export const accountStrings = {
     dependentSave: 'Enregistrer',
     dependentCancel: 'Annuler',
     dependentInvalid: 'Le nom est vide, trop long ou non valide.',
+    savedDoctorsTitle: 'Médecins enregistrés',
+    savedDoctorsHint:
+      'Les médecins que vous avez enregistrés. Seuls leur nom et leur cabinet sont affichés.',
+    savedDoctorsEmpty: 'Aucun médecin enregistré.',
+    savedDoctorRemove: 'Retirer',
     otherLanguage: 'العربية',
   },
   ar: {
@@ -105,6 +110,10 @@ export const accountStrings = {
     dependentSave: 'حفظ',
     dependentCancel: 'إلغاء',
     dependentInvalid: 'الاسم فارغ أو طويل جدًا أو غير صالح.',
+    savedDoctorsTitle: 'الأطباء المحفوظون',
+    savedDoctorsHint: 'الأطباء الذين حفظتهم. يُعرض اسم الطبيب والعيادة فقط.',
+    savedDoctorsEmpty: 'لا يوجد أطباء محفوظون.',
+    savedDoctorRemove: 'إزالة',
     otherLanguage: 'Français',
   },
 } as const;

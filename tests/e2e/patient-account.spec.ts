@@ -96,6 +96,13 @@ test('session check failure is not shown as signed out and can be retried', asyn
       body: JSON.stringify({ dependents: [] }),
     }),
   );
+  await page.route('**/api/patient/saved-doctors', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ doctors: [] }),
+    }),
+  );
   await page.goto('/account?locale=fr');
   await expect(page.getByTestId('account-session-error')).toContainText(
     t.unavailable,
@@ -442,6 +449,13 @@ test('dependents list failure is retryable and not shown as empty', async ({
         })
       : route.continue(),
   );
+  await page.route('**/api/patient/saved-doctors', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ doctors: [] }),
+    }),
+  );
   let calls = 0;
   await page.route('**/api/patient/dependents', (route) => {
     calls += 1;
@@ -464,3 +478,107 @@ test('dependents list failure is retryable and not shown as empty', async ({
     .click();
   await expect(page.getByTestId('dependent-row')).toContainText('Sara');
 });
+
+for (const locale of ['fr', 'ar'] as const) {
+  test(`saved doctors ${locale}: list, remove, load retry, signed-out on 401`, async ({
+    page,
+  }) => {
+    const t = accountStrings[locale];
+    const clinicId = randomUUID();
+    const doctorId = randomUUID();
+    let doctors = [
+      {
+        clinicId,
+        clinicName: 'Cabinet Amel',
+        doctorId,
+        displayName: 'Dr Karim',
+        savedAt: '2026-11-20T09:00:00.000Z',
+      },
+    ];
+    const deletes: string[] = [];
+    let listCalls = 0;
+    let failDelete = false;
+    let unauthorized = false;
+    await page.route('**/api/patient/session', (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ account: { displayName: 'Amel' } }),
+          })
+        : route.continue(),
+    );
+    await page.route('**/api/patient/dependents', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ dependents: [] }),
+      }),
+    );
+    await page.route('**/api/patient/saved-doctors', (route) => {
+      listCalls += 1;
+      if (unauthorized) return route.fulfill({ status: 401, body: '{}' });
+      if (listCalls === 1) return route.fulfill({ status: 503, body: '{}' });
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ doctors }),
+      });
+    });
+    await page.route('**/api/patient/saved-doctors/*/*', (route) => {
+      deletes.push(
+        `${route.request().method()} ${new URL(route.request().url()).pathname}`,
+      );
+      if (unauthorized) return route.fulfill({ status: 401, body: '{}' });
+      if (failDelete) return route.fulfill({ status: 503, body: '{}' });
+      doctors = [];
+      return route.fulfill({ status: 204 });
+    });
+
+    await page.goto(`/account?locale=${locale}`);
+    const section = page.getByTestId('saved-doctors');
+    await expect(section.getByRole('heading', { level: 2 })).toHaveText(
+      t.savedDoctorsTitle,
+    );
+    await expect(page.getByTestId('saved-doctors-load-error')).toContainText(
+      t.unavailable,
+    );
+    await section.getByRole('button', { name: t.retry }).click();
+    const rows = page.getByTestId('saved-doctor-row');
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText('Dr Karim');
+    await expect(rows.first()).toContainText('Cabinet Amel');
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+
+    const remove = rows
+      .first()
+      .getByRole('button', { name: `${t.savedDoctorRemove} Dr Karim` });
+    failDelete = true;
+    await remove.click();
+    await expect(page.getByTestId('saved-doctors-error')).toBeFocused();
+    await expect(page.getByTestId('saved-doctors-error')).toContainText(
+      t.unavailable,
+    );
+    await expect(rows).toHaveCount(1);
+
+    failDelete = false;
+    await remove.click();
+    await expect(page.getByTestId('saved-doctors-empty')).toContainText(
+      t.savedDoctorsEmpty,
+    );
+    await expect(page.getByTestId('saved-doctors-error')).toHaveCount(0);
+    expect(deletes).toEqual([
+      `DELETE /api/patient/saved-doctors/${clinicId}/${doctorId}`,
+      `DELETE /api/patient/saved-doctors/${clinicId}/${doctorId}`,
+    ]);
+
+    unauthorized = true;
+    await page.reload();
+    await expect(page.locator('#account-email')).toBeVisible();
+    await expect(page.getByTestId('account-signed-in')).toHaveCount(0);
+  });
+}
