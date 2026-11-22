@@ -40,7 +40,11 @@ function auditDocument(): Audit {
       const t = Array.from(labels).map(text).join(' ').trim();
       if (t) return t;
     }
-    if (text(el)) return text(el);
+    // Option text never names a select, and textarea content is its value, so
+    // visible-text naming is limited to buttons, links and role=button/link.
+    const tag = el.tagName.toLowerCase();
+    if (tag !== 'select' && tag !== 'textarea' && tag !== 'input' && text(el))
+      return text(el);
     const title = el.getAttribute('title')?.trim();
     if (title) return title;
     const img = el.querySelector('img[alt]');
@@ -80,17 +84,19 @@ test('positive control: the audit flags overflow, missing names and landmarks', 
     `<html><body>
        <div style="width:900px">wide</div>
        <button></button><a href="/x"></a><input type="text" />
+       <select><option>Alger</option></select>
      </body></html>`,
   );
   const audit = await page.evaluate(auditDocument);
   expect(audit.overflow).toBe(true);
   expect(audit.mains).toBe(0);
   expect(audit.h1s).toBe(0);
-  expect(audit.unnamed).toEqual(['button', 'a', 'input']);
+  expect(audit.unnamed).toEqual(['button', 'a', 'input', 'select']);
 
   await page.setContent(
     `<html><body><main><h1>T</h1>
        <button aria-label="ok"></button><label>Nom<input type="text" /></label>
+       <label>Wilaya<select><option>Alger</option></select></label>
      </main></body></html>`,
   );
   const clean = await page.evaluate(auditDocument);
