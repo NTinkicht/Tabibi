@@ -71,6 +71,7 @@ const committedMigrations = [
   '0060_patient_password_reset_tokens.sql',
   '0061_guest_credential_class.sql',
   '0062_patient_account_audit_events.sql',
+  '0063_patient_saved_doctors.sql',
 ];
 
 beforeAll(async () => {
