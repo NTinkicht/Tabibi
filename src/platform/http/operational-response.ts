@@ -26,6 +26,7 @@ import {
 } from '@/modules/identity/staff-invites';
 import { StatisticsWindowError } from '@/modules/clinic-statistics';
 import { QueueConflictError, QueueValidationError } from '@/modules/queue';
+import { PatientVisitHistoryValidationError } from '@/modules/patient-visit-history';
 import {
   SavedDoctorLimitError,
   SavedDoctorNotFoundError,
@@ -108,6 +109,7 @@ export async function operationalJson(
       error instanceof PasswordPolicyError ||
       error instanceof AccountDependentValidationError ||
       error instanceof SavedDoctorValidationError ||
+      error instanceof PatientVisitHistoryValidationError ||
       error instanceof ZodError ||
       error instanceof SyntaxError
     ) {
