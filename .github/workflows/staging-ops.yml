@@ -1,0 +1,113 @@
+name: Staging operations
+
+# Manual one-off operations against the synthetic-data staging database
+# (owner decision A on #731: managed PaaS, synthetic data only). Run from the
+# Actions tab with "Run workflow". It never runs on push or on pull requests.
+#
+# Repository secrets (Settings -> Secrets and variables -> Actions):
+#   STAGING_DATABASE_URL    the staging Postgres URL (postgresql://...)
+#   STAGING_ADMIN_PASSWORD  only for bootstrap-admin; delete it afterwards
+#
+# Inputs are passed through environment variables, never interpolated into
+# shell code, and the scripts validate them. Never point this at a database
+# that holds real patient data.
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Operation to run
+        required: true
+        type: choice
+        options:
+          - migrate
+          - create-clinic
+          - bootstrap-admin
+      tenant_key:
+        description: create-clinic - tenant key (for example demo)
+        required: false
+      clinic_name:
+        description: create-clinic - clinic name
+        required: false
+      locale:
+        description: create-clinic - locale
+        required: false
+        type: choice
+        default: fr
+        options:
+          - fr
+          - ar
+      clinic_id:
+        description: bootstrap-admin - clinic id printed by create-clinic
+        required: false
+      admin_email:
+        description: bootstrap-admin - admin e-mail
+        required: false
+      admin_display_name:
+        description: bootstrap-admin - admin display name
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-ops
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Staging ${{ inputs.task }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+    steps:
+      - name: Require the staging database secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Add the STAGING_DATABASE_URL repository secret first."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply migrations
+        if: inputs.task == 'migrate'
+        run: npm run db:migrate
+
+      - name: Create clinic
+        if: inputs.task == 'create-clinic'
+        env:
+          TENANT_KEY: ${{ inputs.tenant_key }}
+          CLINIC_NAME: ${{ inputs.clinic_name }}
+          CLINIC_LOCALE: ${{ inputs.locale }}
+        run: |
+          if [ -z "$TENANT_KEY" ] || [ -z "$CLINIC_NAME" ]; then
+            echo "::error::create-clinic needs tenant_key and clinic_name."
+            exit 1
+          fi
+          npm run db:create-clinic -- --tenant-key "$TENANT_KEY" --name "$CLINIC_NAME" --locale "$CLINIC_LOCALE"
+
+      - name: Bootstrap first clinic admin
+        if: inputs.task == 'bootstrap-admin'
+        env:
+          CLINIC_ID: ${{ inputs.clinic_id }}
+          ADMIN_EMAIL: ${{ inputs.admin_email }}
+          ADMIN_NAME: ${{ inputs.admin_display_name }}
+          ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
+        run: |
+          if [ -z "$CLINIC_ID" ] || [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_NAME" ] || [ -z "$ADMIN_PASSWORD" ]; then
+            echo "::error::bootstrap-admin needs clinic_id, admin_email, admin_display_name and the STAGING_ADMIN_PASSWORD secret."
+            exit 1
+          fi
+          printf '%s' "$ADMIN_PASSWORD" | npm run db:bootstrap-admin -- --clinic-id "$CLINIC_ID" --email "$ADMIN_EMAIL" --display-name "$ADMIN_NAME"
