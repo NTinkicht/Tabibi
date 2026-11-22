@@ -155,6 +155,55 @@ test('doctor view renders RTL in Arabic', async ({ page }) => {
   await expect(page.locator('.doctorPrimary')).toHaveText('إنهاء الاستشارة');
 });
 
+const urlAr = url.replace('locale=fr', 'locale=ar');
+
+test('doctor view (ar): complete, call next, start each issue exactly one command', async ({
+  page,
+}) => {
+  const posts = await setup(page);
+  await page.goto(urlAr);
+  await expect(page.locator('main.doctorView')).toHaveAttribute('dir', 'rtl');
+  const primary = page.locator('.doctorPrimary');
+  await expect(primary).toHaveText('إنهاء الاستشارة');
+  await expect(page.getByText('≈ 7 دقيقة متبقية')).toBeVisible();
+  await primary.click();
+  await expect(primary).toContainText('نداء التالي · A-02 · Salima Benali');
+  await primary.click();
+  await expect(primary).toContainText('بدء الاستشارة · A-02');
+  await expect(page.getByText('تم النداء، في الطريق إليك')).toBeVisible();
+  await primary.click();
+  await expect(primary).toHaveText('إنهاء الاستشارة');
+  expect(posts.map((p) => p.body.command)).toEqual([
+    'complete_consultation',
+    'call',
+    'start_consultation',
+  ]);
+});
+
+test('doctor view (ar): no-show needs a reason', async ({ page }) => {
+  const posts = await setup(page);
+  await page.goto(urlAr);
+  await page.locator('.doctorPrimary').click();
+  await page.locator('.doctorPrimary').click();
+  await page.getByRole('button', { name: 'المريض لم يحضر' }).click();
+  const confirm = page.getByRole('button', { name: 'تأكيد عدم الحضور' });
+  await expect(confirm).toBeDisabled();
+  await page.getByLabel('السبب التشغيلي (مطلوب)').fill('لا يرد');
+  await confirm.click();
+  await expect(page.getByText('لا يوجد مريض في الاستشارة')).toBeVisible();
+  expect(posts.at(-1)?.body).toEqual({ command: 'no_show', reason: 'لا يرد' });
+});
+
+test('doctor view (ar): a rejected command leaves the screen unchanged and shows the error', async ({
+  page,
+}) => {
+  await setup(page, true);
+  await page.goto(urlAr);
+  await page.locator('.doctorPrimary').click();
+  await expect(page.locator('.doctorError')).toContainText('Stale entry');
+  await expect(page.locator('.doctorPrimary')).toHaveText('إنهاء الاستشارة');
+});
+
 test('doctor view: resume after a lost pause response uses a different idempotency key', async ({
   page,
 }) => {
