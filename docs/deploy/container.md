@@ -49,3 +49,15 @@ Every `NOTIFICATION_DISPATCH_INTERVAL_MS` (default `15000`, range 1000 to 360000
 ## Image contents
 
 `.dockerignore` excludes `.env*`, tests, docs, coordination files and git metadata. `node_modules` is kept whole because `next.config.ts` needs `typescript` at start-up and the migration command needs `tsx`.
+
+## Staging (synthetic data only)
+
+Owner decision A on #731: staging runs on a managed PaaS with synthetic data only; real patient data waits for the legal and privacy review. The zero-cost setup is a Render free web service built from this `Dockerfile` (region Frankfurt, health check `/api/ready`, auto-deploy from `main`) and a Neon free Postgres 16 project. The free web service sleeps after 15 minutes idle and takes about a minute to wake. The notification worker needs a paid Render worker, so leave it out until push is tested.
+
+Set on the web service: `DATABASE_URL`, `STAFF_SESSION_SECRET`, `GUEST_BEARER_SIGNING_SECRET`, `PUBLIC_AVAILABILITY_SELECTION_SECRET` (each from `openssl rand -base64 48`), `NODE_HEAP_MB=384`, and `PUBLIC_ORIGIN` (the service's https origin, used by `db:issue-patient-reset`).
+
+One-off operations run from the Actions tab with the **Staging operations** workflow (`.github/workflows/staging-ops.yml`), using the `STAGING_DATABASE_URL` repository secret:
+
+1. `migrate`: after the first deploy and after any merge that adds a migration.
+2. `create-clinic`: `tenant_key` and `clinic_name`; the run log prints the clinic id.
+3. `bootstrap-admin`: `clinic_id`, `admin_email` and `admin_display_name`, with the password in the `STAGING_ADMIN_PASSWORD` secret (delete it afterwards).

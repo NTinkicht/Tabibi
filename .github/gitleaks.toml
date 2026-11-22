@@ -1,0 +1,26 @@
+# Secret scan configuration for CI (TAB-P0-15). Protected path: changes need
+# the owner's approval, so the pipeline cannot weaken the scan on its own.
+# Extends the default gitleaks rules; only the generic high-entropy rule is
+# relaxed for test code and documented CI-only placeholder values. Every other
+# rule (private keys, cloud and GitHub tokens, database URLs...) still applies
+# everywhere, tests included.
+title = "Tabibi secret scan"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test fixtures use fake, self-describing secrets"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^tests/''',
+  '''^e2e/''',
+]
+
+[[allowlists]]
+description = "Documented CI-only placeholders, never used outside CI"
+targetRules = ["generic-api-key"]
+regexTarget = "match"
+regexes = [
+  '''ci-only-[a-z0-9-]+''',
+]

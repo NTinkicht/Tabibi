@@ -30,6 +30,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history so the secret scan covers every commit, not only the tip.
+          fetch-depth: 0
+
+      # TAB-P0-15 secret scan. gitleaks is built from source at a pinned tag;
+      # the Go checksum database makes that tag's source immutable. The scan
+      # covers the working tree and the full git history, with redacted output.
+      - name: Set up Go for the secret scanner
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+
+      - name: Secret scan (gitleaks v8.30.1)
+        env:
+          GOFLAGS: -mod=mod
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          "$(go env GOPATH)/bin/gitleaks" dir . --config .github/gitleaks.toml --redact --no-banner --exit-code 1
+          "$(go env GOPATH)/bin/gitleaks" git . --config .github/gitleaks.toml --redact --no-banner --exit-code 1
 
       - name: Offline cloud-worker adapter regression checks
         run: python3 scripts/autonomous-worker-readiness.py
