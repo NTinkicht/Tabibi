@@ -42,6 +42,17 @@ export const accountStrings = {
       'Ce lien est invalide, expiré ou déjà utilisé. Demandez un nouveau lien au support.',
     resetPolicy:
       'Le mot de passe est refusé : au moins 12 caractères et différent de votre e-mail. Ce lien reste utilisable.',
+    dependentsTitle: 'Proches',
+    dependentsHint:
+      'Ajoutez les proches pour lesquels vous gérez les rendez-vous. Seul un nom est enregistré.',
+    dependentsEmpty: 'Aucun proche enregistré.',
+    dependentName: 'Nom du proche',
+    dependentAdd: 'Ajouter le proche',
+    dependentRename: 'Renommer',
+    dependentArchive: 'Archiver',
+    dependentSave: 'Enregistrer',
+    dependentCancel: 'Annuler',
+    dependentInvalid: 'Le nom est vide, trop long ou non valide.',
     otherLanguage: 'العربية',
   },
   ar: {
@@ -84,6 +95,16 @@ export const accountStrings = {
       'هذا الرابط غير صالح أو منتهي أو مستعمل. اطلب رابطًا جديدًا من الدعم.',
     resetPolicy:
       'كلمة المرور مرفوضة: 12 حرفًا على الأقل ومختلفة عن بريدك الإلكتروني. يبقى الرابط صالحًا.',
+    dependentsTitle: 'الأقارب',
+    dependentsHint: 'أضف الأقارب الذين تدير مواعيدهم. يُحفظ الاسم فقط.',
+    dependentsEmpty: 'لا يوجد أقارب مسجّلون.',
+    dependentName: 'اسم القريب',
+    dependentAdd: 'إضافة القريب',
+    dependentRename: 'إعادة التسمية',
+    dependentArchive: 'أرشفة',
+    dependentSave: 'حفظ',
+    dependentCancel: 'إلغاء',
+    dependentInvalid: 'الاسم فارغ أو طويل جدًا أو غير صالح.',
     otherLanguage: 'Français',
   },
 } as const;
