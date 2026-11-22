@@ -50,3 +50,10 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+
+.ac-saved-clinic {
+  display: block;
+  color: var(--tb-text-muted);
+  font-size: var(--tb-text-meta);
+  font-weight: 400;
+}
