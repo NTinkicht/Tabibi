@@ -194,6 +194,23 @@ describe('staff invites (#727)', () => {
       ).toHaveLength(5);
       expect(await rows()).toBe(MAX_OPEN_INVITES_PER_CLINIC);
     });
+
+    it('differently cased clinic ids share one cap lock', async () => {
+      await fill(clinicA, MAX_OPEN_INVITES_PER_CLINIC - 1);
+      const results = await Promise.allSettled(
+        Array.from({ length: 6 }, (_, i) =>
+          service.create(
+            {
+              ...scopeA,
+              clinicId: i % 2 ? clinicA.toUpperCase() : clinicA.toLowerCase(),
+            },
+            { email: `case${i}@x.example`, role: 'receptionist' },
+          ),
+        ),
+      );
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(await rows()).toBe(MAX_OPEN_INVITES_PER_CLINIC);
+    });
   });
 
   it('accept creates user, password and membership atomically and audits without secrets', async () => {

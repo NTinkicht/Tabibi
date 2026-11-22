@@ -153,8 +153,8 @@ export class StaffInviteService {
       }
       const email = normalizeInviteEmail(input.email);
       await client.query(
-        `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
-        [`staff_invite_cap:${scope.clinicId}`],
+        `SELECT pg_advisory_xact_lock(hashtextextended('staff_invite_cap:' || $1::uuid::text, 0))`,
+        [scope.clinicId],
       );
       const open = await client.query<{ n: string }>(
         `SELECT count(*) AS n FROM staff_invites
