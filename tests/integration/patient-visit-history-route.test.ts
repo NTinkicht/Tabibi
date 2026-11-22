@@ -262,6 +262,8 @@ describe('patient visit history route', () => {
       '?limit=-1',
       '?cursor=not-a-cursor',
       `?cursor=${Buffer.from('2026-01-01T00:00:00.000Z|nope').toString('base64url')}`,
+      `?cursor=${Buffer.from('2026-02-30T00:00:00.000Z|00000000-0000-4000-8000-000000000001').toString('base64url')}`,
+      `?cursor=${Buffer.from('2026-13-01T00:00:00.000Z|00000000-0000-4000-8000-000000000001').toString('base64url')}`,
       '?owner=someone',
     ])
       expect((await get(a, q)).status, q).toBe(400);

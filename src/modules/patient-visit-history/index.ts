@@ -50,6 +50,11 @@ function encodeCursor(cursor: Cursor): string {
   return Buffer.from(`${cursor.startedAt}|${cursor.id}`).toString('base64url');
 }
 
+function roundTripsAsUtcInstant(value: string): boolean {
+  const time = Date.parse(value);
+  return !Number.isNaN(time) && new Date(time).toISOString() === value;
+}
+
 function decodeCursor(raw: string): Cursor {
   const [startedAt, id, ...rest] = Buffer.from(raw, 'base64url')
     .toString('utf8')
@@ -60,7 +65,7 @@ function decodeCursor(raw: string): Cursor {
     id === undefined ||
     !uuidPattern.test(id) ||
     !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(startedAt) ||
-    Number.isNaN(Date.parse(startedAt))
+    !roundTripsAsUtcInstant(startedAt)
   )
     throw new PatientVisitHistoryValidationError();
   return { startedAt, id: id.toLowerCase() };
