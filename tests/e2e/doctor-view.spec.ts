@@ -326,3 +326,78 @@ test('doctor view: delay stepper declares, updates and clears, and stops at the 
   await page.reload();
   await expect(plus).toBeDisabled();
 });
+
+test('doctor view (ar): delay stepper uses Arabic accessible names and issues one command per step', async ({
+  page,
+}) => {
+  await page.context().addCookies([
+    {
+      name: 'tabibi_staff_session',
+      value: 'mocked-staff-session',
+      url: 'http://127.0.0.1:3000',
+      httpOnly: true,
+      sameSite: 'Strict',
+    },
+  ]);
+  let delay: number | null = null;
+  let version = 1;
+  const posts: Array<{ path: string; body: Record<string, unknown> }> = [];
+  await page.route('**/api/clinics/**', async (route) => {
+    const request = route.request();
+    if (request.method() === 'GET')
+      return route.fulfill({
+        json: {
+          entries: [row('a', 1, 'in_consultation', 'Yacine Haddad')],
+          session: {
+            doctorDisplayName: 'Dr Leila',
+            startsAt: '2026-09-08T09:00:00.000Z',
+            endsAt: '2026-09-08T12:00:00.000Z',
+            status: 'open',
+            declaredDelayMinutes: delay,
+            delayVersion: version,
+            queueOrderVersion: 1,
+          },
+          generatedAt: new Date().toISOString(),
+          refreshAfterSeconds: 30,
+        },
+      });
+    const body = request.postDataJSON() as Record<string, unknown>;
+    const path = new URL(request.url()).pathname.split('/').pop() ?? '';
+    posts.push({ path, body });
+    delay = body.command === 'clear_delay' ? null : (body.minutes as number);
+    version += 1;
+    return route.fulfill({ json: { session: { status: 'open' } } });
+  });
+  await page.goto(urlAr);
+  await expect(page.locator('main.doctorView')).toHaveAttribute('dir', 'rtl');
+  const group = page.getByRole('group', { name: 'التأخير' });
+  await expect(group).toBeVisible();
+  const minus = group.getByRole('button', { name: 'التأخير −' });
+  const plus = group.getByRole('button', { name: 'التأخير +' });
+  // Positive control: the French accessible names must not exist on the Arabic
+  // page, so a wrong-locale label makes the assertions above fail.
+  await expect(page.getByRole('group', { name: 'Retard' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Retard +' })).toHaveCount(0);
+  await expect(group).toContainText('لا يوجد تأخير');
+  await expect(minus).toBeDisabled();
+  await plus.click();
+  await expect.poll(() => posts.length).toBe(1);
+  await expect(group).toContainText('5 دقيقة');
+  await expect(minus).toBeEnabled();
+  await plus.click();
+  await expect.poll(() => posts.length).toBe(2);
+  await minus.click();
+  await expect.poll(() => posts.length).toBe(3);
+  await minus.click();
+  await expect.poll(() => posts.length).toBe(4);
+  await expect(group).toContainText('لا يوجد تأخير');
+  expect(posts.map((p) => [p.path, p.body.command, p.body.minutes])).toEqual([
+    ['delay', 'declare_delay', 5],
+    ['delay', 'update_delay', 10],
+    ['delay', 'update_delay', 5],
+    ['delay', 'clear_delay', undefined],
+  ]);
+  delay = 720;
+  await page.reload();
+  await expect(plus).toBeDisabled();
+});
