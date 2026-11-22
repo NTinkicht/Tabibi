@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import '../staff/sign-in/sign-in.css';
 import './account.css';
 import { Button } from '@/app/ui';
 import { DocumentLocaleSync } from '@/app/DocumentLocaleSync';
+import { DependentsSection } from './dependents-section';
 import { PasswordChangeForm } from './password-change-form';
 import { accountStrings, type AccountLocale } from './strings';
 
@@ -129,6 +130,7 @@ export function AccountClient({
     }
   }
 
+  const signedOut = useCallback(() => setAccount(null), []);
   const invalid = failure === 'failed' || failure === 'invalid';
   const registering = mode === 'register';
   return (
@@ -180,6 +182,7 @@ export function AccountClient({
             >
               {t.signOut}
             </Button>
+            <DependentsSection locale={locale} onSignedOut={signedOut} />
             <PasswordChangeForm locale={locale} />
           </div>
         ) : checked ? (

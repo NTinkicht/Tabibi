@@ -31,3 +31,22 @@
   color: var(--tb-text-muted);
   font-size: var(--tb-text-meta);
 }
+
+.ac-dependents {
+  display: grid;
+  gap: var(--tb-space-4);
+  margin: 0 0 var(--tb-space-6);
+  padding: 0;
+  list-style: none;
+}
+.ac-dependents li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tb-space-2);
+}
+.ac-dependent-name {
+  flex: 1 1 100%;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
