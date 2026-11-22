@@ -24,3 +24,11 @@ regexTarget = "match"
 regexes = [
   '''ci-only-[a-z0-9-]+''',
 ]
+
+[[allowlists]]
+description = "Fixed sample push subscription used only to validate VAPID settings (not a credential)"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^src/modules/guest-push/vapid-config\.ts$''']
+regexTarget = "match"
+regexes = ['''auth: 'tBHItJI5svbpez7KI4CCXg'$''']
