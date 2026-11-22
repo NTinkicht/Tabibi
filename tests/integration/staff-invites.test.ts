@@ -317,6 +317,96 @@ describe('staff invites (#727)', () => {
     ).toBe(1);
   });
 
+  describe('revoke concurrency (#992)', () => {
+    const auditCount = async (inviteId: string, action: string) =>
+      (
+        await pool.query(
+          `SELECT 1 FROM audit_events WHERE entity_id = $1 AND action = $2`,
+          [inviteId, action],
+        )
+      ).rowCount;
+    const memberCount = async (email: string) =>
+      (
+        await pool.query(
+          `SELECT 1 FROM clinic_memberships m JOIN users u ON u.id = m.user_id
+            WHERE u.auth_subject = $1`,
+          [email],
+        )
+      ).rowCount;
+
+    it('concurrent revokes of one invite have exactly one winner and one audit row', async () => {
+      const { inviteId } = await invite('revoke-race@x.example');
+      const results = await Promise.allSettled(
+        Array.from({ length: 6 }, () => service.revoke(scopeA, inviteId)),
+      );
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      const rejected = results.filter(
+        (r): r is PromiseRejectedResult => r.status === 'rejected',
+      );
+      expect(rejected).toHaveLength(5);
+      for (const r of rejected) {
+        expect(r.reason).toBeInstanceOf(InviteRejectedError);
+      }
+      expect(await auditCount(inviteId, 'invite_revoked')).toBe(1);
+    });
+
+    it('sequential controls: revoke then accept, and accept then revoke, each refuse the second', async () => {
+      const first = await invite('seq-revoked@x.example');
+      await service.revoke(scopeA, first.inviteId);
+      await expect(
+        service.accept(first.token, { displayName: 'R', password: GOOD }),
+      ).rejects.toBeInstanceOf(InviteRejectedError);
+      expect(await memberCount('seq-revoked@x.example')).toBe(0);
+
+      const second = await invite('seq-accepted@x.example');
+      await service.accept(second.token, { displayName: 'A', password: GOOD });
+      await expect(
+        service.revoke(scopeA, second.inviteId),
+      ).rejects.toBeInstanceOf(InviteRejectedError);
+      expect(await memberCount('seq-accepted@x.example')).toBe(1);
+      expect(await auditCount(second.inviteId, 'invite_revoked')).toBe(0);
+    });
+
+    it('revoke racing accept yields exactly one outcome with matching state and audit', async () => {
+      const wins = { accept: 0, revoke: 0 };
+      for (let round = 0; round < 12; round += 1) {
+        const email = `race-${round}@x.example`;
+        const { inviteId, token } = await invite(email);
+        const [accepted, revoked] = await Promise.allSettled([
+          service.accept(token, { displayName: 'R', password: GOOD }),
+          service.revoke(scopeA, inviteId),
+        ]);
+        expect([accepted.status, revoked.status].sort()).toEqual([
+          'fulfilled',
+          'rejected',
+        ]);
+        const row = await pool.query<{
+          accepted_at: Date | null;
+          revoked_at: Date | null;
+        }>('SELECT accepted_at, revoked_at FROM staff_invites WHERE id = $1', [
+          inviteId,
+        ]);
+        const state = row.rows[0];
+        if (accepted.status === 'fulfilled') {
+          wins.accept += 1;
+          expect(state.accepted_at).not.toBeNull();
+          expect(state.revoked_at).toBeNull();
+          expect(await memberCount(email)).toBe(1);
+          expect(await auditCount(inviteId, 'invite_accepted')).toBe(1);
+          expect(await auditCount(inviteId, 'invite_revoked')).toBe(0);
+        } else {
+          wins.revoke += 1;
+          expect(state.accepted_at).toBeNull();
+          expect(state.revoked_at).not.toBeNull();
+          expect(await memberCount(email)).toBe(0);
+          expect(await auditCount(inviteId, 'invite_accepted')).toBe(0);
+          expect(await auditCount(inviteId, 'invite_revoked')).toBe(1);
+        }
+      }
+      expect(wins.accept + wins.revoke).toBe(12);
+    });
+  });
+
   it('a doctor invite creates the doctor profile and clinic association', async () => {
     const { token } = await invite('doc@x.example', 'doctor');
     const out = await service.accept(token, {
