@@ -5,7 +5,12 @@ export const VISIT_HISTORY_DEFAULT_LIMIT = 20;
 export const VISIT_HISTORY_MAX_LIMIT = 50;
 
 export type VisitStatus =
-  'booked' | 'confirmed' | 'checked_in' | 'completed' | 'cancelled' | 'no_show';
+  | 'booked'
+  | 'confirmed'
+  | 'checked_in'
+  | 'completed'
+  | 'cancelled'
+  | 'no_show';
 
 /** Operational facts only: no clinical data, contact details or queue position. */
 export interface PatientVisit {
