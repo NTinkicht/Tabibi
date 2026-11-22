@@ -627,6 +627,7 @@ for (const locale of ['fr', 'ar'] as const) {
     };
     const requests: string[] = [];
     let listCalls = 0;
+    let failRefresh = false;
     let cancelStatus = 503;
     let unauthorized = false;
     await page.route('**/api/patient/session', (route) =>
@@ -658,7 +659,8 @@ for (const locale of ['fr', 'ar'] as const) {
     await page.route('**/api/patient/visits', (route) => {
       listCalls += 1;
       if (unauthorized) return route.fulfill({ status: 401, body: '{}' });
-      if (listCalls === 1) return route.fulfill({ status: 503, body: '{}' });
+      if (listCalls === 1 || failRefresh)
+        return route.fulfill({ status: 503, body: '{}' });
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -736,6 +738,7 @@ for (const locale of ['fr', 'ar'] as const) {
     );
 
     cancelStatus = 200;
+    failRefresh = true;
     await rows
       .nth(0)
       .getByRole('button', { name: new RegExp(`^${t.visitCancel}`) })
@@ -744,6 +747,19 @@ for (const locale of ['fr', 'ar'] as const) {
       .nth(0)
       .getByRole('button', { name: new RegExp(`^${t.visitCancelConfirm}`) })
       .click();
+    await expect(rows.nth(0).getByTestId('visit-status')).toHaveText(
+      t.visitStatus.cancelled,
+    );
+    // The refresh failed: the row must still be cancelled, offer no cancel
+    // control, and a retry must be available.
+    await expect(page.getByTestId('visits-more-error')).toBeVisible();
+    await expect(rows.nth(0).getByRole('button')).toHaveCount(0);
+    failRefresh = false;
+    await page
+      .getByTestId('visits-more-error')
+      .getByRole('button', { name: t.retry })
+      .click();
+    await expect(page.getByTestId('visits-more-error')).toHaveCount(0);
     await expect(rows.nth(0).getByTestId('visit-status')).toHaveText(
       t.visitStatus.cancelled,
     );

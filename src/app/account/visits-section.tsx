@@ -174,6 +174,15 @@ export function VisitsSection({
         return;
       }
       setConfirming(null);
+      // Reflect the committed cancellation immediately so a failed refresh
+      // cannot leave a cancelled visit looking cancellable.
+      setVisits((previous) =>
+        (previous ?? []).map((item) =>
+          item.appointmentId === visit.appointmentId
+            ? { ...item, status: 'cancelled' }
+            : item,
+        ),
+      );
       setAttempt((n) => n + 1);
     } catch {
       setFailure('unavailable');
@@ -273,9 +282,16 @@ export function VisitsSection({
             })}
           </ul>
           {loadFailed ? (
-            <p role="alert" data-testid="visits-more-error">
-              {t.unavailable}
-            </p>
+            <div role="alert" data-testid="visits-more-error">
+              <p>{t.unavailable}</p>
+              <Button
+                variant="secondary"
+                disabled={pending}
+                onClick={() => setAttempt((n) => n + 1)}
+              >
+                {t.retry}
+              </Button>
+            </div>
           ) : null}
           {nextCursor ? (
             <Button
