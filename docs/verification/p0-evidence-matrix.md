@@ -120,7 +120,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 
 - [COVERED] Arabic mobile queue view recovers from stale conflict and switches to French | src: src/modules/localization | test: tests/e2e/queue-rtl-mobile.spec.ts :: "mobile Arabic queue view reloads safely after a stale reorder conflict and can switch back to F" | pr: review: not audited
 - [COVERED] Receptionist keyboard/bilingual accessibility | src: src/app/operations | test: tests/e2e/receptionist-bilingual-accessibility.spec.ts :: "receptionist queue stays clinic-scoped, private, bilingual, and keyboard operable" | pr: review: not audited
-- [PARTIAL] Doctor-facing Playwright journey is COVERED in French (complete, call next, delay declare/update/clear, rejected command leaves the screen unchanged); Arabic only asserts RTL rendering and the initial button text, so an Arabic functional journey is not located | src: src/app/operations | test: tests/e2e/doctor-view.spec.ts :: "doctor view: complete, call next, start each issue exactly one command"; tests/e2e/doctor-view.spec.ts :: "doctor view renders RTL in Arabic"; tests/e2e/doctor-view.spec.ts :: "doctor view: delay stepper declares, updates and clears, and stops at the maximum" | pr: review: not audited
+- [COVERED] Doctor-facing Playwright journey is COVERED in French and Arabic (`tests/e2e/doctor-view.spec.ts`: complete, call next, start, no-show reason, rejected command, delay declare/update/clear with Arabic accessible names and exactly one command per step; a wrong-locale positive control asserts French names are absent on the Arabic page) | src: src/app/operations | test: tests/e2e/doctor-view.spec.ts :: "doctor view: complete, call next, start each issue exactly one command"; tests/e2e/doctor-view.spec.ts :: "doctor view renders RTL in Arabic"; tests/e2e/doctor-view.spec.ts :: "doctor view: delay stepper declares, updates and clears, and stops at the maximum" | pr: review: not audited
 - [PARTIAL] Screen-reader label and viewport-width coverage is per-spec, not asserted as a matrix | src: src/app | test: tests/e2e/find-doctor.spec.ts :: "an API error offers a retry that recovers" | pr: review: not audited
 
 ## TAB-P0-15 Privacy/tenant security, migrations, release assurance
@@ -150,7 +150,7 @@ Serves issue #729 and the `PRODUCT.md` "Execution and completion protocol". This
 | TAB-P0-11 | VERIFY | COVERED with review evidence on #705/#709/#714/#716 |
 | TAB-P0-12 | VERIFY | all criteria COVERED incl. #748 grace test; review of pre-#600 PRs not audited |
 | TAB-P0-13 | VERIFY | scrub and dispatch worker COVERED (#744, #746); external provider and escalation PARTIAL |
-| TAB-P0-14 | VERIFY | doctor journey COVERED in French, Arabic render-only PARTIAL; screen-reader/viewport matrix PARTIAL |
+| TAB-P0-14 | VERIFY | doctor journey COVERED in French and Arabic; screen-reader/viewport matrix PARTIAL |
 | TAB-P0-15 | VERIFY | secret scan MISSING (CI workflow is a protected path); executed rollback drill and ciphertext inspection PARTIAL |
 
 No row is proposed as VERIFIED: the protocol also requires per-row independent review of the full implementing history, which this matrix could only confirm for the recent PRs listed.
@@ -160,6 +160,6 @@ No row is proposed as VERIFIED: the protocol also requires per-row independent r
 1. (done: #742) Envelope-encrypted exchange-link outbox intents with AAD binding (P0-08).
 2. (done: #744, #746; external provider and escalation remain, see owner decision #730) Ciphertext scrub and provider worker lifecycle (P0-13).
 3. (penetration checklist done: #922; secret scan in CI remains, protected `.github/**` path) Secret scan in CI (P0-15).
-4. (open: Arabic functional journey; French journey done in `tests/e2e/doctor-view.spec.ts`) Doctor-facing bilingual Playwright journey (P0-14).
+4. (done: French and Arabic journeys in `tests/e2e/doctor-view.spec.ts`) Doctor-facing bilingual Playwright journey (P0-14).
 5. (15-minute grace done: #748; restore-vs-cancel and priority-vs-transfer done: #759; restore-vs-call done: #761) Named restore race and terminal-grace tests (P0-07, P0-12).
 6. (done: #937, #938) Replay-receipt ciphertext retention/scrub audit (P0-06).
