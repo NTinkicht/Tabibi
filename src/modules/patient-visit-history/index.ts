@@ -160,3 +160,10 @@ export class PatientVisitHistoryService {
     };
   }
 }
+
+export {
+  PatientVisitCancellationConflictError,
+  PatientVisitCancellationService,
+  PatientVisitNotFoundError,
+} from './cancellation';
+export type { PatientVisitCancellationResult } from './cancellation';
