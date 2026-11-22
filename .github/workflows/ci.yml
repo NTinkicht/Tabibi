@@ -48,8 +48,8 @@ jobs:
           GOFLAGS: -mod=mod
         run: |
           go install github.com/zricethezav/gitleaks/v8@v8.30.1
-          "$(go env GOPATH)/bin/gitleaks" dir . --config .github/gitleaks.toml --redact --no-banner --exit-code 1
-          "$(go env GOPATH)/bin/gitleaks" git . --config .github/gitleaks.toml --redact --no-banner --exit-code 1
+          "$(go env GOPATH)/bin/gitleaks" dir . --config .github/gitleaks.toml --redact --verbose --no-banner --exit-code 1
+          "$(go env GOPATH)/bin/gitleaks" git . --config .github/gitleaks.toml --redact --verbose --no-banner --exit-code 1
 
       - name: Offline cloud-worker adapter regression checks
         run: python3 scripts/autonomous-worker-readiness.py
