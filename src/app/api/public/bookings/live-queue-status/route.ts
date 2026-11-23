@@ -5,6 +5,11 @@ import {
   PublicGuestLiveQueueStatusService,
 } from '@/modules/public-guest-live-queue-status';
 import { getPool } from '@/platform/database/pool';
+import {
+  PUBLIC_BOOKING_BEARER_RETRY_AFTER_SECONDS,
+  bookingBearerRateLimited,
+  withinPublicBookingBearerBudget,
+} from '@/platform/http/public-booking-bearer-rate-limit';
 import { observedJson } from '@/platform/http/request-context';
 
 const GUEST_ETA_CONFIDENCE_THRESHOLDS = {
@@ -31,6 +36,15 @@ function bearerFrom(request: Request): string | null {
 export async function GET(request: Request): Promise<Response> {
   const response = await observedJson(request, async (requestId) => {
     const bearer = bearerFrom(request);
+    if (
+      !(await withinPublicBookingBearerBudget(
+        getPool(),
+        'live-queue-status',
+        bearer,
+      ))
+    ) {
+      return bookingBearerRateLimited(requestId);
+    }
     if (!bearer) return rejected(requestId);
 
     try {
@@ -91,6 +105,12 @@ export async function GET(request: Request): Promise<Response> {
 
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
     response.headers.set(name, value);
+  }
+  if (response.status === 429) {
+    response.headers.set(
+      'retry-after',
+      String(PUBLIC_BOOKING_BEARER_RETRY_AFTER_SECONDS),
+    );
   }
   return response;
 }
