@@ -341,11 +341,22 @@ function NotificationDeliveryExceptionsView({
   }, []);
 
   const kind = state.kind;
+  // An `online` event during a load cannot trigger a reload (refresh would race
+  // the in-flight request), so remember it and retry once if that load fails.
+  const reconnectedWhileLoading = useRef(false);
+  useEffect(() => {
+    if (kind === 'ready') reconnectedWhileLoading.current = false;
+    if (kind === 'error' && reconnectedWhileLoading.current) {
+      reconnectedWhileLoading.current = false;
+      refresh();
+    }
+  }, [kind, refresh]);
   useEffect(() => {
     const onOnline = () => {
       // Reload after a failed load so failures that landed while the device was
       // unreachable are not hidden until someone presses Refresh.
       if (kind === 'error') refresh();
+      else if (kind === 'loading') reconnectedWhileLoading.current = true;
     };
     const onVisible = () => {
       if (

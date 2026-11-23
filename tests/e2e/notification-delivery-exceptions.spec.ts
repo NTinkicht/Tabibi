@@ -292,6 +292,51 @@ for (const [locale, offlineText, rowText] of [
   });
 }
 
+test('an online event during a slow failing load still retries once that load fails', async ({
+  page,
+}) => {
+  await authenticate(page);
+  await page.addInitScript(() => {
+    const w = window as unknown as { __online: boolean };
+    w.__online = false;
+    Object.defineProperty(navigator, 'onLine', {
+      configurable: true,
+      get: () => w.__online,
+    });
+  });
+  let attempt = 0;
+  let releaseFirst: () => void = () => {};
+  const firstGate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  await page.route(DEAD_LETTERS_URL, async (route) => {
+    attempt += 1;
+    if (attempt === 1) {
+      await firstGate;
+      await route.abort('internetdisconnected');
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(deadLettersBody([])),
+    });
+  });
+
+  await page.goto(`/operations/${clinicId}/notifications?locale=fr`);
+  await expect.poll(() => attempt).toBe(1);
+  // The device reconnects while the first request is still pending.
+  await page.evaluate(() => {
+    (window as unknown as { __online: boolean }).__online = true;
+    window.dispatchEvent(new Event('online'));
+  });
+  releaseFirst();
+  await expect.poll(() => attempt).toBe(2);
+  await expect(
+    page.getByText('Aucune notification en échec de livraison.'),
+  ).toBeVisible();
+});
+
 test('shows the empty state when there are no delivery exceptions', async ({
   page,
 }) => {
