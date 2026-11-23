@@ -32,6 +32,10 @@ import {
   PatientVisitNotFoundError,
 } from '@/modules/patient-visit-history';
 import {
+  PatientVisitRescheduleConflictError,
+  PatientVisitRescheduleTargetError,
+} from '@/modules/patient-visit-history/reschedule';
+import {
   SavedDoctorLimitError,
   SavedDoctorNotFoundError,
   SavedDoctorValidationError,
@@ -135,6 +139,8 @@ export async function operationalJson(
       error instanceof InviteLimitError ||
       error instanceof SavedDoctorLimitError ||
       error instanceof PatientVisitCancellationConflictError ||
+      error instanceof PatientVisitRescheduleConflictError ||
+      error instanceof PatientVisitRescheduleTargetError ||
       isPostgresCheckConflict(error)
     ) {
       status = 409;
