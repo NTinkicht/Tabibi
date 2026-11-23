@@ -69,6 +69,15 @@ export const accountStrings = {
     visitCancelKeep: 'Garder le rendez-vous',
     visitCancelConflict:
       'Ce rendez-vous ne peut plus être annulé ici. Contactez le cabinet.',
+    visitReschedule: 'Changer l’horaire',
+    visitRescheduleLoading: 'Chargement des horaires…',
+    visitRescheduleSelect: 'Nouvel horaire',
+    visitRescheduleConfirm: 'Confirmer le nouvel horaire',
+    visitRescheduleKeep: 'Garder l’horaire actuel',
+    visitRescheduleNone:
+      'Aucun autre horaire disponible avec ce médecin pour le moment.',
+    visitRescheduleConflict:
+      'Ce rendez-vous ne peut plus être déplacé ici ou cet horaire n’est plus disponible. Contactez le cabinet.',
     visitStatus: {
       booked: 'Réservé',
       confirmed: 'Confirmé',
@@ -143,6 +152,14 @@ export const accountStrings = {
     visitCancelConfirm: 'تأكيد الإلغاء',
     visitCancelKeep: 'الاحتفاظ بالموعد',
     visitCancelConflict: 'لا يمكن إلغاء هذا الموعد من هنا. تواصل مع العيادة.',
+    visitReschedule: 'تغيير الموعد',
+    visitRescheduleLoading: 'جارٍ تحميل المواعيد المتاحة…',
+    visitRescheduleSelect: 'الموعد الجديد',
+    visitRescheduleConfirm: 'تأكيد الموعد الجديد',
+    visitRescheduleKeep: 'الاحتفاظ بالموعد الحالي',
+    visitRescheduleNone: 'لا توجد مواعيد أخرى متاحة مع هذا الطبيب حاليًا.',
+    visitRescheduleConflict:
+      'لا يمكن نقل هذا الموعد من هنا أو لم يعد الموعد المختار متاحًا. تواصل مع العيادة.',
     visitStatus: {
       booked: 'محجوز',
       confirmed: 'مؤكد',
