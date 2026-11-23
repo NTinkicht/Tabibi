@@ -114,19 +114,26 @@ export function VisitsSection({
   const [failure, setFailure] = useState<Failure | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
+  // Bumped whenever the first page is (re)loaded or settles, so a pagination
+  // request started against an older list is discarded instead of appended.
+  const generation = useRef(0);
 
   useEffect(() => {
     let live = true;
+    generation.current += 1;
     fetchPage(null)
       .then((result) => {
         if (!live) return;
+        generation.current += 1;
         if (result === 'unauthorized') return onSignedOut();
         setVisits(result.visits);
         setNextCursor(result.nextCursor);
         setLoadFailed(false);
       })
       .catch(() => {
-        if (live) setLoadFailed(true);
+        if (!live) return;
+        generation.current += 1;
+        setLoadFailed(true);
       });
     return () => {
       live = false;
@@ -140,9 +147,11 @@ export function VisitsSection({
   async function loadMore() {
     if (pending || !nextCursor) return;
     setPending(true);
+    const started = generation.current;
     try {
       const result = await fetchPage(nextCursor);
       if (result === 'unauthorized') return onSignedOut();
+      if (generation.current !== started) return;
       setVisits((previous) => [...(previous ?? []), ...result.visits]);
       setNextCursor(result.nextCursor);
       setLoadFailed(false);

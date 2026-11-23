@@ -776,3 +776,105 @@ for (const locale of ['fr', 'ar'] as const) {
     await expect(page.getByTestId('account-signed-in')).toHaveCount(0);
   });
 }
+
+for (const locale of ['fr', 'ar'] as const) {
+  test(`visits ${locale}: a load-more started before a refresh is discarded`, async ({
+    page,
+  }) => {
+    const t = accountStrings[locale];
+    const id = randomUUID();
+    const row = (appointmentId: string, status: string, name: string) => ({
+      appointmentId,
+      clinicId: randomUUID(),
+      clinicName: 'Cabinet Amel',
+      doctorId: randomUUID(),
+      doctorDisplayName: name,
+      scheduledStartAt: '2026-12-01T08:30:00.000Z',
+      scheduledEndAt: '2026-12-01T09:00:00.000Z',
+      status,
+      dependentId: null,
+    });
+    let releaseRefresh!: () => void;
+    let releaseMore!: () => void;
+    const refreshGate = new Promise<void>((r) => (releaseRefresh = r));
+    const moreGate = new Promise<void>((r) => (releaseMore = r));
+    let listCalls = 0;
+    let moreRequested = false;
+    let moreAnswered = false;
+    const json = (body: unknown) => ({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+    await page.route('**/api/patient/session', (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill(json({ account: { displayName: 'Amel' } }))
+        : route.continue(),
+    );
+    await page.route('**/api/patient/dependents', (route) =>
+      route.fulfill(json({ dependents: [] })),
+    );
+    await page.route('**/api/patient/saved-doctors', (route) =>
+      route.fulfill(json({ doctors: [] })),
+    );
+    await page.route('**/api/patient/visits?*', async (route) => {
+      moreRequested = true;
+      await moreGate;
+      moreAnswered = true;
+      return route.fulfill(
+        json({
+          visits: [row(randomUUID(), 'booked', 'Dr Omar')],
+          nextCursor: null,
+        }),
+      );
+    });
+    await page.route('**/api/patient/visits', async (route) => {
+      listCalls += 1;
+      if (listCalls === 2) await refreshGate;
+      return route.fulfill(
+        json({
+          visits: [
+            row(id, listCalls === 1 ? 'confirmed' : 'cancelled', 'Dr Karim'),
+          ],
+          nextCursor: 'cursor-2',
+        }),
+      );
+    });
+    await page.route('**/api/patient/visits/*/cancel', (route) =>
+      route.fulfill(json({ appointmentId: id, status: 'cancelled' })),
+    );
+
+    await page.goto(`/account?locale=${locale}`);
+    const rows = page.getByTestId('visit-row');
+    await expect(rows).toHaveCount(1);
+    await rows
+      .first()
+      .getByRole('button', { name: new RegExp(`^${t.visitCancel}`) })
+      .click();
+    await rows
+      .first()
+      .getByRole('button', { name: new RegExp(`^${t.visitCancelConfirm}`) })
+      .click();
+    await expect(rows.first().getByTestId('visit-status')).toHaveText(
+      t.visitStatus.cancelled,
+    );
+    // The refresh is still in flight; paginating now uses the stale cursor.
+    await page
+      .getByTestId('visits')
+      .getByRole('button', { name: t.visitsMore })
+      .click();
+    await expect.poll(() => moreRequested).toBe(true);
+    releaseRefresh();
+    await expect(rows.first().getByTestId('visit-status')).toHaveText(
+      t.visitStatus.cancelled,
+    );
+    releaseMore();
+    await expect.poll(() => moreAnswered).toBe(true);
+    await page.waitForTimeout(300);
+    await expect(rows).toHaveCount(1);
+    await expect(page.getByTestId('visits')).not.toContainText('Dr Omar');
+    await expect(
+      page.getByTestId('visits').getByRole('button', { name: t.visitsMore }),
+    ).toBeVisible();
+  });
+}
