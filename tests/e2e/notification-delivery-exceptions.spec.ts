@@ -228,6 +228,70 @@ test('mobile exceptions page uses reception-desk layout rather than the landing-
   ).toBeLessThanOrEqual(375);
 });
 
+for (const [locale, offlineText, rowText] of [
+  ['fr', /Vous êtes hors ligne/, 'Patient appelé'],
+  ['ar', /أنت غير متصل بالإنترنت/, null],
+] as const) {
+  test(`${locale}: an offline failed load says so, never shows the empty state, and reloads when the device comes back online`, async ({
+    page,
+  }) => {
+    await authenticate(page);
+    // Simulate the device being offline at load time and reconnecting later.
+    await page.addInitScript(() => {
+      const w = window as unknown as { __online: boolean };
+      w.__online = false;
+      Object.defineProperty(navigator, 'onLine', {
+        configurable: true,
+        get: () => w.__online,
+      });
+    });
+    let attempt = 0;
+    await page.route(DEAD_LETTERS_URL, async (route) => {
+      attempt += 1;
+      if (attempt === 1) {
+        await route.abort('internetdisconnected');
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          deadLettersBody([
+            {
+              eventKey: 'patient_called',
+              queueLabel: 'A-041',
+              attemptCount: 3,
+              maxAttempts: 5,
+              outcomeAt: '2026-09-13T11:00:00.000Z',
+            },
+          ]),
+        ),
+      });
+    });
+
+    await page.goto(`/operations/${clinicId}/notifications?locale=${locale}`);
+    await expect(
+      page.getByRole('alert').filter({ hasText: offlineText }),
+    ).toBeVisible();
+    await expect(page.getByRole('table')).toHaveCount(0);
+    expect(await page.locator('body').innerText()).not.toMatch(
+      /Aucune notification en échec/,
+    );
+    expect(attempt).toBe(1);
+
+    await page.evaluate(() => {
+      (window as unknown as { __online: boolean }).__online = true;
+      window.dispatchEvent(new Event('online'));
+    });
+    await expect.poll(() => attempt).toBe(2);
+    await expect(page.getByRole('table').first()).toBeVisible();
+    await expect(
+      page.getByRole('alert').filter({ hasText: offlineText }),
+    ).toHaveCount(0);
+    if (rowText) await expect(page.getByText(rowText)).toBeVisible();
+  });
+}
+
 test('shows the empty state when there are no delivery exceptions', async ({
   page,
 }) => {
