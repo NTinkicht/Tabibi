@@ -54,6 +54,7 @@ const EXPECTED: Record<string, readonly Method[]> = {
   'memberships/[userId]': ['PATCH', 'DELETE'],
   'notifications/dead-letters': ['GET'],
   'notifications/dead-letters/[intentId]/handled': ['POST'],
+  'notification-templates': ['GET'],
   'notifications/guest-link-failures': ['GET'],
   'notifications/dispatch': ['POST'],
   'schedule-generations': ['POST'],
@@ -201,7 +202,7 @@ describe('staff clinic route inventory', () => {
     }
     expect(discovered).toEqual(EXPECTED);
     expect(mutations).toHaveLength(30);
-    expect(reads).toHaveLength(14);
+    expect(reads).toHaveLength(15);
   });
 });
 
