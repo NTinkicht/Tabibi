@@ -11,7 +11,9 @@ vi.mock('@/modules/public-guest-live-queue-status', () => ({
   },
 }));
 
-vi.mock('@/platform/database/pool', () => ({ getPool: () => ({}) }));
+vi.mock('@/platform/database/pool', () => ({
+  getPool: () => ({ query: async () => ({ rows: [{ allowed: true }] }) }),
+}));
 vi.mock('@/platform/observability/logger', () => ({
   getLogger: () => ({ info: vi.fn(), error: vi.fn() }),
 }));
