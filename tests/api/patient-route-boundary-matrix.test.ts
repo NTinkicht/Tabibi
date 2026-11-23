@@ -84,13 +84,11 @@ function routeKey(file: string): string {
   return relative(ROUTES_ROOT, file).split(sep).slice(0, -1).join('/');
 }
 
-function patientToken(): Promise<string> {
+function patientToken(
+  expiresAt = new Date(Date.now() + 3600_000),
+): Promise<string> {
   const fake = { query: async () => ({ rows: [{ user_id: USER }] }) };
-  return createPatientSessionToken(
-    USER,
-    new Date(Date.now() + 3600_000),
-    fake as never,
-  );
+  return createPatientSessionToken(USER, expiresAt, fake as never);
 }
 function staffSignedToken(exp: number): string {
   // Same claim shape, signed with the staff key rather than the derived
@@ -159,11 +157,14 @@ const all = Object.entries(ACCOUNT_OWNED).flatMap(([key, methods]) =>
 const mutations = all.filter((r) => r.method !== 'GET');
 
 let valid = '';
+let expiredPatient = '';
 beforeEach(async () => {
   access.value = { sessionLookups: 0, other: [], connects: 0 };
   access.sessionRows = [];
   vi.stubEnv('STAFF_SESSION_SECRET', SECRET);
   valid = await patientToken();
+  // Genuine patient-key signature, past expiry: only the expiry check refuses it.
+  expiredPatient = await patientToken(new Date(Date.now() - 3600_000));
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -195,7 +196,7 @@ describe.each(all)('$method $key', ({ key, method }) => {
   const unauthenticated: Record<string, () => string | undefined> = {
     'no session cookie': () => undefined,
     'forged signature': () => `${COOKIE}=${valid.split('.')[0]}.AAAAforged`,
-    'expired token': () => `${COOKIE}=${staffSignedToken(1)}`,
+    'expired token': () => `${COOKIE}=${expiredPatient}`,
     'duplicate session cookies': () => `${COOKIE}=${valid}; ${COOKIE}=${valid}`,
     'staff-signed token': () => `${COOKIE}=${staffSignedToken(exp)}`,
   };
