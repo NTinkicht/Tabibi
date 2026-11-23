@@ -62,6 +62,7 @@ const ACCOUNT_OWNED: Record<string, readonly Method[]> = {
   session: ['GET'],
   visits: ['GET'],
   'visits/[appointmentId]/cancel': ['POST'],
+  'visits/[appointmentId]/reschedule': ['POST'],
 };
 // Routes that cannot require a session, with the reason each is public.
 const PUBLIC_BY_DESIGN: Record<string, readonly Method[]> = {
@@ -186,8 +187,8 @@ describe('patient route inventory', () => {
           (a, b) => HTTP_METHODS.indexOf(a) - HTTP_METHODS.indexOf(b),
         );
     expect(discovered).toEqual(classified);
-    expect(all).toHaveLength(12);
-    expect(mutations).toHaveLength(7);
+    expect(all).toHaveLength(13);
+    expect(mutations).toHaveLength(8);
   });
 });
 
