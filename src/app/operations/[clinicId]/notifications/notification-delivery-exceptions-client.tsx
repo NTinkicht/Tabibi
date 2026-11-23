@@ -3,7 +3,13 @@
 import Link from 'next/link';
 import './notifications.css';
 import { Button } from '@/app/ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 
 type Locale = 'ar' | 'fr';
 type OutcomeCategory =
@@ -92,6 +98,8 @@ const copy = {
       'Cette page n’affiche ni coordonnées ni texte du fournisseur de notification.',
     loading: 'Chargement des notifications non remises…',
     error: 'Impossible de charger les notifications. Veuillez réessayer.',
+    offline:
+      'Vous êtes hors ligne : la liste des échecs est indisponible, ne la considérez pas comme vide. Elle se rechargera au retour de la connexion.',
     empty: 'Aucune notification en échec de livraison.',
     note: 'Une notification non remise ne signifie pas que le patient a été contacté. Si nécessaire, utilisez la procédure habituelle de contact manuel de la clinique.',
     guestLinksTitle: 'Liens de suivi non remis aux patients',
@@ -153,6 +161,8 @@ const copy = {
     privacy: 'لا تعرض هذه الصفحة بيانات الاتصال ولا نص مزوّد الإشعارات.',
     loading: 'جارٍ تحميل الإشعارات التي تعذّر تسليمها…',
     error: 'تعذّر تحميل الإشعارات. حاول مرة أخرى.',
+    offline:
+      'أنت غير متصل بالإنترنت: قائمة حالات الفشل غير متاحة، فلا تعتبرها فارغة. ستُعاد تحميلها عند عودة الاتصال.',
     empty: 'لا توجد إشعارات تعذّر تسليمها.',
     note: 'عدم تسليم الإشعار لا يعني التواصل مع المريض. عند الحاجة، اتبع إجراءات العيادة المعتادة للتواصل اليدوي.',
     guestLinksTitle: 'روابط المتابعة التي لم تصل إلى المرضى',
@@ -260,6 +270,15 @@ function toGuestLinkViews(payload: unknown): GuestLinkFailureView[] {
   });
 }
 
+function subscribeOnline(notify: () => void) {
+  window.addEventListener('online', notify);
+  window.addEventListener('offline', notify);
+  return () => {
+    window.removeEventListener('online', notify);
+    window.removeEventListener('offline', notify);
+  };
+}
+
 function NotificationDeliveryExceptionsView({
   clinicId,
   initialLocale,
@@ -270,6 +289,11 @@ function NotificationDeliveryExceptionsView({
   const [locale, setLocale] = useState<Locale>(initialLocale);
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [generation, setGeneration] = useState(0);
+  const online = useSyncExternalStore(
+    subscribeOnline,
+    () => navigator.onLine,
+    () => true,
+  );
   const requestId = useRef(0);
   const handling = useRef(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -315,6 +339,40 @@ function NotificationDeliveryExceptionsView({
     setState({ kind: 'loading' });
     setGeneration((current) => current + 1);
   }, []);
+
+  const kind = state.kind;
+  // An `online` event during a load cannot trigger a reload (refresh would race
+  // the in-flight request), so remember it and retry once if that load fails.
+  const reconnectedWhileLoading = useRef(false);
+  useEffect(() => {
+    if (kind === 'ready') reconnectedWhileLoading.current = false;
+    if (kind === 'error' && reconnectedWhileLoading.current) {
+      reconnectedWhileLoading.current = false;
+      refresh();
+    }
+  }, [kind, refresh]);
+  useEffect(() => {
+    const onOnline = () => {
+      // Reload after a failed load so failures that landed while the device was
+      // unreachable are not hidden until someone presses Refresh.
+      if (kind === 'error') refresh();
+      else if (kind === 'loading') reconnectedWhileLoading.current = true;
+    };
+    const onVisible = () => {
+      if (
+        document.visibilityState === 'visible' &&
+        navigator.onLine &&
+        kind === 'error'
+      )
+        refresh();
+    };
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [kind, refresh]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -417,7 +475,9 @@ function NotificationDeliveryExceptionsView({
       >
         <h2 id="nx-queue-title">{t.queueTableTitle}</h2>
         {state.kind === 'loading' ? <p role="status">{t.loading}</p> : null}
-        {state.kind === 'error' ? <p role="alert">{t.error}</p> : null}
+        {state.kind === 'error' ? (
+          <p role="alert">{online ? t.error : t.offline}</p>
+        ) : null}
         {state.kind === 'ready' && state.records.length === 0 ? (
           <p role="status">{t.empty}</p>
         ) : null}
