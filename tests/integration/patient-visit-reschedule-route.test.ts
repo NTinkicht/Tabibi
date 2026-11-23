@@ -520,4 +520,40 @@ describe('patient visit reschedule route', () => {
       appointmentId: id,
     });
   });
+
+  it('fails closed with 404 when a dependent archive commits first, creating no new entry', async () => {
+    const a = await login(A);
+    const dep = randomUUID();
+    await pool.query(
+      `INSERT INTO patient_dependents(id,owner_user_id,display_name) VALUES($1,$2,'Child')`,
+      [dep, await userId(A)],
+    );
+    const id = await seedVisit(null, inDays(2), 'booked', dep);
+    const target = await seedSession(inDays(5));
+    const before = await stateOf(id);
+    const archiver = await pool.connect();
+    try {
+      await archiver.query('BEGIN');
+      await archiver.query(
+        `UPDATE patient_dependents
+            SET status='archived', archived_at=now(), updated_at=now()
+          WHERE id=$1`,
+        [dep],
+      );
+      const pending = reschedule(a, id, target);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await archiver.query('COMMIT');
+      expect((await pending).status).toBe(404);
+    } finally {
+      await archiver.query('ROLLBACK').catch(() => undefined);
+      archiver.release();
+    }
+    expect(await stateOf(id)).toEqual(before);
+    expect(await auditCount(id)).toBe(0);
+    const live = await pool.query(
+      `SELECT count(*)::int AS n FROM queue_entries WHERE session_id = $1`,
+      [target],
+    );
+    expect(live.rows[0].n).toBe(0);
+  });
 });

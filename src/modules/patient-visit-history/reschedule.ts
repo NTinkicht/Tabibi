@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
+import {
+  AccountDependentNotFoundError,
+  lockActiveAccountDependentForOperation,
+} from '@/modules/account-dependent';
 import { inTransaction } from '@/platform/database/transaction';
 import { PatientVisitNotFoundError } from './cancellation';
 
@@ -39,6 +43,7 @@ interface OwnedRow {
   clinic_id: string;
   doctor_id: string;
   patient_id: string;
+  dependent_id: string | null;
   session_id: string;
   queue_entry_id: string;
   appointment_status: string;
@@ -48,7 +53,7 @@ interface OwnedRow {
 
 const OWNED_APPOINTMENT_SQL = `
   SELECT appt.id AS appointment_id, appt.clinic_id, appt.doctor_id,
-         appt.patient_id, appt.session_id, appt.queue_entry_id,
+         appt.patient_id, appt.dependent_id, appt.session_id, appt.queue_entry_id,
          appt.status::text AS appointment_status,
          entry.state::text AS queue_state,
          entry.priority_order::text AS priority_order
@@ -109,6 +114,21 @@ export class PatientVisitRescheduleService {
       );
       const row = locked.rows[0];
       if (!row) throw new PatientVisitNotFoundError();
+      // Hold the active owner-bound dependent row until commit so a concurrent
+      // archive cannot slip between authorization and the new queue entry.
+      if (row.dependent_id !== null) {
+        try {
+          await lockActiveAccountDependentForOperation(
+            client,
+            { ownerUserId: owner },
+            row.dependent_id,
+          );
+        } catch (error) {
+          if (error instanceof AccountDependentNotFoundError)
+            throw new PatientVisitNotFoundError();
+          throw error;
+        }
+      }
       if (row.session_id === targetId) {
         // Idempotent retry: already moved to the requested session.
         if (
