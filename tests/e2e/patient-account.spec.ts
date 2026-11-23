@@ -778,6 +778,183 @@ for (const locale of ['fr', 'ar'] as const) {
 }
 
 for (const locale of ['fr', 'ar'] as const) {
+  test(`visits ${locale}: reschedule picker, options states, conflict, failure, success, 401`, async ({
+    page,
+  }) => {
+    const t = accountStrings[locale];
+    const id = randomUUID();
+    const optionA = {
+      sessionId: randomUUID(),
+      startsAt: '2026-12-08T08:30:00.000Z',
+    };
+    const optionB = {
+      sessionId: randomUUID(),
+      startsAt: '2026-12-15T09:00:00.000Z',
+    };
+    const row = (scheduledStartAt: string) => ({
+      appointmentId: id,
+      clinicId: randomUUID(),
+      clinicName: 'Cabinet Amel',
+      doctorId: randomUUID(),
+      doctorDisplayName: 'Dr Karim',
+      scheduledStartAt,
+      scheduledEndAt: '2026-12-01T09:00:00.000Z',
+      status: 'confirmed',
+      dependentId: null,
+    });
+    const state = {
+      start: '2026-12-01T08:30:00.000Z',
+      optionsStatus: 200,
+      options: [optionA, optionB] as unknown[],
+      rescheduleStatus: 503,
+    };
+    const requests: string[] = [];
+    await page.route('**/api/patient/session', (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ account: { displayName: 'Amel' } }),
+          })
+        : route.continue(),
+    );
+    for (const path of ['dependents', 'saved-doctors'])
+      await page.route(`**/api/patient/${path}`, (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            path === 'dependents' ? { dependents: [] } : { doctors: [] },
+          ),
+        }),
+      );
+    await page.route('**/api/patient/visits', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ visits: [row(state.start)], nextCursor: null }),
+      }),
+    );
+    await page.route('**/api/patient/visits/*/reschedule-options', (route) => {
+      requests.push(
+        `${route.request().method()} ${new URL(route.request().url()).pathname}`,
+      );
+      return state.optionsStatus === 200
+        ? route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ options: state.options }),
+          })
+        : route.fulfill({ status: state.optionsStatus, body: '{}' });
+    });
+    await page.route('**/api/patient/visits/*/reschedule', (route) => {
+      requests.push(
+        `${route.request().method()} ${new URL(route.request().url()).pathname} ${route.request().postData()}`,
+      );
+      if (state.rescheduleStatus === 200) {
+        state.start = optionB.startsAt;
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            appointmentId: id,
+            status: 'confirmed',
+            scheduledStartAt: optionB.startsAt,
+            scheduledEndAt: '2026-12-15T09:30:00.000Z',
+          }),
+        });
+      }
+      return route.fulfill({ status: state.rescheduleStatus, body: '{}' });
+    });
+
+    await page.goto(`/account?locale=${locale}`);
+    const rowLocator = page.getByTestId('visit-row');
+    const open = rowLocator.getByRole('button', {
+      name: new RegExp(`^${t.visitReschedule}`),
+    });
+    const panel = page.getByTestId('reschedule-panel');
+    const error = page.getByTestId('visits-error');
+    await expect(rowLocator).toHaveCount(1);
+
+    // Options load; the picker lists them and "keep" closes it untouched.
+    await open.click();
+    const select = panel.getByLabel(t.visitRescheduleSelect, { exact: true });
+    await expect(select.locator('option')).toHaveCount(2);
+    await expect(select).toHaveValue(optionA.sessionId);
+    await panel.getByRole('button', { name: t.visitRescheduleKeep }).click();
+    await expect(panel).toHaveCount(0);
+    expect(requests).toEqual([
+      `GET /api/patient/visits/${id}/reschedule-options`,
+    ]);
+
+    // No options: an explanatory message, and no confirm button.
+    state.options = [];
+    await open.click();
+    await expect(page.getByTestId('reschedule-none')).toHaveText(
+      t.visitRescheduleNone,
+    );
+    await expect(
+      panel.getByRole('button', {
+        name: new RegExp(`^${t.visitRescheduleConfirm}`),
+      }),
+    ).toHaveCount(0);
+    await panel.getByRole('button', { name: t.visitRescheduleKeep }).click();
+    state.options = [optionA, optionB];
+
+    // Options failures surface a focused error and keep the visit as is.
+    for (const [status, message] of [
+      [503, t.unavailable],
+      [429, t.rateLimited],
+      [409, t.visitRescheduleConflict],
+    ] as const) {
+      state.optionsStatus = status;
+      await open.click();
+      await expect(error).toBeFocused();
+      await expect(error).toContainText(message);
+      await expect(panel).toHaveCount(0);
+    }
+    state.optionsStatus = 200;
+
+    // Confirm failures: 409 closes the picker, 503 keeps it for a retry.
+    await open.click();
+    await select.selectOption(optionB.sessionId);
+    const confirm = panel.getByRole('button', {
+      name: new RegExp(`^${t.visitRescheduleConfirm}`),
+    });
+    state.rescheduleStatus = 409;
+    await confirm.click();
+    await expect(error).toContainText(t.visitRescheduleConflict);
+    await expect(panel).toHaveCount(0);
+    await open.click();
+    await select.selectOption(optionB.sessionId);
+    state.rescheduleStatus = 503;
+    await confirm.click();
+    await expect(error).toContainText(t.unavailable);
+    await expect(panel).toBeVisible();
+    await expect(select).toHaveValue(optionB.sessionId);
+
+    // Success sends exactly the chosen session and shows the new time.
+    state.rescheduleStatus = 200;
+    requests.length = 0;
+    await confirm.click();
+    await expect(panel).toHaveCount(0);
+    await expect(error).toHaveCount(0);
+    await expect(rowLocator.locator('time')).toHaveAttribute(
+      'datetime',
+      optionB.startsAt,
+    );
+    expect(requests).toEqual([
+      `POST /api/patient/visits/${id}/reschedule ${JSON.stringify({ targetSessionId: optionB.sessionId })}`,
+    ]);
+
+    // A 401 on the options read returns to the signed-out page.
+    state.optionsStatus = 401;
+    await open.click();
+    await expect(page.locator('#account-email')).toBeVisible();
+  });
+}
+
+for (const locale of ['fr', 'ar'] as const) {
   test(`visits ${locale}: a load-more started before a refresh is discarded`, async ({
     page,
   }) => {

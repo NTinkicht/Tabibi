@@ -32,7 +32,38 @@ interface Page {
   visits: Visit[];
   nextCursor: string | null;
 }
-type Failure = 'rateLimited' | 'unavailable' | 'visitCancelConflict';
+type Failure =
+  | 'rateLimited'
+  | 'unavailable'
+  | 'visitCancelConflict'
+  | 'visitRescheduleConflict';
+interface RescheduleOption {
+  sessionId: string;
+  startsAt: string;
+}
+// null options = still loading; selected = the session id chosen in the list.
+interface Rescheduling {
+  appointmentId: string;
+  options: RescheduleOption[] | null;
+  selected: string;
+}
+
+function parseOptions(body: unknown): RescheduleOption[] | null {
+  const { options } = (body ?? {}) as Record<string, unknown>;
+  if (!Array.isArray(options)) return null;
+  const parsed: RescheduleOption[] = [];
+  for (const item of options) {
+    const { sessionId, startsAt } = (item ?? {}) as Record<string, unknown>;
+    if (
+      typeof sessionId !== 'string' ||
+      typeof startsAt !== 'string' ||
+      Number.isNaN(Date.parse(startsAt))
+    )
+      return null;
+    parsed.push({ sessionId, startsAt });
+  }
+  return parsed;
+}
 
 // Strict parse of the documented response shape; anything else is a load
 // failure rather than a partial list.
@@ -113,6 +144,7 @@ export function VisitsSection({
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [rescheduling, setRescheduling] = useState<Rescheduling | null>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   // Bumped whenever the first page is (re)loaded or settles, so a pagination
   // request started against an older list is discarded instead of appended.
@@ -200,6 +232,96 @@ export function VisitsSection({
     }
   }
 
+  // Open the time picker for one visit. The options are read from the
+  // owner-scoped endpoint; a second click while one is loading is ignored.
+  async function openReschedule(visit: Visit) {
+    if (pending) return;
+    setFailure(null);
+    setConfirming(null);
+    setRescheduling({
+      appointmentId: visit.appointmentId,
+      options: null,
+      selected: '',
+    });
+    setPending(true);
+    try {
+      const response = await fetch(
+        `/api/patient/visits/${encodeURIComponent(visit.appointmentId)}/reschedule-options`,
+      );
+      if (response.status === 401) return onSignedOut();
+      const options = response.ok ? parseOptions(await response.json()) : null;
+      if (!options) {
+        setRescheduling(null);
+        setFailure(
+          response.status === 429
+            ? 'rateLimited'
+            : response.status === 409
+              ? 'visitRescheduleConflict'
+              : 'unavailable',
+        );
+        if (response.status === 409) setAttempt((n) => n + 1);
+        return;
+      }
+      setRescheduling({
+        appointmentId: visit.appointmentId,
+        options,
+        selected: options[0]?.sessionId ?? '',
+      });
+    } catch {
+      setRescheduling(null);
+      setFailure('unavailable');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function reschedule(visit: Visit, targetSessionId: string) {
+    if (pending || !targetSessionId) return;
+    setPending(true);
+    setFailure(null);
+    try {
+      const response = await fetch(
+        `/api/patient/visits/${encodeURIComponent(visit.appointmentId)}/reschedule`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ targetSessionId }),
+        },
+      );
+      if (response.status === 401) return onSignedOut();
+      if (response.status === 409) {
+        setFailure('visitRescheduleConflict');
+        setRescheduling(null);
+        setAttempt((n) => n + 1);
+        return;
+      }
+      if (!response.ok) {
+        setFailure(response.status === 429 ? 'rateLimited' : 'unavailable');
+        return;
+      }
+      const body = (await response.json().catch(() => null)) as Record<
+        string,
+        unknown
+      > | null;
+      const startedAt = body?.scheduledStartAt;
+      setRescheduling(null);
+      // Show the committed time at once; the refresh below confirms it.
+      if (typeof startedAt === 'string' && !Number.isNaN(Date.parse(startedAt)))
+        setVisits((previous) =>
+          (previous ?? []).map((item) =>
+            item.appointmentId === visit.appointmentId
+              ? { ...item, scheduledStartAt: startedAt }
+              : item,
+          ),
+        );
+      setAttempt((n) => n + 1);
+    } catch {
+      setFailure('unavailable');
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
     <section aria-labelledby="account-visits-title" data-testid="visits">
       <h2 id="account-visits-title">{t.visitsTitle}</h2>
@@ -261,11 +383,82 @@ export function VisitsSection({
                       aria-label={`${t.visitCancel} ${label}`}
                       onClick={() => {
                         setFailure(null);
+                        setRescheduling(null);
                         setConfirming(visit.appointmentId);
                       }}
                     >
                       {t.visitCancel}
                     </Button>
+                  ) : null}
+                  {cancellable &&
+                  confirming !== visit.appointmentId &&
+                  rescheduling?.appointmentId !== visit.appointmentId ? (
+                    <Button
+                      variant="secondary"
+                      disabled={pending}
+                      aria-label={`${t.visitReschedule} ${label}`}
+                      onClick={() => void openReschedule(visit)}
+                    >
+                      {t.visitReschedule}
+                    </Button>
+                  ) : null}
+                  {cancellable &&
+                  rescheduling?.appointmentId === visit.appointmentId ? (
+                    <div data-testid="reschedule-panel">
+                      {rescheduling.options === null ? (
+                        <p role="status">{t.visitRescheduleLoading}</p>
+                      ) : rescheduling.options.length === 0 ? (
+                        <p data-testid="reschedule-none">
+                          {t.visitRescheduleNone}
+                        </p>
+                      ) : (
+                        <div className="si-field">
+                          <label htmlFor={`reschedule-${visit.appointmentId}`}>
+                            {t.visitRescheduleSelect}
+                          </label>
+                          <select
+                            id={`reschedule-${visit.appointmentId}`}
+                            value={rescheduling.selected}
+                            disabled={pending}
+                            onChange={(event) =>
+                              setRescheduling({
+                                ...rescheduling,
+                                selected: event.target.value,
+                              })
+                            }
+                          >
+                            {rescheduling.options.map((option) => (
+                              <option
+                                key={option.sessionId}
+                                value={option.sessionId}
+                              >
+                                {formatStart(option.startsAt, locale)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      {rescheduling.options &&
+                      rescheduling.options.length > 0 ? (
+                        <Button
+                          variant="secondary"
+                          disabled={pending || !rescheduling.selected}
+                          aria-label={`${t.visitRescheduleConfirm} ${label}`}
+                          onClick={() =>
+                            void reschedule(visit, rescheduling.selected)
+                          }
+                        >
+                          {t.visitRescheduleConfirm}
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="secondary"
+                        disabled={pending}
+                        onClick={() => setRescheduling(null)}
+                      >
+                        {t.visitRescheduleKeep}
+                      </Button>
+                    </div>
                   ) : null}
                   {cancellable && confirming === visit.appointmentId ? (
                     <>
