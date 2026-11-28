@@ -81,6 +81,7 @@ const copy = {
     title: 'Notifications non remises',
     back: 'Retour à la réception',
     refresh: 'Actualiser',
+    templatesLink: 'Voir les modèles de notification',
     action: 'Action',
     markHandled: 'Marquer comme traitée',
     handledError: 'Impossible d’enregistrer cette action. Veuillez réessayer.',
@@ -146,6 +147,7 @@ const copy = {
     title: 'إشعارات تعذّر تسليمها',
     back: 'العودة إلى الاستقبال',
     refresh: 'تحديث',
+    templatesLink: 'عرض نماذج الإشعارات',
     action: 'إجراء',
     markHandled: 'تمت المعالجة',
     handledError: 'تعذّر تسجيل هذا الإجراء. حاول مرة أخرى.',
@@ -451,6 +453,13 @@ function NotificationDeliveryExceptionsView({
         </div>
       </header>
       <h1>{t.title}</h1>
+      <p>
+        <Link
+          href={`/operations/${encodeURIComponent(clinicId)}/notifications/templates?locale=${locale}`}
+        >
+          {t.templatesLink}
+        </Link>
+      </p>
       <p>{t.intro}</p>
       <p>{t.note}</p>
       <section className="nx-todo" aria-labelledby="nx-todo-title">

@@ -1,0 +1,27 @@
+/* TAB-P1-06 template catalogue page. Tokens + logical properties only. */
+.nt-list {
+  display: grid;
+  gap: var(--tb-space-6);
+  margin-block: var(--tb-space-6);
+  padding: 0;
+  list-style: none;
+}
+.nt-card {
+  padding: var(--tb-space-6) var(--tb-space-7);
+  border: 1px solid var(--tb-border);
+  border-radius: var(--tb-radius-tile);
+}
+.nt-card h2 {
+  font-size: var(--tb-text-section);
+  overflow-wrap: anywhere;
+}
+.nt-preview {
+  margin-block: var(--tb-space-4);
+}
+.nt-preview strong {
+  display: block;
+}
+.nt-vars {
+  color: var(--tb-text-secondary);
+  font-size: var(--tb-text-meta);
+}
