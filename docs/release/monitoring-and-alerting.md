@@ -40,10 +40,10 @@ A growing `pending` count with an old `min(created_at)` means the worker is not 
 |---|---|---|---|
 | Process down | `/api/health` fails 3 consecutive 30 s checks | page | restart the web process; follow `docs/release/deployment-cutover-rollback-runbook.md` if a release is implicated |
 | Database not ready | `/api/ready` returns 503 for 2 consecutive minutes | page | check database reachability and connection limits; if data is damaged use `docs/DATABASE_RECOVERY_REHEARSAL.md` |
-| Server errors | `request failed` occurs more than 5 times in 5 minutes | page | find the `requestId` in the log, identify the route, roll back if the release is recent |
+| Server errors | `request failed` or `operational request failed` (emitted by `operationalJson` routes such as patient cancel and reschedule) occurs more than 5 times in 5 minutes combined | page | find the `requestId` in the log, identify the route, roll back if the release is recent |
 | Slow requests | p95 of `durationMs` exceeds the production p95 budget for 10 minutes | ticket | compare with `docs/release/clinic-day-load-baseline.md`; budgets are defined in the recovery-objectives guide once merged |
 | Worker silent | no `notification.worker.tick` for 5 dispatch intervals | page | restart `npm run worker:notifications`; check the outbox `pending` age |
-| Worker failing | `notification.worker.tick_failed` in 3 consecutive ticks, or any `notification.worker.fatal` | page | inspect worker stderr, restart, confirm `/api/ready` |
+| Worker failing | `notification.worker.tick_failed` in 3 consecutive ticks, any `notification.worker.fatal`, or a nonzero `errors` count in `notification.worker.tick` for 3 consecutive ticks (batch, guest-link or expiry errors are caught inside the tick and do not dead-letter) | page | inspect worker stderr, restart, confirm `/api/ready` |
 | Dead letters rising | `deadLettered` is above 0 in any tick, or the `dead_letter` row count grows | ticket | clinic staff contact the affected patients manually from the exceptions page |
 | Retention missed | no `retention.sweep` in 36 hours, or non-empty `failed` | ticket | run `npm run worker:retention` manually and inspect the failed task names |
 

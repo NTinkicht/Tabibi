@@ -114,4 +114,12 @@ describe('monitoring and alerting guide', () => {
     expect(markdown).toMatch(/Never add patient names/);
     expect(markdown).toMatch(/Proposed alert rules \(PROPOSED\)/);
   });
+
+  it('covers operational request failures and in-tick worker errors in the alert rules', () => {
+    const rules = markdown.slice(markdown.indexOf('## Proposed alert rules'));
+    expect(rules).toContain('`operational request failed`');
+    expect(rules).toMatch(
+      /nonzero `errors` count in `notification\.worker\.tick`/,
+    );
+  });
 });
