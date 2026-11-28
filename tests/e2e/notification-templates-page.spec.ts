@@ -84,7 +84,9 @@ test('a rejected request shows an error and retry recovers', async ({
     });
   });
   await page.goto(`/operations/${clinicId}/notifications/templates?locale=fr`);
-  await expect(page.getByRole('alert')).toContainText('Impossible de charger');
+  await expect(page.locator('main').getByRole('alert')).toContainText(
+    'Impossible de charger',
+  );
   await page.getByRole('button', { name: 'Réessayer' }).click();
   await expect(page.getByText('Retard de 15 minutes.')).toBeVisible();
   expect(calls).toBe(2);
